@@ -39,44 +39,7 @@ export const createPositionTool = defineTool({
   },
 });
 
-export const updatePositionTool = defineTool({
-  name: 'update_position',
-  category: 'Positions',
-  description: '[Positions] Update existing position. AUTHENTICATION REQUIRED.',
-  requiresAuth: true,
-
-  input: z.object({
-    company_id: z.number().int().positive().describe('Company ID'),
-    position_id: z.number().int().positive().describe('Position ID'),
-    title: z.string().min(1).optional().describe('Position title'),
-    api_id: z.string().optional().describe('External API identifier'),
-  }),
-
-  handler: async ({ input, client }) => {
-    const { company_id, position_id, ...updateData } = input;
-    const position = await client.updatePosition(
-      company_id,
-      position_id,
-      updateData
-    );
-    return `Successfully updated position ${position_id}:\nTitle: ${position.title}`;
-  },
-});
-
-export const deletePositionTool = defineTool({
-  name: 'delete_position',
-  category: 'Positions',
-  description:
-    '[Positions] Delete/remove position. AUTHENTICATION REQUIRED.',
-  requiresAuth: true,
-
-  input: z.object({
-    company_id: z.number().int().positive().describe('Company ID'),
-    position_id: z.number().int().positive().describe('Position ID'),
-  }),
-
-  handler: async ({ input, client }) => {
-    await client.deletePosition(input.company_id, input.position_id);
-    return `Successfully deleted position ${input.position_id}`;
-  },
-});
+// NOTE: update_position and delete_position are NOT supported by Altegio API
+// PUT /company/{id}/positions/{id} returns "An error has occurred"
+// DELETE /company/{id}/positions/{id} returns "An error has occurred"
+// Only GET and POST (create) operations are available

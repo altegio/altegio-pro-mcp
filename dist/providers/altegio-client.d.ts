@@ -70,16 +70,6 @@ export declare class AltegioClient {
      * POST /company/{company_id}/positions/quick/
      */
     createPosition(companyId: number, data: import('../types/altegio.types.js').CreatePositionRequest): Promise<AltegioPosition>;
-    /**
-     * Update position (B2B API, requires user auth)
-     * Note: This endpoint may not be supported by the API
-     */
-    updatePosition(companyId: number, positionId: number, data: import('../types/altegio.types.js').UpdatePositionRequest): Promise<AltegioPosition>;
-    /**
-     * Delete position (B2B API, requires user auth)
-     * Note: This endpoint may not be supported by the API
-     */
-    deletePosition(companyId: number, positionId: number): Promise<void>;
     createBooking(companyId: number, data: import('../types/altegio.types.js').CreateBookingRequest): Promise<AltegioBooking>;
     updateBooking(companyId: number, recordId: number, data: import('../types/altegio.types.js').UpdateBookingRequest): Promise<AltegioBooking>;
     deleteBooking(companyId: number, recordId: number): Promise<void>;

@@ -328,7 +328,4 @@ export interface CreatePositionRequest {
   api_id?: string;
 }
 
-export interface UpdatePositionRequest {
-  title?: string;
-  api_id?: string;
-}
+// NOTE: UpdatePositionRequest removed - PUT/DELETE not supported by Altegio API

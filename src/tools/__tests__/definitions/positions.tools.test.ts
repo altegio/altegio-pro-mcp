@@ -1,8 +1,6 @@
 import {
   getPositionsTool,
   createPositionTool,
-  updatePositionTool,
-  deletePositionTool,
 } from '../../definitions/positions.tools.js';
 
 describe('Positions Tools', () => {
@@ -10,8 +8,6 @@ describe('Positions Tools', () => {
     isAuthenticated: jest.fn(),
     getPositions: jest.fn(),
     createPosition: jest.fn(),
-    updatePosition: jest.fn(),
-    deletePosition: jest.fn(),
   } as any;
 
   beforeEach(() => {
@@ -72,42 +68,8 @@ describe('Positions Tools', () => {
     });
   });
 
-  describe('updatePositionTool', () => {
-    it('requires auth', () => {
-      expect(updatePositionTool.meta.requiresAuth).toBe(true);
-    });
-
-    it('updates position', async () => {
-      mockClient.updatePosition.mockResolvedValue({
-        id: 1,
-        title: 'Updated Position',
-      });
-
-      const handler = updatePositionTool.createHandler(mockClient);
-      const result = await handler({
-        company_id: 123,
-        position_id: 1,
-        title: 'Updated Position',
-      });
-
-      expect(result.content[0]?.text).toContain('Successfully updated');
-      expect(result.content[0]?.text).toContain('Updated Position');
-    });
-  });
-
-  describe('deletePositionTool', () => {
-    it('requires auth', () => {
-      expect(deletePositionTool.meta.requiresAuth).toBe(true);
-    });
-
-    it('deletes position', async () => {
-      mockClient.deletePosition.mockResolvedValue(undefined);
-
-      const handler = deletePositionTool.createHandler(mockClient);
-      const result = await handler({ company_id: 123, position_id: 1 });
-
-      expect(result.content[0]?.text).toContain('Successfully deleted');
-      expect(mockClient.deletePosition).toHaveBeenCalledWith(123, 1);
-    });
-  });
+  // NOTE: updatePositionTool and deletePositionTool tests removed
+  // API does not support PUT/DELETE for positions
+  // PUT /company/{id}/positions/{id} returns "An error has occurred"
+  // DELETE /company/{id}/positions/{id} returns "An error has occurred"
 });

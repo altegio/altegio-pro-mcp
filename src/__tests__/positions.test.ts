@@ -108,63 +108,8 @@ describe('AltegioClient Position Operations', () => {
     });
   });
 
-  describe('updatePosition', () => {
-    it('should call PUT endpoint', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          success: true,
-          data: { id: 1, title: 'Senior Manager' },
-        }),
-      });
-
-      const testDir = join(tmpdir(), `altegio-test-${Date.now()}`);
-      const client = new AltegioClient(
-        {
-          apiBase: 'https://api.alteg.io/api/v1',
-          partnerToken: 'partner123',
-          userToken: 'user456',
-        },
-        testDir
-      );
-
-      await client.updatePosition(123, 1, { title: 'Senior Manager' });
-
-      // Note: Update endpoint may not be supported by API
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/company/123/positions/1',
-        expect.objectContaining({
-          method: 'PUT',
-        })
-      );
-    });
-  });
-
-  describe('deletePosition', () => {
-    it('should call DELETE endpoint', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-      });
-
-      const testDir = join(tmpdir(), `altegio-test-${Date.now()}`);
-      const client = new AltegioClient(
-        {
-          apiBase: 'https://api.alteg.io/api/v1',
-          partnerToken: 'partner123',
-          userToken: 'user456',
-        },
-        testDir
-      );
-
-      await client.deletePosition(123, 1);
-
-      // Note: Delete endpoint may not be supported by API
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/company/123/positions/1',
-        expect.objectContaining({
-          method: 'DELETE',
-        })
-      );
-    });
-  });
+  // NOTE: updatePosition and deletePosition tests removed
+  // API does not support PUT/DELETE for positions
+  // PUT /company/{id}/positions/{id} returns "An error has occurred"
+  // DELETE /company/{id}/positions/{id} returns "An error has occurred"
 });

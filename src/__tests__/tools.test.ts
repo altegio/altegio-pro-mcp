@@ -57,14 +57,12 @@ describe('Tool Registration', () => {
     expect(toolNames).toContain('update_schedule');
     expect(toolNames).toContain('delete_schedule');
 
-    // Position management tools
+    // Position management tools (only GET and CREATE - API doesn't support PUT/DELETE)
     expect(toolNames).toContain('get_positions');
     expect(toolNames).toContain('create_position');
-    expect(toolNames).toContain('update_position');
-    expect(toolNames).toContain('delete_position');
 
-    // Total: 16 + 10 + 3 + 4 = 33 tools
-    expect(toolNames.length).toBe(33);
+    // Total: 16 + 10 + 3 + 2 = 31 tools (positions: GET + CREATE only)
+    expect(toolNames.length).toBe(31);
   });
 
   it('should create server with tools', () => {

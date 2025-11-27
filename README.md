@@ -25,7 +25,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Available Tools
 
-**33 tools organized by category** for complete business management:
+**31 tools organized by category** for complete business management:
 
 ### 🔐 Authentication
 - `altegio_login` - Authenticate with email/password
@@ -43,8 +43,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 ### 📋 Positions Management
 - `get_positions` - List company positions/roles
 - `create_position` - Create new position (Manager, Stylist, etc.)
-- `update_position` - Modify position details
-- `delete_position` - Remove position
+> Note: Update/delete not supported by Altegio API
 
 ### 🛎️ Services Management
 - `get_services` - View all services with configuration

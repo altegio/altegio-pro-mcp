@@ -291,8 +291,4 @@ export interface CreatePositionRequest {
     title: string;
     api_id?: string;
 }
-export interface UpdatePositionRequest {
-    title?: string;
-    api_id?: string;
-}
 //# sourceMappingURL=altegio.types.d.ts.map

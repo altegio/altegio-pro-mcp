@@ -67,14 +67,14 @@ Always check BUILD.md / never add it to Git
 
 MCP server for **B2B business management only** (Altegio.Pro, not public booking /b2c). Local service business business owners, admins and team members manage their operations through authenticated tools
 
-### Tools Available (33 total)
+### Tools Available (31 total)
 
 **Category-organized with [Prefix] tags for LLM navigation:**
 
 **[Auth] Authentication (2):** login, logout
 **[Company] Company (1):** list_companies
 **[Staff] Staff CRUD (4):** get, create, update, delete
-**[Positions] Positions CRUD (4):** get, create, update, delete
+**[Positions] Positions (2):** get, create (API doesn't support update/delete)
 **[Services] Services (3):** get, create, update
 **[Categories] Service Categories (1):** get
 **[Schedule] Schedule CRUD (4):** get, create, update, delete

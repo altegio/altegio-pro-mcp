@@ -416,47 +416,9 @@ export class AltegioClient {
         }
         return result.data;
     }
-    /**
-     * Update position (B2B API, requires user auth)
-     * Note: This endpoint may not be supported by the API
-     */
-    async updatePosition(companyId, positionId, data) {
-        if (!this.userToken) {
-            throw new Error('Not authenticated. Use login() first.');
-        }
-        const response = await this.apiRequest(`/company/${companyId}/positions/${positionId}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(data),
-        });
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to update position: HTTP ${response.status} - ${errorText}`);
-        }
-        const result = (await response.json());
-        if (!result.success || !result.data) {
-            throw new Error('Failed to update position: Invalid response');
-        }
-        return result.data;
-    }
-    /**
-     * Delete position (B2B API, requires user auth)
-     * Note: This endpoint may not be supported by the API
-     */
-    async deletePosition(companyId, positionId) {
-        if (!this.userToken) {
-            throw new Error('Not authenticated. Use login() first.');
-        }
-        const response = await this.apiRequest(`/company/${companyId}/positions/${positionId}`, {
-            method: 'DELETE',
-        });
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to delete position: HTTP ${response.status} - ${errorText}`);
-        }
-    }
+    // NOTE: updatePosition and deletePosition are NOT supported by Altegio API
+    // PUT /company/{id}/positions/{id} returns "An error has occurred"
+    // DELETE /company/{id}/positions/{id} returns "An error has occurred"
     // ========== Bookings CRUD Operations ==========
     async createBooking(companyId, data) {
         if (!this.userToken) {
