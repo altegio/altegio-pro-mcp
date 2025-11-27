@@ -331,7 +331,11 @@ export class AltegioClient {
 
   /**
    * Create or update employee schedule (B2B API, requires user auth)
-   * PUT /schedule/{company_id}
+   * PUT /schedule/{company_id}/{staff_id}/{start_date}/{end_date}
+   *
+   * Converts simple request format to API format:
+   * Input: { staff_id, date, time_from, time_to }
+   * API: [{ date, is_working, slots: [{from, to}] }]
    */
   async createSchedule(
     companyId: number,
@@ -341,13 +345,23 @@ export class AltegioClient {
       throw new Error('Not authenticated. Use login() first.');
     }
 
-    const response = await this.apiRequest(`/schedule/${companyId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
+    // Convert to API format
+    const apiBody: import('../types/altegio.types.js').ScheduleDayEntry[] = [{
+      date: data.date,
+      is_working: true,
+      slots: [{ from: data.time_from, to: data.time_to }]
+    }];
+
+    const response = await this.apiRequest(
+      `/schedule/${companyId}/${data.staff_id}/${data.date}/${data.date}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(apiBody),
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -370,7 +384,7 @@ export class AltegioClient {
 
   /**
    * Update employee schedule (B2B API, requires user auth)
-   * PUT /schedule/{company_id}
+   * PUT /schedule/{company_id}/{staff_id}/{start_date}/{end_date}
    */
   async updateSchedule(
     companyId: number,
@@ -380,13 +394,29 @@ export class AltegioClient {
       throw new Error('Not authenticated. Use login() first.');
     }
 
-    const response = await this.apiRequest(`/schedule/${companyId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
+    // Build slots array if time provided
+    const slots: import('../types/altegio.types.js').ScheduleSlot[] = [];
+    if (data.time_from && data.time_to) {
+      slots.push({ from: data.time_from, to: data.time_to });
+    }
+
+    // Convert to API format
+    const apiBody: import('../types/altegio.types.js').ScheduleDayEntry[] = [{
+      date: data.date,
+      is_working: slots.length > 0,
+      slots
+    }];
+
+    const response = await this.apiRequest(
+      `/schedule/${companyId}/${data.staff_id}/${data.date}/${data.date}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(apiBody),
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();

@@ -195,7 +195,19 @@ export interface AltegioScheduleEntry {
 
 // ========== Write Operation Request Types ==========
 
-// Schedule
+// Schedule - API format for PUT /schedule/{company_id}/{staff_id}/{start_date}/{end_date}
+export interface ScheduleSlot {
+  from: string; // HH:MM
+  to: string; // HH:MM
+}
+
+export interface ScheduleDayEntry {
+  date: string; // ISO8601 format
+  is_working: boolean;
+  slots: ScheduleSlot[];
+}
+
+// Legacy request format (for tool interface)
 export interface CreateScheduleRequest {
   staff_id: number;
   date: string; // YYYY-MM-DD

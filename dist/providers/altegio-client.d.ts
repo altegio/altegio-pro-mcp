@@ -42,12 +42,16 @@ export declare class AltegioClient {
     getSchedule(companyId: number, staffId: number, startDate: string, endDate: string): Promise<AltegioScheduleEntry[]>;
     /**
      * Create or update employee schedule (B2B API, requires user auth)
-     * PUT /schedule/{company_id}
+     * PUT /schedule/{company_id}/{staff_id}/{start_date}/{end_date}
+     *
+     * Converts simple request format to API format:
+     * Input: { staff_id, date, time_from, time_to }
+     * API: [{ date, is_working, slots: [{from, to}] }]
      */
     createSchedule(companyId: number, data: import('../types/altegio.types.js').CreateScheduleRequest): Promise<AltegioScheduleEntry[]>;
     /**
      * Update employee schedule (B2B API, requires user auth)
-     * PUT /schedule/{company_id}
+     * PUT /schedule/{company_id}/{staff_id}/{start_date}/{end_date}
      */
     updateSchedule(companyId: number, data: import('../types/altegio.types.js').UpdateScheduleRequest): Promise<AltegioScheduleEntry[]>;
     /**

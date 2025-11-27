@@ -174,6 +174,15 @@ export interface AltegioScheduleEntry {
     seance_length: number;
     datetime: string;
 }
+export interface ScheduleSlot {
+    from: string;
+    to: string;
+}
+export interface ScheduleDayEntry {
+    date: string;
+    is_working: boolean;
+    slots: ScheduleSlot[];
+}
 export interface CreateScheduleRequest {
     staff_id: number;
     date: string;
