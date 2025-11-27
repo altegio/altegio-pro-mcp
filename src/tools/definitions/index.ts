@@ -6,3 +6,4 @@ export * from './categories.tools.js';
 export * from './schedule.tools.js';
 export * from './bookings.tools.js';
 export * from './company.tools.js';
+export * from './onboarding.tools.js';
