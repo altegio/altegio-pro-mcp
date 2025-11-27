@@ -13,6 +13,7 @@ import type {
   AltegioBookingParams,
   AltegioCompaniesParams,
   AltegioListParams,
+  ScheduleDayEntry,
 } from '../types/altegio.types.js';
 import { CredentialManager } from './credential-manager.js';
 
@@ -439,8 +440,8 @@ export class AltegioClient {
   }
 
   /**
-   * Delete employee schedule for a specific date (B2B API, requires user auth)
-   * DELETE /schedule/{company_id}/{staff_id}/{date}
+   * Clear employee schedule for a specific date (B2B API, requires user auth)
+   * Uses PUT with is_working: false (DELETE not supported by API)
    */
   async deleteSchedule(
     companyId: number,
@@ -451,17 +452,28 @@ export class AltegioClient {
       throw new Error('Not authenticated. Use login() first.');
     }
 
-    const response = await this.apiRequest(
-      `/schedule/${companyId}/${staffId}/${date}`,
+    // API doesn't support DELETE, use PUT with is_working: false instead
+    const apiBody: ScheduleDayEntry[] = [
       {
-        method: 'DELETE',
+        date,
+        is_working: false,
+        slots: [],
+      },
+    ];
+
+    const response = await this.apiRequest(
+      `/schedule/${companyId}/${staffId}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(apiBody),
       }
     );
 
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(
-        `Failed to delete schedule: HTTP ${response.status} - ${errorText}`
+        `Failed to clear schedule: HTTP ${response.status} - ${errorText}`
       );
     }
   }

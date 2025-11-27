@@ -277,19 +277,29 @@ export class AltegioClient {
         return result.data;
     }
     /**
-     * Delete employee schedule for a specific date (B2B API, requires user auth)
-     * DELETE /schedule/{company_id}/{staff_id}/{date}
+     * Clear employee schedule for a specific date (B2B API, requires user auth)
+     * Uses PUT with is_working: false (DELETE not supported by API)
      */
     async deleteSchedule(companyId, staffId, date) {
         if (!this.userToken) {
             throw new Error('Not authenticated. Use login() first.');
         }
-        const response = await this.apiRequest(`/schedule/${companyId}/${staffId}/${date}`, {
-            method: 'DELETE',
+        // API doesn't support DELETE, use PUT with is_working: false instead
+        const apiBody = [
+            {
+                date,
+                is_working: false,
+                slots: [],
+            },
+        ];
+        const response = await this.apiRequest(`/schedule/${companyId}/${staffId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(apiBody),
         });
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(`Failed to delete schedule: HTTP ${response.status} - ${errorText}`);
+            throw new Error(`Failed to clear schedule: HTTP ${response.status} - ${errorText}`);
         }
     }
     // ========== Staff CRUD Operations ==========

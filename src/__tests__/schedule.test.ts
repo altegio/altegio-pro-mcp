@@ -201,9 +201,10 @@ describe('AltegioClient Schedule Operations', () => {
       ).rejects.toThrow('Not authenticated');
     });
 
-    it('should call DELETE endpoint with correct parameters', async () => {
+    it('should clear schedule via PUT with is_working=false', async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
+        json: async () => ({ success: true, data: null }),
       });
 
       const testDir = join(tmpdir(), `altegio-test-${Date.now()}`);
@@ -218,13 +219,19 @@ describe('AltegioClient Schedule Operations', () => {
 
       await client.deleteSchedule(123, 456, '2025-10-30');
 
+      // API doesn't support DELETE, uses PUT with is_working: false
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/schedule/123/456/2025-10-30',
+        'https://api.alteg.io/api/v1/schedule/123/456',
         expect.objectContaining({
-          method: 'DELETE',
+          method: 'PUT',
           headers: expect.objectContaining({
-            Authorization: 'Bearer partner123, User user456',
+            'Content-Type': 'application/json',
           }),
+          body: JSON.stringify([{
+            date: '2025-10-30',
+            is_working: false,
+            slots: []
+          }]),
         })
       );
     });

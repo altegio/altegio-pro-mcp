@@ -56,8 +56,8 @@ export declare class AltegioClient {
      */
     updateSchedule(companyId: number, data: import('../types/altegio.types.js').UpdateScheduleRequest): Promise<AltegioScheduleEntry[]>;
     /**
-     * Delete employee schedule for a specific date (B2B API, requires user auth)
-     * DELETE /schedule/{company_id}/{staff_id}/{date}
+     * Clear employee schedule for a specific date (B2B API, requires user auth)
+     * Uses PUT with is_working: false (DELETE not supported by API)
      */
     deleteSchedule(companyId: number, staffId: number, date: string): Promise<void>;
     createStaff(companyId: number, data: import('../types/altegio.types.js').CreateStaffRequest): Promise<AltegioStaff>;

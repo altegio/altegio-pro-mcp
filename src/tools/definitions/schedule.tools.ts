@@ -110,7 +110,7 @@ export const deleteScheduleTool = defineTool({
   name: 'delete_schedule',
   category: 'Schedule',
   description:
-    '[Schedule] Delete work schedule for a staff member. AUTHENTICATION REQUIRED.',
+    '[Schedule] Clear work schedule for a staff member (marks day as non-working). AUTHENTICATION REQUIRED.',
   requiresAuth: true,
 
   input: z.object({
@@ -128,6 +128,6 @@ export const deleteScheduleTool = defineTool({
       input.staff_id,
       input.date
     );
-    return `Successfully deleted schedule for staff ${input.staff_id} on ${input.date}`;
+    return `Successfully cleared schedule for staff ${input.staff_id} on ${input.date} (marked as non-working)`;
   },
 });

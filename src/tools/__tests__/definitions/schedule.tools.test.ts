@@ -107,7 +107,7 @@ describe('Schedule Tools', () => {
       expect(deleteScheduleTool.meta.requiresAuth).toBe(true);
     });
 
-    it('deletes schedule', async () => {
+    it('clears schedule (marks as non-working)', async () => {
       mockClient.deleteSchedule.mockResolvedValue(undefined);
 
       const handler = deleteScheduleTool.createHandler(mockClient);
@@ -117,7 +117,8 @@ describe('Schedule Tools', () => {
         date: '2025-01-15',
       });
 
-      expect(result.content[0]?.text).toContain('Successfully deleted');
+      expect(result.content[0]?.text).toContain('Successfully cleared');
+      expect(result.content[0]?.text).toContain('non-working');
       expect(mockClient.deleteSchedule).toHaveBeenCalledWith(
         123,
         1,
