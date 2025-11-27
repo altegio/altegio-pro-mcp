@@ -1,0 +1,60 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build
+dist/
+build/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Credentials
+.altegio-mcp/
+credentials.json
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Test
+coverage/
+*.lcov
+.nyc_output/
+tests/
+*.test.ts
+*.spec.ts
+
+# Documentation
+docs/
+examples/
+*.md
+!README.md
+
+# CI/CD
+.github/
+.husky/
+.commitlintrc
+.prettierrc
+.eslintrc
+
+# Misc
+logs/
+*.log
+tmp/
+temp/
+*.tmp

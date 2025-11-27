@@ -1,0 +1,19 @@
+# Docker Compose for local development and testing
+version: '3.8'
+
+services:
+  altegio-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      - PORT=8080
+      - NODE_ENV=development
+    volumes:
+      # Mount credentials directory for persistence
+      - ~/.altegio-mcp:/home/nodejs/.altegio-mcp
+    restart: unless-stopped

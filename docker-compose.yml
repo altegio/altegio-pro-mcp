@@ -1,0 +1,23 @@
+services:
+  altegio-mcp:
+    build: .
+    container_name: altegio-mcp-server
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      NODE_ENV: "production"
+      LOG_LEVEL: "info"
+      ALTEGIO_API_BASE: "https://api.altegio.com"
+      ALTEGIO_API_TOKEN: "${ALTEGIO_API_TOKEN}"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - altegio-credentials:/home/nodejs/.altegio-mcp
+
+volumes:
+  altegio-credentials:

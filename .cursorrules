@@ -1,0 +1,28 @@
+# Cursor AI Rules for Altegio MCP Project
+
+## Git Workflow
+
+**CRITICAL: NEVER work directly in main branch**
+
+### Mandatory Workflow
+1. Always create feature branch first: `git checkout -b feature/description`
+2. Work in feature branch, run tests: `npm test && npm run lint`
+3. Commit with conventional commits
+4. Push and create PR: `git push origin feature/description && gh pr create --fill`
+5. Wait for CI checks + 1 approval, then merge via GitHub UI
+6. After merge: `git checkout main && git pull && git branch -d feature/description`
+
+### Never Do This
+- ❌ Working in main branch
+- ❌ Pushing directly to main (even docs/quick fixes)
+- ❌ Bypassing PR process
+
+**Why:** Cloud Build trigger only fires on PR merge, not direct pushes.
+
+## Project-Specific Rules
+- Always check OpenAPI spec before implementing: `git -C api.docs pull origin master`
+- Never modify `api.docs/` directory (read-only submodule)
+- All write operations require authentication check
+- Refer to DESCRIPTION.md for detailed project instructions
+- Always follow rules from `~/.claude/CLAUDE.md` as primary reference
+

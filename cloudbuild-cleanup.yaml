@@ -1,0 +1,95 @@
+# Cloud Build configuration for CLEANUP automation
+# Deletes staging Cloud Run services older than 3 days
+# Triggered by Cloud Scheduler (daily at 2 AM UTC)
+# Project: altegio-mcp
+# Region: europe-west1
+
+substitutions:
+  _REGION: europe-west1
+  _RETENTION_DAYS: '3'
+
+steps:
+  # Step 1: List and delete old staging services
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        #!/bin/bash
+        set -e
+
+        REGION="${_REGION}"
+        RETENTION_DAYS="${_RETENTION_DAYS}"
+        CUTOFF_DATE=$(date -u -d "$RETENTION_DAYS days ago" +%s 2>/dev/null || date -u -v-${RETENTION_DAYS}d +%s)
+
+        echo "================================================"
+        echo "Cleanup Job Started"
+        echo "Region: $REGION"
+        echo "Retention: $RETENTION_DAYS days"
+        echo "Cutoff date: $(date -u -d @$CUTOFF_DATE 2>/dev/null || date -u -r $CUTOFF_DATE)"
+        echo "================================================"
+
+        # Get all staging services (exclude production)
+        SERVICES=$(gcloud run services list \
+          --region=$REGION \
+          --format="value(metadata.name)" \
+          --filter="metadata.name:altegio-mcp-* AND NOT metadata.name:altegio-mcp")
+
+        if [ -z "$SERVICES" ]; then
+          echo "No staging services found."
+          exit 0
+        fi
+
+        DELETED_COUNT=0
+        KEPT_COUNT=0
+
+        echo "Checking $(echo "$SERVICES" | wc -l) staging services..."
+        echo ""
+
+        for SERVICE in $SERVICES; do
+          # Get last update time
+          LAST_UPDATE=$(gcloud run services describe "$SERVICE" \
+            --region=$REGION \
+            --format="value(metadata.creationTimestamp)")
+
+          if [ -z "$LAST_UPDATE" ]; then
+            echo "⚠️  $SERVICE - Cannot get update time, skipping"
+            continue
+          fi
+
+          # Convert to unix timestamp
+          LAST_UPDATE_TS=$(date -u -d "$LAST_UPDATE" +%s 2>/dev/null || date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$LAST_UPDATE" +%s)
+          AGE_DAYS=$(( ($(date +%s) - LAST_UPDATE_TS) / 86400 ))
+
+          if [ "$LAST_UPDATE_TS" -lt "$CUTOFF_DATE" ]; then
+            echo "🗑️  Deleting $SERVICE (age: $AGE_DAYS days)"
+
+            if gcloud run services delete "$SERVICE" \
+              --region=$REGION \
+              --quiet; then
+              DELETED_COUNT=$((DELETED_COUNT + 1))
+              echo "   ✅ Deleted successfully"
+            else
+              echo "   ❌ Failed to delete"
+            fi
+          else
+            echo "✅ Keeping $SERVICE (age: $AGE_DAYS days)"
+            KEPT_COUNT=$((KEPT_COUNT + 1))
+          fi
+          echo ""
+        done
+
+        echo "================================================"
+        echo "Cleanup Summary"
+        echo "Deleted: $DELETED_COUNT services"
+        echo "Kept: $KEPT_COUNT services"
+        echo "================================================"
+    id: 'cleanup-staging'
+
+# Build configuration
+options:
+  machineType: 'E2_SMALL'
+  logging: CLOUD_LOGGING_ONLY
+
+# Timeout
+timeout: '600s'

@@ -1,0 +1,68 @@
+
+> @altegio/mcp-server-pro@1.0.0 test
+> jest
+
+PASS src/providers/__tests__/altegio-client-services.test.ts
+PASS src/providers/__tests__/altegio-client-staff.test.ts
+PASS src/providers/__tests__/altegio-client-bookings.test.ts
+PASS src/__tests__/altegio-client.test.ts
+PASS src/__tests__/config.test.ts
+PASS src/__tests__/schedule.test.ts
+PASS src/types/__tests__/write-types.test.ts
+PASS src/tools/__tests__/handlers-bookings.test.ts
+PASS src/tools/__tests__/handlers-staff.test.ts
+PASS src/tools/__tests__/handlers-services.test.ts
+PASS src/__tests__/credential-manager.test.ts
+[2025-10-29 00:56:48.433 -0300] [31mERROR[39m (credential-manager): [36mFailed to decrypt credentials[39m
+    [35menv[39m: "test"
+    [35mversion[39m: "1.0.0"
+    error: {
+      "type": "Error",
+      "message": "Unsupported state or unable to authenticate data",
+      "stack":
+          Error: Unsupported state or unable to authenticate data
+              at Decipheriv.final (node:internal/crypto/cipher:184:29)
+              at CredentialManager.decrypt (/Users/iyour/Developer/altegio-mcp/src/providers/credential-manager.ts:83:29)
+              at CredentialManager.load (/Users/iyour/Developer/altegio-mcp/src/providers/credential-manager.ts:120:34)
+              at Object.<anonymous> (/Users/iyour/Developer/altegio-mcp/src/__tests__/credential-manager.test.ts:156:31)
+    }
+[2025-10-29 00:56:48.446 -0300] [31mERROR[39m (credential-manager): [36mFailed to load credentials[39m
+    [35menv[39m: "test"
+    [35mversion[39m: "1.0.0"
+    error: {
+      "type": "Error",
+      "message": "Invalid credentials or encryption key",
+      "stack":
+          Error: Invalid credentials or encryption key
+              at CredentialManager.decrypt (/Users/iyour/Developer/altegio-mcp/src/providers/credential-manager.ts:88:13)
+              at CredentialManager.load (/Users/iyour/Developer/altegio-mcp/src/providers/credential-manager.ts:120:34)
+              at Object.<anonymous> (/Users/iyour/Developer/altegio-mcp/src/__tests__/credential-manager.test.ts:156:31)
+    }
+PASS src/__tests__/index.test.ts
+FAIL src/__tests__/tools.test.ts
+  ● Tool Registration › should register all tools and return tool names
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 8
+    Received: 16
+
+      32 |     expect(toolNames).toContain('get_service_categories');
+      33 |     expect(toolNames).toContain('get_schedule');
+    > 34 |     expect(toolNames.length).toBe(8);
+         |                              ^
+      35 |   });
+      36 |
+      37 |   it('should create server with tools', () => {
+
+      at Object.<anonymous> (src/__tests__/tools.test.ts:34:30)
+
+PASS src/__tests__/server.test.ts
+PASS src/__tests__/e2e.test.ts
+PASS src/__tests__/integration.test.ts
+
+Test Suites: 1 failed, 15 passed, 16 total
+Tests:       1 failed, 92 passed, 93 total
+Snapshots:   0 total
+Time:        4.896 s
+Ran all test suites.
