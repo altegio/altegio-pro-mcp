@@ -64,5 +64,5 @@ dist/
 test-*.sh
 *-test.sh
 
-# Old plan documents (keep active plans only)
-docs/plans/
+# Old plan documents are cleaned up manually
+# Active plans in docs/plans/ are tracked
