@@ -45,8 +45,9 @@ describe('AltegioClient Position Operations', () => {
 
       await client.getPositions(123);
 
+      // Correct endpoint: /company/{company_id}/staff/positions/
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/positions/123',
+        'https://api.alteg.io/api/v1/company/123/staff/positions/',
         expect.objectContaining({
           headers: expect.objectContaining({
             Authorization: 'Bearer partner123, User user456',
@@ -73,7 +74,7 @@ describe('AltegioClient Position Operations', () => {
       ).rejects.toThrow('Not authenticated');
     });
 
-    it('should call POST /positions endpoint', async () => {
+    it('should call POST /company/{id}/positions/quick/ endpoint', async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
         json: async () => ({
@@ -95,7 +96,7 @@ describe('AltegioClient Position Operations', () => {
       await client.createPosition(123, { title: 'Manager' });
 
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/positions/123',
+        'https://api.alteg.io/api/v1/company/123/positions/quick/',
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
@@ -129,8 +130,9 @@ describe('AltegioClient Position Operations', () => {
 
       await client.updatePosition(123, 1, { title: 'Senior Manager' });
 
+      // Note: Update endpoint may not be supported by API
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/positions/123/1',
+        'https://api.alteg.io/api/v1/company/123/positions/1',
         expect.objectContaining({
           method: 'PUT',
         })
@@ -156,8 +158,9 @@ describe('AltegioClient Position Operations', () => {
 
       await client.deletePosition(123, 1);
 
+      // Note: Delete endpoint may not be supported by API
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/positions/123/1',
+        'https://api.alteg.io/api/v1/company/123/positions/1',
         expect.objectContaining({
           method: 'DELETE',
         })

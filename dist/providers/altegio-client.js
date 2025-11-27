@@ -171,12 +171,13 @@ export class AltegioClient {
     }
     /**
      * Get company positions (B2B API, requires user auth)
+     * GET /company/{company_id}/staff/positions/
      */
     async getPositions(companyId) {
         if (!this.userToken) {
             throw new Error('Not authenticated');
         }
-        const response = await this.apiRequest(`/positions/${companyId}`);
+        const response = await this.apiRequest(`/company/${companyId}/staff/positions/`);
         if (!response.ok) {
             throw new Error(`Failed to fetch positions: ${response.statusText}`);
         }
@@ -390,11 +391,15 @@ export class AltegioClient {
         return result.data;
     }
     // ========== Positions CRUD Operations ==========
+    /**
+     * Create position (B2B API, requires user auth)
+     * POST /company/{company_id}/positions/quick/
+     */
     async createPosition(companyId, data) {
         if (!this.userToken) {
             throw new Error('Not authenticated. Use login() first.');
         }
-        const response = await this.apiRequest(`/positions/${companyId}`, {
+        const response = await this.apiRequest(`/company/${companyId}/positions/quick/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -411,11 +416,15 @@ export class AltegioClient {
         }
         return result.data;
     }
+    /**
+     * Update position (B2B API, requires user auth)
+     * Note: This endpoint may not be supported by the API
+     */
     async updatePosition(companyId, positionId, data) {
         if (!this.userToken) {
             throw new Error('Not authenticated. Use login() first.');
         }
-        const response = await this.apiRequest(`/positions/${companyId}/${positionId}`, {
+        const response = await this.apiRequest(`/company/${companyId}/positions/${positionId}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -432,11 +441,15 @@ export class AltegioClient {
         }
         return result.data;
     }
+    /**
+     * Delete position (B2B API, requires user auth)
+     * Note: This endpoint may not be supported by the API
+     */
     async deletePosition(companyId, positionId) {
         if (!this.userToken) {
             throw new Error('Not authenticated. Use login() first.');
         }
-        const response = await this.apiRequest(`/positions/${companyId}/${positionId}`, {
+        const response = await this.apiRequest(`/company/${companyId}/positions/${positionId}`, {
             method: 'DELETE',
         });
         if (!response.ok) {

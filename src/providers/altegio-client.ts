@@ -272,13 +272,14 @@ export class AltegioClient {
 
   /**
    * Get company positions (B2B API, requires user auth)
+   * GET /company/{company_id}/staff/positions/
    */
   async getPositions(companyId: number): Promise<AltegioPosition[]> {
     if (!this.userToken) {
       throw new Error('Not authenticated');
     }
 
-    const response = await this.apiRequest(`/positions/${companyId}`);
+    const response = await this.apiRequest(`/company/${companyId}/staff/positions/`);
 
     if (!response.ok) {
       throw new Error(`Failed to fetch positions: ${response.statusText}`);
@@ -620,6 +621,10 @@ export class AltegioClient {
 
   // ========== Positions CRUD Operations ==========
 
+  /**
+   * Create position (B2B API, requires user auth)
+   * POST /company/{company_id}/positions/quick/
+   */
   async createPosition(
     companyId: number,
     data: import('../types/altegio.types.js').CreatePositionRequest
@@ -628,7 +633,7 @@ export class AltegioClient {
       throw new Error('Not authenticated. Use login() first.');
     }
 
-    const response = await this.apiRequest(`/positions/${companyId}`, {
+    const response = await this.apiRequest(`/company/${companyId}/positions/quick/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -651,6 +656,10 @@ export class AltegioClient {
     return result.data;
   }
 
+  /**
+   * Update position (B2B API, requires user auth)
+   * Note: This endpoint may not be supported by the API
+   */
   async updatePosition(
     companyId: number,
     positionId: number,
@@ -661,7 +670,7 @@ export class AltegioClient {
     }
 
     const response = await this.apiRequest(
-      `/positions/${companyId}/${positionId}`,
+      `/company/${companyId}/positions/${positionId}`,
       {
         method: 'PUT',
         headers: {
@@ -686,13 +695,17 @@ export class AltegioClient {
     return result.data;
   }
 
+  /**
+   * Delete position (B2B API, requires user auth)
+   * Note: This endpoint may not be supported by the API
+   */
   async deletePosition(companyId: number, positionId: number): Promise<void> {
     if (!this.userToken) {
       throw new Error('Not authenticated. Use login() first.');
     }
 
     const response = await this.apiRequest(
-      `/positions/${companyId}/${positionId}`,
+      `/company/${companyId}/positions/${positionId}`,
       {
         method: 'DELETE',
       }
