@@ -171,12 +171,13 @@ export class AltegioClient {
     }
     /**
      * Get company positions (B2B API, requires user auth)
+     * GET /company/{company_id}/staff/positions/
      */
     async getPositions(companyId) {
         if (!this.userToken) {
             throw new Error('Not authenticated');
         }
-        const response = await this.apiRequest(`/positions/${companyId}`);
+        const response = await this.apiRequest(`/company/${companyId}/staff/positions/`);
         if (!response.ok) {
             throw new Error(`Failed to fetch positions: ${response.statusText}`);
         }
@@ -206,18 +207,28 @@ export class AltegioClient {
     // ========== Schedule CRUD Operations ==========
     /**
      * Create or update employee schedule (B2B API, requires user auth)
-     * PUT /schedule/{company_id}
+     * PUT /schedule/{company_id}/{staff_id}/{start_date}/{end_date}
+     *
+     * Converts simple request format to API format:
+     * Input: { staff_id, date, time_from, time_to }
+     * API: [{ date, is_working, slots: [{from, to}] }]
      */
     async createSchedule(companyId, data) {
         if (!this.userToken) {
             throw new Error('Not authenticated. Use login() first.');
         }
-        const response = await this.apiRequest(`/schedule/${companyId}`, {
+        // Convert to API format
+        const apiBody = [{
+                date: data.date,
+                is_working: true,
+                slots: [{ from: data.time_from, to: data.time_to }]
+            }];
+        const response = await this.apiRequest(`/schedule/${companyId}/${data.staff_id}/${data.date}/${data.date}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(data),
+            body: JSON.stringify(apiBody),
         });
         if (!response.ok) {
             const errorText = await response.text();
@@ -231,18 +242,29 @@ export class AltegioClient {
     }
     /**
      * Update employee schedule (B2B API, requires user auth)
-     * PUT /schedule/{company_id}
+     * PUT /schedule/{company_id}/{staff_id}/{start_date}/{end_date}
      */
     async updateSchedule(companyId, data) {
         if (!this.userToken) {
             throw new Error('Not authenticated. Use login() first.');
         }
-        const response = await this.apiRequest(`/schedule/${companyId}`, {
+        // Build slots array if time provided
+        const slots = [];
+        if (data.time_from && data.time_to) {
+            slots.push({ from: data.time_from, to: data.time_to });
+        }
+        // Convert to API format
+        const apiBody = [{
+                date: data.date,
+                is_working: slots.length > 0,
+                slots
+            }];
+        const response = await this.apiRequest(`/schedule/${companyId}/${data.staff_id}/${data.date}/${data.date}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(data),
+            body: JSON.stringify(apiBody),
         });
         if (!response.ok) {
             const errorText = await response.text();
@@ -369,11 +391,15 @@ export class AltegioClient {
         return result.data;
     }
     // ========== Positions CRUD Operations ==========
+    /**
+     * Create position (B2B API, requires user auth)
+     * POST /company/{company_id}/positions/quick/
+     */
     async createPosition(companyId, data) {
         if (!this.userToken) {
             throw new Error('Not authenticated. Use login() first.');
         }
-        const response = await this.apiRequest(`/positions/${companyId}`, {
+        const response = await this.apiRequest(`/company/${companyId}/positions/quick/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -390,11 +416,15 @@ export class AltegioClient {
         }
         return result.data;
     }
+    /**
+     * Update position (B2B API, requires user auth)
+     * Note: This endpoint may not be supported by the API
+     */
     async updatePosition(companyId, positionId, data) {
         if (!this.userToken) {
             throw new Error('Not authenticated. Use login() first.');
         }
-        const response = await this.apiRequest(`/positions/${companyId}/${positionId}`, {
+        const response = await this.apiRequest(`/company/${companyId}/positions/${positionId}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -411,11 +441,15 @@ export class AltegioClient {
         }
         return result.data;
     }
+    /**
+     * Delete position (B2B API, requires user auth)
+     * Note: This endpoint may not be supported by the API
+     */
     async deletePosition(companyId, positionId) {
         if (!this.userToken) {
             throw new Error('Not authenticated. Use login() first.');
         }
-        const response = await this.apiRequest(`/positions/${companyId}/${positionId}`, {
+        const response = await this.apiRequest(`/company/${companyId}/positions/${positionId}`, {
             method: 'DELETE',
         });
         if (!response.ok) {

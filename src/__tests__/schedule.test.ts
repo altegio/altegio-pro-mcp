@@ -101,15 +101,20 @@ describe('AltegioClient Schedule Operations', () => {
 
       await client.createSchedule(123, scheduleData);
 
+      // New API format: /schedule/{company_id}/{staff_id}/{start_date}/{end_date}
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/schedule/123',
+        'https://api.alteg.io/api/v1/schedule/123/456/2025-10-30/2025-10-30',
         expect.objectContaining({
           method: 'PUT',
           headers: expect.objectContaining({
             'Content-Type': 'application/json',
             Authorization: 'Bearer partner123, User user456',
           }),
-          body: JSON.stringify(scheduleData),
+          body: JSON.stringify([{
+            date: '2025-10-30',
+            is_working: true,
+            slots: [{ from: '09:00', to: '18:00' }]
+          }]),
         })
       );
     });
@@ -161,14 +166,19 @@ describe('AltegioClient Schedule Operations', () => {
 
       await client.updateSchedule(123, updateData);
 
+      // New API format: /schedule/{company_id}/{staff_id}/{start_date}/{end_date}
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/schedule/123',
+        'https://api.alteg.io/api/v1/schedule/123/456/2025-10-30/2025-10-30',
         expect.objectContaining({
           method: 'PUT',
           headers: expect.objectContaining({
             'Content-Type': 'application/json',
           }),
-          body: JSON.stringify(updateData),
+          body: JSON.stringify([{
+            date: '2025-10-30',
+            is_working: true,
+            slots: [{ from: '10:00', to: '17:00' }]
+          }]),
         })
       );
     });
