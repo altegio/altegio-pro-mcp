@@ -175,20 +175,19 @@ print('Done!')
 "
 ```
 
-## Cloud Run Testing
+## Production Testing
 
-After deploying to Cloud Run (see [CI-CD.md](CI-CD.md)):
+After deployment to the VM (see [CI-CD.md](CI-CD.md)):
 
 ```bash
-SERVICE_URL="https://your-service-name.run.app"
-
-# Health check
-curl $SERVICE_URL/health
+# Health check via proxy
+curl https://mcp.alteg.io/pro/health
 
 # MCP Streamable HTTP — initialize a session
-curl -sv -X POST $SERVICE_URL/mcp \
+curl -s -X POST https://mcp.alteg.io/pro/mcp \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
 ```
 
 The MCP protocol flow is the same as local — POST requests to `/mcp` with the `mcp-session-id` header.
@@ -201,7 +200,7 @@ Native stdio transport. See [CLAUDE_DESKTOP_SETUP.md](CLAUDE_DESKTOP_SETUP.md).
 
 ### Other MCP Clients
 
-Streamable HTTP transport via Cloud Run URL. Any MCP-compatible client can connect using the `/mcp` endpoint.
+Streamable HTTP transport via `https://mcp.alteg.io/pro/mcp`. Any MCP-compatible client can connect using this endpoint.
 
 ## Security Notes
 

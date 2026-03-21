@@ -19,7 +19,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 - **Conversational onboarding** with bulk CSV/JSON import and checkpoint/resume
 - **Dual transport:** stdio for Claude Desktop, HTTP for cloud deployments
 - **TypeScript** with full type safety and comprehensive tests (157 passing)
-- **Auto-deploy CI/CD** via Cloud Build on push to main
+- **Auto-deploy CI/CD** via VM cron (git pull + docker compose rebuild every 2 min)
 - **Rate limiting** and **retry logic** with exponential backoff
 - **Secure credential storage** in `~/.altegio-mcp/`
 
@@ -211,11 +211,13 @@ docker run --rm -p 8080:8080 --env-file .env -e PORT=8080 altegio-mcp:local
 
 The MCP endpoint is available at `http://localhost:8080/mcp` (Streamable HTTP transport). See [TESTING.md](TESTING.md) for the full MCP protocol testing guide.
 
-### Cloud Deployment
+### Production Deployment
 
-Automatic deployment to Cloud Run on PR merge to `main`. See [CI-CD.md](CI-CD.md) for:
-- GitHub → Cloud Build → Artifact Registry → Cloud Run pipeline
-- Secret management
+Automatic deployment to `mcp-servers` VM on PR merge to `main`. A cron job pulls latest `main` every 2 minutes and rebuilds if changed.
+
+Public endpoint: `https://mcp.alteg.io/pro/mcp`
+
+See [CI-CD.md](CI-CD.md) for details.
 
 ## Configuration
 
