@@ -218,6 +218,11 @@ const tools: ToolDefinition[] = [
           type: 'number',
           description: 'ID of the company to get service categories for',
         },
+        category_id: {
+          type: 'number',
+          description:
+            'Parent category ID to get subcategories for. Use 0 (default) to get root-level categories.',
+        },
         page: {
           type: 'number',
           description:
@@ -274,31 +279,32 @@ const tools: ToolDefinition[] = [
       properties: {
         company_id: { type: 'number', description: 'ID of the company' },
         staff_id: { type: 'number', description: 'ID of the staff member' },
-        date: {
-          type: 'string',
-          description: 'Date for the schedule (YYYY-MM-DD format)',
+        dates: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Dates for the schedule (YYYY-MM-DD format). Can set multiple dates at once.',
         },
-        time_from: {
-          type: 'string',
-          description: 'Start time (HH:MM format, e.g., "09:00")',
-        },
-        time_to: {
-          type: 'string',
-          description: 'End time (HH:MM format, e.g., "18:00")',
-        },
-        seance_length: {
-          type: 'number',
-          description: 'Session length in minutes (optional)',
+        slots: {
+          type: 'array',
+          description: 'Working time intervals for each date',
+          items: {
+            type: 'object',
+            properties: {
+              from: { type: 'string', description: 'Start time (HH:MM format, e.g., "09:00")' },
+              to: { type: 'string', description: 'End time (HH:MM format, e.g., "18:00")' },
+            },
+            required: ['from', 'to'],
+          },
         },
       },
-      required: ['company_id', 'staff_id', 'date', 'time_from', 'time_to'],
+      required: ['company_id', 'staff_id', 'dates', 'slots'],
     },
     outputSchema: output.scheduleEntityOutput,
   },
   {
     name: 'update_schedule',
     description:
-      '[Schedule] Update employee work schedule. AUTHENTICATION REQUIRED - administrative access to modify staff working schedule. Updates existing work hours for a specific date.',
+      '[Schedule] Update employee work schedule. AUTHENTICATION REQUIRED - administrative access to modify staff working schedule. Replaces work hours for specified dates.',
     annotations: {
       title: 'Update Schedule',
       openWorldHint: true,
@@ -309,31 +315,32 @@ const tools: ToolDefinition[] = [
       properties: {
         company_id: { type: 'number', description: 'ID of the company' },
         staff_id: { type: 'number', description: 'ID of the staff member' },
-        date: {
-          type: 'string',
-          description: 'Date for the schedule (YYYY-MM-DD format)',
+        dates: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Dates to update schedule for (YYYY-MM-DD format)',
         },
-        time_from: {
-          type: 'string',
-          description: 'New start time (HH:MM format, e.g., "09:00")',
-        },
-        time_to: {
-          type: 'string',
-          description: 'New end time (HH:MM format, e.g., "18:00")',
-        },
-        seance_length: {
-          type: 'number',
-          description: 'Session length in minutes (optional)',
+        slots: {
+          type: 'array',
+          description: 'New working time intervals for each date',
+          items: {
+            type: 'object',
+            properties: {
+              from: { type: 'string', description: 'Start time (HH:MM format, e.g., "09:00")' },
+              to: { type: 'string', description: 'End time (HH:MM format, e.g., "18:00")' },
+            },
+            required: ['from', 'to'],
+          },
         },
       },
-      required: ['company_id', 'staff_id', 'date'],
+      required: ['company_id', 'staff_id', 'dates', 'slots'],
     },
     outputSchema: output.scheduleEntityOutput,
   },
   {
     name: 'delete_schedule',
     description:
-      '[Schedule] Delete employee work schedule for a specific date. AUTHENTICATION REQUIRED - administrative access to remove staff working schedule. Removes work hours for the specified date.',
+      '[Schedule] Delete employee work schedule for specified dates. AUTHENTICATION REQUIRED - administrative access to remove staff working schedule. Makes the specified dates non-working days.',
     annotations: {
       title: 'Delete Schedule',
       destructiveHint: true,
@@ -344,12 +351,13 @@ const tools: ToolDefinition[] = [
       properties: {
         company_id: { type: 'number', description: 'ID of the company' },
         staff_id: { type: 'number', description: 'ID of the staff member' },
-        date: {
-          type: 'string',
-          description: 'Date to delete schedule (YYYY-MM-DD format)',
+        dates: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Dates to delete schedule for (YYYY-MM-DD format)',
         },
       },
-      required: ['company_id', 'staff_id', 'date'],
+      required: ['company_id', 'staff_id', 'dates'],
     },
   },
   {
@@ -487,10 +495,12 @@ const tools: ToolDefinition[] = [
         staff_id: { type: 'number', description: 'Staff member ID' },
         name: { type: 'string', description: 'Employee name' },
         specialization: { type: 'string', description: 'Employee specialization' },
-        position_id: { type: 'number', description: 'Position ID', nullable: true },
-        phone_number: { type: 'string', description: 'Phone number', nullable: true },
-        hidden: { type: 'number', description: '0 or 1' },
-        fired: { type: 'number', description: '0 or 1' },
+        weight: { type: 'number', description: 'Display order weight (higher = first)' },
+        information: { type: 'string', description: 'Employee info (HTML format)' },
+        api_id: { type: 'string', description: 'External API ID' },
+        hidden: { type: 'number', description: 'Hidden from online booking (0 or 1)' },
+        fired: { type: 'number', description: 'Dismissed status (0 or 1)' },
+        user_id: { type: 'number', description: 'Linked user ID (0 to unlink)' },
       },
       required: ['company_id', 'staff_id'],
     },

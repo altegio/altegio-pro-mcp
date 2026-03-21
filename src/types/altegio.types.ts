@@ -187,29 +187,55 @@ export interface AltegioBookingParams {
 }
 
 export interface AltegioScheduleEntry {
+  staff_id?: number;
   date: string;
-  time: string;
-  seance_length: number;
-  datetime: string;
+  time?: string;
+  seance_length?: number;
+  datetime?: string;
+  slots?: Array<{ from: string; to: string }>;
+  [key: string]: unknown;
 }
 
 // ========== Write Operation Request Types ==========
 
-// Schedule
-export interface CreateScheduleRequest {
-  staff_id: number;
-  date: string; // YYYY-MM-DD
-  time_from: string; // HH:MM
-  time_to: string; // HH:MM
-  seance_length?: number; // Duration in minutes
+// Schedule — matches PUT /company/{location_id}/staff/schedule spec
+export interface ScheduleSlot {
+  from: string; // HH:mm
+  to: string;   // HH:mm
 }
 
+export interface ScheduleToSet {
+  team_member_id: number;
+  dates: string[];    // YYYY-MM-DD
+  slots: ScheduleSlot[];
+}
+
+export interface ScheduleToDelete {
+  team_member_id: number;
+  dates: string[];    // YYYY-MM-DD
+}
+
+export interface SetScheduleRequest {
+  schedules_to_set?: ScheduleToSet[];
+  schedules_to_delete?: ScheduleToDelete[];
+}
+
+/** @deprecated Use SetScheduleRequest instead */
+export interface CreateScheduleRequest {
+  staff_id: number;
+  date: string;
+  time_from: string;
+  time_to: string;
+  seance_length?: number;
+}
+
+/** @deprecated Use SetScheduleRequest instead */
 export interface UpdateScheduleRequest {
   staff_id: number;
-  date: string; // YYYY-MM-DD
-  time_from?: string; // HH:MM
-  time_to?: string; // HH:MM
-  seance_length?: number; // Duration in minutes
+  date: string;
+  time_from?: string;
+  time_to?: string;
+  seance_length?: number;
 }
 
 // Staff
@@ -226,10 +252,12 @@ export interface CreateStaffRequest {
 export interface UpdateStaffRequest {
   name?: string;
   specialization?: string;
-  position_id?: number | null;
-  phone_number?: string | null;
+  weight?: number;
+  information?: string;
+  api_id?: string;
   hidden?: number;
   fired?: number;
+  user_id?: number;
 }
 
 // Services
