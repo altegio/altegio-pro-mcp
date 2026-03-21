@@ -15,6 +15,7 @@ import type {
   AltegioListParams,
 } from '../types/altegio.types.js';
 import { CredentialManager } from './credential-manager.js';
+import { AuthenticationError, AltegioApiError } from '../utils/errors.js';
 
 export class AltegioClient {
   private apiUrl: string;
@@ -60,6 +61,95 @@ export class AltegioClient {
       ...options,
       headers,
     });
+  }
+
+  /**
+   * Throw a typed API error based on HTTP status code
+   */
+  private async throwApiError(
+    response: Response,
+    context: string
+  ): Promise<never> {
+    let body: Record<string, unknown> | undefined;
+    try {
+      body = (await response.json()) as Record<string, unknown>;
+    } catch {
+      const text = await response.text().catch(() => response.statusText);
+      body = { meta: { message: text } };
+    }
+    const meta = body?.meta as Record<string, unknown> | undefined;
+    const message =
+      (meta?.message as string) || response.statusText || 'Unknown error';
+
+    switch (response.status) {
+      case 401:
+        throw new AuthenticationError(
+          `Session expired while trying to ${context}. Call altegio_login to re-authenticate.`
+        );
+      case 403:
+        throw new AltegioApiError(
+          `Access denied for ${context}. Check company permissions.`,
+          403,
+          body
+        );
+      case 404:
+        throw new AltegioApiError(
+          `Not found: ${context}. Verify the ID is correct.`,
+          404,
+          body
+        );
+      default:
+        throw new AltegioApiError(
+          `Failed to ${context}: ${message} (HTTP ${response.status})`,
+          response.status,
+          body
+        );
+    }
+  }
+
+  /**
+   * Centralized response handler for methods that return data
+   */
+  private async handleResponse<T>(
+    response: Response,
+    context: string
+  ): Promise<T> {
+    if (!response.ok) {
+      await this.throwApiError(response, context);
+    }
+
+    const result = (await response.json()) as AltegioApiResponse<T>;
+    if (!result.success || result.data === undefined || result.data === null) {
+      throw new AltegioApiError(
+        result.meta?.message || `Unexpected response for ${context}`,
+        response.status,
+        result
+      );
+    }
+    return result.data;
+  }
+
+  /**
+   * Centralized response handler for void-returning methods (DELETE)
+   */
+  private async handleVoidResponse(
+    response: Response,
+    context: string
+  ): Promise<void> {
+    if (!response.ok) {
+      await this.throwApiError(response, context);
+    }
+  }
+
+  /**
+   * Require authentication, throwing AuthenticationError if not logged in
+   */
+  private requireAuth(): void {
+    if (!this.userToken) {
+      throw new AuthenticationError(
+        'Not authenticated. Call altegio_login first.'
+      );
+    }
   }
 
   async login(
@@ -119,37 +209,21 @@ export class AltegioClient {
   async getCompanies(
     params?: AltegioCompaniesParams
   ): Promise<AltegioCompany[]> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated');
-    }
+    this.requireAuth();
 
     const queryParams = params
       ? `?${new URLSearchParams(params as Record<string, string>).toString()}`
       : '';
     const response = await this.apiRequest(`/companies${queryParams}`);
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch companies: ${response.statusText}`);
-    }
-
-    const result = (await response.json()) as AltegioApiResponse<
-      AltegioCompany[]
-    >;
-
-    if (result.success && result.data) {
-      return result.data;
-    }
-
-    throw new Error(result.meta?.message || 'Failed to fetch companies');
+    return this.handleResponse<AltegioCompany[]>(response, 'fetch companies');
   }
 
   async getBookings(
     companyId: number,
     params?: AltegioListParams
   ): Promise<AltegioBooking[]> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated');
-    }
+    this.requireAuth();
 
     const queryParams = params
       ? `?${new URLSearchParams(params as Record<string, string>).toString()}`
@@ -158,19 +232,7 @@ export class AltegioClient {
       `/records/${companyId}${queryParams}`
     );
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch bookings: ${response.statusText}`);
-    }
-
-    const result = (await response.json()) as AltegioApiResponse<
-      AltegioBooking[]
-    >;
-
-    if (result.success && result.data) {
-      return result.data;
-    }
-
-    throw new Error(result.meta?.message || 'Failed to fetch bookings');
+    return this.handleResponse<AltegioBooking[]>(response, 'fetch bookings');
   }
 
   /**
@@ -180,28 +242,14 @@ export class AltegioClient {
     companyId: number,
     params?: AltegioBookingParams
   ): Promise<AltegioStaff[]> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated');
-    }
+    this.requireAuth();
 
     const queryParams = params
       ? `?${new URLSearchParams(params as Record<string, string>).toString()}`
       : '';
     const response = await this.apiRequest(`/staff/${companyId}${queryParams}`);
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch staff: ${response.statusText}`);
-    }
-
-    const result = (await response.json()) as AltegioApiResponse<
-      AltegioStaff[]
-    >;
-
-    if (result.success && result.data) {
-      return result.data;
-    }
-
-    throw new Error(result.meta?.message || 'Failed to fetch staff');
+    return this.handleResponse<AltegioStaff[]>(response, 'fetch staff');
   }
 
   /**
@@ -211,9 +259,7 @@ export class AltegioClient {
     companyId: number,
     params?: AltegioBookingParams
   ): Promise<AltegioService[]> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated');
-    }
+    this.requireAuth();
 
     const queryParams = params
       ? `?${new URLSearchParams(params as Record<string, string>).toString()}`
@@ -222,19 +268,7 @@ export class AltegioClient {
       `/services/${companyId}${queryParams}`
     );
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch services: ${response.statusText}`);
-    }
-
-    const result = (await response.json()) as AltegioApiResponse<
-      AltegioService[]
-    >;
-
-    if (result.success && result.data) {
-      return result.data;
-    }
-
-    throw new Error(result.meta?.message || 'Failed to fetch services');
+    return this.handleResponse<AltegioService[]>(response, 'fetch services');
   }
 
   /**
@@ -252,22 +286,9 @@ export class AltegioClient {
       `/service_categories/${companyId}/${categoryId}${queryParams}`
     );
 
-    if (!response.ok) {
-      throw new Error(
-        `Failed to fetch service categories: ${response.statusText}`
-      );
-    }
-
-    const result = (await response.json()) as AltegioApiResponse<
-      AltegioServiceCategory[]
-    >;
-
-    if (result.success && result.data) {
-      return result.data;
-    }
-
-    throw new Error(
-      result.meta?.message || 'Failed to fetch service categories'
+    return this.handleResponse<AltegioServiceCategory[]>(
+      response,
+      'fetch service categories'
     );
   }
 
@@ -275,25 +296,11 @@ export class AltegioClient {
    * Get company positions (B2B API, requires user auth)
    */
   async getPositions(companyId: number): Promise<AltegioPosition[]> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated');
-    }
+    this.requireAuth();
 
     const response = await this.apiRequest(`/positions/${companyId}`);
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch positions: ${response.statusText}`);
-    }
-
-    const result = (await response.json()) as AltegioApiResponse<
-      AltegioPosition[]
-    >;
-
-    if (result.success && result.data) {
-      return result.data;
-    }
-
-    throw new Error(result.meta?.message || 'Failed to fetch positions');
+    return this.handleResponse<AltegioPosition[]>(response, 'fetch positions');
   }
 
   /**
@@ -305,27 +312,16 @@ export class AltegioClient {
     startDate: string,
     endDate: string
   ): Promise<AltegioScheduleEntry[]> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated');
-    }
+    this.requireAuth();
 
     const response = await this.apiRequest(
       `/schedule/${companyId}/${staffId}/${startDate}/${endDate}`
     );
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch schedule: ${response.statusText}`);
-    }
-
-    const result = (await response.json()) as AltegioApiResponse<
-      AltegioScheduleEntry[]
-    >;
-
-    if (result.success && result.data) {
-      return result.data;
-    }
-
-    throw new Error(result.meta?.message || 'Failed to fetch schedule');
+    return this.handleResponse<AltegioScheduleEntry[]>(
+      response,
+      'fetch schedule'
+    );
   }
 
   // ========== Schedule CRUD Operations ==========
@@ -340,9 +336,7 @@ export class AltegioClient {
     companyId: number,
     data: import('../types/altegio.types.js').SetScheduleRequest
   ): Promise<AltegioScheduleEntry[]> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated. Use login() first.');
-    }
+    this.requireAuth();
 
     const response = await this.apiRequest(
       `/company/${companyId}/staff/schedule`,
@@ -355,23 +349,10 @@ export class AltegioClient {
       }
     );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to set schedule: HTTP ${response.status} - ${errorText}`
-      );
-    }
-
-    const result = (await response.json()) as AltegioApiResponse<
-      AltegioScheduleEntry[]
-    >;
-    if (!result.success || !result.data) {
-      throw new Error(
-        result.meta?.message || 'Failed to set schedule: Invalid response'
-      );
-    }
-
-    return result.data;
+    return this.handleResponse<AltegioScheduleEntry[]>(
+      response,
+      'set schedule'
+    );
   }
 
   // ========== Staff CRUD Operations ==========
@@ -380,9 +361,7 @@ export class AltegioClient {
     companyId: number,
     data: import('../types/altegio.types.js').CreateStaffRequest
   ): Promise<AltegioStaff> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated. Use login() first.');
-    }
+    this.requireAuth();
 
     const response = await this.apiRequest(
       `/company/${companyId}/staff/quick`,
@@ -395,19 +374,7 @@ export class AltegioClient {
       }
     );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to create staff: HTTP ${response.status} - ${errorText}`
-      );
-    }
-
-    const result = (await response.json()) as AltegioApiResponse<AltegioStaff>;
-    if (!result.success || !result.data) {
-      throw new Error('Failed to create staff: Invalid response');
-    }
-
-    return result.data;
+    return this.handleResponse<AltegioStaff>(response, 'create staff');
   }
 
   async updateStaff(
@@ -415,9 +382,7 @@ export class AltegioClient {
     staffId: number,
     data: import('../types/altegio.types.js').UpdateStaffRequest
   ): Promise<AltegioStaff> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated. Use login() first.');
-    }
+    this.requireAuth();
 
     const response = await this.apiRequest(`/staff/${companyId}/${staffId}`, {
       method: 'PUT',
@@ -427,36 +392,17 @@ export class AltegioClient {
       body: JSON.stringify(data),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to update staff: HTTP ${response.status} - ${errorText}`
-      );
-    }
-
-    const result = (await response.json()) as AltegioApiResponse<AltegioStaff>;
-    if (!result.success || !result.data) {
-      throw new Error('Failed to update staff: Invalid response');
-    }
-
-    return result.data;
+    return this.handleResponse<AltegioStaff>(response, 'update staff');
   }
 
   async deleteStaff(companyId: number, staffId: number): Promise<void> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated. Use login() first.');
-    }
+    this.requireAuth();
 
     const response = await this.apiRequest(`/staff/${companyId}/${staffId}`, {
       method: 'DELETE',
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to delete staff: HTTP ${response.status} - ${errorText}`
-      );
-    }
+    await this.handleVoidResponse(response, 'delete staff');
   }
 
   // ========== Services CRUD Operations ==========
@@ -465,9 +411,7 @@ export class AltegioClient {
     companyId: number,
     data: import('../types/altegio.types.js').CreateServiceRequest
   ): Promise<AltegioService> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated. Use login() first.');
-    }
+    this.requireAuth();
 
     const response = await this.apiRequest(`/services/${companyId}`, {
       method: 'POST',
@@ -477,19 +421,7 @@ export class AltegioClient {
       body: JSON.stringify(data),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to create service: HTTP ${response.status} - ${errorText}`
-      );
-    }
-
-    const result = (await response.json()) as AltegioApiResponse<AltegioService>;
-    if (!result.success || !result.data) {
-      throw new Error('Failed to create service: Invalid response');
-    }
-
-    return result.data;
+    return this.handleResponse<AltegioService>(response, 'create service');
   }
 
   async updateService(
@@ -497,9 +429,7 @@ export class AltegioClient {
     serviceId: number,
     data: import('../types/altegio.types.js').UpdateServiceRequest
   ): Promise<AltegioService> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated. Use login() first.');
-    }
+    this.requireAuth();
 
     const response = await this.apiRequest(
       `/services/${companyId}/${serviceId}`,
@@ -512,19 +442,7 @@ export class AltegioClient {
       }
     );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to update service: HTTP ${response.status} - ${errorText}`
-      );
-    }
-
-    const result = (await response.json()) as AltegioApiResponse<AltegioService>;
-    if (!result.success || !result.data) {
-      throw new Error('Failed to update service: Invalid response');
-    }
-
-    return result.data;
+    return this.handleResponse<AltegioService>(response, 'update service');
   }
 
   // ========== Positions CRUD Operations ==========
@@ -533,9 +451,7 @@ export class AltegioClient {
     companyId: number,
     data: import('../types/altegio.types.js').CreatePositionRequest
   ): Promise<AltegioPosition> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated. Use login() first.');
-    }
+    this.requireAuth();
 
     const response = await this.apiRequest(`/positions/${companyId}`, {
       method: 'POST',
@@ -545,19 +461,7 @@ export class AltegioClient {
       body: JSON.stringify(data),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to create position: HTTP ${response.status} - ${errorText}`
-      );
-    }
-
-    const result = (await response.json()) as AltegioApiResponse<AltegioPosition>;
-    if (!result.success || !result.data) {
-      throw new Error('Failed to create position: Invalid response');
-    }
-
-    return result.data;
+    return this.handleResponse<AltegioPosition>(response, 'create position');
   }
 
   async updatePosition(
@@ -565,9 +469,7 @@ export class AltegioClient {
     positionId: number,
     data: import('../types/altegio.types.js').UpdatePositionRequest
   ): Promise<AltegioPosition> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated. Use login() first.');
-    }
+    this.requireAuth();
 
     const response = await this.apiRequest(
       `/positions/${companyId}/${positionId}`,
@@ -580,25 +482,11 @@ export class AltegioClient {
       }
     );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to update position: HTTP ${response.status} - ${errorText}`
-      );
-    }
-
-    const result = (await response.json()) as AltegioApiResponse<AltegioPosition>;
-    if (!result.success || !result.data) {
-      throw new Error('Failed to update position: Invalid response');
-    }
-
-    return result.data;
+    return this.handleResponse<AltegioPosition>(response, 'update position');
   }
 
   async deletePosition(companyId: number, positionId: number): Promise<void> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated. Use login() first.');
-    }
+    this.requireAuth();
 
     const response = await this.apiRequest(
       `/positions/${companyId}/${positionId}`,
@@ -607,12 +495,7 @@ export class AltegioClient {
       }
     );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to delete position: HTTP ${response.status} - ${errorText}`
-      );
-    }
+    await this.handleVoidResponse(response, 'delete position');
   }
 
   // ========== Bookings CRUD Operations ==========
@@ -621,9 +504,7 @@ export class AltegioClient {
     companyId: number,
     data: import('../types/altegio.types.js').CreateBookingRequest
   ): Promise<AltegioBooking> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated. Use login() first.');
-    }
+    this.requireAuth();
 
     const response = await this.apiRequest(`/records/${companyId}`, {
       method: 'POST',
@@ -633,19 +514,7 @@ export class AltegioClient {
       body: JSON.stringify(data),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to create booking: HTTP ${response.status} - ${errorText}`
-      );
-    }
-
-    const result = (await response.json()) as AltegioApiResponse<AltegioBooking>;
-    if (!result.success || !result.data) {
-      throw new Error('Failed to create booking: Invalid response');
-    }
-
-    return result.data;
+    return this.handleResponse<AltegioBooking>(response, 'create booking');
   }
 
   async updateBooking(
@@ -653,9 +522,7 @@ export class AltegioClient {
     recordId: number,
     data: import('../types/altegio.types.js').UpdateBookingRequest
   ): Promise<AltegioBooking> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated. Use login() first.');
-    }
+    this.requireAuth();
 
     const response = await this.apiRequest(`/record/${companyId}/${recordId}`, {
       method: 'PUT',
@@ -665,36 +532,17 @@ export class AltegioClient {
       body: JSON.stringify(data),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to update booking: HTTP ${response.status} - ${errorText}`
-      );
-    }
-
-    const result = (await response.json()) as AltegioApiResponse<AltegioBooking>;
-    if (!result.success || !result.data) {
-      throw new Error('Failed to update booking: Invalid response');
-    }
-
-    return result.data;
+    return this.handleResponse<AltegioBooking>(response, 'update booking');
   }
 
   async deleteBooking(companyId: number, recordId: number): Promise<void> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated. Use login() first.');
-    }
+    this.requireAuth();
 
     const response = await this.apiRequest(`/record/${companyId}/${recordId}`, {
       method: 'DELETE',
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to delete booking: HTTP ${response.status} - ${errorText}`
-      );
-    }
+    await this.handleVoidResponse(response, 'delete booking');
   }
 
   // ========== Clients CRUD Operations ==========
@@ -703,9 +551,7 @@ export class AltegioClient {
     companyId: number,
     data: import('../types/altegio.types.js').CreateClientRequest
   ): Promise<import('../types/altegio.types.js').AltegioClientEntity> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated. Use login() first.');
-    }
+    this.requireAuth();
 
     const response = await this.apiRequest(`/clients/${companyId}`, {
       method: 'POST',
@@ -715,21 +561,9 @@ export class AltegioClient {
       body: JSON.stringify(data),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to create client: HTTP ${response.status} - ${errorText}`
-      );
-    }
-
-    const result = (await response.json()) as AltegioApiResponse<
+    return this.handleResponse<
       import('../types/altegio.types.js').AltegioClientEntity
-    >;
-    if (!result.success || !result.data) {
-      throw new Error('Failed to create client: Invalid response');
-    }
-
-    return result.data;
+    >(response, 'create client');
   }
 
   // ========== Service Categories CRUD Operations ==========
@@ -738,9 +572,7 @@ export class AltegioClient {
     companyId: number,
     data: import('../types/altegio.types.js').CreateCategoryRequest
   ): Promise<AltegioServiceCategory> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated. Use login() first.');
-    }
+    this.requireAuth();
 
     const response = await this.apiRequest(`/service_categories/${companyId}`, {
       method: 'POST',
@@ -750,19 +582,10 @@ export class AltegioClient {
       body: JSON.stringify(data),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to create category: HTTP ${response.status} - ${errorText}`
-      );
-    }
-
-    const result = (await response.json()) as AltegioApiResponse<AltegioServiceCategory>;
-    if (!result.success || !result.data) {
-      throw new Error('Failed to create category: Invalid response');
-    }
-
-    return result.data;
+    return this.handleResponse<AltegioServiceCategory>(
+      response,
+      'create category'
+    );
   }
 
   isAuthenticated(): boolean {

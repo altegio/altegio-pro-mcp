@@ -7,6 +7,7 @@ import {
   jest,
 } from '@jest/globals';
 import { AltegioClient } from '../providers/altegio-client.js';
+import { AuthenticationError, AltegioApiError } from '../utils/errors.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { promises as fs } from 'fs';
@@ -131,9 +132,217 @@ describe('AltegioClient', () => {
     });
   });
 
+  describe('error handling', () => {
+    describe('authentication errors', () => {
+      it('should throw AuthenticationError when not authenticated', async () => {
+        await expect(client.getCompanies()).rejects.toThrow(
+          AuthenticationError
+        );
+        await expect(client.getCompanies()).rejects.toThrow(
+          'Not authenticated. Call altegio_login first.'
+        );
+      });
+
+      it('should throw AuthenticationError on 401 response', async () => {
+        // Login first
+        (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: { user_token: 'test-token' },
+          }),
+        } as Response);
+        await client.login('test@example.com', 'password123');
+
+        // Mock 401 response
+        (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+          ok: false,
+          status: 401,
+          statusText: 'Unauthorized',
+          json: async () => ({ meta: { message: 'Token expired' } }),
+        } as unknown as Response);
+
+        await expect(client.getCompanies()).rejects.toThrow(
+          AuthenticationError
+        );
+        // Re-mock for second assertion
+        (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+          ok: false,
+          status: 401,
+          statusText: 'Unauthorized',
+          json: async () => ({ meta: { message: 'Token expired' } }),
+        } as unknown as Response);
+        await expect(client.getCompanies()).rejects.toThrow(
+          /altegio_login/
+        );
+      });
+
+      it('should throw AltegioApiError on 404 response', async () => {
+        // Login first
+        (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: { user_token: 'test-token' },
+          }),
+        } as Response);
+        await client.login('test@example.com', 'password123');
+
+        // Mock 404 response
+        (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+          ok: false,
+          status: 404,
+          statusText: 'Not Found',
+          json: async () => ({ meta: { message: 'Not found' } }),
+        } as unknown as Response);
+
+        await expect(client.getCompanies()).rejects.toThrow(AltegioApiError);
+        // Re-mock
+        (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+          ok: false,
+          status: 404,
+          statusText: 'Not Found',
+          json: async () => ({ meta: { message: 'Not found' } }),
+        } as unknown as Response);
+        await expect(client.getCompanies()).rejects.toThrow(/Verify the ID/);
+      });
+
+      it('should throw AltegioApiError on 500 response with meta.message', async () => {
+        // Login first
+        (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: { user_token: 'test-token' },
+          }),
+        } as Response);
+        await client.login('test@example.com', 'password123');
+
+        // Mock 500 with JSON body
+        (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          statusText: 'Internal Server Error',
+          json: async () => ({ meta: { message: 'Database connection failed' } }),
+        } as unknown as Response);
+
+        await expect(client.getCompanies()).rejects.toThrow(AltegioApiError);
+        // Re-mock
+        (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          statusText: 'Internal Server Error',
+          json: async () => ({ meta: { message: 'Database connection failed' } }),
+        } as unknown as Response);
+        await expect(client.getCompanies()).rejects.toThrow(
+          /Database connection failed/
+        );
+      });
+
+      it('should handle non-JSON error responses gracefully', async () => {
+        // Login first
+        (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: { user_token: 'test-token' },
+          }),
+        } as Response);
+        await client.login('test@example.com', 'password123');
+
+        // Mock 500 with non-JSON body
+        (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          statusText: 'Internal Server Error',
+          json: async () => {
+            throw new Error('not json');
+          },
+          text: async () => 'nginx gateway timeout',
+        } as unknown as Response);
+
+        await expect(client.getCompanies()).rejects.toThrow(
+          /nginx gateway timeout/
+        );
+      });
+
+      it('should throw AltegioApiError when success is false', async () => {
+        // Login first
+        (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: { user_token: 'test-token' },
+          }),
+        } as Response);
+        await client.login('test@example.com', 'password123');
+
+        // Mock 200 but success: false
+        (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            success: false,
+            meta: { message: 'Invalid filter parameter' },
+          }),
+        } as unknown as Response);
+
+        await expect(client.getCompanies()).rejects.toThrow(AltegioApiError);
+        // Re-mock
+        (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            success: false,
+            meta: { message: 'Invalid filter parameter' },
+          }),
+        } as unknown as Response);
+        await expect(client.getCompanies()).rejects.toThrow(
+          'Invalid filter parameter'
+        );
+      });
+    });
+
+    describe('void response methods', () => {
+      it('should throw AuthenticationError on delete when not authenticated', async () => {
+        const unauthClient = new AltegioClient(
+          { partnerToken: 'test', userToken: undefined },
+          testDir
+        );
+        await expect(unauthClient.deleteStaff(1, 1)).rejects.toThrow(
+          AuthenticationError
+        );
+      });
+
+      it('should throw AltegioApiError on delete 404', async () => {
+        const authClient = new AltegioClient(
+          {
+            apiBase: 'https://api.alteg.io/api/v1',
+            partnerToken: 'test',
+            userToken: 'token',
+          },
+          testDir
+        );
+
+        (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+          ok: false,
+          status: 404,
+          statusText: 'Not Found',
+          json: async () => ({ meta: { message: 'Staff not found' } }),
+        } as unknown as Response);
+
+        await expect(authClient.deleteStaff(1, 999)).rejects.toThrow(
+          AltegioApiError
+        );
+      });
+    });
+  });
+
   describe('getCompanies', () => {
-    it('should throw error when not authenticated', async () => {
-      await expect(client.getCompanies()).rejects.toThrow('Not authenticated');
+    it('should throw AuthenticationError when not authenticated', async () => {
+      await expect(client.getCompanies()).rejects.toThrow(
+        'Not authenticated. Call altegio_login first.'
+      );
     });
 
     it('should fetch companies successfully when authenticated', async () => {
@@ -289,7 +498,7 @@ describe('AltegioClient', () => {
       expect(companies).toEqual(mockCompanies);
     });
 
-    it('should handle API errors', async () => {
+    it('should throw AltegioApiError on API errors', async () => {
       // Login first
       const loginResponse = {
         success: true,
@@ -308,17 +517,30 @@ describe('AltegioClient', () => {
         ok: false,
         status: 500,
         statusText: 'Internal Server Error',
-      } as Response);
+        json: async () => ({
+          meta: { message: 'Internal Server Error' },
+        }),
+      } as unknown as Response);
 
-      await expect(client.getCompanies()).rejects.toThrow(
-        'Failed to fetch companies: Internal Server Error'
-      );
+      await expect(client.getCompanies()).rejects.toThrow(AltegioApiError);
+      // Re-mock
+      (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        json: async () => ({
+          meta: { message: 'Internal Server Error' },
+        }),
+      } as unknown as Response);
+      await expect(client.getCompanies()).rejects.toThrow(/HTTP 500/);
     });
   });
 
   describe('getBookings', () => {
-    it('should throw error when not authenticated', async () => {
-      await expect(client.getBookings(1)).rejects.toThrow('Not authenticated');
+    it('should throw AuthenticationError when not authenticated', async () => {
+      await expect(client.getBookings(1)).rejects.toThrow(
+        'Not authenticated. Call altegio_login first.'
+      );
     });
 
     it('should fetch bookings successfully when authenticated', async () => {
@@ -371,7 +593,7 @@ describe('AltegioClient', () => {
       expect(bookings).toEqual(mockBookings);
     });
 
-    it('should handle API errors', async () => {
+    it('should throw AltegioApiError on API errors', async () => {
       // Login first
       const loginResponse = {
         success: true,
@@ -390,11 +612,10 @@ describe('AltegioClient', () => {
         ok: false,
         status: 404,
         statusText: 'Not Found',
-      } as Response);
+        json: async () => ({ meta: { message: 'Not found' } }),
+      } as unknown as Response);
 
-      await expect(client.getBookings(999)).rejects.toThrow(
-        'Failed to fetch bookings: Not Found'
-      );
+      await expect(client.getBookings(999)).rejects.toThrow(AltegioApiError);
     });
   });
 
@@ -468,7 +689,7 @@ describe('AltegioClient', () => {
         );
 
         await expect(client.getStaff(4564)).rejects.toThrow(
-          'Not authenticated'
+          'Not authenticated. Call altegio_login first.'
         );
       });
 
@@ -580,7 +801,7 @@ describe('AltegioClient', () => {
         );
 
         await expect(client.getServices(4564)).rejects.toThrow(
-          'Not authenticated'
+          'Not authenticated. Call altegio_login first.'
         );
       });
 
