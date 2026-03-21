@@ -44,12 +44,12 @@ firebase-debug.log
 firestore-debug.log
 ui-debug.log
 
+# IDE
+.vscode/
+.idea/
+
 # Git worktrees
 .worktrees/
-.worktrees/
-
-# Corporate OpenAPI specs (not for open source)
-api.docs/
 
 # Build output
 dist/

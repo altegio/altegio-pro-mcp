@@ -13,10 +13,10 @@ MCP (Model Context Protocol) server for Altegio.Pro business management API.
 
 1. **Pull latest OpenAPI spec:**
    ```bash
-   git -C api.docs pull origin master
+   git -C ../biz.erp.api.docs pull origin master
    ```
-2. **Check OpenAPI spec first:** `api.docs/docs/altegio/en/openapi.yml`
-3. **NEVER modify `api.docs/`** - read-only submodule (managed in separate GitLab repo)
+2. **Check OpenAPI spec first:** `../biz.erp.api.docs/docs/altegio/en/openapi.yml`
+3. **NEVER modify `../biz.erp.api.docs/`** - separate repo, read-only for this project
 4. **Read Product logic** - `docs/*.md`
 
 ## Quick Start
@@ -135,7 +135,7 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 **Base URL:** `https://api.alteg.io/api/v1`
 **Docs:**
 - Online: https://developer.alteg.io/api (cached at `/tmp/alteg_api.html`)
-- **OpenAPI Spec (corporate):** `api.docs/docs/altegio/en/openapi.yml` (see OPENAPI.md for setup)
+- **OpenAPI Spec (corporate):** `../biz.erp.api.docs/docs/altegio/en/openapi.yml` (see OPENAPI.md)
 
 **B2B Endpoints (require user_token):**
 - `GET /staff/{company_id}` - staff with admin details
