@@ -53,48 +53,42 @@ curl http://localhost:8080/health
 
 ### 4. MCP Protocol Testing
 
-The server uses **SSE transport** for MCP. The protocol requires keeping the SSE connection open while sending POST requests to the session URL.
-
-**Step 1: Establish SSE connection** (keep this terminal open):
+The server uses **Streamable HTTP transport** (MCP spec 2025-11-25). All communication happens via POST requests to the `/mcp` endpoint. The server returns an `mcp-session-id` header on initialization, which must be included in subsequent requests. Responses are returned inline in the POST response body.
 
 ```bash
-curl -sN http://localhost:8080/mcp -H "Accept: text/event-stream"
-# Returns: event: endpoint
-#          data: /mcp?sessionId=<SESSION_ID>
-```
-
-**Step 2: In another terminal, send MCP requests** using the session ID from step 1:
-
-```bash
-SESSION_ID="<paste session id from step 1>"
-
-# Initialize MCP handshake
-curl -s -X POST "http://localhost:8080/mcp?sessionId=$SESSION_ID" \
+# Initialize MCP handshake (note the session ID in the response header)
+curl -sv -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
     "id": 1,
     "method": "initialize",
     "params": {
-      "protocolVersion": "2024-11-05",
+      "protocolVersion": "2025-11-25",
       "capabilities": {},
       "clientInfo": {"name": "manual-test", "version": "1.0"}
     }
-  }'
+  }' 2>&1 | grep -i "mcp-session-id"
+# Look for: mcp-session-id: <SESSION_ID>
+
+SESSION_ID="<paste session id from response header>"
 
 # Send initialized notification
-curl -s -X POST "http://localhost:8080/mcp?sessionId=$SESSION_ID" \
+curl -s -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
+  -H "mcp-session-id: $SESSION_ID" \
   -d '{"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}}'
 
 # List all available tools
-curl -s -X POST "http://localhost:8080/mcp?sessionId=$SESSION_ID" \
+curl -s -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
+  -H "mcp-session-id: $SESSION_ID" \
   -d '{"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}'
 
 # Call a tool (e.g., list_companies)
-curl -s -X POST "http://localhost:8080/mcp?sessionId=$SESSION_ID" \
+curl -s -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
+  -H "mcp-session-id: $SESSION_ID" \
   -d '{
     "jsonrpc": "2.0",
     "id": 3,
@@ -104,86 +98,79 @@ curl -s -X POST "http://localhost:8080/mcp?sessionId=$SESSION_ID" \
       "arguments": {"count": 5}
     }
   }'
+
+# Terminate session when done
+curl -s -X DELETE http://localhost:8080/mcp \
+  -H "mcp-session-id: $SESSION_ID"
 ```
 
-All responses arrive via the SSE stream in the first terminal.
+All responses are returned inline in the POST response body (no separate SSE stream needed).
 
 ### 5. Automated MCP Test Script
 
 ```bash
 python3 -c "
-import subprocess, json, time, re, threading, queue
+import subprocess, json, re
 
-q = queue.Queue()
+BASE = 'http://localhost:8080/mcp'
 
-def read_sse(proc, q):
-    for line in proc.stdout:
-        q.put(line.rstrip('\n'))
-
-sse = subprocess.Popen(
-    ['curl', '-sN', 'http://localhost:8080/mcp', '-H', 'Accept: text/event-stream'],
-    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-)
-t = threading.Thread(target=read_sse, args=(sse, q), daemon=True)
-t.start()
-time.sleep(1)
-
-session_id = None
-while not q.empty():
-    line = q.get()
-    m = re.search(r'sessionId=([a-f0-9-]+)', line)
-    if m:
-        session_id = m.group(1)
-
-if not session_id:
-    print('FAIL: No session ID')
-    sse.kill()
-    exit(1)
-
-BASE = f'http://localhost:8080/mcp?sessionId={session_id}'
-
-def post(payload):
-    subprocess.run(['curl', '-s', '-X', 'POST', BASE,
-        '-H', 'Content-Type: application/json',
-        '-d', json.dumps(payload)], capture_output=True, text=True)
-
-def wait_response(req_id, timeout=10):
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        try:
-            line = q.get(timeout=0.5)
-            if line.startswith('data: '):
-                data = json.loads(line[6:])
-                if data.get('id') == req_id:
-                    return data
-        except:
-            pass
-    return None
+def post(payload, session_id=None):
+    headers = ['-H', 'Content-Type: application/json']
+    if session_id:
+        headers += ['-H', f'mcp-session-id: {session_id}']
+    result = subprocess.run(
+        ['curl', '-s', '-D', '-', '-X', 'POST', BASE] + headers +
+        ['-d', json.dumps(payload)],
+        capture_output=True, text=True
+    )
+    return result.stdout
 
 # Initialize
-post({'jsonrpc':'2.0','id':1,'method':'initialize',
-    'params':{'protocolVersion':'2024-11-05','capabilities':{},
+resp = post({'jsonrpc':'2.0','id':1,'method':'initialize',
+    'params':{'protocolVersion':'2025-11-25','capabilities':{},
         'clientInfo':{'name':'test','version':'1.0'}}})
-r = wait_response(1)
-print(f'1. Initialize: {'OK' if r and 'result' in r else 'FAIL'}')
 
-post({'jsonrpc':'2.0','method':'notifications/initialized','params':{}})
-time.sleep(0.5)
+# Extract session ID from response headers
+session_id = None
+for line in resp.split('\n'):
+    m = re.search(r'mcp-session-id:\s*(\S+)', line, re.IGNORECASE)
+    if m:
+        session_id = m.group(1)
+        break
+
+if not session_id:
+    print('FAIL: No session ID in response headers')
+    exit(1)
+
+# Parse JSON body (after blank line in response)
+parts = resp.split('\r\n\r\n', 1)
+body = parts[1] if len(parts) > 1 else ''
+r = json.loads(body) if body.strip() else None
+print(f'1. Initialize: {\"OK\" if r and \"result\" in r else \"FAIL\"}')
+
+# Send initialized notification
+post({'jsonrpc':'2.0','method':'notifications/initialized','params':{}}, session_id)
 
 # List tools
-post({'jsonrpc':'2.0','id':2,'method':'tools/list','params':{}})
-r = wait_response(2)
+resp = post({'jsonrpc':'2.0','id':2,'method':'tools/list','params':{}}, session_id)
+parts = resp.split('\r\n\r\n', 1)
+body = parts[1] if len(parts) > 1 else ''
+r = json.loads(body) if body.strip() else None
 tools = r.get('result',{}).get('tools',[]) if r else []
-print(f'2. Tools list: {len(tools)} tools found {'(OK)' if len(tools) > 0 else '(FAIL)'}')
+print(f'2. Tools list: {len(tools)} tools found {\"(OK)\" if len(tools) > 0 else \"(FAIL)\"}')
 
 # Call list_companies
-post({'jsonrpc':'2.0','id':3,'method':'tools/call',
-    'params':{'name':'list_companies','arguments':{'count':3}}})
-r = wait_response(3, 15)
+resp = post({'jsonrpc':'2.0','id':3,'method':'tools/call',
+    'params':{'name':'list_companies','arguments':{'count':3}}}, session_id)
+parts = resp.split('\r\n\r\n', 1)
+body = parts[1] if len(parts) > 1 else ''
+r = json.loads(body) if body.strip() else None
 has_result = r and 'result' in r and not r.get('result',{}).get('isError')
-print(f'3. list_companies: {'OK' if has_result else 'FAIL'}')
+print(f'3. list_companies: {\"OK\" if has_result else \"FAIL\"}')
 
-sse.kill()
+# Terminate session
+subprocess.run(['curl', '-s', '-X', 'DELETE', BASE, '-H', f'mcp-session-id: {session_id}'],
+    capture_output=True, text=True)
 print('Done!')
 "
 ```
@@ -198,11 +185,13 @@ SERVICE_URL="https://your-service-name.run.app"
 # Health check
 curl $SERVICE_URL/health
 
-# MCP SSE connection
-curl -sN $SERVICE_URL/mcp -H "Accept: text/event-stream"
+# MCP Streamable HTTP — initialize a session
+curl -sv -X POST $SERVICE_URL/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
 ```
 
-The MCP protocol flow is the same as local — establish SSE, then POST to the session endpoint.
+The MCP protocol flow is the same as local — POST requests to `/mcp` with the `mcp-session-id` header.
 
 ## Integration Testing
 
@@ -210,9 +199,9 @@ The MCP protocol flow is the same as local — establish SSE, then POST to the s
 
 Native stdio transport. See [CLAUDE_DESKTOP_SETUP.md](CLAUDE_DESKTOP_SETUP.md).
 
-### OpenAI Platform / ChatGPT
+### Other MCP Clients
 
-SSE transport via Cloud Run URL. See [OPENAI_PLATFORM.md](OPENAI_PLATFORM.md).
+Streamable HTTP transport via Cloud Run URL. Any MCP-compatible client can connect using the `/mcp` endpoint.
 
 ## Security Notes
 
