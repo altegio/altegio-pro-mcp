@@ -46,10 +46,12 @@ const UpdateStaffSchema = z.object({
   staff_id: z.number().int().positive(),
   name: z.string().min(1).optional(),
   specialization: z.string().optional(),
-  position_id: z.number().int().positive().nullable().optional(),
-  phone_number: z.string().nullable().optional(),
+  weight: z.number().optional(),
+  information: z.string().optional(),
+  api_id: z.string().optional(),
   hidden: z.number().int().min(0).max(1).optional(),
   fired: z.number().int().min(0).max(1).optional(),
+  user_id: z.number().int().optional(),
 });
 
 const DeleteStaffSchema = z.object({
@@ -155,28 +157,31 @@ const DeleteBookingSchema = z.object({
 });
 
 // ========== Schedule CRUD Schemas ==========
+// Matches PUT /company/{location_id}/staff/schedule spec
+
+const ScheduleSlotSchema = z.object({
+  from: z.string().regex(/^\d{2}:\d{2}$/),
+  to: z.string().regex(/^\d{2}:\d{2}$/),
+});
+
 const CreateScheduleSchema = z.object({
   company_id: z.number().int().positive(),
   staff_id: z.number().int().positive(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  time_from: z.string().regex(/^\d{2}:\d{2}$/),
-  time_to: z.string().regex(/^\d{2}:\d{2}$/),
-  seance_length: z.number().int().positive().optional(),
+  dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).min(1),
+  slots: z.array(ScheduleSlotSchema).min(1),
 });
 
 const UpdateScheduleSchema = z.object({
   company_id: z.number().int().positive(),
   staff_id: z.number().int().positive(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  time_from: z.string().regex(/^\d{2}:\d{2}$/).optional(),
-  time_to: z.string().regex(/^\d{2}:\d{2}$/).optional(),
-  seance_length: z.number().int().positive().optional(),
+  dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).min(1),
+  slots: z.array(ScheduleSlotSchema).min(1),
 });
 
 const DeleteScheduleSchema = z.object({
   company_id: z.number().int().positive(),
   staff_id: z.number().int().positive(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).min(1),
 });
 
 export class ToolHandlers {
@@ -325,10 +330,18 @@ export class ToolHandlers {
   }
 
   async getServiceCategories(args: unknown) {
-    const params = PublicListParamsSchema.parse(args);
-    const { company_id, ...listParams } = params;
+    const params = z
+      .object({
+        company_id: z.number().int().positive(),
+        category_id: z.number().int().min(0).optional().default(0),
+        page: z.number().int().positive().optional(),
+        count: z.number().int().positive().optional(),
+      })
+      .parse(args);
+    const { company_id, category_id, ...listParams } = params;
     const categories = await this.client.getServiceCategories(
       company_id,
+      category_id,
       Object.keys(listParams).length > 0 ? listParams : undefined
     );
 
@@ -392,18 +405,23 @@ export class ToolHandlers {
   async createSchedule(args: unknown) {
     try {
       const params = CreateScheduleSchema.parse(args);
-      const { company_id, ...scheduleData } = params;
 
-      const schedule = await this.client.createSchedule(
-        company_id,
-        scheduleData
-      );
+      const schedule = await this.client.setSchedule(params.company_id, {
+        schedules_to_set: [
+          {
+            team_member_id: params.staff_id,
+            dates: params.dates,
+            slots: params.slots,
+          },
+        ],
+      });
 
+      const slotsStr = params.slots.map((s) => `${s.from}-${s.to}`).join(', ');
       return {
         content: [
           {
             type: 'text' as const,
-            text: `Successfully created schedule for staff ${params.staff_id} on ${params.date}:\nTime: ${params.time_from} - ${params.time_to}\nEntries created: ${schedule.length}`,
+            text: `Successfully created schedule for staff ${params.staff_id} on ${params.dates.join(', ')}:\nSlots: ${slotsStr}\nEntries returned: ${schedule.length}`,
           },
         ],
         structuredContent: { items: schedule, count: schedule.length },
@@ -424,18 +442,22 @@ export class ToolHandlers {
   async updateSchedule(args: unknown) {
     try {
       const params = UpdateScheduleSchema.parse(args);
-      const { company_id, ...scheduleData } = params;
 
-      const schedule = await this.client.updateSchedule(
-        company_id,
-        scheduleData
-      );
+      const schedule = await this.client.setSchedule(params.company_id, {
+        schedules_to_set: [
+          {
+            team_member_id: params.staff_id,
+            dates: params.dates,
+            slots: params.slots,
+          },
+        ],
+      });
 
       return {
         content: [
           {
             type: 'text' as const,
-            text: `Successfully updated schedule for staff ${params.staff_id} on ${params.date}\nEntries updated: ${schedule.length}`,
+            text: `Successfully updated schedule for staff ${params.staff_id} on ${params.dates.join(', ')}\nEntries returned: ${schedule.length}`,
           },
         ],
         structuredContent: { items: schedule, count: schedule.length },
@@ -457,17 +479,20 @@ export class ToolHandlers {
     try {
       const params = DeleteScheduleSchema.parse(args);
 
-      await this.client.deleteSchedule(
-        params.company_id,
-        params.staff_id,
-        params.date
-      );
+      await this.client.setSchedule(params.company_id, {
+        schedules_to_delete: [
+          {
+            team_member_id: params.staff_id,
+            dates: params.dates,
+          },
+        ],
+      });
 
       return {
         content: [
           {
             type: 'text' as const,
-            text: `Successfully deleted schedule for staff ${params.staff_id} on ${params.date}`,
+            text: `Successfully deleted schedule for staff ${params.staff_id} on ${params.dates.join(', ')}`,
           },
         ],
       };

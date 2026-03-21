@@ -219,7 +219,7 @@ export class AltegioClient {
       ? `?${new URLSearchParams(params as Record<string, string>).toString()}`
       : '';
     const response = await this.apiRequest(
-      `/company/${companyId}/services${queryParams}`
+      `/services/${companyId}${queryParams}`
     );
 
     if (!response.ok) {
@@ -242,13 +242,14 @@ export class AltegioClient {
    */
   async getServiceCategories(
     companyId: number,
+    categoryId: number = 0,
     params?: AltegioBookingParams
   ): Promise<AltegioServiceCategory[]> {
     const queryParams = params
       ? `?${new URLSearchParams(params as Record<string, string>).toString()}`
       : '';
     const response = await this.apiRequest(
-      `/service_categories/${companyId}${queryParams}`
+      `/service_categories/${companyId}/${categoryId}${queryParams}`
     );
 
     if (!response.ok) {
@@ -330,109 +331,47 @@ export class AltegioClient {
   // ========== Schedule CRUD Operations ==========
 
   /**
-   * Create or update employee schedule (B2B API, requires user auth)
-   * PUT /schedule/{company_id}
+   * Set team member schedules (B2B API, requires user auth)
+   * PUT /company/{location_id}/staff/schedule
+   *
+   * Supports both setting and deleting schedules in a single request.
    */
-  async createSchedule(
+  async setSchedule(
     companyId: number,
-    data: import('../types/altegio.types.js').CreateScheduleRequest
+    data: import('../types/altegio.types.js').SetScheduleRequest
   ): Promise<AltegioScheduleEntry[]> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated. Use login() first.');
-    }
-
-    const response = await this.apiRequest(`/schedule/${companyId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to create schedule: HTTP ${response.status} - ${errorText}`
-      );
-    }
-
-    const result = (await response.json()) as AltegioApiResponse<
-      AltegioScheduleEntry[]
-    >;
-    if (!result.success || !result.data) {
-      throw new Error(
-        result.meta?.message || 'Failed to create schedule: Invalid response'
-      );
-    }
-
-    return result.data;
-  }
-
-  /**
-   * Update employee schedule (B2B API, requires user auth)
-   * PUT /schedule/{company_id}
-   */
-  async updateSchedule(
-    companyId: number,
-    data: import('../types/altegio.types.js').UpdateScheduleRequest
-  ): Promise<AltegioScheduleEntry[]> {
-    if (!this.userToken) {
-      throw new Error('Not authenticated. Use login() first.');
-    }
-
-    const response = await this.apiRequest(`/schedule/${companyId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to update schedule: HTTP ${response.status} - ${errorText}`
-      );
-    }
-
-    const result = (await response.json()) as AltegioApiResponse<
-      AltegioScheduleEntry[]
-    >;
-    if (!result.success || !result.data) {
-      throw new Error(
-        result.meta?.message || 'Failed to update schedule: Invalid response'
-      );
-    }
-
-    return result.data;
-  }
-
-  /**
-   * Delete employee schedule for a specific date (B2B API, requires user auth)
-   * DELETE /schedule/{company_id}/{staff_id}/{date}
-   */
-  async deleteSchedule(
-    companyId: number,
-    staffId: number,
-    date: string
-  ): Promise<void> {
     if (!this.userToken) {
       throw new Error('Not authenticated. Use login() first.');
     }
 
     const response = await this.apiRequest(
-      `/schedule/${companyId}/${staffId}/${date}`,
+      `/company/${companyId}/staff/schedule`,
       {
-        method: 'DELETE',
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
       }
     );
 
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(
-        `Failed to delete schedule: HTTP ${response.status} - ${errorText}`
+        `Failed to set schedule: HTTP ${response.status} - ${errorText}`
       );
     }
+
+    const result = (await response.json()) as AltegioApiResponse<
+      AltegioScheduleEntry[]
+    >;
+    if (!result.success || !result.data) {
+      throw new Error(
+        result.meta?.message || 'Failed to set schedule: Invalid response'
+      );
+    }
+
+    return result.data;
   }
 
   // ========== Staff CRUD Operations ==========
@@ -563,7 +502,7 @@ export class AltegioClient {
     }
 
     const response = await this.apiRequest(
-      `/services/${companyId}/services/${serviceId}`,
+      `/services/${companyId}/${serviceId}`,
       {
         method: 'PATCH',
         headers: {

@@ -555,7 +555,7 @@ describe('AltegioClient', () => {
         const services = await authenticatedClient.getServices(4564);
 
         expect(fetch).toHaveBeenLastCalledWith(
-          'https://api.alteg.io/api/v1/company/4564/services',
+          'https://api.alteg.io/api/v1/services/4564',
           {
             headers: {
               Accept: 'application/vnd.api.v2+json',
@@ -599,7 +599,7 @@ describe('AltegioClient', () => {
         await client.getServices(4564);
 
         expect(fetch).toHaveBeenLastCalledWith(
-          'https://api.alteg.io/api/v1/company/4564/services',
+          'https://api.alteg.io/api/v1/services/4564',
           expect.any(Object)
         );
       });
@@ -632,7 +632,7 @@ describe('AltegioClient', () => {
         const categories = await client.getServiceCategories(4564);
 
         expect(fetch).toHaveBeenLastCalledWith(
-          'https://api.alteg.io/api/v1/service_categories/4564',
+          'https://api.alteg.io/api/v1/service_categories/4564/0',
           {
             headers: {
               Accept: 'application/vnd.api.v2+json',

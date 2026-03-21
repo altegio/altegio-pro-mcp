@@ -75,7 +75,7 @@ describe('AltegioClient - Services CRUD', () => {
 
       expect(result.title).toBe('New Haircut');
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/services/456/services/789'),
+        expect.stringContaining('/services/456/789'),
         expect.objectContaining({ method: 'PATCH' })
       );
     });

@@ -53,7 +53,7 @@ describe('AltegioClient Schedule Operations', () => {
     });
   });
 
-  describe('createSchedule', () => {
+  describe('setSchedule', () => {
     it('should require user token', async () => {
       const testDir = join(tmpdir(), `altegio-test-${Date.now()}`);
       const client = new AltegioClient(
@@ -66,16 +66,19 @@ describe('AltegioClient Schedule Operations', () => {
       );
 
       await expect(
-        client.createSchedule(123, {
-          staff_id: 456,
-          date: '2025-10-30',
-          time_from: '09:00',
-          time_to: '18:00',
+        client.setSchedule(123, {
+          schedules_to_set: [
+            {
+              team_member_id: 456,
+              dates: ['2025-10-30'],
+              slots: [{ from: '09:00', to: '18:00' }],
+            },
+          ],
         })
       ).rejects.toThrow('Not authenticated');
     });
 
-    it('should call PUT /schedule endpoint with correct data', async () => {
+    it('should call PUT /company/{id}/staff/schedule with schedules_to_set', async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
         json: async () => ({ success: true, data: [] }),
@@ -92,17 +95,22 @@ describe('AltegioClient Schedule Operations', () => {
       );
 
       const scheduleData = {
-        staff_id: 456,
-        date: '2025-10-30',
-        time_from: '09:00',
-        time_to: '18:00',
-        seance_length: 30,
+        schedules_to_set: [
+          {
+            team_member_id: 456,
+            dates: ['2025-10-30', '2025-10-31'],
+            slots: [
+              { from: '09:00', to: '13:00' },
+              { from: '14:00', to: '18:00' },
+            ],
+          },
+        ],
       };
 
-      await client.createSchedule(123, scheduleData);
+      await client.setSchedule(123, scheduleData);
 
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/schedule/123',
+        'https://api.alteg.io/api/v1/company/123/staff/schedule',
         expect.objectContaining({
           method: 'PUT',
           headers: expect.objectContaining({
@@ -113,30 +121,8 @@ describe('AltegioClient Schedule Operations', () => {
         })
       );
     });
-  });
 
-  describe('updateSchedule', () => {
-    it('should require user token', async () => {
-      const testDir = join(tmpdir(), `altegio-test-${Date.now()}`);
-      const client = new AltegioClient(
-        {
-          apiBase: 'https://api.altegio.com',
-          partnerToken: 'partner123',
-          userToken: undefined,
-        },
-        testDir
-      );
-
-      await expect(
-        client.updateSchedule(123, {
-          staff_id: 456,
-          date: '2025-10-30',
-          time_from: '10:00',
-        })
-      ).rejects.toThrow('Not authenticated');
-    });
-
-    it('should call PUT /schedule endpoint with update data', async () => {
+    it('should call PUT /company/{id}/staff/schedule with schedules_to_delete', async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
         json: async () => ({ success: true, data: [] }),
@@ -152,69 +138,22 @@ describe('AltegioClient Schedule Operations', () => {
         testDir
       );
 
-      const updateData = {
-        staff_id: 456,
-        date: '2025-10-30',
-        time_from: '10:00',
-        time_to: '17:00',
+      const scheduleData = {
+        schedules_to_delete: [
+          {
+            team_member_id: 456,
+            dates: ['2025-10-30'],
+          },
+        ],
       };
 
-      await client.updateSchedule(123, updateData);
+      await client.setSchedule(123, scheduleData);
 
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/schedule/123',
+        'https://api.alteg.io/api/v1/company/123/staff/schedule',
         expect.objectContaining({
           method: 'PUT',
-          headers: expect.objectContaining({
-            'Content-Type': 'application/json',
-          }),
-          body: JSON.stringify(updateData),
-        })
-      );
-    });
-  });
-
-  describe('deleteSchedule', () => {
-    it('should require user token', async () => {
-      const testDir = join(tmpdir(), `altegio-test-${Date.now()}`);
-      const client = new AltegioClient(
-        {
-          apiBase: 'https://api.altegio.com',
-          partnerToken: 'partner123',
-          userToken: undefined,
-        },
-        testDir
-      );
-
-      await expect(
-        client.deleteSchedule(123, 456, '2025-10-30')
-      ).rejects.toThrow('Not authenticated');
-    });
-
-    it('should call DELETE endpoint with correct parameters', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-      });
-
-      const testDir = join(tmpdir(), `altegio-test-${Date.now()}`);
-      const client = new AltegioClient(
-        {
-          apiBase: 'https://api.alteg.io/api/v1',
-          partnerToken: 'partner123',
-          userToken: 'user456',
-        },
-        testDir
-      );
-
-      await client.deleteSchedule(123, 456, '2025-10-30');
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/schedule/123/456/2025-10-30',
-        expect.objectContaining({
-          method: 'DELETE',
-          headers: expect.objectContaining({
-            Authorization: 'Bearer partner123, User user456',
-          }),
+          body: JSON.stringify(scheduleData),
         })
       );
     });
