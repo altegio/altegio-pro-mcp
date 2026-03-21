@@ -42,7 +42,7 @@ export const ServerConfigSchema = z.object({
   name: z.string().default('altegio-mcp-server'),
   version: z.string().default('1.0.0'),
   description: z.string().optional(),
-  protocolVersion: z.string().default('2024-11-05'),
+  protocolVersion: z.string().default('2025-11-25'),
   capabilities: z
     .object({
       tools: z

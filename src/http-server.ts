@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import 'dotenv/config';
+import { randomUUID } from 'node:crypto';
 import express from 'express';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { createServer } from './server.js';
 import { createLogger } from './utils/logger.js';
 
@@ -20,63 +22,110 @@ async function startHTTPServer(): Promise<void> {
   });
 
   // Store transports by session ID
-  const transports: Record<string, SSEServerTransport> = {};
+  const transports: Record<string, StreamableHTTPServerTransport> = {};
 
-  // SSE endpoint - GET to establish connection
-  app.get('/mcp', async (_req, res) => {
-    logger.info('New SSE connection request');
+  // POST /mcp — client sends JSON-RPC messages
+  app.post('/mcp', async (req, res) => {
+    const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
     try {
-      const transport = new SSEServerTransport('/mcp', res);
-      const sessionId = transport.sessionId;
+      let transport: StreamableHTTPServerTransport;
 
-      transports[sessionId] = transport;
+      if (sessionId && transports[sessionId]) {
+        // Reuse existing transport
+        transport = transports[sessionId];
+      } else if (!sessionId && isInitializeRequest(req.body)) {
+        // New initialization request — create transport + server
+        transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          onsessioninitialized: (id) => {
+            logger.info(`Session initialized: ${id}`);
+            transports[id] = transport;
+          },
+        });
 
-      res.on('close', () => {
-        logger.info(`SSE connection closed: ${sessionId}`);
-        delete transports[sessionId];
-      });
+        transport.onclose = () => {
+          const sid = transport.sessionId;
+          if (sid && transports[sid]) {
+            logger.info(`Transport closed for session ${sid}`);
+            delete transports[sid];
+          }
+        };
 
-      // Create new server instance for this connection
-      const server = createServer();
-      await server.connect(transport);
+        const server = createServer();
+        await server.connect(transport);
+        await transport.handleRequest(req, res, req.body);
+        return;
+      } else {
+        res.status(400).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32000,
+            message: 'Bad Request: No valid session ID provided',
+          },
+          id: null,
+        });
+        return;
+      }
 
-      logger.info(`SSE connection established: ${sessionId}`);
+      await transport.handleRequest(req, res, req.body);
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
-      logger.error(`Failed to establish SSE connection: ${errMsg}`);
+      logger.error(`Failed to handle POST: ${errMsg}`);
       if (!res.headersSent) {
-        res.status(500).json({ error: 'Failed to establish connection' });
+        res.status(500).json({
+          jsonrpc: '2.0',
+          error: { code: -32603, message: 'Internal server error' },
+          id: null,
+        });
       }
     }
   });
 
-  // POST endpoint for messages
-  app.post('/mcp', async (req, res) => {
+  // GET /mcp — client opens SSE stream for server-initiated messages
+  app.get('/mcp', async (req, res) => {
+    const sessionId = req.headers['mcp-session-id'] as string | undefined;
+
+    if (!sessionId || !transports[sessionId]) {
+      res.status(400).json({ error: 'Invalid or missing session ID' });
+      return;
+    }
+
     try {
-      const sessionId = req.query.sessionId as string;
-      const transport = transports[sessionId];
-
-      if (!transport) {
-        logger.warn(`Session not found: ${sessionId}`);
-        res.status(404).json({ error: 'Session not found' });
-        return;
-      }
-
-      await transport.handlePostMessage(req, res, req.body);
+      await transports[sessionId].handleRequest(req, res);
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
-      logger.error(`Failed to handle POST message: ${errMsg}`);
+      logger.error(`Failed to handle GET SSE: ${errMsg}`);
       if (!res.headersSent) {
-        res.status(500).json({ error: 'Failed to handle message' });
+        res.status(500).json({ error: 'Failed to establish SSE stream' });
+      }
+    }
+  });
+
+  // DELETE /mcp — client terminates session
+  app.delete('/mcp', async (req, res) => {
+    const sessionId = req.headers['mcp-session-id'] as string | undefined;
+
+    if (!sessionId || !transports[sessionId]) {
+      res.status(400).json({ error: 'Invalid or missing session ID' });
+      return;
+    }
+
+    try {
+      await transports[sessionId].handleRequest(req, res);
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      logger.error(`Failed to handle DELETE: ${errMsg}`);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to terminate session' });
       }
     }
   });
 
   // Start Express server
   app.listen(port, () => {
-    logger.info(`HTTP server listening on port ${port}`);
-    logger.info(`SSE endpoint available at http://localhost:${port}/mcp`);
+    logger.info(`Streamable HTTP server listening on port ${port}`);
+    logger.info(`MCP endpoint: http://localhost:${port}/mcp`);
   });
 }
 

@@ -10,12 +10,27 @@ import { OnboardingHandlers } from './onboarding-handlers.js';
 import { AltegioClient } from '../providers/altegio-client.js';
 import { OnboardingStateManager } from '../providers/onboarding-state-manager.js';
 import { onboardingTools } from './onboarding-registry.js';
+import * as output from './output-schemas.js';
 
-interface ToolDefinition {
+interface ToolAnnotations {
+  title?: string;
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
+}
+
+export interface ToolDefinition {
   name: string;
   description: string;
+  annotations?: ToolAnnotations;
   inputSchema: {
     type: string;
+    properties?: Record<string, any>;
+    required?: string[];
+  };
+  outputSchema?: {
+    type: 'object';
     properties?: Record<string, any>;
     required?: string[];
   };
@@ -26,6 +41,10 @@ const tools: ToolDefinition[] = [
     name: 'altegio_login',
     description:
       '[Auth] Login to Altegio with email and password. REQUIRED for administrative operations: getting user companies (list_companies with my=1), viewing bookings, and other business management tasks. Ask user for credentials when they request administrative data.',
+    annotations: {
+      title: 'Login to Altegio',
+      openWorldHint: true,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -34,10 +53,15 @@ const tools: ToolDefinition[] = [
       },
       required: ['email', 'password'],
     },
+    outputSchema: output.loginOutput,
   },
   {
     name: 'altegio_logout',
     description: '[Auth] Logout from Altegio and clear stored credentials.',
+    annotations: {
+      title: 'Logout from Altegio',
+      openWorldHint: true,
+    },
     inputSchema: {
       type: 'object',
       properties: {},
@@ -47,6 +71,11 @@ const tools: ToolDefinition[] = [
     name: 'list_companies',
     description:
       '[Company] Get list of companies. AUTHENTICATION REQUIRED when my=1 (to get companies user manages). PUBLIC when my=0 or omitted (all companies). If user asks about "their" or "my" companies, use my=1 and ensure user is logged in first. After getting user companies, ask which company they want to work with if not specified. PAGINATION STRATEGY: Default returns 200 companies (can overwhelm context). RECOMMENDED: Start with count=20-50 for initial results. Show user first batch, ask if they need more or can identify their company. Only increase count if user explicitly needs full list. Maximum count=300. Use page parameter to fetch next batches. This approach saves context and computation.',
+    annotations: {
+      title: 'List Companies',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -68,11 +97,17 @@ const tools: ToolDefinition[] = [
         },
       },
     },
+    outputSchema: output.companiesOutput,
   },
   {
     name: 'get_bookings',
     description:
       '[Bookings] Get bookings for a company. AUTHENTICATION REQUIRED - this is administrative data. User must be logged in and have access to the company. If company_id not known, first call list_companies with my=1 to get user companies, then ask user to choose one. PAGINATION STRATEGY: Default may return many bookings. RECOMMENDED: Start with count=20-50 for recent bookings. Use start_date/end_date to filter by date range. Show first batch to user, fetch more only if needed. This saves context and computation.',
+    annotations: {
+      title: 'Get Bookings',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -103,11 +138,17 @@ const tools: ToolDefinition[] = [
       },
       required: ['company_id'],
     },
+    outputSchema: output.bookingsOutput,
   },
   {
     name: 'get_staff',
     description:
       '[Staff] Get list of staff members for a company. AUTHENTICATION REQUIRED - administrative access to view all staff with full details (not just public booking info). User must be logged in and have access to the company. PAGINATION STRATEGY: May return many staff (100+). RECOMMENDED: Start with count=30-50 to show initial options. User can browse and request more if needed. This saves context for large salons.',
+    annotations: {
+      title: 'Get Staff',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -128,11 +169,17 @@ const tools: ToolDefinition[] = [
       },
       required: ['company_id'],
     },
+    outputSchema: output.staffListOutput,
   },
   {
     name: 'get_services',
     description:
       '[Services] Get list of services available at a company. AUTHENTICATION REQUIRED - administrative access to view all services with full pricing, settings, and configuration (not just public booking info). User must be logged in and have access to the company. PAGINATION STRATEGY: May return many services (50+). RECOMMENDED: Start with count=30-50 to show main services. User can request more or use categories for better organization.',
+    annotations: {
+      title: 'Get Services',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -153,11 +200,17 @@ const tools: ToolDefinition[] = [
       },
       required: ['company_id'],
     },
+    outputSchema: output.servicesOutput,
   },
   {
     name: 'get_service_categories',
     description:
       '[Categories] Get list of service categories at a company. PUBLIC API - NO AUTHENTICATION REQUIRED. Use this for online booking - shows how services are organized. PAGINATION STRATEGY: May return many categories (20+). RECOMMENDED: Start with count=20-30. Categories help organize services, so showing initial set is usually sufficient.',
+    annotations: {
+      title: 'Get Service Categories',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -178,11 +231,17 @@ const tools: ToolDefinition[] = [
       },
       required: ['company_id'],
     },
+    outputSchema: output.categoriesOutput,
   },
   {
     name: 'get_schedule',
     description:
       '[Schedule] Get employee schedule for a date range. AUTHENTICATION REQUIRED - administrative access to view staff working schedule. User must be logged in and have access to the company. Returns schedule entries with dates, times, and session lengths.',
+    annotations: {
+      title: 'Get Schedule',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -199,11 +258,17 @@ const tools: ToolDefinition[] = [
       },
       required: ['company_id', 'staff_id', 'start_date', 'end_date'],
     },
+    outputSchema: output.scheduleOutput,
   },
   {
     name: 'create_schedule',
     description:
       '[Schedule] Create employee work schedule. AUTHENTICATION REQUIRED - administrative access to create staff working schedule. Defines when an employee is available to work (e.g., "Monday 9:00-18:00"). Use this to set up or modify work hours.',
+    annotations: {
+      title: 'Create Schedule',
+      openWorldHint: true,
+      idempotentHint: false,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -228,11 +293,17 @@ const tools: ToolDefinition[] = [
       },
       required: ['company_id', 'staff_id', 'date', 'time_from', 'time_to'],
     },
+    outputSchema: output.scheduleEntityOutput,
   },
   {
     name: 'update_schedule',
     description:
       '[Schedule] Update employee work schedule. AUTHENTICATION REQUIRED - administrative access to modify staff working schedule. Updates existing work hours for a specific date.',
+    annotations: {
+      title: 'Update Schedule',
+      openWorldHint: true,
+      idempotentHint: true,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -257,11 +328,17 @@ const tools: ToolDefinition[] = [
       },
       required: ['company_id', 'staff_id', 'date'],
     },
+    outputSchema: output.scheduleEntityOutput,
   },
   {
     name: 'delete_schedule',
     description:
       '[Schedule] Delete employee work schedule for a specific date. AUTHENTICATION REQUIRED - administrative access to remove staff working schedule. Removes work hours for the specified date.',
+    annotations: {
+      title: 'Delete Schedule',
+      destructiveHint: true,
+      openWorldHint: true,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -279,6 +356,11 @@ const tools: ToolDefinition[] = [
     name: 'get_positions',
     description:
       '[Positions] Get list of positions in company. AUTHENTICATION REQUIRED. Returns all available positions that can be assigned to staff members.',
+    annotations: {
+      title: 'Get Positions',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -286,11 +368,17 @@ const tools: ToolDefinition[] = [
       },
       required: ['company_id'],
     },
+    outputSchema: output.positionsOutput,
   },
   {
     name: 'create_position',
     description:
       '[Positions] Create a new position. AUTHENTICATION REQUIRED. Positions are used to categorize staff roles (e.g., "Manager", "Stylist", "Receptionist").',
+    annotations: {
+      title: 'Create Position',
+      openWorldHint: true,
+      idempotentHint: false,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -300,11 +388,17 @@ const tools: ToolDefinition[] = [
       },
       required: ['company_id', 'title'],
     },
+    outputSchema: output.positionEntityOutput,
   },
   {
     name: 'update_position',
     description:
       '[Positions] Update existing position. AUTHENTICATION REQUIRED. Modify position title or external ID.',
+    annotations: {
+      title: 'Update Position',
+      openWorldHint: true,
+      idempotentHint: true,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -315,11 +409,17 @@ const tools: ToolDefinition[] = [
       },
       required: ['company_id', 'position_id'],
     },
+    outputSchema: output.positionEntityOutput,
   },
   {
     name: 'delete_position',
     description:
       '[Positions] Delete position. AUTHENTICATION REQUIRED. Note: Cannot delete positions that are assigned to staff members.',
+    annotations: {
+      title: 'Delete Position',
+      destructiveHint: true,
+      openWorldHint: true,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -333,6 +433,11 @@ const tools: ToolDefinition[] = [
     name: 'create_staff',
     description:
       '[Staff] Create a new employee/staff member. AUTHENTICATION REQUIRED. Required fields: name, specialization, position_id, phone_number, user_email, user_phone, is_user_invite.',
+    annotations: {
+      title: 'Create Staff Member',
+      openWorldHint: true,
+      idempotentHint: false,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -364,11 +469,17 @@ const tools: ToolDefinition[] = [
       },
       required: ['company_id', 'name', 'specialization', 'position_id', 'phone_number', 'user_email', 'user_phone', 'is_user_invite'],
     },
+    outputSchema: output.staffEntityOutput,
   },
   {
     name: 'update_staff',
     description:
       '[Staff] Update existing employee/staff member. AUTHENTICATION REQUIRED. Provide only fields to update.',
+    annotations: {
+      title: 'Update Staff Member',
+      openWorldHint: true,
+      idempotentHint: true,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -383,11 +494,17 @@ const tools: ToolDefinition[] = [
       },
       required: ['company_id', 'staff_id'],
     },
+    outputSchema: output.staffEntityOutput,
   },
   {
     name: 'delete_staff',
     description:
       '[Staff] Delete/remove employee/staff member. AUTHENTICATION REQUIRED.',
+    annotations: {
+      title: 'Delete Staff Member',
+      destructiveHint: true,
+      openWorldHint: true,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -401,6 +518,11 @@ const tools: ToolDefinition[] = [
     name: 'create_service',
     description:
       '[Services] Create a new service. AUTHENTICATION REQUIRED. Required fields: title, category_id.',
+    annotations: {
+      title: 'Create Service',
+      openWorldHint: true,
+      idempotentHint: false,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -416,11 +538,17 @@ const tools: ToolDefinition[] = [
       },
       required: ['company_id', 'title', 'category_id'],
     },
+    outputSchema: output.serviceEntityOutput,
   },
   {
     name: 'update_service',
     description:
       '[Services] Update existing service. AUTHENTICATION REQUIRED. Provide only fields to update.',
+    annotations: {
+      title: 'Update Service',
+      openWorldHint: true,
+      idempotentHint: true,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -437,11 +565,17 @@ const tools: ToolDefinition[] = [
       },
       required: ['company_id', 'service_id'],
     },
+    outputSchema: output.serviceEntityOutput,
   },
   {
     name: 'create_booking',
     description:
       '[Bookings] Create a new client booking/appointment. AUTHENTICATION REQUIRED. Required fields: staff_id, services, datetime, client info.',
+    annotations: {
+      title: 'Create Booking',
+      openWorldHint: true,
+      idempotentHint: false,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -480,11 +614,17 @@ const tools: ToolDefinition[] = [
       },
       required: ['company_id', 'staff_id', 'services', 'datetime', 'client'],
     },
+    outputSchema: output.bookingEntityOutput,
   },
   {
     name: 'update_booking',
     description:
       '[Bookings] Update existing booking/appointment. AUTHENTICATION REQUIRED. Provide only fields to update.',
+    annotations: {
+      title: 'Update Booking',
+      openWorldHint: true,
+      idempotentHint: true,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -518,11 +658,17 @@ const tools: ToolDefinition[] = [
       },
       required: ['company_id', 'record_id'],
     },
+    outputSchema: output.bookingEntityOutput,
   },
   {
     name: 'delete_booking',
     description:
       '[Bookings] Delete/cancel booking/appointment. AUTHENTICATION REQUIRED.',
+    annotations: {
+      title: 'Delete Booking',
+      destructiveHint: true,
+      openWorldHint: true,
+    },
     inputSchema: {
       type: 'object',
       properties: {
@@ -548,7 +694,9 @@ export function registerTools(server: Server, client: AltegioClient): string[] {
       tools: allTools.map((t) => ({
         name: t.name,
         description: t.description,
+        annotations: t.annotations,
         inputSchema: t.inputSchema,
+        ...(t.outputSchema && { outputSchema: t.outputSchema }),
       })),
     };
   });

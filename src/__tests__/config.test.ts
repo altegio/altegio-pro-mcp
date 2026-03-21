@@ -61,7 +61,7 @@ describe('Configuration Schema', () => {
 
       expect(result.name).toBe('altegio-mcp-server');
       expect(result.version).toBe('1.0.0');
-      expect(result.protocolVersion).toBe('2024-11-05');
+      expect(result.protocolVersion).toBe('2025-11-25');
       expect(result.capabilities.tools?.listChanged).toBe(true);
     });
 
