@@ -85,7 +85,7 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 
 **Transports:**
 - **stdio** (default) → `dist/index.js` → Claude Desktop integration
-- **HTTP** → `dist/http-server.js` → Local on port 8080
+- **HTTP** → `dist/http-server.js` → Production on VM (port 3000), public via `https://mcp.alteg.io/pro/mcp`
   - `/health` - health check
   - `/mcp` - MCP Streamable HTTP (POST for messages, GET for SSE stream, DELETE for session termination)
 
@@ -189,7 +189,7 @@ ALTEGIO_API_TOKEN=your_partner_token
 ALTEGIO_API_BASE=https://api.alteg.io/api/v1
 NODE_ENV=development|production
 LOG_LEVEL=debug|info|warn|error
-PORT=8080
+PORT=3000
 CREDENTIALS_DIR=~/.altegio-mcp
 RATE_LIMIT_REQUESTS=200
 MAX_RETRY_ATTEMPTS=3

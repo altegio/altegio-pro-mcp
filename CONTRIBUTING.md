@@ -198,9 +198,8 @@ Update README.md when:
 ## CI/CD
 
 Push to `main` triggers:
-1. Cloud Build via GitHub trigger
-2. Docker image build and push to Artifact Registry
-3. Automatic deployment to Cloud Run staging
+1. GitHub Actions CI (lint, test, build, security audit)
+2. VM auto-deploy within 2 minutes (git pull + docker compose rebuild)
 
 See [CI-CD.md](CI-CD.md) for details.
 
