@@ -322,8 +322,9 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
     });
 
     it('should handle resume with no session', async () => {
-      await expect(handlers.resume({ company_id: 999 }))
-        .rejects.toThrow('No onboarding session found for company 999');
+      const result = await handlers.resume({ company_id: 999 });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toContain('No onboarding session found');
     });
 
     it('should resume with no completed checkpoints', async () => {
@@ -451,14 +452,17 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
     it('should require authentication for all operations', async () => {
       mockClient.isAuthenticated = jest.fn().mockReturnValue(false);
 
-      await expect(handlers.start({ company_id: 123 }))
-        .rejects.toThrow('Authentication required');
+      const startResult = await handlers.start({ company_id: 123 });
+      expect(startResult.isError).toBe(true);
+      expect(startResult.content[0]?.text).toContain('Authentication required');
 
-      await expect(handlers.resume({ company_id: 123 }))
-        .rejects.toThrow('Authentication required');
+      const resumeResult = await handlers.resume({ company_id: 123 });
+      expect(resumeResult.isError).toBe(true);
+      expect(resumeResult.content[0]?.text).toContain('Authentication required');
 
-      await expect(handlers.status({ company_id: 123 }))
-        .rejects.toThrow('Authentication required');
+      const statusResult = await handlers.status({ company_id: 123 });
+      expect(statusResult.isError).toBe(true);
+      expect(statusResult.content[0]?.text).toContain('Authentication required');
     });
 
     it('should reject test bookings if prerequisites missing', async () => {
@@ -467,9 +471,9 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
       await handlers.start({ company_id: companyId });
 
       // Try to create bookings without staff/services
-      await expect(
-        handlers.createTestBookings({ company_id: companyId, count: 2 })
-      ).rejects.toThrow('No staff or services found');
+      const result1 = await handlers.createTestBookings({ company_id: companyId, count: 2 });
+      expect(result1.isError).toBe(true);
+      expect(result1.content[0]?.text).toContain('No staff or services found');
 
       // Add only staff
       mockClient.createStaff = jest.fn()
@@ -480,9 +484,9 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
       });
 
       // Still should fail without services
-      await expect(
-        handlers.createTestBookings({ company_id: companyId, count: 2 })
-      ).rejects.toThrow('No staff or services found');
+      const result2 = await handlers.createTestBookings({ company_id: companyId, count: 2 });
+      expect(result2.isError).toBe(true);
+      expect(result2.content[0]?.text).toContain('No staff or services found');
     });
   });
 

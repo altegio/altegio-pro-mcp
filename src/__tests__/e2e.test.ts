@@ -41,21 +41,20 @@ describe('End-to-End Tests', () => {
   });
 
   it('should validate email format for login', async () => {
-    // Test with invalid email format
-    await expect(
-      handlers.login({
-        email: 'not-an-email',
-        password: 'test123',
-      })
-    ).rejects.toThrow();
+    const result = await handlers.login({
+      email: 'not-an-email',
+      password: 'test123',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('Invalid parameters');
   });
 
   it('should validate company_id is a number', async () => {
-    await expect(
-      handlers.getBookings({
-        company_id: 'not-a-number',
-      })
-    ).rejects.toThrow();
+    const result = await handlers.getBookings({
+      company_id: 'not-a-number',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('Invalid parameters');
   });
 
   it('should handle login with proper response structure', async () => {

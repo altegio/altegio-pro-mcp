@@ -37,11 +37,12 @@ describe('Onboarding Handlers', () => {
       expect(textContent).toContain('company 123');
     });
 
-    it('should reject if not authenticated', async () => {
+    it('should return error if not authenticated', async () => {
       mockClient.isAuthenticated.mockReturnValue(false);
 
-      await expect(handlers.start({ company_id: 123 }))
-        .rejects.toThrow('Authentication required');
+      const result = await handlers.start({ company_id: 123 });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toContain('Authentication required');
     });
   });
 
@@ -57,8 +58,9 @@ describe('Onboarding Handlers', () => {
     });
 
     it('should handle no existing session', async () => {
-      await expect(handlers.resume({ company_id: 999 }))
-        .rejects.toThrow('No onboarding session found');
+      const result = await handlers.resume({ company_id: 999 });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toContain('No onboarding session found');
     });
   });
 
@@ -194,11 +196,12 @@ describe('Onboarding Handlers', () => {
       expect(mockClient.createBooking).toHaveBeenCalledTimes(3);
     });
 
-    it('should reject if no staff exist', async () => {
+    it('should return error if no staff exist', async () => {
       await handlers.start({ company_id: 123 });
 
-      await expect(handlers.createTestBookings({ company_id: 123, count: 2 }))
-        .rejects.toThrow('No staff or services found');
+      const result = await handlers.createTestBookings({ company_id: 123, count: 2 });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toContain('No staff or services found');
     });
   });
 
@@ -292,13 +295,15 @@ describe('Onboarding Handlers', () => {
       expect(result.content[0]?.text).toContain('Note: Services cannot be deleted via API');
     });
 
-    it('should reject if no checkpoint exists', async () => {
+    it('should return error if no checkpoint exists', async () => {
       await handlers.start({ company_id: 123 });
 
-      await expect(handlers.rollbackPhase({
+      const result = await handlers.rollbackPhase({
         company_id: 123,
         phase_name: 'staff'
-      })).rejects.toThrow('No checkpoint found');
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toContain('No checkpoint found');
     });
   });
 });

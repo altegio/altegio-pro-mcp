@@ -1,5 +1,6 @@
 import { ToolHandlers } from '../handlers.js';
 import { AltegioClient } from '../../providers/altegio-client.js';
+import { AuthenticationError } from '../../utils/errors.js';
 
 jest.mock('../../providers/altegio-client.js');
 
@@ -45,7 +46,7 @@ describe('ToolHandlers - Bookings CRUD', () => {
 
     it('should handle errors', async () => {
       mockClient.createBooking.mockRejectedValue(
-        new Error('Not authenticated')
+        new AuthenticationError('Not authenticated. Call altegio_login first.')
       );
 
       const result = await handlers.createBooking({
@@ -56,7 +57,7 @@ describe('ToolHandlers - Bookings CRUD', () => {
         client: { name: 'Jane', phone: '123' },
       });
 
-      expect(result.content[0]?.text).toContain('Failed to create booking');
+      expect(result.content[0]?.text).toContain('Authentication required');
     });
   });
 

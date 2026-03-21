@@ -1,5 +1,6 @@
 import { ToolHandlers } from '../handlers.js';
 import { AltegioClient } from '../../providers/altegio-client.js';
+import { AuthenticationError } from '../../utils/errors.js';
 
 jest.mock('../../providers/altegio-client.js');
 
@@ -36,7 +37,7 @@ describe('ToolHandlers - Services CRUD', () => {
 
     it('should handle errors', async () => {
       mockClient.createService.mockRejectedValue(
-        new Error('Not authenticated')
+        new AuthenticationError('Not authenticated. Call altegio_login first.')
       );
 
       const result = await handlers.createService({
@@ -45,7 +46,7 @@ describe('ToolHandlers - Services CRUD', () => {
         category_id: 1,
       });
 
-      expect((result.content[0] as any).text).toContain('Failed to create service');
+      expect((result.content[0] as any).text).toContain('Authentication required');
     });
   });
 

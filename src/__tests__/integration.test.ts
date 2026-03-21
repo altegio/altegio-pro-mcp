@@ -72,12 +72,13 @@ describe('Tool Integration', () => {
     });
     const handlers = new ToolHandlers(client);
 
-    await expect(
-      handlers.login({
-        email: 'invalid-email',
-        password: 'test',
-      })
-    ).rejects.toThrow();
+    const result = await handlers.login({
+      email: 'invalid-email',
+      password: 'test',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('Invalid parameters');
+    expect(result.content[0]?.text).toContain('email');
   });
 
   it('should validate company_id is a number', async () => {
@@ -87,10 +88,10 @@ describe('Tool Integration', () => {
     });
     const handlers = new ToolHandlers(client);
 
-    await expect(
-      handlers.getBookings({
-        company_id: 'not-a-number',
-      })
-    ).rejects.toThrow();
+    const result = await handlers.getBookings({
+      company_id: 'not-a-number',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('Invalid parameters');
   });
 });

@@ -1,5 +1,6 @@
 import { ToolHandlers } from '../handlers.js';
 import { AltegioClient } from '../../providers/altegio-client.js';
+import { AuthenticationError } from '../../utils/errors.js';
 
 jest.mock('../../providers/altegio-client.js');
 
@@ -47,7 +48,7 @@ describe('ToolHandlers - Staff CRUD', () => {
 
     it('should handle errors', async () => {
       mockClient.createStaff.mockRejectedValue(
-        new Error('Not authenticated')
+        new AuthenticationError('Not authenticated. Call altegio_login first.')
       );
 
       const result = await handlers.createStaff({
@@ -61,8 +62,8 @@ describe('ToolHandlers - Staff CRUD', () => {
         is_user_invite: true,
       });
 
-      expect((result.content[0] as any).text).toContain('Failed to create staff');
-      expect((result.content[0] as any).text).toContain('Not authenticated');
+      expect((result.content[0] as any).text).toContain('Authentication required');
+      expect((result.content[0] as any).text).toContain('altegio_login');
     });
   });
 
