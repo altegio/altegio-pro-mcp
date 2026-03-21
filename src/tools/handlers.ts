@@ -195,6 +195,7 @@ export class ToolHandlers {
             : `Login failed: ${result.error}`,
         },
       ],
+      structuredContent: { success: result.success, ...(result.error && { error: result.error }) },
     };
   }
 
@@ -230,6 +231,7 @@ export class ToolHandlers {
           text: summary + companiesList,
         },
       ],
+      structuredContent: { items: companies, count: companies.length },
     };
   }
 
@@ -261,6 +263,7 @@ export class ToolHandlers {
           text: summary + bookingsList,
         },
       ],
+      structuredContent: { items: bookings, count: bookings.length },
     };
   }
 
@@ -289,6 +292,7 @@ export class ToolHandlers {
           text: summary + staffList,
         },
       ],
+      structuredContent: { items: staff, count: staff.length },
     };
   }
 
@@ -316,6 +320,7 @@ export class ToolHandlers {
           text: summary + servicesList,
         },
       ],
+      structuredContent: { items: services, count: services.length },
     };
   }
 
@@ -342,6 +347,7 @@ export class ToolHandlers {
           text: summary + categoriesList,
         },
       ],
+      structuredContent: { items: categories, count: categories.length },
     };
   }
 
@@ -377,6 +383,7 @@ export class ToolHandlers {
           text: summary + scheduleList,
         },
       ],
+      structuredContent: { items: schedule, count: schedule.length },
     };
   }
 
@@ -399,6 +406,7 @@ export class ToolHandlers {
             text: `Successfully created schedule for staff ${params.staff_id} on ${params.date}:\nTime: ${params.time_from} - ${params.time_to}\nEntries created: ${schedule.length}`,
           },
         ],
+        structuredContent: { items: schedule, count: schedule.length },
       };
     } catch (error) {
       return {
@@ -430,6 +438,7 @@ export class ToolHandlers {
             text: `Successfully updated schedule for staff ${params.staff_id} on ${params.date}\nEntries updated: ${schedule.length}`,
           },
         ],
+        structuredContent: { items: schedule, count: schedule.length },
       };
     } catch (error) {
       return {
@@ -491,6 +500,7 @@ export class ToolHandlers {
             text: `Successfully created staff member:\nID: ${staff.id}\nName: ${staff.name}\nSpecialization: ${staff.specialization}`,
           },
         ],
+        structuredContent: { id: staff.id, name: staff.name, specialization: staff.specialization },
       };
     } catch (error) {
       return {
@@ -522,6 +532,7 @@ export class ToolHandlers {
             text: `Successfully updated staff member ${staff_id}:\nName: ${staff.name}\nSpecialization: ${staff.specialization}`,
           },
         ],
+        structuredContent: { id: staff.id, name: staff.name, specialization: staff.specialization },
       };
     } catch (error) {
       return {
@@ -577,6 +588,7 @@ export class ToolHandlers {
             text: `Successfully created service:\nID: ${service.id}\nTitle: ${service.title}\nCategory: ${service.category_id}`,
           },
         ],
+        structuredContent: { id: service.id, title: service.title, category_id: service.category_id },
       };
     } catch (error) {
       return {
@@ -608,6 +620,7 @@ export class ToolHandlers {
             text: `Successfully updated service ${service_id}:\nTitle: ${service.title}`,
           },
         ],
+        structuredContent: { id: service.id, title: service.title, category_id: service.category_id },
       };
     } catch (error) {
       return {
@@ -641,6 +654,7 @@ export class ToolHandlers {
               text: 'No positions found for this company.',
             },
           ],
+          structuredContent: { items: [], count: 0 },
         };
       }
 
@@ -655,6 +669,7 @@ export class ToolHandlers {
             text: `Found ${positions.length} position(s):\n\n${positionsList}`,
           },
         ],
+        structuredContent: { items: positions, count: positions.length },
       };
     } catch (error) {
       return {
@@ -686,6 +701,7 @@ export class ToolHandlers {
             text: `Successfully created position:\nID: ${position.id}\nTitle: ${position.title}`,
           },
         ],
+        structuredContent: { id: position.id, title: position.title },
       };
     } catch (error) {
       return {
@@ -718,6 +734,7 @@ export class ToolHandlers {
             text: `Successfully updated position ${position_id}:\nTitle: ${position.title}`,
           },
         ],
+        structuredContent: { id: position.id, title: position.title },
       };
     } catch (error) {
       return {
@@ -775,6 +792,7 @@ export class ToolHandlers {
             text: `Successfully created booking:\nID: ${booking.id}\nStaff ID: ${booking.staff_id}\nDate: ${booking.datetime || booking.date}`,
           },
         ],
+        structuredContent: { id: booking.id, staff_id: booking.staff_id, datetime: booking.datetime, date: booking.date },
       };
     } catch (error) {
       return {
@@ -806,6 +824,7 @@ export class ToolHandlers {
             text: `Successfully updated booking ${record_id}:\nDate: ${booking.datetime || booking.date}`,
           },
         ],
+        structuredContent: { id: booking.id, staff_id: booking.staff_id, datetime: booking.datetime, date: booking.date },
       };
     } catch (error) {
       return {
