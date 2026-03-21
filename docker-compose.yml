@@ -8,7 +8,7 @@ services:
       PORT: "3000"
       NODE_ENV: "production"
       LOG_LEVEL: "info"
-      ALTEGIO_API_BASE: "https://api.altegio.com"
+      ALTEGIO_API_BASE: "https://api.alteg.io/api/v1"
       ALTEGIO_API_TOKEN: "${ALTEGIO_API_TOKEN}"
     restart: unless-stopped
     healthcheck:

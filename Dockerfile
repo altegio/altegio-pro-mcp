@@ -8,9 +8,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY tsconfig.json ./
 
-# Install dependencies (skip prepare scripts - no git in container)
-RUN npm ci --only=production --ignore-scripts && \
-    npm ci --only=development --ignore-scripts
+# Install all dependencies (skip prepare scripts - no git in container)
+RUN npm ci --ignore-scripts
 
 # Copy source code
 COPY src ./src
@@ -44,8 +43,8 @@ COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 # Switch to non-root user
 USER nodejs
 
-# Expose port (Cloud Run will provide PORT env var)
-EXPOSE 8080
+# Default port (overridable via PORT env var)
+EXPOSE 3000
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
