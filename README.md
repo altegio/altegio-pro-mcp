@@ -209,7 +209,7 @@ docker build -t altegio-mcp:local .
 docker run --rm -p 8080:8080 --env-file .env -e PORT=8080 altegio-mcp:local
 ```
 
-The MCP endpoint is available at `http://localhost:8080/mcp` (SSE transport). See [TESTING.md](TESTING.md) for the full MCP protocol testing guide.
+The MCP endpoint is available at `http://localhost:8080/mcp` (Streamable HTTP transport). See [TESTING.md](TESTING.md) for the full MCP protocol testing guide.
 
 ### Cloud Deployment
 
@@ -264,7 +264,7 @@ src/
 ## Integrations
 
 - **Claude Desktop:** Native stdio transport (recommended)
-- **OpenAI/ChatGPT:** SSE transport - see [OPENAI_PLATFORM.md](OPENAI_PLATFORM.md)
+- **Other MCP Clients:** Streamable HTTP transport via Cloud Run URL (MCP spec 2025-11-25 with tool annotations and structured output)
 
 ## API Reference
 

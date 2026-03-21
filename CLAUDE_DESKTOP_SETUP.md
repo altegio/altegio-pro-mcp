@@ -57,7 +57,7 @@ Close and restart Claude Desktop.
 
 ### Step 5: Verify
 
-Look for MCP indicator - you should see `altegio-pro` with 8 tools available.
+Look for MCP indicator - you should see `altegio-pro` with 33 tools available.
 
 ---
 
