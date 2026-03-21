@@ -106,7 +106,7 @@ All warnings must be resolved before merging.
 ### Testing
 
 - Write tests for all new features
-- Maintain or improve coverage (currently 68 tests)
+- Maintain or improve coverage (currently 157 tests, 23 suites)
 - Use Jest with descriptive test names
 - Mock external dependencies
 - Test edge cases and errors
