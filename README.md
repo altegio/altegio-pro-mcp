@@ -18,7 +18,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 - **CRUD operations** for staff, services, bookings, schedules, and positions management
 - **Conversational onboarding** with bulk CSV/JSON import and checkpoint/resume
 - **Dual transport:** stdio for Claude Desktop, HTTP for cloud deployments
-- **TypeScript** with full type safety and comprehensive tests (145 passing)
+- **TypeScript** with full type safety and comprehensive tests (157 passing)
 - **Auto-deploy CI/CD** via Cloud Build on push to main
 - **Rate limiting** and **retry logic** with exponential backoff
 - **Secure credential storage** in `~/.altegio-mcp/`
@@ -183,18 +183,39 @@ onboarding_status({ company_id: 123456 })
 
 See [docs/ONBOARDING_GUIDE.md](docs/ONBOARDING_GUIDE.md) for complete guide with CSV templates, error handling, and troubleshooting.
 
-### Cloud Deployment
-
-Automatic deployment to Cloud Run on push to `main`. See [CI-CD.md](CI-CD.md) for:
-- GitHub → Cloud Build → Artifact Registry → Cloud Run pipeline
-- Local Docker testing
-- Secret management
+### Local Docker Testing
 
 ```bash
-# Local Docker test
-docker build -t altegio-mcp:local .
-docker run --rm -p 8080:8080 --env-file .env altegio-mcp:local
+# Create .env with your API token
+echo "ALTEGIO_API_TOKEN=your_partner_token" > .env
+
+# Start with Docker Compose (recommended)
+docker compose -f docker-compose.local.yml up --build -d
+
+# Health check
+curl http://localhost:8080/health
+
+# View logs
+docker compose -f docker-compose.local.yml logs -f
+
+# Stop
+docker compose -f docker-compose.local.yml down
 ```
+
+Or run standalone:
+
+```bash
+docker build -t altegio-mcp:local .
+docker run --rm -p 8080:8080 --env-file .env -e PORT=8080 altegio-mcp:local
+```
+
+The MCP endpoint is available at `http://localhost:8080/mcp` (SSE transport). See [TESTING.md](TESTING.md) for the full MCP protocol testing guide.
+
+### Cloud Deployment
+
+Automatic deployment to Cloud Run on PR merge to `main`. See [CI-CD.md](CI-CD.md) for:
+- GitHub → Cloud Build → Artifact Registry → Cloud Run pipeline
+- Secret management
 
 ## Configuration
 
@@ -234,16 +255,16 @@ src/
 
 ### Testing
 
-- **68 tests** covering authentication, all tools, error handling, pagination
+- **157 tests** (23 suites) covering authentication, all tools, error handling, pagination
 - **Jest** for unit tests with mocked API responses
 - **Test isolation** with temporary credentials directory
 - Run: `npm test` or `npm run test:coverage`
+- See [TESTING.md](TESTING.md) for local Docker and MCP protocol testing
 
 ## Integrations
 
 - **Claude Desktop:** Native stdio transport (recommended)
 - **OpenAI/ChatGPT:** SSE transport - see [OPENAI_PLATFORM.md](OPENAI_PLATFORM.md)
-- **Other LLMs:** JSON-RPC endpoint at `/rpc`
 
 ## API Reference
 
@@ -281,4 +302,3 @@ MIT License - see [LICENSE](LICENSE) file
 ## Acknowledgments
 
 Built with [Model Context Protocol](https://modelcontextprotocol.io) by Anthropic and [Altegio API](https://developer.alteg.io) for salon/spa management.
-# Test staging trigger

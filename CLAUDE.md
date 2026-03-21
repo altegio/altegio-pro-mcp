@@ -87,9 +87,7 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 - **stdio** (default) → `dist/index.js` → Claude Desktop integration
 - **HTTP** → `dist/http-server.js` → Local on port 8080
   - `/health` - health check
-  - `/sse` - Server-Sent Events (OpenAI/Perplexity)
-  - `/rpc` - JSON-RPC 2.0
-  - `/mcp` - MCP SSE
+  - `/mcp` - MCP SSE (GET for connection, POST for messages)
 
 **Authentication:**
 - Partner token: `ALTEGIO_API_TOKEN` (required, from https://developer.alteg.io)
