@@ -27,11 +27,15 @@ export function createServer(): MCPServer {
   server.version = config.server.version;
 
   // Create Altegio client with validated config
-  const altegioClient = new AltegioClient({
-    apiBase: config.altegio.apiBase,
-    partnerToken: config.altegio.partnerToken,
-    userToken: config.altegio.userToken,
-  });
+  const altegioClient = new AltegioClient(
+    {
+      apiBase: config.altegio.apiBase,
+      partnerToken: config.altegio.partnerToken,
+      userToken: config.altegio.userToken,
+    },
+    config.env.CREDENTIALS_DIR,
+    { requireDelegatedIdentity: config.env.REQUIRE_DELEGATED_IDENTITY }
+  );
 
   // Register tools with client
   registerTools(server, altegioClient);

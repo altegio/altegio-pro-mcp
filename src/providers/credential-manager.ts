@@ -90,16 +90,34 @@ export class CredentialManager {
   }
 
   /**
-   * Save credentials to file
+   * Resolve the file path for a given identity.
+   *
+   * When an `identityKey` is provided the token is stored in a per-identity
+   * file (`credentials-<identityKey>.json`) so that concurrent delegated
+   * callers never share a token. Without a key the legacy single-user file
+   * (`credentials.json`) is used, preserving stdio behavior.
    */
-  public async save(credentials: AltegioCredentials): Promise<void> {
+  private fileFor(identityKey?: string): string {
+    if (identityKey) {
+      return join(this.credentialsDir, `credentials-${identityKey}.json`);
+    }
+    return this.credentialsFile;
+  }
+
+  /**
+   * Save credentials to file (scoped to `identityKey` when provided)
+   */
+  public async save(
+    credentials: AltegioCredentials,
+    identityKey?: string
+  ): Promise<void> {
     await this.ensureDirectory();
 
     try {
       const data = JSON.stringify(credentials, null, 2);
       const finalData = this.encrypt(data);
 
-      await fs.writeFile(this.credentialsFile, finalData, {
+      await fs.writeFile(this.fileFor(identityKey), finalData, {
         mode: 0o600,
         encoding: 'utf8',
       });
@@ -112,11 +130,11 @@ export class CredentialManager {
   }
 
   /**
-   * Load credentials from file
+   * Load credentials from file (scoped to `identityKey` when provided)
    */
-  public load(): AltegioCredentials | null {
+  public load(identityKey?: string): AltegioCredentials | null {
     try {
-      const data = readFileSync(this.credentialsFile, 'utf8');
+      const data = readFileSync(this.fileFor(identityKey), 'utf8');
       const decryptedData = this.decrypt(data);
       const credentials = JSON.parse(decryptedData) as AltegioCredentials;
 
@@ -134,11 +152,13 @@ export class CredentialManager {
   }
 
   /**
-   * Load credentials async
+   * Load credentials async (scoped to `identityKey` when provided)
    */
-  public async loadAsync(): Promise<AltegioCredentials | null> {
+  public async loadAsync(
+    identityKey?: string
+  ): Promise<AltegioCredentials | null> {
     try {
-      const data = await fs.readFile(this.credentialsFile, 'utf8');
+      const data = await fs.readFile(this.fileFor(identityKey), 'utf8');
       const decryptedData = this.decrypt(data);
       const credentials = JSON.parse(decryptedData) as AltegioCredentials;
 
@@ -156,11 +176,11 @@ export class CredentialManager {
   }
 
   /**
-   * Clear saved credentials
+   * Clear saved credentials (scoped to `identityKey` when provided)
    */
-  public async clear(): Promise<void> {
+  public async clear(identityKey?: string): Promise<void> {
     try {
-      await fs.unlink(this.credentialsFile);
+      await fs.unlink(this.fileFor(identityKey));
       this.logger.info('Credentials cleared successfully');
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
@@ -171,11 +191,11 @@ export class CredentialManager {
   }
 
   /**
-   * Check if credentials exist
+   * Check if credentials exist (scoped to `identityKey` when provided)
    */
-  public async exists(): Promise<boolean> {
+  public async exists(identityKey?: string): Promise<boolean> {
     try {
-      await fs.access(this.credentialsFile);
+      await fs.access(this.fileFor(identityKey));
       return true;
     } catch {
       return false;
@@ -183,9 +203,9 @@ export class CredentialManager {
   }
 
   /**
-   * Get credentials file path
+   * Get credentials file path (scoped to `identityKey` when provided)
    */
-  public getFilePath(): string {
-    return this.credentialsFile;
+  public getFilePath(identityKey?: string): string {
+    return this.fileFor(identityKey);
   }
 }
