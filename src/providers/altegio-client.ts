@@ -16,27 +16,98 @@ import type {
 } from '../types/altegio.types.js';
 import { CredentialManager } from './credential-manager.js';
 import { AuthenticationError, AltegioApiError } from '../utils/errors.js';
+import {
+  getRequestIdentity,
+  identityKey,
+  type RequestIdentity,
+} from '../request-context.js';
+
+export interface AltegioClientOptions {
+  /**
+   * When true (set in the HTTP deployment), anonymous requests — HTTP requests
+   * without a proxy-verified identity — get no user token and cannot login.
+   * Local stdio usage is unaffected.
+   */
+  requireDelegatedIdentity?: boolean;
+}
 
 export class AltegioClient {
   private apiUrl: string;
   private partnerToken: string;
+  /** Legacy single-user token (stdio / transition mode only). */
   private userToken?: string;
   private credentials: CredentialManager;
+  private requireDelegatedIdentity: boolean;
+  /** Per-identity token cache backing the credential files (HTTP mode). */
+  private tokenCache = new Map<string, string>();
 
-  constructor(config: AltegioConfig, credentialsDir?: string) {
+  constructor(
+    config: AltegioConfig,
+    credentialsDir?: string,
+    options?: AltegioClientOptions
+  ) {
     this.apiUrl = config.apiBase || 'https://api.alteg.io/api/v1';
     this.partnerToken = config.partnerToken;
     this.userToken = config.userToken;
     this.credentials = new CredentialManager(credentialsDir);
-
-    this.loadSavedCredentials();
+    this.requireDelegatedIdentity = options?.requireDelegatedIdentity ?? false;
+    // NOTE: credentials are resolved per request (see resolveUserToken), never
+    // loaded into shared global state at construction time.
   }
 
-  private loadSavedCredentials(): void {
-    const savedCredentials = this.credentials.load();
-    if (savedCredentials && savedCredentials.user_token) {
-      this.userToken = savedCredentials.user_token;
+  /**
+   * Resolve the Altegio user token for the CURRENT request.
+   *
+   * - No HTTP context (stdio): legacy single-user token / credentials.json.
+   * - HTTP but anonymous (`null`): no token when delegated identity is
+   *   required; otherwise legacy behavior (transition mode).
+   * - Identity present: only that identity's token — never another identity's
+   *   token and never the legacy file.
+   */
+  private resolveUserToken(): string | undefined {
+    const identity = getRequestIdentity();
+
+    // stdio, or HTTP transition mode (anonymous + not enforcing delegation).
+    if (
+      identity === undefined ||
+      (identity === null && !this.requireDelegatedIdentity)
+    ) {
+      return this.resolveLegacyToken();
     }
+
+    // HTTP, anonymous, delegation enforced: no user token.
+    if (identity === null) {
+      return undefined;
+    }
+
+    // Proxy-verified identity: strictly scoped to this identity.
+    const key = identityKey(identity);
+    const cached = this.tokenCache.get(key);
+    if (cached) {
+      return cached;
+    }
+    const saved = this.credentials.load(key);
+    if (saved?.user_token) {
+      this.tokenCache.set(key, saved.user_token);
+      return saved.user_token;
+    }
+    return undefined;
+  }
+
+  /**
+   * Legacy single-user token resolution (stdio / transition mode). Lazily
+   * loads credentials.json once, mirroring the previous constructor behavior.
+   */
+  private resolveLegacyToken(): string | undefined {
+    if (this.userToken) {
+      return this.userToken;
+    }
+    const saved = this.credentials.load();
+    if (saved?.user_token) {
+      this.userToken = saved.user_token;
+      return this.userToken;
+    }
+    return undefined;
   }
 
   /**
@@ -46,9 +117,10 @@ export class AltegioClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<Response> {
+    const userToken = this.resolveUserToken();
     const authParts = [`Bearer ${this.partnerToken}`];
-    if (this.userToken) {
-      authParts.push(`User ${this.userToken}`);
+    if (userToken) {
+      authParts.push(`User ${userToken}`);
     }
 
     const headers: Record<string, string> = {
@@ -145,7 +217,7 @@ export class AltegioClient {
    * Require authentication, throwing AuthenticationError if not logged in
    */
   private requireAuth(): void {
-    if (!this.userToken) {
+    if (!this.resolveUserToken()) {
       throw new AuthenticationError(
         'Not authenticated. Call altegio_login first.'
       );
@@ -156,6 +228,18 @@ export class AltegioClient {
     email: string,
     password: string
   ): Promise<{ success: boolean; user_token?: string; error?: string }> {
+    const identity = getRequestIdentity();
+
+    // In the HTTP deployment an anonymous request has no identity to key a
+    // token by; refuse rather than silently writing a shared token.
+    if (identity === null && this.requireDelegatedIdentity) {
+      return {
+        success: false,
+        error:
+          'This deployment requires a proxy-verified identity; login is unavailable for anonymous sessions.',
+      };
+    }
+
     try {
       const response = await this.apiRequest('/auth', {
         method: 'POST',
@@ -175,17 +259,16 @@ export class AltegioClient {
       const result = (await response.json()) as AltegioLoginResponse;
 
       if (result.success && result.data?.user_token) {
-        this.userToken = result.data.user_token;
-
+        const token = result.data.user_token;
         const credentials: AltegioCredentials = {
-          user_token: result.data.user_token,
+          user_token: token,
           user_id: result.data.id,
           updated_at: new Date().toISOString(),
         };
 
-        await this.credentials.save(credentials);
+        await this.persistToken(token, credentials, identity);
 
-        return { success: true, user_token: result.data.user_token };
+        return { success: true, user_token: token };
       }
 
       return {
@@ -200,9 +283,35 @@ export class AltegioClient {
     }
   }
 
+  /**
+   * Store a freshly obtained token under the current request's identity
+   * (HTTP mode) or the legacy single-user file (stdio / transition mode).
+   */
+  private async persistToken(
+    token: string,
+    credentials: AltegioCredentials,
+    identity: RequestIdentity | null | undefined
+  ): Promise<void> {
+    if (identity) {
+      const key = identityKey(identity);
+      this.tokenCache.set(key, token);
+      await this.credentials.save(credentials, key);
+      return;
+    }
+    this.userToken = token;
+    await this.credentials.save(credentials);
+  }
+
   async logout(): Promise<{ success: boolean }> {
-    this.userToken = undefined;
-    await this.credentials.clear();
+    const identity = getRequestIdentity();
+    if (identity) {
+      const key = identityKey(identity);
+      this.tokenCache.delete(key);
+      await this.credentials.clear(key);
+    } else {
+      this.userToken = undefined;
+      await this.credentials.clear();
+    }
     return { success: true };
   }
 
@@ -589,6 +698,6 @@ export class AltegioClient {
   }
 
   isAuthenticated(): boolean {
-    return !!this.userToken;
+    return !!this.resolveUserToken();
   }
 }

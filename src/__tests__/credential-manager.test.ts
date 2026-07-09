@@ -164,5 +164,61 @@ describe('CredentialManager', () => {
       const path = manager.getFilePath();
       expect(path).toContain('credentials.json');
     });
+
+    it('should return an identity-scoped path when a key is given', () => {
+      const path = manager.getFilePath('abc123');
+      expect(path).toContain('credentials-abc123.json');
+    });
+  });
+
+  describe('identity-scoped storage', () => {
+    const credA = { user_token: 'tok-A', user_id: 1, updated_at: '2026-07-09' };
+    const credB = { user_token: 'tok-B', user_id: 2, updated_at: '2026-07-09' };
+
+    it('writes two distinct files for two identity keys', async () => {
+      await manager.save(credA, 'keyaaaa');
+      await manager.save(credB, 'keybbbb');
+
+      expect(manager.load('keyaaaa')?.user_token).toBe('tok-A');
+      expect(manager.load('keybbbb')?.user_token).toBe('tok-B');
+
+      const files = await fs.readdir(testDir);
+      expect(files).toContain('credentials-keyaaaa.json');
+      expect(files).toContain('credentials-keybbbb.json');
+      // No shared legacy file is created for scoped writes.
+      expect(files).not.toContain('credentials.json');
+    });
+
+    it('clear(keyA) leaves keyB intact', async () => {
+      await manager.save(credA, 'keyaaaa');
+      await manager.save(credB, 'keybbbb');
+
+      await manager.clear('keyaaaa');
+
+      expect(manager.load('keyaaaa')).toBeNull();
+      expect(manager.load('keybbbb')?.user_token).toBe('tok-B');
+    });
+
+    it('keeps the legacy file and identity files independent', async () => {
+      await manager.save({ user_token: 'legacy', user_id: 0, updated_at: 'x' });
+      await manager.save(credA, 'keyaaaa');
+
+      expect(manager.load()?.user_token).toBe('legacy');
+      expect(manager.load('keyaaaa')?.user_token).toBe('tok-A');
+    });
+
+    it('scopes exists() per identity key', async () => {
+      await manager.save(credA, 'keyaaaa');
+
+      expect(await manager.exists('keyaaaa')).toBe(true);
+      expect(await manager.exists('keybbbb')).toBe(false);
+      expect(await manager.exists()).toBe(false);
+    });
+
+    it('loads a scoped credential asynchronously', async () => {
+      await manager.save(credA, 'keyaaaa');
+      const loaded = await manager.loadAsync('keyaaaa');
+      expect(loaded?.user_token).toBe('tok-A');
+    });
   });
 });
