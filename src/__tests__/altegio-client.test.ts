@@ -7,6 +7,9 @@ import {
   jest,
 } from '@jest/globals';
 import { AltegioClient } from '../providers/altegio-client.js';
+import { CredentialManager } from '../providers/credential-manager.js';
+import { runWithIdentity, type RequestIdentity } from '../request-context.js';
+import { loginTool, logoutTool } from '../tools/definitions/auth.tools.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { promises as fs } from 'fs';
@@ -643,6 +646,129 @@ describe('AltegioClient', () => {
 
         expect(categories).toEqual(mockCategories);
       });
+    });
+  });
+
+  describe('request-scoped delegated identity', () => {
+    const idA: RequestIdentity = { kind: 'user', email: 'a@example.com' };
+    const idB: RequestIdentity = { kind: 'user', email: 'b@example.com' };
+
+    const mockOnce = (body: unknown, ok = true): void => {
+      (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+        ok,
+        json: async () => body,
+      } as Response);
+    };
+    const mockLogin = (token: string): void =>
+      mockOnce({ success: true, data: { user_token: token, id: 1 } });
+    const mockEmptyCompanies = (): void => mockOnce({ success: true, data: [] });
+
+    it('never lets identity B act with identity A token, even right after A login', async () => {
+      mockLogin('token-A');
+      const login = await runWithIdentity(idA, () =>
+        client.login('a@example.com', 'password123')
+      );
+      expect(login.success).toBe(true);
+
+      // Identity B has never logged in — it must not inherit A's token.
+      await expect(
+        runWithIdentity(idB, () => client.getCompanies())
+      ).rejects.toThrow('Not authenticated');
+      expect(runWithIdentity(idB, () => client.isAuthenticated())).toBe(false);
+
+      // Identity A is still authorized and its request carries A's token.
+      mockEmptyCompanies();
+      await runWithIdentity(idA, () => client.getCompanies());
+      expect(fetch).toHaveBeenLastCalledWith(
+        'https://api.alteg.io/api/v1/companies',
+        {
+          headers: {
+            Accept: 'application/vnd.api.v2+json',
+            Authorization: 'Bearer test-partner-token, User token-A',
+          },
+        }
+      );
+    });
+
+    it('logout clears only the caller identity token', async () => {
+      mockLogin('token-A');
+      await runWithIdentity(idA, () => client.login('a@example.com', 'pw'));
+      mockLogin('token-B');
+      await runWithIdentity(idB, () => client.login('b@example.com', 'pw'));
+
+      await runWithIdentity(idA, () => client.logout());
+
+      expect(runWithIdentity(idA, () => client.isAuthenticated())).toBe(false);
+      expect(runWithIdentity(idB, () => client.isAuthenticated())).toBe(true);
+    });
+
+    it('does not leak the token value in login/logout tool responses', async () => {
+      const secret = 'super-secret-user-token';
+      const loginHandler = loginTool.createHandler(client);
+
+      mockLogin(secret);
+      const loginRes = await runWithIdentity(idA, () =>
+        loginHandler({ email: 'a@example.com', password: 'pw' })
+      );
+      const loginText = loginRes.content.map((c) => c.text).join(' ');
+      expect(loginText).toContain('Successfully logged in');
+      expect(loginText).not.toContain(secret);
+
+      const logoutHandler = logoutTool.createHandler(client);
+      const logoutRes = await runWithIdentity(idA, () => logoutHandler({}));
+      const logoutText = logoutRes.content.map((c) => c.text).join(' ');
+      expect(logoutText).not.toContain(secret);
+    });
+
+    it('stdio (no request context) still loads the legacy credentials.json', async () => {
+      // Simulate a token persisted by a previous stdio session.
+      const legacyStore = new CredentialManager(testDir);
+      await legacyStore.save({
+        user_token: 'legacy-token',
+        user_id: 7,
+        updated_at: new Date().toISOString(),
+      });
+
+      const stdioClient = new AltegioClient(
+        { apiBase: 'https://api.alteg.io/api/v1', partnerToken: 'test-partner-token' },
+        testDir
+      );
+
+      expect(stdioClient.isAuthenticated()).toBe(true);
+
+      mockEmptyCompanies();
+      await stdioClient.getCompanies();
+      expect(fetch).toHaveBeenLastCalledWith(
+        'https://api.alteg.io/api/v1/companies',
+        {
+          headers: {
+            Accept: 'application/vnd.api.v2+json',
+            Authorization: 'Bearer test-partner-token, User legacy-token',
+          },
+        }
+      );
+    });
+
+    it('REQUIRE_DELEGATED_IDENTITY + anonymous request: no token, login refused', async () => {
+      const secured = new AltegioClient(
+        { apiBase: 'https://api.alteg.io/api/v1', partnerToken: 'test-partner-token' },
+        testDir,
+        { requireDelegatedIdentity: true }
+      );
+
+      // Anonymous HTTP request (null identity) is unauthenticated.
+      expect(runWithIdentity(null, () => secured.isAuthenticated())).toBe(false);
+      await expect(
+        runWithIdentity(null, () => secured.getCompanies())
+      ).rejects.toThrow('Not authenticated');
+
+      // ...and login is refused without ever calling the upstream /auth endpoint.
+      const res = await runWithIdentity(null, () =>
+        secured.login('a@example.com', 'pw')
+      );
+      expect(res.success).toBe(false);
+      expect(res.error).toMatch(/proxy-verified identity/);
+      expect(fetch).not.toHaveBeenCalled();
     });
   });
 });

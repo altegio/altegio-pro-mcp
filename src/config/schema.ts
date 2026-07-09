@@ -25,6 +25,10 @@ export const EnvSchema = z.object({
   // Credentials storage
   CREDENTIALS_DIR: z.string().optional(),
 
+  // HTTP deployment: require a proxy-verified delegated identity for every
+  // request. Anonymous requests get no user token and cannot login.
+  REQUIRE_DELEGATED_IDENTITY: z.coerce.boolean().default(false),
+
   // Rate limiting
   RATE_LIMIT_REQUESTS: z.coerce.number().min(1).default(200),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().min(1000).default(60000), // 1 minute
@@ -134,6 +138,7 @@ export class ConfigLoader {
         NODE_ENV: env.NODE_ENV,
         LOG_LEVEL: env.LOG_LEVEL,
         CREDENTIALS_DIR: env.CREDENTIALS_DIR,
+        REQUIRE_DELEGATED_IDENTITY: env.REQUIRE_DELEGATED_IDENTITY,
         RATE_LIMIT_REQUESTS: env.RATE_LIMIT_REQUESTS,
         RATE_LIMIT_WINDOW_MS: env.RATE_LIMIT_WINDOW_MS,
         MAX_RETRY_ATTEMPTS: env.MAX_RETRY_ATTEMPTS,

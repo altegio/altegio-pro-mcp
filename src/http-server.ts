@@ -4,12 +4,24 @@ import express from 'express';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { createServer } from './server.js';
 import { createLogger } from './utils/logger.js';
+import { parseIdentityHeaders, runWithIdentity } from './request-context.js';
 
 const logger = createLogger('http-server');
 
-async function startHTTPServer(): Promise<void> {
+/**
+ * Build the Express app and the per-session transport registry.
+ *
+ * Every request's proxy-verified identity (`x-mcp-auth-*` headers) is bound to
+ * the async context for the duration of the SDK message handling, so tool
+ * handlers running on a shared server/client instance resolve the correct
+ * per-request identity. The identity wrapping is intentionally localized here
+ * so a future transport migration (PRO-3) can move it in one place.
+ */
+export function createApp(): {
+  app: express.Express;
+  transports: Record<string, SSEServerTransport>;
+} {
   const app = express();
-  const port = parseInt(process.env.PORT || '3000', 10);
 
   // Middleware
   app.use(express.json());
@@ -23,7 +35,7 @@ async function startHTTPServer(): Promise<void> {
   const transports: Record<string, SSEServerTransport> = {};
 
   // SSE endpoint - GET to establish connection
-  app.get('/mcp', async (_req, res) => {
+  app.get('/mcp', async (req, res) => {
     logger.info('New SSE connection request');
 
     try {
@@ -39,7 +51,9 @@ async function startHTTPServer(): Promise<void> {
 
       // Create new server instance for this connection
       const server = createServer();
-      await server.connect(transport);
+      await runWithIdentity(parseIdentityHeaders(req.headers), () =>
+        server.connect(transport)
+      );
 
       logger.info(`SSE connection established: ${sessionId}`);
     } catch (error) {
@@ -63,7 +77,9 @@ async function startHTTPServer(): Promise<void> {
         return;
       }
 
-      await transport.handlePostMessage(req, res, req.body);
+      await runWithIdentity(parseIdentityHeaders(req.headers), () =>
+        transport.handlePostMessage(req, res, req.body)
+      );
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
       logger.error(`Failed to handle POST message: ${errMsg}`);
@@ -72,6 +88,13 @@ async function startHTTPServer(): Promise<void> {
       }
     }
   });
+
+  return { app, transports };
+}
+
+async function startHTTPServer(): Promise<void> {
+  const port = parseInt(process.env.PORT || '3000', 10);
+  const { app } = createApp();
 
   // Start Express server
   app.listen(port, () => {
@@ -91,8 +114,8 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
-// Run if executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Run if executed directly (not when imported by tests)
+if (process.argv[1] && !process.argv[1].includes('jest')) {
   startHTTPServer().catch((error) => {
     logger.error('Failed to start HTTP server', error);
     process.exit(1);
