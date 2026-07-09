@@ -225,9 +225,36 @@ See [CI-CD.md](CI-CD.md) for details.
 |----------|----------|---------|-------------|
 | `ALTEGIO_API_TOKEN` | Yes | - | Partner API token |
 | `ALTEGIO_API_BASE` | No | `https://api.alteg.io/api/v1` | API base URL |
+| `ALTEGIO_USER_TOKEN` | No | - | Pre-seeded user token (stdio single-user only) |
+| `CREDENTIALS_DIR` | No | `~/.altegio-mcp` | Directory for stored user tokens |
+| `REQUIRE_DELEGATED_IDENTITY` | No | `false` | HTTP mode: require a proxy-verified identity per request |
 | `LOG_LEVEL` | No | `info` | `debug\|info\|warn\|error` |
 | `NODE_ENV` | No | `development` | `development\|production` |
 | `RATE_LIMIT_REQUESTS` | No | `200` | Max requests per minute |
+
+### Authentication & identity
+
+How the user token behind `altegio_login` is stored depends on the transport:
+
+- **stdio (Claude Desktop, `npm start`) — single user.** `altegio_login` writes
+  one token to `<CREDENTIALS_DIR>/credentials.json` and every tool call uses it.
+  This is unchanged from previous releases.
+- **HTTP (`mcp.alteg.io/pro`) — per delegated identity.** The deployment sits
+  behind the platform's OAuth 2.1 proxy, which forwards the verified caller as
+  `x-mcp-auth-*` headers. Each request acts strictly as *its own* identity: the
+  token from `altegio_login` is stored per identity
+  (`<CREDENTIALS_DIR>/credentials-<hash>.json`) and resolved from the current
+  request's identity on every tool call. One caller can never read or write with
+  another caller's token, and `altegio_logout` clears only the caller's own token.
+
+Set **`REQUIRE_DELEGATED_IDENTITY=true`** in the HTTP deployment (it is enabled
+in production). With it on, a request that arrives without a proxy-verified
+identity gets no user token — every authenticated tool returns
+`Not authenticated. Call altegio_login first.` and `altegio_login` is refused
+for that request.
+
+> **After a deploy, HTTP callers must run `altegio_login` once more.** Tokens are
+> stored on the container's ephemeral filesystem, so a redeploy clears them.
 
 ## Development
 
