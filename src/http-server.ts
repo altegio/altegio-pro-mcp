@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import 'dotenv/config';
+import './config/env.js';
 import { randomUUID } from 'node:crypto';
 import express from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';

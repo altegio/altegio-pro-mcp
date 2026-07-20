@@ -193,7 +193,9 @@ describe('Spec Compliance', () => {
         const operation = pathObj[mapping.method];
         const requestBody = operation.requestBody;
         if (!requestBody) {
-          console.warn(`[${toolName}] Spec has no requestBody but tool sends body params`);
+          console.warn(
+            `[${toolName}] Spec has no requestBody but tool sends body params`
+          );
           return;
         }
 

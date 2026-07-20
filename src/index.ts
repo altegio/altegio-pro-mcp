@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import 'dotenv/config';
+import './config/env.js';
 import { createServer, startServer } from './server.js';
 import { createLogger } from './utils/logger.js';
 

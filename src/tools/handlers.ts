@@ -1,9 +1,6 @@
 import { AltegioClient } from '../providers/altegio-client.js';
 import { z, ZodError } from 'zod';
-import {
-  AuthenticationError,
-  AltegioApiError,
-} from '../utils/errors.js';
+import { AuthenticationError, AltegioApiError } from '../utils/errors.js';
 
 export interface ToolResult {
   [key: string]: unknown;
@@ -243,7 +240,10 @@ export class ToolHandlers {
               : `Login failed: ${result.error}`,
           },
         ],
-        structuredContent: { success: result.success, ...(result.error && { error: result.error }) },
+        structuredContent: {
+          success: result.success,
+          ...(result.error && { error: result.error }),
+        },
       };
     });
   }
@@ -553,7 +553,11 @@ export class ToolHandlers {
             text: `Successfully created staff member:\nID: ${staff.id}\nName: ${staff.name}\nSpecialization: ${staff.specialization}`,
           },
         ],
-        structuredContent: { id: staff.id, name: staff.name, specialization: staff.specialization },
+        structuredContent: {
+          id: staff.id,
+          name: staff.name,
+          specialization: staff.specialization,
+        },
       };
     });
   }
@@ -576,7 +580,11 @@ export class ToolHandlers {
             text: `Successfully updated staff member ${staff_id}:\nName: ${staff.name}\nSpecialization: ${staff.specialization}`,
           },
         ],
-        structuredContent: { id: staff.id, name: staff.name, specialization: staff.specialization },
+        structuredContent: {
+          id: staff.id,
+          name: staff.name,
+          specialization: staff.specialization,
+        },
       };
     });
   }
@@ -614,7 +622,11 @@ export class ToolHandlers {
             text: `Successfully created service:\nID: ${service.id}\nTitle: ${service.title}\nCategory: ${service.category_id}`,
           },
         ],
-        structuredContent: { id: service.id, title: service.title, category_id: service.category_id },
+        structuredContent: {
+          id: service.id,
+          title: service.title,
+          category_id: service.category_id,
+        },
       };
     });
   }
@@ -637,7 +649,11 @@ export class ToolHandlers {
             text: `Successfully updated service ${service_id}:\nTitle: ${service.title}`,
           },
         ],
-        structuredContent: { id: service.id, title: service.title, category_id: service.category_id },
+        structuredContent: {
+          id: service.id,
+          title: service.title,
+          category_id: service.category_id,
+        },
       };
     });
   }
@@ -760,7 +776,12 @@ export class ToolHandlers {
             text: `Successfully created booking:\nID: ${booking.id}\nStaff ID: ${booking.staff_id}\nDate: ${booking.datetime || booking.date}`,
           },
         ],
-        structuredContent: { id: booking.id, staff_id: booking.staff_id, datetime: booking.datetime, date: booking.date },
+        structuredContent: {
+          id: booking.id,
+          staff_id: booking.staff_id,
+          datetime: booking.datetime,
+          date: booking.date,
+        },
       };
     });
   }
@@ -783,7 +804,12 @@ export class ToolHandlers {
             text: `Successfully updated booking ${record_id}:\nDate: ${booking.datetime || booking.date}`,
           },
         ],
-        structuredContent: { id: booking.id, staff_id: booking.staff_id, datetime: booking.datetime, date: booking.date },
+        structuredContent: {
+          id: booking.id,
+          staff_id: booking.staff_id,
+          datetime: booking.datetime,
+          date: booking.date,
+        },
       };
     });
   }

@@ -85,13 +85,13 @@ export const AltegioConfigSchema = z.object({
       initialDelay: z.number().min(100).default(1000),
       maxDelay: z.number().min(1000).default(30000),
     })
-    .default({}),
+    .prefault({}),
   rateLimit: z
     .object({
       requests: z.number().min(1).default(200),
       windowMs: z.number().min(1000).default(60000),
     })
-    .default({}),
+    .prefault({}),
 });
 
 export type AltegioConfig = z.infer<typeof AltegioConfigSchema>;
@@ -179,7 +179,7 @@ export class ConfigLoader {
       return this.config;
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const errors = error.errors.map(
+        const errors = error.issues.map(
           (e) => `${e.path.join('.')}: ${e.message}`
         );
         throw new ConfigurationError(

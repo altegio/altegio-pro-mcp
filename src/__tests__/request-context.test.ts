@@ -33,7 +33,10 @@ describe('request-context', () => {
         'x-mcp-auth-email': 'user@example.com',
       });
 
-      expect(identity).toMatchObject({ kind: 'user', email: 'user@example.com' });
+      expect(identity).toMatchObject({
+        kind: 'user',
+        email: 'user@example.com',
+      });
     });
 
     it('parses a user identity with only sub', () => {
@@ -62,7 +65,10 @@ describe('request-context', () => {
     it('returns null when the kind header is absent', () => {
       expect(parseIdentityHeaders({})).toBeNull();
       expect(
-        parseIdentityHeaders({ authorization: 'Bearer x', 'content-type': 'application/json' })
+        parseIdentityHeaders({
+          authorization: 'Bearer x',
+          'content-type': 'application/json',
+        })
       ).toBeNull();
     });
 
@@ -85,7 +91,10 @@ describe('request-context', () => {
         'X-Mcp-Auth-Email': ['first@example.com', 'second@example.com'],
       });
 
-      expect(identity).toMatchObject({ kind: 'user', email: 'first@example.com' });
+      expect(identity).toMatchObject({
+        kind: 'user',
+        email: 'first@example.com',
+      });
     });
   });
 
@@ -108,7 +117,11 @@ describe('request-context', () => {
     it('isolates identity across two concurrent async chains', async () => {
       const seen: Record<string, string | undefined> = {};
 
-      const chain = (label: string, email: string, delay: number): Promise<void> =>
+      const chain = (
+        label: string,
+        email: string,
+        delay: number
+      ): Promise<void> =>
         runWithIdentity({ kind: 'user', email }, async () => {
           // Yield so the two chains interleave; each must keep its own identity.
           await new Promise((resolve) => setTimeout(resolve, delay));
@@ -143,7 +156,10 @@ describe('request-context', () => {
     it('produces different keys for different identities', () => {
       const a = identityKey({ kind: 'user', email: 'a@x.com' });
       const b = identityKey({ kind: 'user', email: 'b@x.com' });
-      const machine = identityKey({ kind: 'machine', machineName: 'smoke-probe' });
+      const machine = identityKey({
+        kind: 'machine',
+        machineName: 'smoke-probe',
+      });
       expect(new Set([a, b, machine]).size).toBe(3);
     });
   });

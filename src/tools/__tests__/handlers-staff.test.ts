@@ -33,7 +33,9 @@ describe('ToolHandlers - Staff CRUD', () => {
         is_user_invite: true,
       });
 
-      expect((result.content[0] as any).text).toContain('Successfully created staff');
+      expect((result.content[0] as any).text).toContain(
+        'Successfully created staff'
+      );
       expect((result.content[0] as any).text).toContain('John Doe');
       expect(mockClient.createStaff).toHaveBeenCalledWith(456, {
         name: 'John Doe',
@@ -62,7 +64,9 @@ describe('ToolHandlers - Staff CRUD', () => {
         is_user_invite: true,
       });
 
-      expect((result.content[0] as any).text).toContain('Authentication required');
+      expect((result.content[0] as any).text).toContain(
+        'Authentication required'
+      );
       expect((result.content[0] as any).text).toContain('altegio_login');
     });
   });
@@ -78,7 +82,9 @@ describe('ToolHandlers - Staff CRUD', () => {
         name: 'John Smith',
       });
 
-      expect((result.content[0] as any).text).toContain('Successfully updated staff');
+      expect((result.content[0] as any).text).toContain(
+        'Successfully updated staff'
+      );
       expect(mockClient.updateStaff).toHaveBeenCalledWith(456, 123, {
         name: 'John Smith',
       });
@@ -94,7 +100,9 @@ describe('ToolHandlers - Staff CRUD', () => {
         staff_id: 123,
       });
 
-      expect((result.content[0] as any).text).toContain('Successfully deleted staff');
+      expect((result.content[0] as any).text).toContain(
+        'Successfully deleted staff'
+      );
       expect(mockClient.deleteStaff).toHaveBeenCalledWith(456, 123);
     });
   });

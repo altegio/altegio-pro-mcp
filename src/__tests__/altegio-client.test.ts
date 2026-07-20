@@ -175,9 +175,7 @@ describe('AltegioClient', () => {
           statusText: 'Unauthorized',
           json: async () => ({ meta: { message: 'Token expired' } }),
         } as unknown as Response);
-        await expect(client.getCompanies()).rejects.toThrow(
-          /altegio_login/
-        );
+        await expect(client.getCompanies()).rejects.toThrow(/altegio_login/);
       });
 
       it('should throw AltegioApiError on 404 response', async () => {
@@ -226,7 +224,9 @@ describe('AltegioClient', () => {
           ok: false,
           status: 500,
           statusText: 'Internal Server Error',
-          json: async () => ({ meta: { message: 'Database connection failed' } }),
+          json: async () => ({
+            meta: { message: 'Database connection failed' },
+          }),
         } as unknown as Response);
 
         await expect(client.getCompanies()).rejects.toThrow(AltegioApiError);
@@ -235,7 +235,9 @@ describe('AltegioClient', () => {
           ok: false,
           status: 500,
           statusText: 'Internal Server Error',
-          json: async () => ({ meta: { message: 'Database connection failed' } }),
+          json: async () => ({
+            meta: { message: 'Database connection failed' },
+          }),
         } as unknown as Response);
         await expect(client.getCompanies()).rejects.toThrow(
           /Database connection failed/
@@ -882,7 +884,8 @@ describe('AltegioClient', () => {
     };
     const mockLogin = (token: string): void =>
       mockOnce({ success: true, data: { user_token: token, id: 1 } });
-    const mockEmptyCompanies = (): void => mockOnce({ success: true, data: [] });
+    const mockEmptyCompanies = (): void =>
+      mockOnce({ success: true, data: [] });
 
     it('never lets identity B act with identity A token, even right after A login', async () => {
       mockLogin('token-A');
@@ -948,7 +951,10 @@ describe('AltegioClient', () => {
       });
 
       const stdioClient = new AltegioClient(
-        { apiBase: 'https://api.alteg.io/api/v1', partnerToken: 'test-partner-token' },
+        {
+          apiBase: 'https://api.alteg.io/api/v1',
+          partnerToken: 'test-partner-token',
+        },
         testDir
       );
 
@@ -969,13 +975,18 @@ describe('AltegioClient', () => {
 
     it('REQUIRE_DELEGATED_IDENTITY + anonymous request: no token, login refused', async () => {
       const secured = new AltegioClient(
-        { apiBase: 'https://api.alteg.io/api/v1', partnerToken: 'test-partner-token' },
+        {
+          apiBase: 'https://api.alteg.io/api/v1',
+          partnerToken: 'test-partner-token',
+        },
         testDir,
         { requireDelegatedIdentity: true }
       );
 
       // Anonymous HTTP request (null identity) is unauthenticated.
-      expect(runWithIdentity(null, () => secured.isAuthenticated())).toBe(false);
+      expect(runWithIdentity(null, () => secured.isAuthenticated())).toBe(
+        false
+      );
       await expect(
         runWithIdentity(null, () => secured.getCompanies())
       ).rejects.toThrow(AuthenticationError);

@@ -17,7 +17,9 @@ import {
 describe('HTTP server per-request identity', () => {
   type Captured = RequestIdentity | null | undefined;
 
-  const fakeTransport = (sink: (id: Captured) => void): StreamableHTTPServerTransport =>
+  const fakeTransport = (
+    sink: (id: Captured) => void
+  ): StreamableHTTPServerTransport =>
     ({
       handleRequest: async (
         _req: unknown,
@@ -29,7 +31,11 @@ describe('HTTP server per-request identity', () => {
     }) as unknown as StreamableHTTPServerTransport;
 
   // A POST reusing an existing session (a tool call), carrying identity headers.
-  const post = (port: number, sessionId: string, headers: Record<string, string>) =>
+  const post = (
+    port: number,
+    sessionId: string,
+    headers: Record<string, string>
+  ) =>
     fetch(`http://127.0.0.1:${port}/mcp`, {
       method: 'POST',
       headers: {
@@ -64,8 +70,14 @@ describe('HTTP server per-request identity', () => {
       });
 
       expect(captured).toHaveLength(2);
-      expect(captured[0]).toMatchObject({ kind: 'user', email: 'a@example.com' });
-      expect(captured[1]).toMatchObject({ kind: 'user', email: 'b@example.com' });
+      expect(captured[0]).toMatchObject({
+        kind: 'user',
+        email: 'a@example.com',
+      });
+      expect(captured[1]).toMatchObject({
+        kind: 'user',
+        email: 'b@example.com',
+      });
 
       // Distinct identities resolve to distinct token scopes.
       expect(identityKey(captured[0] as RequestIdentity)).not.toBe(
