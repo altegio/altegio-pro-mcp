@@ -1,7 +1,7 @@
-import type { ToolDefinition } from './registry.js';
+import type { McpToolSpec } from './factory.js';
 import * as output from './output-schemas.js';
 
-export const onboardingTools: ToolDefinition[] = [
+export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_start',
     description:
