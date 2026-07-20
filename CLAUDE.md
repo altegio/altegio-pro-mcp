@@ -67,7 +67,7 @@ Always check BUILD.md / never add it to Git
 
 MCP server for **B2B business management only** (Altegio.Pro, not public booking /b2c). Local service business business owners, admins and team members manage their operations through authenticated tools
 
-### Tools Available (33 total)
+### Tools Available (42 total)
 
 **Category-organized with [Prefix] tags for LLM navigation:**
 
@@ -79,7 +79,9 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 **[Categories] Service Categories (1):** get
 **[Schedule] Schedule CRUD (4):** get, create, update, delete
 **[Bookings] Bookings CRUD (4):** get, create, update, delete
-**[Onboarding] Wizard (10):** start, resume, status, batch imports, preview, rollback
+**[Settings] Location Settings (6):** get/update appointment settings, get/update online booking settings, get/create booking forms
+**[Resources] Resources (1):** get (read-only; API has no create)
+**[Onboarding] Wizard (12):** start, resume, status, batch imports (positions, staff, categories, services), set schedules, import clients, test bookings, preview, rollback
 
 ### Architecture
 
@@ -104,6 +106,16 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 - `src/utils/` - logging, errors, config, credential manager
 
 ### Change history
+
+**Location Onboarding Completion (2026-07-20)**
+- **Added 9 tools (33 → 42):**
+  - Onboarding wizard: `onboarding_add_positions`, `onboarding_set_schedules`
+  - `[Settings]`: get/update appointment settings (`/company/{id}/settings/timetable`), get/update online booking settings (`/company/{id}/settings/online`), get/create booking forms (`/company/{id}/booking_forms`)
+  - `[Resources]`: `get_resources` (`/resources/{id}`, read-only — API has no create)
+- **Onboarding flow now:** init → positions → staff → categories → services → schedules → clients → test_bookings → complete (positions before staff so `position_id` can be referenced; schedules make the booking grid operational)
+- Fixed `addServicesBatch` phase pointer (now → `schedules`); rollback supports `positions` and `schedules`
+- Note: `settings/timetable` is appointment-calendar defaults, NOT location working hours; real working hours come from staff schedules
+- Excluded (separate track): location creation, loyalty, goods/storages, KKM
 
 **Positions Management CRUD (2025-10-30)**
 - **Added 4 tools:** get_positions, create_position, update_position, delete_position

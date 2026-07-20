@@ -308,6 +308,48 @@ describe('Onboarding Handlers', () => {
       );
     });
 
+    it('should delete positions', async () => {
+      await handlers.start({ company_id: 123 });
+      await stateManager.checkpoint(123, 'positions', [5, 6]);
+
+      mockClient.deletePosition = jest.fn().mockResolvedValue(undefined);
+
+      const result = await handlers.rollbackPhase({
+        company_id: 123,
+        phase_name: 'positions',
+      });
+
+      expect(mockClient.deletePosition).toHaveBeenCalledTimes(2);
+      expect(result.content[0]?.text).toContain('Rolled back positions');
+    });
+
+    it('should delete schedules using metadata dates', async () => {
+      await handlers.start({ company_id: 123 });
+      await stateManager.checkpoint(123, 'schedules', [1], {
+        schedules: [{ staff_id: 1, dates: ['2026-08-01'], slots: [] }],
+      });
+
+      mockClient.setSchedule = jest.fn().mockResolvedValue([]);
+
+      const result = await handlers.rollbackPhase({
+        company_id: 123,
+        phase_name: 'schedules',
+      });
+
+      expect(mockClient.setSchedule).toHaveBeenCalledWith(
+        123,
+        expect.objectContaining({
+          schedules_to_delete: [
+            expect.objectContaining({
+              team_member_id: 1,
+              dates: ['2026-08-01'],
+            }),
+          ],
+        })
+      );
+      expect(result.content[0]?.text).toContain('Rolled back schedules');
+    });
+
     it('should return error if no checkpoint exists', async () => {
       await handlers.start({ company_id: 123 });
 
@@ -317,6 +359,101 @@ describe('Onboarding Handlers', () => {
       });
       expect(result.isError).toBe(true);
       expect(result.content[0]?.text).toContain('No checkpoint found');
+    });
+  });
+
+  describe('addPositions', () => {
+    it('should create positions and advance phase to staff', async () => {
+      await handlers.start({ company_id: 123 });
+
+      mockClient.createPosition = jest
+        .fn()
+        .mockResolvedValueOnce({ id: 5, title: 'Stylist' })
+        .mockResolvedValueOnce({ id: 6, title: 'Manager' });
+
+      const result = await handlers.addPositions({
+        company_id: 123,
+        positions: [{ title: 'Stylist' }, { title: 'Manager' }],
+      });
+
+      expect(result.content[0]?.text).toContain('2 positions created');
+      expect(result.content[0]?.text).toContain('[5, 6]');
+      expect(mockClient.createPosition).toHaveBeenCalledTimes(2);
+
+      const state = await stateManager.load(123);
+      expect(state?.checkpoints['positions']?.entity_ids).toEqual([5, 6]);
+      expect(state?.phase).toBe('staff');
+    });
+
+    it('should create positions from CSV string', async () => {
+      await handlers.start({ company_id: 123 });
+
+      mockClient.createPosition = jest
+        .fn()
+        .mockResolvedValue({ id: 5, title: 'Stylist' });
+
+      const result = await handlers.addPositions({
+        company_id: 123,
+        positions: 'title\nStylist',
+      });
+
+      expect(result.content[0]?.text).toContain('1 positions created');
+      expect(mockClient.createPosition).toHaveBeenCalledWith(
+        123,
+        expect.objectContaining({ title: 'Stylist' })
+      );
+    });
+  });
+
+  describe('setSchedules', () => {
+    it('should set work schedules and advance phase to clients', async () => {
+      await handlers.start({ company_id: 123 });
+
+      mockClient.setSchedule = jest.fn().mockResolvedValue([]);
+
+      const result = await handlers.setSchedules({
+        company_id: 123,
+        schedules: [
+          {
+            staff_id: 1,
+            dates: ['2026-08-01', '2026-08-02'],
+            slots: [{ from: '09:00', to: '18:00' }],
+          },
+        ],
+      });
+
+      expect(result.content[0]?.text).toContain('Work schedules set for 1');
+      expect(mockClient.setSchedule).toHaveBeenCalledWith(
+        123,
+        expect.objectContaining({
+          schedules_to_set: [expect.objectContaining({ team_member_id: 1 })],
+        })
+      );
+
+      const state = await stateManager.load(123);
+      expect(state?.checkpoints['schedules']?.entity_ids).toEqual([1]);
+      expect(state?.phase).toBe('clients');
+    });
+  });
+
+  describe('phase order', () => {
+    it('addServicesBatch advances phase to schedules', async () => {
+      await handlers.start({ company_id: 123 });
+      await stateManager.checkpoint(123, 'categories', [10]);
+
+      mockClient.createService = jest
+        .fn()
+        .mockResolvedValue({ id: 20, title: 'Haircut' });
+
+      await handlers.addServicesBatch({
+        company_id: 123,
+        services_data: [
+          { title: 'Haircut', price_min: 50, duration: 1800, category_id: 10 },
+        ],
+      });
+
+      const state = await stateManager.load(123);
+      expect(state?.phase).toBe('schedules');
     });
   });
 });

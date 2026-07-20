@@ -7,8 +7,8 @@ const tools = (Object.values(defs) as unknown[]).filter(
 );
 
 describe('factory tool definitions', () => {
-  it('exposes all 23 CRUD tools', () => {
-    expect(tools.length).toBe(23);
+  it('exposes all 30 CRUD tools', () => {
+    expect(tools.length).toBe(30);
   });
 
   it('every tool produces a valid MCP spec', () => {

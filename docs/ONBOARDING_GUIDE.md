@@ -4,7 +4,7 @@ Complete guide for using the conversational onboarding assistant to set up your 
 
 ## Overview
 
-The onboarding wizard provides **10 specialized tools** to help new users quickly configure their business platform through natural conversation or bulk data import. Perfect for first-time setup with staff, services, and client databases.
+The onboarding wizard provides **12 specialized tools** to help new users quickly configure their business platform through natural conversation or bulk data import. Perfect for first-time setup with positions, staff, services, schedules, and client databases.
 
 **Key Features:**
 - Hybrid input: conversational or CSV/JSON bulk import
@@ -12,6 +12,41 @@ The onboarding wizard provides **10 specialized tools** to help new users quickl
 - Persistent state: track progress across sessions
 - Test data generation: create sample bookings
 - Phase-level rollback: undo specific setup steps
+
+**Recommended setup order:**
+`positions → staff → categories → services → schedules → clients → test_bookings`
+
+Positions come first so staff can reference `position_id`. Work schedules come after staff — without them the booking grid stays empty and the location isn't operational.
+
+### New steps
+
+**Add positions (before staff):**
+```typescript
+onboarding_add_positions({
+  company_id: 123456,
+  positions: [
+    { title: "Senior Stylist", api_id: "pos-senior" },
+    { title: "Manicurist" },
+    { title: "Receptionist" }
+  ]
+})
+// Response lists created position IDs — use them as position_id when adding staff.
+// CSV form: "title,api_id\nSenior Stylist,pos-senior\nManicurist,"
+```
+
+**Set work schedules (after staff):**
+```typescript
+onboarding_set_schedules({
+  company_id: 123456,
+  schedules: [
+    {
+      staff_id: 101,                       // from onboarding_add_staff_batch response
+      dates: ["2026-08-01", "2026-08-02"],
+      slots: [{ from: "09:00", to: "18:00" }]
+    }
+  ]
+})
+```
 
 ## Quick Start
 
@@ -318,11 +353,15 @@ onboarding_rollback_phase({
 ```
 
 **Rollback order (reverse dependency):**
-1. `test_bookings` (depends on staff, services, clients)
+1. `test_bookings` (depends on staff, services, clients) — deleted via API
 2. `clients` (standalone)
-3. `services` (depends on categories)
-4. `categories` (standalone)
-5. `staff` (standalone)
+3. `schedules` (depends on staff) — deleted via API
+4. `services` (depends on categories) — checkpoint cleared, entities remain (no delete API)
+5. `categories` (standalone) — checkpoint cleared, entities remain (no delete API)
+6. `staff` (depends on positions) — deleted via API
+7. `positions` (standalone) — deleted via API
+
+Supported `phase_name` values for `onboarding_rollback_phase`: `positions`, `staff`, `services`, `categories`, `schedules`, `clients`, `test_bookings`.
 
 ## Error Handling
 
@@ -541,15 +580,27 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 - Input: `[{title, api_id?, weight?}, ...]`
 - Returns: created category IDs
 
+**`onboarding_add_positions(company_id, positions)`**
+- Bulk create staff positions/roles from JSON array or CSV string
+- Required: `title`
+- Optional: `api_id`
+- Run before staff so staff can reference `position_id`
+
 **`onboarding_add_staff_batch(company_id, staff_data)`**
 - Bulk add staff from JSON array or CSV string
 - Required: `name`
-- Optional: `specialization`, `phone`, `email`, `api_id`
+- Optional: `specialization`, `phone`, `email`, `position_id`, `api_id`
 
 **`onboarding_add_services_batch(company_id, services_data)`**
 - Bulk add services from JSON array or CSV string
 - Required: `title`, `price_min`, `duration`
 - Optional: `price_max`, `category_id`, `api_id`
+
+**`onboarding_set_schedules(company_id, schedules)`**
+- Set work schedules (working hours) for staff members
+- Each entry: `staff_id`, `dates` (YYYY-MM-DD[]), `slots` (`[{from, to}]` in HH:MM)
+- Use staff IDs returned by `onboarding_add_staff_batch`
+- Without schedules the booking grid stays empty
 
 **`onboarding_import_clients(company_id, clients_csv)`**
 - Import client database from CSV

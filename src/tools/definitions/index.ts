@@ -10,3 +10,5 @@ export * from './services.tools.js';
 export * from './categories.tools.js';
 export * from './schedule.tools.js';
 export * from './bookings.tools.js';
+export * from './settings.tools.js';
+export * from './resources.tools.js';

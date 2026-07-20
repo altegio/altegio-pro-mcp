@@ -348,3 +348,75 @@ export interface UpdatePositionRequest {
   title?: string;
   api_id?: string;
 }
+
+// ========== Location Settings & Resources ==========
+
+// Appointment calendar settings — GET/PATCH /company/{id}/settings/timetable
+export interface AppointmentSettings {
+  /** Default appointment type: 0 - Mixed, 1 - Individual, 2 - Group event */
+  record_type: number;
+  /** Maximum number of seats in one group event (1-255) */
+  activity_record_clients_count_max: number;
+  is_show_newsletter_agreement?: boolean;
+  is_show_personal_data_processing_agreement?: boolean;
+  [key: string]: unknown;
+}
+
+export interface UpdateAppointmentSettingsRequest {
+  record_type: number;
+  activity_record_clients_count_max: number;
+  is_show_newsletter_agreement?: boolean;
+  is_show_personal_data_processing_agreement?: boolean;
+}
+
+// Online booking settings — GET/PATCH /company/{id}/settings/online
+export interface OnlineBookingSettings {
+  /** Confirm customer number via SMS */
+  confirm_number: boolean;
+  /** "Any team member" mode */
+  any_master: boolean;
+  /** Delay to the next session, minutes 0-1380 in steps of 30 */
+  seance_delay_step: number;
+  /** Maximum number of seats in one group event (1-255) */
+  activity_online_record_clients_count_max: number;
+  [key: string]: unknown;
+}
+
+export interface UpdateOnlineBookingSettingsRequest {
+  confirm_number: boolean;
+  any_master: boolean;
+  seance_delay_step: number;
+  activity_online_record_clients_count_max: number;
+}
+
+// Booking (appointment) forms — GET/POST /company/{id}/booking_forms
+export interface BookingForm {
+  id: number;
+  title: string;
+  description?: string;
+  is_default?: boolean;
+  [key: string]: unknown;
+}
+
+export interface CreateBookingFormRequest {
+  title: string;
+  description?: string;
+  is_default?: boolean;
+  /** Step mode flag ("without menu") */
+  without_menu?: boolean;
+}
+
+// Resources — GET /resources/{id} (read-only; creation not exposed by the API)
+export interface AltegioResourceInstance {
+  id: number;
+  title: string;
+  resource_id: number;
+  [key: string]: unknown;
+}
+
+export interface AltegioResource {
+  id: number;
+  title: string;
+  instances?: AltegioResourceInstance[];
+  [key: string]: unknown;
+}
