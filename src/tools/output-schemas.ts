@@ -9,7 +9,10 @@ const strProp = { type: 'string' as const };
 const numProp = { type: 'number' as const };
 const boolProp = { type: 'boolean' as const };
 
-function listSchema(itemProps: Record<string, object>, itemRequired?: string[]) {
+function listSchema(
+  itemProps: Record<string, object>,
+  itemRequired?: string[]
+) {
   return {
     type: 'object' as const,
     properties: {
@@ -37,10 +40,9 @@ function entitySchema(props: Record<string, object>, required?: string[]) {
 
 // ========== Auth ==========
 
-export const loginOutput = entitySchema(
-  { success: boolProp, error: strProp },
-  ['success']
-);
+export const loginOutput = entitySchema({ success: boolProp, error: strProp }, [
+  'success',
+]);
 
 // ========== Lists (GET) ==========
 
@@ -91,10 +93,10 @@ export const servicesOutput = listSchema(
   ['id', 'title']
 );
 
-export const categoriesOutput = listSchema(
-  { id: idProp, title: strProp },
-  ['id', 'title']
-);
+export const categoriesOutput = listSchema({ id: idProp, title: strProp }, [
+  'id',
+  'title',
+]);
 
 export const positionsOutput = listSchema(
   { id: idProp, title: strProp, api_id: strProp },

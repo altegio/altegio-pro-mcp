@@ -1,4 +1,9 @@
-import { OnboardingStateSchema, OnboardingPhase, StaffBatchSchema, ClientBatchSchema } from '../onboarding.types';
+import {
+  OnboardingStateSchema,
+  OnboardingPhase,
+  StaffBatchSchema,
+  ClientBatchSchema,
+} from '../onboarding.types';
 
 describe('Onboarding Types', () => {
   it('should validate valid onboarding state', () => {
@@ -8,7 +13,7 @@ describe('Onboarding Types', () => {
       started_at: '2025-01-29T10:00:00Z',
       updated_at: '2025-01-29T10:00:00Z',
       checkpoints: {},
-      conversation_context: {}
+      conversation_context: {},
     };
 
     const result = OnboardingStateSchema.safeParse(validState);
@@ -22,7 +27,7 @@ describe('Onboarding Types', () => {
       started_at: '2025-01-29T10:00:00Z',
       updated_at: '2025-01-29T10:00:00Z',
       checkpoints: {},
-      conversation_context: {}
+      conversation_context: {},
     };
 
     const result = OnboardingStateSchema.safeParse(invalidState);
@@ -34,7 +39,7 @@ describe('Batch Schemas', () => {
   it('should validate staff batch', () => {
     const validBatch = [
       { name: 'Alice', specialization: 'Hairdresser' },
-      { name: 'Bob', phone: '+1234567890' }
+      { name: 'Bob', phone: '+1234567890' },
     ];
 
     const result = StaffBatchSchema.safeParse(validBatch);

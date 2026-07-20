@@ -32,7 +32,11 @@ describe('SDK identity propagation', () => {
     );
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: [
-        { name: 'probe', description: 'echo identity', inputSchema: { type: 'object' } },
+        {
+          name: 'probe',
+          description: 'echo identity',
+          inputSchema: { type: 'object' },
+        },
       ],
     }));
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -42,13 +46,21 @@ describe('SDK identity propagation', () => {
       const tag = String(request.params.arguments?.tag ?? '');
       seenByTag.set(
         tag,
-        identity === undefined ? undefined : identity === null ? null : identity.email
+        identity === undefined
+          ? undefined
+          : identity === null
+            ? null
+            : identity.email
       );
       return { content: [{ type: 'text', text: 'ok' }] };
     });
 
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    const client = new Client({ name: 'test-client', version: '1.0.0' }, { capabilities: {} });
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+    const client = new Client(
+      { name: 'test-client', version: '1.0.0' },
+      { capabilities: {} }
+    );
     await Promise.all([
       server.connect(serverTransport),
       client.connect(clientTransport),

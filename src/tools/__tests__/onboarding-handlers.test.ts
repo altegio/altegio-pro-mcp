@@ -16,7 +16,7 @@ describe('Onboarding Handlers', () => {
     stateManager = new OnboardingStateManager(testDir);
 
     mockClient = {
-      isAuthenticated: jest.fn().mockReturnValue(true)
+      isAuthenticated: jest.fn().mockReturnValue(true),
     } as any;
 
     handlers = new OnboardingHandlers(mockClient, stateManager);
@@ -78,7 +78,8 @@ describe('Onboarding Handlers', () => {
     it('should create staff from JSON array', async () => {
       await handlers.start({ company_id: 123 });
 
-      mockClient.createStaff = jest.fn()
+      mockClient.createStaff = jest
+        .fn()
         .mockResolvedValueOnce({ id: 1, name: 'Alice' })
         .mockResolvedValueOnce({ id: 2, name: 'Bob' });
 
@@ -86,8 +87,8 @@ describe('Onboarding Handlers', () => {
         company_id: 123,
         staff_data: [
           { name: 'Alice', specialization: 'Hairdresser' },
-          { name: 'Bob', specialization: 'Nail Tech' }
-        ]
+          { name: 'Bob', specialization: 'Nail Tech' },
+        ],
       });
 
       expect(result.content[0]?.text).toContain('2 staff members created');
@@ -97,20 +98,24 @@ describe('Onboarding Handlers', () => {
     it('should create staff from CSV string', async () => {
       await handlers.start({ company_id: 123 });
 
-      mockClient.createStaff = jest.fn()
+      mockClient.createStaff = jest
+        .fn()
         .mockResolvedValue({ id: 1, name: 'Alice' });
 
       const csv = 'name,specialization\nAlice,Hairdresser';
 
       const result = await handlers.addStaffBatch({
         company_id: 123,
-        staff_data: csv
+        staff_data: csv,
       });
 
       expect(result.content[0]?.text).toContain('1 staff member');
       expect(mockClient.createStaff).toHaveBeenCalledWith(
         123,
-        expect.objectContaining({ name: 'Alice', specialization: 'Hairdresser' })
+        expect.objectContaining({
+          name: 'Alice',
+          specialization: 'Hairdresser',
+        })
       );
     });
   });
@@ -119,7 +124,8 @@ describe('Onboarding Handlers', () => {
     it('should create service categories', async () => {
       await handlers.start({ company_id: 123 });
 
-      mockClient.createServiceCategory = jest.fn()
+      mockClient.createServiceCategory = jest
+        .fn()
         .mockResolvedValueOnce({ id: 10, title: 'Hair Services' })
         .mockResolvedValueOnce({ id: 11, title: 'Nail Services' });
 
@@ -127,8 +133,8 @@ describe('Onboarding Handlers', () => {
         company_id: 123,
         categories: [
           { title: 'Hair Services', weight: 1 },
-          { title: 'Nail Services', weight: 2 }
-        ]
+          { title: 'Nail Services', weight: 2 },
+        ],
       });
 
       expect(result.content[0]?.text).toContain('2 categories created');
@@ -141,7 +147,8 @@ describe('Onboarding Handlers', () => {
       await handlers.start({ company_id: 123 });
       await stateManager.checkpoint(123, 'categories', [10]);
 
-      mockClient.createService = jest.fn()
+      mockClient.createService = jest
+        .fn()
         .mockResolvedValueOnce({ id: 20, title: 'Haircut' })
         .mockResolvedValueOnce({ id: 21, title: 'Manicure' });
 
@@ -149,8 +156,8 @@ describe('Onboarding Handlers', () => {
         company_id: 123,
         services_data: [
           { title: 'Haircut', price_min: 50, duration: 1800, category_id: 10 },
-          { title: 'Manicure', price_min: 30, duration: 1200, category_id: 10 }
-        ]
+          { title: 'Manicure', price_min: 30, duration: 1200, category_id: 10 },
+        ],
       });
 
       expect(result.content[0]?.text).toContain('2 services created');
@@ -162,15 +169,17 @@ describe('Onboarding Handlers', () => {
     it('should import clients from CSV', async () => {
       await handlers.start({ company_id: 123 });
 
-      mockClient.createClient = jest.fn()
+      mockClient.createClient = jest
+        .fn()
         .mockResolvedValueOnce({ id: 30, name: 'John' })
         .mockResolvedValueOnce({ id: 31, name: 'Jane' });
 
-      const csv = 'name,phone,email\nJohn,+1234567890,john@test.com\nJane,+0987654321,jane@test.com';
+      const csv =
+        'name,phone,email\nJohn,+1234567890,john@test.com\nJane,+0987654321,jane@test.com';
 
       const result = await handlers.importClients({
         company_id: 123,
-        clients_csv: csv
+        clients_csv: csv,
       });
 
       expect(result.content[0]?.text).toContain('2 clients imported');
@@ -184,12 +193,11 @@ describe('Onboarding Handlers', () => {
       await stateManager.checkpoint(123, 'staff', [1, 2]);
       await stateManager.checkpoint(123, 'services', [10, 11]);
 
-      mockClient.createBooking = jest.fn()
-        .mockResolvedValue({ id: 100 });
+      mockClient.createBooking = jest.fn().mockResolvedValue({ id: 100 });
 
       const result = await handlers.createTestBookings({
         company_id: 123,
-        count: 3
+        count: 3,
       });
 
       expect(result.content[0]?.text).toContain('Test bookings created: 3');
@@ -199,7 +207,10 @@ describe('Onboarding Handlers', () => {
     it('should return error if no staff exist', async () => {
       await handlers.start({ company_id: 123 });
 
-      const result = await handlers.createTestBookings({ company_id: 123, count: 2 });
+      const result = await handlers.createTestBookings({
+        company_id: 123,
+        count: 2,
+      });
       expect(result.isError).toBe(true);
       expect(result.content[0]?.text).toContain('No staff or services found');
     });
@@ -211,7 +222,7 @@ describe('Onboarding Handlers', () => {
 
       const result = await handlers.previewData({
         data_type: 'staff',
-        raw_input: csv
+        raw_input: csv,
       });
 
       const textContent = result.content[0]?.text;
@@ -224,12 +235,12 @@ describe('Onboarding Handlers', () => {
     it('should show JSON preview', async () => {
       const json = JSON.stringify([
         { name: 'Alice', phone: '+1234567890' },
-        { name: 'Bob', phone: '+0987654321' }
+        { name: 'Bob', phone: '+0987654321' },
       ]);
 
       const result = await handlers.previewData({
         data_type: 'staff',
-        raw_input: json
+        raw_input: json,
       });
 
       const textContent = result.content[0]?.text;
@@ -239,7 +250,7 @@ describe('Onboarding Handlers', () => {
     it('should handle empty data', async () => {
       const result = await handlers.previewData({
         data_type: 'staff',
-        raw_input: ''
+        raw_input: '',
       });
 
       expect(result.content[0]?.text).toContain('No data parsed');
@@ -255,7 +266,7 @@ describe('Onboarding Handlers', () => {
 
       const result = await handlers.rollbackPhase({
         company_id: 123,
-        phase_name: 'staff'
+        phase_name: 'staff',
       });
 
       expect(mockClient.deleteStaff).toHaveBeenCalledTimes(3);
@@ -275,7 +286,7 @@ describe('Onboarding Handlers', () => {
 
       const result = await handlers.rollbackPhase({
         company_id: 123,
-        phase_name: 'test_bookings'
+        phase_name: 'test_bookings',
       });
 
       expect(mockClient.deleteBooking).toHaveBeenCalledTimes(2);
@@ -288,11 +299,13 @@ describe('Onboarding Handlers', () => {
 
       const result = await handlers.rollbackPhase({
         company_id: 123,
-        phase_name: 'services'
+        phase_name: 'services',
       });
 
       expect(result.content[0]?.text).toContain('Rolled back services');
-      expect(result.content[0]?.text).toContain('Note: Services cannot be deleted via API');
+      expect(result.content[0]?.text).toContain(
+        'Note: Services cannot be deleted via API'
+      );
     });
 
     it('should return error if no checkpoint exists', async () => {
@@ -300,7 +313,7 @@ describe('Onboarding Handlers', () => {
 
       const result = await handlers.rollbackPhase({
         company_id: 123,
-        phase_name: 'staff'
+        phase_name: 'staff',
       });
       expect(result.isError).toBe(true);
       expect(result.content[0]?.text).toContain('No checkpoint found');

@@ -1,5 +1,8 @@
 import { parseCSV } from '../csv-parser';
-import { ServiceBatchItemSchema, StaffBatchItemSchema } from '../../types/onboarding.types';
+import {
+  ServiceBatchItemSchema,
+  StaffBatchItemSchema,
+} from '../../types/onboarding.types';
 
 describe('CSV Parser', () => {
   describe('parseCSV', () => {
@@ -9,7 +12,7 @@ describe('CSV Parser', () => {
 
       expect(result).toEqual([
         { name: 'Alice', phone: '+1234567890' },
-        { name: 'Bob', phone: '+0987654321' }
+        { name: 'Bob', phone: '+0987654321' },
       ]);
     });
 
@@ -18,7 +21,7 @@ describe('CSV Parser', () => {
       const result = parseCSV(csv);
 
       expect(result).toEqual([
-        { name: 'Smith, John', address: '123 Main St, Apt 4' }
+        { name: 'Smith, John', address: '123 Main St, Apt 4' },
       ]);
     });
 
@@ -34,7 +37,7 @@ describe('CSV Parser', () => {
       const parsed = parseCSV(csv);
 
       expect(parsed).toEqual([
-        { title: 'Haircut', price_min: '50', duration: '1800' }
+        { title: 'Haircut', price_min: '50', duration: '1800' },
       ]);
 
       // Validate with Zod schema (coercion happens during validation)
@@ -42,14 +45,15 @@ describe('CSV Parser', () => {
       expect(result).toEqual({
         title: 'Haircut',
         price_min: 50,
-        duration: 1800
+        duration: 1800,
       });
       expect(typeof result.price_min).toBe('number');
       expect(typeof result.duration).toBe('number');
     });
 
     it('should parse services CSV with optional numeric fields', () => {
-      const csv = 'title,price_min,price_max,duration,category_id\nManicure,30,40,1200,5';
+      const csv =
+        'title,price_min,price_max,duration,category_id\nManicure,30,40,1200,5';
       const parsed = parseCSV(csv);
 
       const result = ServiceBatchItemSchema.parse(parsed[0]);
@@ -58,7 +62,7 @@ describe('CSV Parser', () => {
         price_min: 30,
         price_max: 40,
         duration: 1200,
-        category_id: 5
+        category_id: 5,
       });
       expect(typeof result.price_max).toBe('number');
       expect(typeof result.category_id).toBe('number');
@@ -71,7 +75,7 @@ describe('CSV Parser', () => {
       const result = StaffBatchItemSchema.parse(parsed[0]);
       expect(result).toEqual({
         name: 'Alice',
-        position_id: 3
+        position_id: 3,
       });
       expect(typeof result.position_id).toBe('number');
     });

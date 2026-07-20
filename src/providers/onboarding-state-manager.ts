@@ -1,17 +1,23 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { OnboardingState, OnboardingPhase, Checkpoint } from '../types/onboarding.types.js';
+import {
+  OnboardingState,
+  OnboardingPhase,
+  Checkpoint,
+} from '../types/onboarding.types.js';
 import { logger } from '../utils/logger.js';
 
 export class OnboardingStateManager {
   private baseDir: string;
 
   constructor(baseDir?: string) {
-    this.baseDir = baseDir || path.join(
-      process.env.HOME || process.env.USERPROFILE || '',
-      '.altegio-mcp',
-      'onboarding'
-    );
+    this.baseDir =
+      baseDir ||
+      path.join(
+        process.env.HOME || process.env.USERPROFILE || '',
+        '.altegio-mcp',
+        'onboarding'
+      );
   }
 
   private getStatePath(companyId: number): string {
@@ -26,7 +32,7 @@ export class OnboardingStateManager {
       started_at: now,
       updated_at: now,
       checkpoints: {},
-      conversation_context: {}
+      conversation_context: {},
     };
 
     await this.save(state);
@@ -75,7 +81,7 @@ export class OnboardingStateManager {
       completed: true,
       entity_ids: entityIds,
       timestamp: new Date().toISOString(),
-      metadata
+      metadata,
     };
 
     state.checkpoints[phase] = checkpoint;

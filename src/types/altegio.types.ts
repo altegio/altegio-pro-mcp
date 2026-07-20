@@ -201,18 +201,18 @@ export interface AltegioScheduleEntry {
 // Schedule — matches PUT /company/{location_id}/staff/schedule spec
 export interface ScheduleSlot {
   from: string; // HH:mm
-  to: string;   // HH:mm
+  to: string; // HH:mm
 }
 
 export interface ScheduleToSet {
   team_member_id: number;
-  dates: string[];    // YYYY-MM-DD
+  dates: string[]; // YYYY-MM-DD
   slots: ScheduleSlot[];
 }
 
 export interface ScheduleToDelete {
   team_member_id: number;
-  dates: string[];    // YYYY-MM-DD
+  dates: string[]; // YYYY-MM-DD
 }
 
 export interface SetScheduleRequest {

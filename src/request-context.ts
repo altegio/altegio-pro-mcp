@@ -51,7 +51,9 @@ function headerValue(headers: HeaderBag, name: string): string | undefined {
  * when a `user` identity is missing both `email` and `sub` (nothing stable to
  * key a token by). A `null` result means "HTTP context, but anonymous".
  */
-export function parseIdentityHeaders(headers: HeaderBag): RequestIdentity | null {
+export function parseIdentityHeaders(
+  headers: HeaderBag
+): RequestIdentity | null {
   const kind = headerValue(headers, 'x-mcp-auth-kind');
   if (!kind) {
     return null;
@@ -83,7 +85,10 @@ export function parseIdentityHeaders(headers: HeaderBag): RequestIdentity | null
     };
   }
 
-  logger.warn({ kind }, 'Unknown x-mcp-auth-kind value; treating request as anonymous');
+  logger.warn(
+    { kind },
+    'Unknown x-mcp-auth-kind value; treating request as anonymous'
+  );
   return null;
 }
 
@@ -117,5 +122,9 @@ export function getRequestIdentity(): RequestIdentity | null | undefined {
 export function identityKey(identity: RequestIdentity): string {
   const material =
     identity.sub || identity.email || `machine:${identity.machineName ?? ''}`;
-  return crypto.createHash('sha256').update(material).digest('hex').slice(0, 16);
+  return crypto
+    .createHash('sha256')
+    .update(material)
+    .digest('hex')
+    .slice(0, 16);
 }

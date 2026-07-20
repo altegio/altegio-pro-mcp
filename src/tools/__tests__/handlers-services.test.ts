@@ -27,7 +27,9 @@ describe('ToolHandlers - Services CRUD', () => {
         category_id: 10,
       });
 
-      expect((result.content[0] as any).text).toContain('Successfully created service');
+      expect((result.content[0] as any).text).toContain(
+        'Successfully created service'
+      );
       expect((result.content[0] as any).text).toContain('Haircut');
       expect(mockClient.createService).toHaveBeenCalledWith(456, {
         title: 'Haircut',
@@ -46,7 +48,9 @@ describe('ToolHandlers - Services CRUD', () => {
         category_id: 1,
       });
 
-      expect((result.content[0] as any).text).toContain('Authentication required');
+      expect((result.content[0] as any).text).toContain(
+        'Authentication required'
+      );
     });
   });
 
@@ -61,7 +65,9 @@ describe('ToolHandlers - Services CRUD', () => {
         title: 'New Haircut',
       });
 
-      expect((result.content[0] as any).text).toContain('Successfully updated service');
+      expect((result.content[0] as any).text).toContain(
+        'Successfully updated service'
+      );
       expect(mockClient.updateService).toHaveBeenCalledWith(456, 789, {
         title: 'New Haircut',
       });

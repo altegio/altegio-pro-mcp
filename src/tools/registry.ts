@@ -282,7 +282,8 @@ const tools: ToolDefinition[] = [
         dates: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Dates for the schedule (YYYY-MM-DD format). Can set multiple dates at once.',
+          description:
+            'Dates for the schedule (YYYY-MM-DD format). Can set multiple dates at once.',
         },
         slots: {
           type: 'array',
@@ -290,8 +291,14 @@ const tools: ToolDefinition[] = [
           items: {
             type: 'object',
             properties: {
-              from: { type: 'string', description: 'Start time (HH:MM format, e.g., "09:00")' },
-              to: { type: 'string', description: 'End time (HH:MM format, e.g., "18:00")' },
+              from: {
+                type: 'string',
+                description: 'Start time (HH:MM format, e.g., "09:00")',
+              },
+              to: {
+                type: 'string',
+                description: 'End time (HH:MM format, e.g., "18:00")',
+              },
             },
             required: ['from', 'to'],
           },
@@ -326,8 +333,14 @@ const tools: ToolDefinition[] = [
           items: {
             type: 'object',
             properties: {
-              from: { type: 'string', description: 'Start time (HH:MM format, e.g., "09:00")' },
-              to: { type: 'string', description: 'End time (HH:MM format, e.g., "18:00")' },
+              from: {
+                type: 'string',
+                description: 'Start time (HH:MM format, e.g., "09:00")',
+              },
+              to: {
+                type: 'string',
+                description: 'End time (HH:MM format, e.g., "18:00")',
+              },
             },
             required: ['from', 'to'],
           },
@@ -451,7 +464,10 @@ const tools: ToolDefinition[] = [
       properties: {
         company_id: { type: 'number', description: 'Company ID' },
         name: { type: 'string', description: 'Employee name' },
-        specialization: { type: 'string', description: 'Employee specialization' },
+        specialization: {
+          type: 'string',
+          description: 'Employee specialization',
+        },
         position_id: {
           type: 'number',
           description: 'Position ID',
@@ -475,7 +491,16 @@ const tools: ToolDefinition[] = [
           description: 'User invitation flag',
         },
       },
-      required: ['company_id', 'name', 'specialization', 'position_id', 'phone_number', 'user_email', 'user_phone', 'is_user_invite'],
+      required: [
+        'company_id',
+        'name',
+        'specialization',
+        'position_id',
+        'phone_number',
+        'user_email',
+        'user_phone',
+        'is_user_invite',
+      ],
     },
     outputSchema: output.staffEntityOutput,
   },
@@ -494,13 +519,28 @@ const tools: ToolDefinition[] = [
         company_id: { type: 'number', description: 'Company ID' },
         staff_id: { type: 'number', description: 'Staff member ID' },
         name: { type: 'string', description: 'Employee name' },
-        specialization: { type: 'string', description: 'Employee specialization' },
-        weight: { type: 'number', description: 'Display order weight (higher = first)' },
-        information: { type: 'string', description: 'Employee info (HTML format)' },
+        specialization: {
+          type: 'string',
+          description: 'Employee specialization',
+        },
+        weight: {
+          type: 'number',
+          description: 'Display order weight (higher = first)',
+        },
+        information: {
+          type: 'string',
+          description: 'Employee info (HTML format)',
+        },
         api_id: { type: 'string', description: 'External API ID' },
-        hidden: { type: 'number', description: 'Hidden from online booking (0 or 1)' },
+        hidden: {
+          type: 'number',
+          description: 'Hidden from online booking (0 or 1)',
+        },
         fired: { type: 'number', description: 'Dismissed status (0 or 1)' },
-        user_id: { type: 'number', description: 'Linked user ID (0 to unlink)' },
+        user_id: {
+          type: 'number',
+          description: 'Linked user ID (0 to unlink)',
+        },
       },
       required: ['company_id', 'staff_id'],
     },
@@ -607,7 +647,10 @@ const tools: ToolDefinition[] = [
           type: 'string',
           description: 'Booking datetime (ISO format: YYYY-MM-DDTHH:MM:SS)',
         },
-        seance_length: { type: 'number', description: 'Session length in seconds' },
+        seance_length: {
+          type: 'number',
+          description: 'Session length in seconds',
+        },
         client: {
           type: 'object',
           description: 'Client information',
@@ -653,7 +696,10 @@ const tools: ToolDefinition[] = [
           },
         },
         datetime: { type: 'string', description: 'New booking datetime' },
-        seance_length: { type: 'number', description: 'Session length in seconds' },
+        seance_length: {
+          type: 'number',
+          description: 'Session length in seconds',
+        },
         client: {
           type: 'object',
           description: 'Client information',
@@ -683,7 +729,10 @@ const tools: ToolDefinition[] = [
       type: 'object',
       properties: {
         company_id: { type: 'number', description: 'Company ID' },
-        record_id: { type: 'number', description: 'Booking/record ID to delete' },
+        record_id: {
+          type: 'number',
+          description: 'Booking/record ID to delete',
+        },
       },
       required: ['company_id', 'record_id'],
     },
