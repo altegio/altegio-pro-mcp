@@ -5,7 +5,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_start',
     description:
-      '[Onboarding] Initialize new onboarding session for a company. Creates persistent state and guides through platform setup workflow.',
+      '[Onboarding] Initialize new onboarding session for a location. Creates persistent state and guides through platform setup workflow.',
     annotations: {
       title: 'Start Onboarding',
       openWorldHint: true,
@@ -13,12 +13,12 @@ export const onboardingTools: McpToolSpec[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        company_id: {
+        location_id: {
           type: 'number',
-          description: 'Company ID to start onboarding for',
+          description: 'Location ID to start onboarding for',
         },
       },
-      required: ['company_id'],
+      required: ['location_id'],
     },
     outputSchema: output.onboardingStatusOutput,
   },
@@ -33,9 +33,9 @@ export const onboardingTools: McpToolSpec[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        company_id: { type: 'number', description: 'Company ID' },
+        location_id: { type: 'number', description: 'Location ID' },
       },
-      required: ['company_id'],
+      required: ['location_id'],
     },
     outputSchema: output.onboardingStatusOutput,
   },
@@ -51,9 +51,9 @@ export const onboardingTools: McpToolSpec[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        company_id: { type: 'number', description: 'Company ID' },
+        location_id: { type: 'number', description: 'Location ID' },
       },
-      required: ['company_id'],
+      required: ['location_id'],
     },
     outputSchema: output.onboardingStatusOutput,
   },
@@ -69,7 +69,7 @@ export const onboardingTools: McpToolSpec[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        company_id: { type: 'number', description: 'Company ID' },
+        location_id: { type: 'number', description: 'Location ID' },
         positions: {
           description:
             'JSON array of position objects or CSV string with headers: title,api_id',
@@ -89,7 +89,7 @@ export const onboardingTools: McpToolSpec[] = [
           ],
         },
       },
-      required: ['company_id', 'positions'],
+      required: ['location_id', 'positions'],
     },
     outputSchema: output.batchImportOutput,
   },
@@ -105,7 +105,7 @@ export const onboardingTools: McpToolSpec[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        company_id: { type: 'number', description: 'Company ID' },
+        location_id: { type: 'number', description: 'Location ID' },
         staff_data: {
           description:
             'JSON array of staff objects or CSV string with headers: name,specialization,phone,email,position_id,api_id',
@@ -129,7 +129,7 @@ export const onboardingTools: McpToolSpec[] = [
           ],
         },
       },
-      required: ['company_id', 'staff_data'],
+      required: ['location_id', 'staff_data'],
     },
     outputSchema: output.batchImportOutput,
   },
@@ -145,7 +145,7 @@ export const onboardingTools: McpToolSpec[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        company_id: { type: 'number', description: 'Company ID' },
+        location_id: { type: 'number', description: 'Location ID' },
         services_data: {
           description:
             'JSON array of service objects or CSV string with headers: title,price_min,price_max,duration,category_id,api_id',
@@ -169,14 +169,14 @@ export const onboardingTools: McpToolSpec[] = [
           ],
         },
       },
-      required: ['company_id', 'services_data'],
+      required: ['location_id', 'services_data'],
     },
     outputSchema: output.batchImportOutput,
   },
   {
     name: 'onboarding_set_schedules',
     description:
-      '[Onboarding] Set work schedules (working hours) for staff members. AUTHENTICATION REQUIRED. Accepts an array of { staff_id, dates[], slots[{from,to}] }. Use the staff IDs returned by onboarding_add_staff_batch. Without schedules the booking grid stays empty. Creates checkpoint for rollback.',
+      '[Onboarding] Set work schedules (working hours) for staff members. AUTHENTICATION REQUIRED. Accepts an array of { team_member_id, dates[], slots[{from,to}] }. Use the team member IDs returned by onboarding_add_staff_batch. Without schedules the appointment grid stays empty. Creates checkpoint for rollback.',
     annotations: {
       title: 'Set Work Schedules',
       openWorldHint: true,
@@ -185,14 +185,17 @@ export const onboardingTools: McpToolSpec[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        company_id: { type: 'number', description: 'Company ID' },
+        location_id: { type: 'number', description: 'Location ID' },
         schedules: {
           type: 'array',
           description: 'Array of per-staff schedule entries',
           items: {
             type: 'object',
             properties: {
-              staff_id: { type: 'number', description: 'Staff member ID' },
+              team_member_id: {
+                type: 'number',
+                description: 'Team member ID',
+              },
               dates: {
                 type: 'array',
                 items: { type: 'string' },
@@ -214,11 +217,11 @@ export const onboardingTools: McpToolSpec[] = [
                 },
               },
             },
-            required: ['staff_id', 'dates', 'slots'],
+            required: ['team_member_id', 'dates', 'slots'],
           },
         },
       },
-      required: ['company_id', 'schedules'],
+      required: ['location_id', 'schedules'],
     },
     outputSchema: output.batchImportOutput,
   },
@@ -234,7 +237,7 @@ export const onboardingTools: McpToolSpec[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        company_id: { type: 'number', description: 'Company ID' },
+        location_id: { type: 'number', description: 'Location ID' },
         categories: {
           type: 'array',
           description: 'Array of category objects',
@@ -252,7 +255,7 @@ export const onboardingTools: McpToolSpec[] = [
           },
         },
       },
-      required: ['company_id', 'categories'],
+      required: ['location_id', 'categories'],
     },
     outputSchema: output.batchImportOutput,
   },
@@ -268,39 +271,39 @@ export const onboardingTools: McpToolSpec[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        company_id: { type: 'number', description: 'Company ID' },
+        location_id: { type: 'number', description: 'Location ID' },
         clients_csv: {
           type: 'string',
           description:
             'CSV string with headers: name,phone,email,surname,comment. Either phone or email required per row.',
         },
       },
-      required: ['company_id', 'clients_csv'],
+      required: ['location_id', 'clients_csv'],
     },
     outputSchema: output.batchImportOutput,
   },
   {
-    name: 'onboarding_create_test_bookings',
+    name: 'onboarding_create_test_appointments',
     description:
-      'Generate test bookings using previously created staff and services. Distributes bookings across next 1-7 days. Marks onboarding as complete.',
+      'Generate test appointments using previously created staff and services. Distributes appointments across next 1-7 days. Marks onboarding as complete.',
     annotations: {
-      title: 'Create Test Bookings',
+      title: 'Create Test Appointments',
       openWorldHint: true,
       idempotentHint: false,
     },
     inputSchema: {
       type: 'object',
       properties: {
-        company_id: { type: 'number', description: 'Company ID' },
+        location_id: { type: 'number', description: 'Location ID' },
         count: {
           type: 'number',
-          description: 'Number of test bookings to create',
+          description: 'Number of test appointments to create',
           minimum: 1,
           maximum: 10,
           default: 5,
         },
       },
-      required: ['company_id'],
+      required: ['location_id'],
     },
     outputSchema: output.batchImportOutput,
   },
@@ -341,14 +344,14 @@ export const onboardingTools: McpToolSpec[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        company_id: { type: 'number', description: 'Company ID' },
+        location_id: { type: 'number', description: 'Location ID' },
         phase_name: {
           type: 'string',
           description:
             'Phase to rollback (staff, services, test_bookings, categories, clients)',
         },
       },
-      required: ['company_id', 'phase_name'],
+      required: ['location_id', 'phase_name'],
     },
   },
 ];

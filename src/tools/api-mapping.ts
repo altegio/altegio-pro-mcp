@@ -41,9 +41,9 @@ export const apiMapping: Record<string, ApiMapping> = {
   // altegio_logout: no API endpoint, local credential clear only
 
   // ==========================================
-  // Companies
+  // Locations
   // ==========================================
-  list_companies: {
+  list_locations: {
     path: '/companies',
     method: 'get',
     operationId: 'get_location_list',
@@ -52,30 +52,30 @@ export const apiMapping: Record<string, ApiMapping> = {
   },
 
   // ==========================================
-  // Bookings (Appointments)
+  // Appointments
   // ==========================================
-  get_bookings: {
+  get_appointments: {
     path: '/records/{location_id}',
     method: 'get',
     operationId: 'get_appointment_list',
     pathParams: ['location_id'],
     queryParams: ['page', 'count', 'start_date', 'end_date'],
   },
-  create_booking: {
+  create_appointment: {
     path: '/records/{location_id}',
     method: 'post',
     operationId: 'create_appointment',
     pathParams: ['location_id'],
     bodyParams: ['staff_id', 'services', 'datetime', 'client'],
   },
-  update_booking: {
+  update_appointment: {
     path: '/record/{location_id}/{record_id}',
     method: 'put',
     operationId: 'update_appointment',
     pathParams: ['location_id', 'record_id'],
     bodyParams: ['staff_id', 'services', 'datetime', 'client'],
   },
-  delete_booking: {
+  delete_appointment: {
     path: '/record/{location_id}/{record_id}',
     method: 'delete',
     operationId: 'delete_appointment',
@@ -309,7 +309,7 @@ export const unmappedTools: string[] = [
   'onboarding_add_services_batch',
   'onboarding_add_categories',
   'onboarding_import_clients',
-  'onboarding_create_test_bookings',
+  'onboarding_create_test_appointments',
   'onboarding_preview_data',
   'onboarding_rollback_phase',
 ];

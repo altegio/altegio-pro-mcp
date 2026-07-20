@@ -7,22 +7,22 @@ const serviceItemSchema = z.object({
   amount: z.number().positive().optional().describe('Amount/quantity'),
 });
 
-export const getBookingsTool = defineTool({
-  name: 'get_bookings',
-  category: 'Bookings',
+export const getAppointmentsTool = defineTool({
+  name: 'get_appointments',
+  category: 'Appointments',
   description:
-    '[Bookings] Get bookings for a company. AUTHENTICATION REQUIRED - this is administrative data. User must be logged in and have access to the company. If company_id not known, first call list_companies with my=1 to get user companies, then ask user to choose one. PAGINATION STRATEGY: Default may return many bookings. RECOMMENDED: Start with count=20-50 for recent bookings. Use start_date/end_date to filter by date range. Show first batch to user, fetch more only if needed. This saves context and computation.',
+    '[Appointments] Get appointments for a location. AUTHENTICATION REQUIRED - this is administrative data. User must be logged in and have access to the location. If location_id not known, first call list_locations with my=1 to get user locations, then ask user to choose one. PAGINATION STRATEGY: Default may return many appointments. RECOMMENDED: Start with count=20-50 for recent appointments. Use start_date/end_date to filter by date range. Show first batch to user, fetch more only if needed. This saves context and computation.',
   annotations: {
-    title: 'Get Bookings',
+    title: 'Get Appointments',
     readOnlyHint: true,
     openWorldHint: true,
   },
   input: z.object({
-    company_id: z
+    location_id: z
       .number()
       .int()
       .positive()
-      .describe('ID of the company to get bookings for'),
+      .describe('ID of the location to get appointments for'),
     page: z
       .number()
       .int()
@@ -43,60 +43,60 @@ export const getBookingsTool = defineTool({
       .string()
       .optional()
       .describe(
-        'Filter bookings from this date (YYYY-MM-DD format). Use to reduce result set.'
+        'Filter appointments from this date (YYYY-MM-DD format). Use to reduce result set.'
       ),
     end_date: z
       .string()
       .optional()
       .describe(
-        'Filter bookings until this date (YYYY-MM-DD format). Use to reduce result set.'
+        'Filter appointments until this date (YYYY-MM-DD format). Use to reduce result set.'
       ),
   }),
   outputSchema: bookingsOutput,
   handler: async ({ input, client }) => {
-    const { company_id, ...listParams } = input;
-    const bookings = await client.getBookings(
-      company_id,
+    const { location_id, ...listParams } = input;
+    const appointments = await client.getBookings(
+      location_id,
       Object.keys(listParams).length > 0 ? listParams : undefined
     );
 
-    const summary = `Found ${bookings.length} ${bookings.length === 1 ? 'booking' : 'bookings'} for company ${company_id}:\n\n`;
-    const bookingsList = bookings
+    const summary = `Found ${appointments.length} ${appointments.length === 1 ? 'appointment' : 'appointments'} for location ${location_id}:\n\n`;
+    const appointmentsList = appointments
       .map(
         (b, idx) =>
-          `${idx + 1}. Booking ID: ${b.id}\n` +
+          `${idx + 1}. Appointment ID: ${b.id}\n` +
           `   Date: ${b.datetime || b.date}\n` +
           `   Client: ${b.client?.name || 'N/A'} (${b.client?.phone || 'no phone'})\n` +
-          `   Staff: ${b.staff?.name || 'N/A'}\n` +
+          `   Team member: ${b.staff?.name || 'N/A'}\n` +
           `   Services: ${b.services?.map((s) => s.title).join(', ') || 'N/A'}\n` +
           `   Status: ${b.status}`
       )
       .join('\n\n');
 
     return {
-      text: summary + bookingsList,
-      structuredContent: { items: bookings, count: bookings.length },
+      text: summary + appointmentsList,
+      structuredContent: { items: appointments, count: appointments.length },
     };
   },
 });
 
-export const createBookingTool = defineTool({
-  name: 'create_booking',
-  category: 'Bookings',
+export const createAppointmentTool = defineTool({
+  name: 'create_appointment',
+  category: 'Appointments',
   description:
-    '[Bookings] Create a new client booking/appointment. AUTHENTICATION REQUIRED. Required fields: staff_id, services, datetime, client info.',
+    '[Appointments] Create a new client appointment. AUTHENTICATION REQUIRED. Required fields: team_member_id, services, datetime, client info.',
   annotations: {
-    title: 'Create Booking',
+    title: 'Create Appointment',
     openWorldHint: true,
     idempotentHint: false,
   },
   input: z.object({
-    company_id: z.number().int().positive().describe('Company ID'),
-    staff_id: z.number().int().positive().describe('Staff member ID'),
+    location_id: z.number().int().positive().describe('Location ID'),
+    team_member_id: z.number().int().positive().describe('Team member ID'),
     services: z.array(serviceItemSchema).describe('Array of service objects'),
     datetime: z
       .string()
-      .describe('Booking datetime (ISO format: YYYY-MM-DDTHH:MM:SS)'),
+      .describe('Appointment datetime (ISO format: YYYY-MM-DDTHH:MM:SS)'),
     seance_length: z
       .number()
       .positive()
@@ -109,7 +109,7 @@ export const createBookingTool = defineTool({
         email: z.string().email().optional().describe('Client email'),
       })
       .describe('Client information'),
-    comment: z.string().optional().describe('Booking comment'),
+    comment: z.string().optional().describe('Appointment comment'),
     send_sms: z
       .number()
       .int()
@@ -121,44 +121,47 @@ export const createBookingTool = defineTool({
   }),
   outputSchema: bookingEntityOutput,
   handler: async ({ input, client }) => {
-    const { company_id, ...bookingData } = input;
-    const booking = await client.createBooking(company_id, bookingData);
+    const { location_id, team_member_id, ...appointmentData } = input;
+    const appointment = await client.createBooking(location_id, {
+      staff_id: team_member_id,
+      ...appointmentData,
+    });
     return {
-      text: `Successfully created booking:\nID: ${booking.id}\nStaff ID: ${booking.staff_id}\nDate: ${booking.datetime || booking.date}`,
+      text: `Successfully created appointment:\nID: ${appointment.id}\nTeam member ID: ${appointment.staff_id}\nDate: ${appointment.datetime || appointment.date}`,
       structuredContent: {
-        id: booking.id,
-        staff_id: booking.staff_id,
-        datetime: booking.datetime,
-        date: booking.date,
+        id: appointment.id,
+        staff_id: appointment.staff_id,
+        datetime: appointment.datetime,
+        date: appointment.date,
       },
     };
   },
 });
 
-export const updateBookingTool = defineTool({
-  name: 'update_booking',
-  category: 'Bookings',
+export const updateAppointmentTool = defineTool({
+  name: 'update_appointment',
+  category: 'Appointments',
   description:
-    '[Bookings] Update existing booking/appointment. AUTHENTICATION REQUIRED. Provide only fields to update.',
+    '[Appointments] Update existing appointment. AUTHENTICATION REQUIRED. Provide only fields to update.',
   annotations: {
-    title: 'Update Booking',
+    title: 'Update Appointment',
     openWorldHint: true,
     idempotentHint: true,
   },
   input: z.object({
-    company_id: z.number().int().positive().describe('Company ID'),
-    record_id: z.number().int().positive().describe('Booking/record ID'),
-    staff_id: z
+    location_id: z.number().int().positive().describe('Location ID'),
+    record_id: z.number().int().positive().describe('Appointment/record ID'),
+    team_member_id: z
       .number()
       .int()
       .positive()
       .optional()
-      .describe('Staff member ID'),
+      .describe('Team member ID'),
     services: z
       .array(serviceItemSchema)
       .optional()
       .describe('Array of service objects'),
-    datetime: z.string().optional().describe('New booking datetime'),
+    datetime: z.string().optional().describe('New appointment datetime'),
     seance_length: z
       .number()
       .positive()
@@ -172,51 +175,50 @@ export const updateBookingTool = defineTool({
       })
       .optional()
       .describe('Client information'),
-    comment: z.string().optional().describe('Booking comment'),
+    comment: z.string().optional().describe('Appointment comment'),
     attendance: z.number().int().optional().describe('Attendance status'),
   }),
   outputSchema: bookingEntityOutput,
   handler: async ({ input, client }) => {
-    const { company_id, record_id, ...updateData } = input;
-    const booking = await client.updateBooking(
-      company_id,
-      record_id,
-      updateData
-    );
+    const { location_id, record_id, team_member_id, ...updateData } = input;
+    const appointment = await client.updateBooking(location_id, record_id, {
+      ...(team_member_id !== undefined ? { staff_id: team_member_id } : {}),
+      ...updateData,
+    });
     return {
-      text: `Successfully updated booking ${record_id}:\nDate: ${booking.datetime || booking.date}`,
+      text: `Successfully updated appointment ${record_id}:\nDate: ${appointment.datetime || appointment.date}`,
       structuredContent: {
-        id: booking.id,
-        staff_id: booking.staff_id,
-        datetime: booking.datetime,
-        date: booking.date,
+        id: appointment.id,
+        staff_id: appointment.staff_id,
+        datetime: appointment.datetime,
+        date: appointment.date,
       },
     };
   },
 });
 
-export const deleteBookingTool = defineTool({
-  name: 'delete_booking',
-  category: 'Bookings',
+export const deleteAppointmentTool = defineTool({
+  name: 'delete_appointment',
+  category: 'Appointments',
   description:
-    '[Bookings] Delete/cancel booking/appointment. AUTHENTICATION REQUIRED.',
+    '[Appointments] Delete/cancel appointment. AUTHENTICATION REQUIRED.',
   annotations: {
-    title: 'Delete Booking',
+    title: 'Delete Appointment',
     destructiveHint: true,
     openWorldHint: true,
   },
   input: z.object({
-    company_id: z.number().int().positive().describe('Company ID'),
+    location_id: z.number().int().positive().describe('Location ID'),
     record_id: z
       .number()
       .int()
       .positive()
-      .describe('Booking/record ID to delete'),
+      .describe('Appointment/record ID to delete'),
   }),
   handler: async ({ input, client }) => {
-    await client.deleteBooking(input.company_id, input.record_id);
+    await client.deleteBooking(input.location_id, input.record_id);
     return {
-      text: `Successfully deleted booking ${input.record_id} from company ${input.company_id}`,
+      text: `Successfully deleted appointment ${input.record_id} from location ${input.location_id}`,
     };
   },
 });

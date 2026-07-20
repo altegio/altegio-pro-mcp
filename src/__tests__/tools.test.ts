@@ -26,8 +26,8 @@ describe('Tool Registration', () => {
     // Core tools (16)
     expect(toolNames).toContain('altegio_login');
     expect(toolNames).toContain('altegio_logout');
-    expect(toolNames).toContain('list_companies');
-    expect(toolNames).toContain('get_bookings');
+    expect(toolNames).toContain('list_locations');
+    expect(toolNames).toContain('get_appointments');
     expect(toolNames).toContain('get_staff');
     expect(toolNames).toContain('get_services');
     expect(toolNames).toContain('get_service_categories');
@@ -37,9 +37,9 @@ describe('Tool Registration', () => {
     expect(toolNames).toContain('delete_staff');
     expect(toolNames).toContain('create_service');
     expect(toolNames).toContain('update_service');
-    expect(toolNames).toContain('create_booking');
-    expect(toolNames).toContain('update_booking');
-    expect(toolNames).toContain('delete_booking');
+    expect(toolNames).toContain('create_appointment');
+    expect(toolNames).toContain('update_appointment');
+    expect(toolNames).toContain('delete_appointment');
 
     // Onboarding tools (12)
     expect(toolNames).toContain('onboarding_start');
@@ -51,7 +51,7 @@ describe('Tool Registration', () => {
     expect(toolNames).toContain('onboarding_add_services_batch');
     expect(toolNames).toContain('onboarding_add_categories');
     expect(toolNames).toContain('onboarding_import_clients');
-    expect(toolNames).toContain('onboarding_create_test_bookings');
+    expect(toolNames).toContain('onboarding_create_test_appointments');
     expect(toolNames).toContain('onboarding_preview_data');
     expect(toolNames).toContain('onboarding_rollback_phase');
 
@@ -111,8 +111,8 @@ describe('get_schedule', () => {
 
     const handlers = new ToolHandlers(mockClient);
     const result = await handlers.getSchedule({
-      company_id: 123,
-      staff_id: 456,
+      location_id: 123,
+      team_member_id: 456,
       start_date: '2025-10-27',
       end_date: '2025-10-28',
     });

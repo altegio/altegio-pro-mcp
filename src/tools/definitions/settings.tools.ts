@@ -20,11 +20,11 @@ export const getAppointmentSettingsTool = defineTool({
     openWorldHint: true,
   },
   input: z.object({
-    company_id: z.number().int().positive().describe('Company ID'),
+    location_id: z.number().int().positive().describe('Location ID'),
   }),
   outputSchema: appointmentSettingsOutput,
   handler: async ({ input, client }) => {
-    const s = await client.getAppointmentSettings(input.company_id);
+    const s = await client.getAppointmentSettings(input.location_id);
     return {
       text:
         `Appointment calendar settings:\n` +
@@ -46,7 +46,7 @@ export const updateAppointmentSettingsTool = defineTool({
     idempotentHint: true,
   },
   input: z.object({
-    company_id: z.number().int().positive().describe('Company ID'),
+    location_id: z.number().int().positive().describe('Location ID'),
     record_type: z
       .number()
       .int()
@@ -72,8 +72,8 @@ export const updateAppointmentSettingsTool = defineTool({
   }),
   outputSchema: appointmentSettingsOutput,
   handler: async ({ input, client }) => {
-    const { company_id, ...data } = input;
-    const s = await client.updateAppointmentSettings(company_id, data);
+    const { location_id, ...data } = input;
+    const s = await client.updateAppointmentSettings(location_id, data);
     return {
       text:
         `Appointment calendar settings updated:\n` +
@@ -97,11 +97,11 @@ export const getOnlineBookingSettingsTool = defineTool({
     openWorldHint: true,
   },
   input: z.object({
-    company_id: z.number().int().positive().describe('Company ID'),
+    location_id: z.number().int().positive().describe('Location ID'),
   }),
   outputSchema: onlineSettingsOutput,
   handler: async ({ input, client }) => {
-    const s = await client.getOnlineBookingSettings(input.company_id);
+    const s = await client.getOnlineBookingSettings(input.location_id);
     return {
       text:
         `Online booking settings:\n` +
@@ -125,9 +125,9 @@ export const updateOnlineBookingSettingsTool = defineTool({
     idempotentHint: true,
   },
   input: z.object({
-    company_id: z.number().int().positive().describe('Company ID'),
+    location_id: z.number().int().positive().describe('Location ID'),
     any_master: z.boolean().describe('"Any team member" mode'),
-    confirm_number: z.boolean().describe('Confirm customer number via SMS'),
+    confirm_number: z.boolean().describe('Confirm client number via SMS'),
     seance_delay_step: z
       .number()
       .int()
@@ -145,8 +145,8 @@ export const updateOnlineBookingSettingsTool = defineTool({
   }),
   outputSchema: onlineSettingsOutput,
   handler: async ({ input, client }) => {
-    const { company_id, ...data } = input;
-    const s = await client.updateOnlineBookingSettings(company_id, data);
+    const { location_id, ...data } = input;
+    const s = await client.updateOnlineBookingSettings(location_id, data);
     return {
       text:
         `Online booking settings updated:\n` +
@@ -172,15 +172,15 @@ export const getBookingFormsTool = defineTool({
     openWorldHint: true,
   },
   input: z.object({
-    company_id: z.number().int().positive().describe('Company ID'),
+    location_id: z.number().int().positive().describe('Location ID'),
   }),
   outputSchema: bookingFormsOutput,
   handler: async ({ input, client }) => {
-    const forms = await client.getBookingForms(input.company_id);
+    const forms = await client.getBookingForms(input.location_id);
 
     if (!forms || forms.length === 0) {
       return {
-        text: 'No booking forms found for this company.',
+        text: 'No booking forms found for this location.',
         structuredContent: { items: [], count: 0 },
       };
     }
@@ -210,7 +210,7 @@ export const createBookingFormTool = defineTool({
     idempotentHint: false,
   },
   input: z.object({
-    company_id: z.number().int().positive().describe('Company ID'),
+    location_id: z.number().int().positive().describe('Location ID'),
     title: z.string().min(1).describe('Name of the booking widget'),
     description: z
       .string()
@@ -227,8 +227,8 @@ export const createBookingFormTool = defineTool({
   }),
   outputSchema: bookingFormEntityOutput,
   handler: async ({ input, client }) => {
-    const { company_id, ...data } = input;
-    const form = await client.createBookingForm(company_id, data);
+    const { location_id, ...data } = input;
+    const form = await client.createBookingForm(location_id, data);
     return {
       text: `Successfully created booking form:\nID: ${form.id}\nTitle: ${form.title}`,
       structuredContent: { id: form.id, title: form.title },

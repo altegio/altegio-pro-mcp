@@ -27,8 +27,8 @@ describe('End-to-End Tests', () => {
     // Test that handlers exist for all tools
     expect(typeof handlers.login).toBe('function');
     expect(typeof handlers.logout).toBe('function');
-    expect(typeof handlers.listCompanies).toBe('function');
-    expect(typeof handlers.getBookings).toBe('function');
+    expect(typeof handlers.listLocations).toBe('function');
+    expect(typeof handlers.getAppointments).toBe('function');
   });
 
   it('should handle logout tool successfully', async () => {
@@ -49,9 +49,9 @@ describe('End-to-End Tests', () => {
     expect(result.content[0]?.text).toContain('Invalid parameters');
   });
 
-  it('should validate company_id is a number', async () => {
-    const result = await handlers.getBookings({
-      company_id: 'not-a-number',
+  it('should validate location_id is a number', async () => {
+    const result = await handlers.getAppointments({
+      location_id: 'not-a-number',
     });
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain('Invalid parameters');

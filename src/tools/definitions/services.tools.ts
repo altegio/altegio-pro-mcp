@@ -6,18 +6,18 @@ export const getServicesTool = defineTool({
   name: 'get_services',
   category: 'Services',
   description:
-    '[Services] Get list of services available at a company. AUTHENTICATION REQUIRED - administrative access to view all services with full pricing, settings, and configuration (not just public booking info). User must be logged in and have access to the company. PAGINATION STRATEGY: May return many services (50+). RECOMMENDED: Start with count=30-50 to show main services. User can request more or use categories for better organization.',
+    '[Services] Get list of services available at a location. AUTHENTICATION REQUIRED - administrative access to view all services with full pricing, settings, and configuration (not just public booking info). User must be logged in and have access to the location. PAGINATION STRATEGY: May return many services (50+). RECOMMENDED: Start with count=30-50 to show main services. User can request more or use categories for better organization.',
   annotations: {
     title: 'Get Services',
     readOnlyHint: true,
     openWorldHint: true,
   },
   input: z.object({
-    company_id: z
+    location_id: z
       .number()
       .int()
       .positive()
-      .describe('ID of the company to get services for'),
+      .describe('ID of the location to get services for'),
     page: z
       .number()
       .int()
@@ -37,13 +37,13 @@ export const getServicesTool = defineTool({
   }),
   outputSchema: servicesOutput,
   handler: async ({ input, client }) => {
-    const { company_id, ...listParams } = input;
+    const { location_id, ...listParams } = input;
     const services = await client.getServices(
-      company_id,
+      location_id,
       Object.keys(listParams).length > 0 ? listParams : undefined
     );
 
-    const summary = `Found ${services.length} ${services.length === 1 ? 'service' : 'services'} for company ${company_id}:\n\n`;
+    const summary = `Found ${services.length} ${services.length === 1 ? 'service' : 'services'} for location ${location_id}:\n\n`;
     const servicesList = services
       .map(
         (s, idx) =>
@@ -70,7 +70,7 @@ export const createServiceTool = defineTool({
     idempotentHint: false,
   },
   input: z.object({
-    company_id: z.number().int().positive().describe('Company ID'),
+    location_id: z.number().int().positive().describe('Location ID'),
     title: z.string().min(1).describe('Service title'),
     category_id: z.number().int().positive().describe('Service category ID'),
     price_min: z.number().nonnegative().optional().describe('Minimum price'),
@@ -86,8 +86,8 @@ export const createServiceTool = defineTool({
   }),
   outputSchema: serviceEntityOutput,
   handler: async ({ input, client }) => {
-    const { company_id, ...serviceData } = input;
-    const service = await client.createService(company_id, serviceData);
+    const { location_id, ...serviceData } = input;
+    const service = await client.createService(location_id, serviceData);
     return {
       text: `Successfully created service:\nID: ${service.id}\nTitle: ${service.title}\nCategory: ${service.category_id}`,
       structuredContent: {
@@ -110,7 +110,7 @@ export const updateServiceTool = defineTool({
     idempotentHint: true,
   },
   input: z.object({
-    company_id: z.number().int().positive().describe('Company ID'),
+    location_id: z.number().int().positive().describe('Location ID'),
     service_id: z.number().int().positive().describe('Service ID'),
     title: z.string().min(1).optional().describe('Service title'),
     category_id: z
@@ -132,9 +132,9 @@ export const updateServiceTool = defineTool({
   }),
   outputSchema: serviceEntityOutput,
   handler: async ({ input, client }) => {
-    const { company_id, service_id, ...updateData } = input;
+    const { location_id, service_id, ...updateData } = input;
     const service = await client.updateService(
-      company_id,
+      location_id,
       service_id,
       updateData
     );

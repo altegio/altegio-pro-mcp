@@ -310,7 +310,7 @@ describe('Spec Compliance', () => {
     for (const [toolName, mapping] of Object.entries(apiMapping)) {
       it(`${toolName} → client uses ${mapping.method.toUpperCase()}`, () => {
         // This is a static check — validates our mapping is internally consistent
-        if (toolName.startsWith('get_') || toolName === 'list_companies') {
+        if (toolName.startsWith('get_') || toolName === 'list_locations') {
           expect(mapping.method).toBe('get');
         }
         if (toolName.startsWith('create_')) {

@@ -6,18 +6,18 @@ export const getStaffTool = defineTool({
   name: 'get_staff',
   category: 'Staff',
   description:
-    '[Staff] Get list of staff members for a company. AUTHENTICATION REQUIRED - administrative access to view all staff with full details (not just public booking info). User must be logged in and have access to the company. PAGINATION STRATEGY: May return many staff (100+). RECOMMENDED: Start with count=30-50 to show initial options. User can browse and request more if needed. This saves context for large salons.',
+    '[Staff] Get list of staff members for a location. AUTHENTICATION REQUIRED - administrative access to view all staff with full details (not just public booking info). User must be logged in and have access to the location. PAGINATION STRATEGY: May return many staff (100+). RECOMMENDED: Start with count=30-50 to show initial options. User can browse and request more if needed. This saves context for large salons.',
   annotations: {
     title: 'Get Staff',
     readOnlyHint: true,
     openWorldHint: true,
   },
   input: z.object({
-    company_id: z
+    location_id: z
       .number()
       .int()
       .positive()
-      .describe('ID of the company to get staff list for'),
+      .describe('ID of the location to get staff list for'),
     page: z
       .number()
       .int()
@@ -37,13 +37,13 @@ export const getStaffTool = defineTool({
   }),
   outputSchema: staffListOutput,
   handler: async ({ input, client }) => {
-    const { company_id, ...listParams } = input;
+    const { location_id, ...listParams } = input;
     const staff = await client.getStaff(
-      company_id,
+      location_id,
       Object.keys(listParams).length > 0 ? listParams : undefined
     );
 
-    const summary = `Found ${staff.length} staff ${staff.length === 1 ? 'member' : 'members'} for company ${company_id}:\n\n`;
+    const summary = `Found ${staff.length} staff ${staff.length === 1 ? 'member' : 'members'} for location ${location_id}:\n\n`;
     const staffList = staff
       .map(
         (s, idx) =>
@@ -64,16 +64,16 @@ export const createStaffTool = defineTool({
   name: 'create_staff',
   category: 'Staff',
   description:
-    '[Staff] Create a new employee/staff member. AUTHENTICATION REQUIRED. Required fields: name, specialization, position_id, phone_number, user_email, user_phone, is_user_invite.',
+    '[Staff] Create a new staff member. AUTHENTICATION REQUIRED. Required fields: name, specialization, position_id, phone_number, user_email, user_phone, is_user_invite.',
   annotations: {
     title: 'Create Staff Member',
     openWorldHint: true,
     idempotentHint: false,
   },
   input: z.object({
-    company_id: z.number().int().positive().describe('Company ID'),
-    name: z.string().min(1).describe('Employee name'),
-    specialization: z.string().min(1).describe('Employee specialization'),
+    location_id: z.number().int().positive().describe('Location ID'),
+    name: z.string().min(1).describe('Staff member name'),
+    specialization: z.string().min(1).describe('Staff member specialization'),
     position_id: z.number().int().positive().nullable().describe('Position ID'),
     phone_number: z
       .string()
@@ -85,8 +85,8 @@ export const createStaffTool = defineTool({
   }),
   outputSchema: staffEntityOutput,
   handler: async ({ input, client }) => {
-    const { company_id, ...staffData } = input;
-    const staff = await client.createStaff(company_id, staffData);
+    const { location_id, ...staffData } = input;
+    const staff = await client.createStaff(location_id, staffData);
     return {
       text: `Successfully created staff member:\nID: ${staff.id}\nName: ${staff.name}\nSpecialization: ${staff.specialization}`,
       structuredContent: {
@@ -102,22 +102,28 @@ export const updateStaffTool = defineTool({
   name: 'update_staff',
   category: 'Staff',
   description:
-    '[Staff] Update existing employee/staff member. AUTHENTICATION REQUIRED. Provide only fields to update.',
+    '[Staff] Update existing staff member. AUTHENTICATION REQUIRED. Provide only fields to update.',
   annotations: {
     title: 'Update Staff Member',
     openWorldHint: true,
     idempotentHint: true,
   },
   input: z.object({
-    company_id: z.number().int().positive().describe('Company ID'),
-    staff_id: z.number().int().positive().describe('Staff member ID'),
-    name: z.string().min(1).optional().describe('Employee name'),
-    specialization: z.string().optional().describe('Employee specialization'),
+    location_id: z.number().int().positive().describe('Location ID'),
+    team_member_id: z.number().int().positive().describe('Team member ID'),
+    name: z.string().min(1).optional().describe('Staff member name'),
+    specialization: z
+      .string()
+      .optional()
+      .describe('Staff member specialization'),
     weight: z
       .number()
       .optional()
       .describe('Display order weight (higher = first)'),
-    information: z.string().optional().describe('Employee info (HTML format)'),
+    information: z
+      .string()
+      .optional()
+      .describe('Staff member info (HTML format)'),
     api_id: z.string().optional().describe('External API ID'),
     hidden: z
       .number()
@@ -141,10 +147,14 @@ export const updateStaffTool = defineTool({
   }),
   outputSchema: staffEntityOutput,
   handler: async ({ input, client }) => {
-    const { company_id, staff_id, ...updateData } = input;
-    const staff = await client.updateStaff(company_id, staff_id, updateData);
+    const { location_id, team_member_id, ...updateData } = input;
+    const staff = await client.updateStaff(
+      location_id,
+      team_member_id,
+      updateData
+    );
     return {
-      text: `Successfully updated staff member ${staff_id}:\nName: ${staff.name}\nSpecialization: ${staff.specialization}`,
+      text: `Successfully updated staff member ${team_member_id}:\nName: ${staff.name}\nSpecialization: ${staff.specialization}`,
       structuredContent: {
         id: staff.id,
         name: staff.name,
@@ -157,21 +167,24 @@ export const updateStaffTool = defineTool({
 export const deleteStaffTool = defineTool({
   name: 'delete_staff',
   category: 'Staff',
-  description:
-    '[Staff] Delete/remove employee/staff member. AUTHENTICATION REQUIRED.',
+  description: '[Staff] Delete/remove staff member. AUTHENTICATION REQUIRED.',
   annotations: {
     title: 'Delete Staff Member',
     destructiveHint: true,
     openWorldHint: true,
   },
   input: z.object({
-    company_id: z.number().int().positive().describe('Company ID'),
-    staff_id: z.number().int().positive().describe('Staff member ID to delete'),
+    location_id: z.number().int().positive().describe('Location ID'),
+    team_member_id: z
+      .number()
+      .int()
+      .positive()
+      .describe('Team member ID to delete'),
   }),
   handler: async ({ input, client }) => {
-    await client.deleteStaff(input.company_id, input.staff_id);
+    await client.deleteStaff(input.location_id, input.team_member_id);
     return {
-      text: `Successfully deleted staff member ${input.staff_id} from company ${input.company_id}`,
+      text: `Successfully deleted staff member ${input.team_member_id} from location ${input.location_id}`,
     };
   },
 });

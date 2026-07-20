@@ -39,7 +39,7 @@ describe('Onboarding E2E Flow', () => {
       const companyId = 123;
 
       // Step 1: Start onboarding session
-      const startResult = await handlers.start({ company_id: companyId });
+      const startResult = await handlers.start({ location_id: companyId });
       expect(startResult.content[0]?.text).toContain(
         'Onboarding session started'
       );
@@ -56,7 +56,7 @@ describe('Onboarding E2E Flow', () => {
         .mockResolvedValueOnce({ id: 11, title: 'Nail Services' });
 
       const categoriesResult = await handlers.addCategories({
-        company_id: companyId,
+        location_id: companyId,
         categories: [
           { title: 'Hair Services', weight: 1 },
           { title: 'Nail Services', weight: 2 },
@@ -96,7 +96,7 @@ Bob Smith,Nail Technician,+1234567891,bob@salon.com
 Carol White,Massage Therapist,+1234567892,carol@salon.com`;
 
       const staffResult = await handlers.addStaffBatch({
-        company_id: companyId,
+        location_id: companyId,
         staff_data: staffCSV,
       });
       expect(staffResult.content[0]?.text).toContain('3 staff members created');
@@ -124,7 +124,7 @@ Carol White,Massage Therapist,+1234567892,carol@salon.com`;
         .mockResolvedValueOnce({ id: 23, title: 'Pedicure', category_id: 11 });
 
       const servicesResult = await handlers.addServicesBatch({
-        company_id: companyId,
+        location_id: companyId,
         services_data: [
           {
             title: "Women's Haircut",
@@ -157,10 +157,10 @@ Carol White,Massage Therapist,+1234567892,carol@salon.com`;
       // Step 4.5: Set work schedules for staff
       mockClient.setSchedule = jest.fn().mockResolvedValue([]);
       const schedulesResult = await handlers.setSchedules({
-        company_id: companyId,
+        location_id: companyId,
         schedules: [
           {
-            staff_id: 1,
+            team_member_id: 1,
             dates: ['2026-08-01', '2026-08-02'],
             slots: [{ from: '09:00', to: '18:00' }],
           },
@@ -187,7 +187,7 @@ Jane,+1555001002,jane.smith@email.com,Smith
 Mike,+1555001003,mike.johnson@email.com,Johnson`;
 
       const clientsResult = await handlers.importClients({
-        company_id: companyId,
+        location_id: companyId,
         clients_csv: clientsCSV,
       });
       expect(clientsResult.content[0]?.text).toContain('3 clients imported');
@@ -209,11 +209,11 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
       );
 
       const bookingsResult = await handlers.createTestBookings({
-        company_id: companyId,
+        location_id: companyId,
         count: 5,
       });
       expect(bookingsResult.content[0]?.text).toContain(
-        'Test bookings created: 5'
+        'Test appointments created: 5'
       );
       expect(bookingsResult.content[0]?.text).toContain('Onboarding complete!');
       expect(mockClient.createBooking).toHaveBeenCalledTimes(5);
@@ -226,7 +226,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
       // Verify final summary
       expect(bookingsResult.content[0]?.text).toContain('Staff: 3');
       expect(bookingsResult.content[0]?.text).toContain('Services: 4');
-      expect(bookingsResult.content[0]?.text).toContain('Test bookings: 5');
+      expect(bookingsResult.content[0]?.text).toContain('Test appointments: 5');
 
       // Verify all checkpoints are in place
       expect(Object.keys(state?.checkpoints || {})).toHaveLength(6);
@@ -241,7 +241,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
     it('should handle phase progression correctly', async () => {
       const companyId = 456;
 
-      await handlers.start({ company_id: companyId });
+      await handlers.start({ location_id: companyId });
       expect((await stateManager.load(companyId))?.phase).toBe('init');
 
       // Categories phase
@@ -249,7 +249,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .fn()
         .mockResolvedValue({ id: 10, title: 'Test' });
       await handlers.addCategories({
-        company_id: companyId,
+        location_id: companyId,
         categories: [{ title: 'Test Category' }],
       });
       expect((await stateManager.load(companyId))?.phase).toBe('services');
@@ -259,7 +259,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .fn()
         .mockResolvedValue({ id: 1, name: 'Test' });
       await handlers.addStaffBatch({
-        company_id: companyId,
+        location_id: companyId,
         staff_data: [{ name: 'Test Staff', specialization: 'Test' }],
       });
       expect((await stateManager.load(companyId))?.phase).toBe('categories');
@@ -269,7 +269,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .fn()
         .mockResolvedValue({ id: 20, title: 'Test' });
       await handlers.addServicesBatch({
-        company_id: companyId,
+        location_id: companyId,
         services_data: [
           { title: 'Test Service', price_min: 50, duration: 1800 },
         ],
@@ -281,12 +281,12 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
       const companyId = 789;
 
       // Start and add categories
-      await handlers.start({ company_id: companyId });
+      await handlers.start({ location_id: companyId });
       mockClient.createServiceCategory = jest
         .fn()
         .mockResolvedValue({ id: 1, title: 'Category 1' });
       await handlers.addCategories({
-        company_id: companyId,
+        location_id: companyId,
         categories: [{ title: 'Category 1' }],
       });
 
@@ -299,7 +299,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
       const newHandlers = new OnboardingHandlers(mockClient, stateManager);
 
       // Verify it can read existing state
-      const statusResult = await newHandlers.status({ company_id: companyId });
+      const statusResult = await newHandlers.status({ location_id: companyId });
       expect(statusResult.content[0]?.text).toContain('Phase: services');
       expect(statusResult.content[0]?.text).toContain(
         'Total entities created: 1'
@@ -313,7 +313,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
       const companyId = 234;
 
       // Start and add staff
-      await handlers.start({ company_id: companyId });
+      await handlers.start({ location_id: companyId });
 
       mockClient.createStaff = jest
         .fn()
@@ -321,7 +321,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValueOnce({ id: 2, name: 'Bob' });
 
       await handlers.addStaffBatch({
-        company_id: companyId,
+        location_id: companyId,
         staff_data: [
           { name: 'Alice', specialization: 'Test' },
           { name: 'Bob', specialization: 'Test' },
@@ -332,9 +332,9 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
       const newHandlers = new OnboardingHandlers(mockClient, stateManager);
 
       // Resume session
-      const resumeResult = await newHandlers.resume({ company_id: companyId });
+      const resumeResult = await newHandlers.resume({ location_id: companyId });
       expect(resumeResult.content[0]?.text).toContain(
-        'Onboarding session for company 234'
+        'Onboarding session for location 234'
       );
       expect(resumeResult.content[0]?.text).toContain(
         'Current phase: categories'
@@ -349,7 +349,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValue({ id: 10, title: 'Hair' });
 
       await newHandlers.addCategories({
-        company_id: companyId,
+        location_id: companyId,
         categories: [{ title: 'Hair Services' }],
       });
 
@@ -363,14 +363,14 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
       const companyId = 567;
 
       // Setup partial progress
-      await handlers.start({ company_id: companyId });
+      await handlers.start({ location_id: companyId });
 
       mockClient.createServiceCategory = jest
         .fn()
         .mockResolvedValueOnce({ id: 10, title: 'Cat1' })
         .mockResolvedValueOnce({ id: 11, title: 'Cat2' });
       await handlers.addCategories({
-        company_id: companyId,
+        location_id: companyId,
         categories: [{ title: 'Cat1' }, { title: 'Cat2' }],
       });
 
@@ -380,7 +380,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValueOnce({ id: 2, name: 'Staff2' })
         .mockResolvedValueOnce({ id: 3, name: 'Staff3' });
       await handlers.addStaffBatch({
-        company_id: companyId,
+        location_id: companyId,
         staff_data: [
           { name: 'Staff1' },
           { name: 'Staff2' },
@@ -392,12 +392,12 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .fn()
         .mockResolvedValueOnce({ id: 20, title: 'Service1' });
       await handlers.addServicesBatch({
-        company_id: companyId,
+        location_id: companyId,
         services_data: [{ title: 'Service1', price_min: 50, duration: 1800 }],
       });
 
       // Resume and check progress
-      const resumeResult = await handlers.resume({ company_id: companyId });
+      const resumeResult = await handlers.resume({ location_id: companyId });
       const text = resumeResult.content[0]?.text;
 
       expect(text).toContain('categories: 2 entities created');
@@ -407,7 +407,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
     });
 
     it('should handle resume with no session', async () => {
-      const result = await handlers.resume({ company_id: 999 });
+      const result = await handlers.resume({ location_id: 999 });
       expect(result.isError).toBe(true);
       expect(result.content[0]?.text).toContain('No onboarding session found');
     });
@@ -415,9 +415,9 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
     it('should resume with no completed checkpoints', async () => {
       const companyId = 890;
 
-      await handlers.start({ company_id: companyId });
+      await handlers.start({ location_id: companyId });
 
-      const resumeResult = await handlers.resume({ company_id: companyId });
+      const resumeResult = await handlers.resume({ location_id: companyId });
       expect(resumeResult.content[0]?.text).toContain('(none yet)');
       expect(resumeResult.content[0]?.text).toContain('Current phase: init');
     });
@@ -427,10 +427,10 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
     it('should track status throughout workflow', async () => {
       const companyId = 321;
 
-      await handlers.start({ company_id: companyId });
+      await handlers.start({ location_id: companyId });
 
       // Check initial status
-      let statusResult = await handlers.status({ company_id: companyId });
+      let statusResult = await handlers.status({ location_id: companyId });
       expect(statusResult.content[0]?.text).toContain('Phase: init');
       expect(statusResult.content[0]?.text).toContain(
         'Total entities created: 0'
@@ -442,11 +442,11 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .fn()
         .mockResolvedValueOnce({ id: 10, title: 'Test' });
       await handlers.addCategories({
-        company_id: companyId,
+        location_id: companyId,
         categories: [{ title: 'Test' }],
       });
 
-      statusResult = await handlers.status({ company_id: companyId });
+      statusResult = await handlers.status({ location_id: companyId });
       expect(statusResult.content[0]?.text).toContain('Phase: services');
       expect(statusResult.content[0]?.text).toContain(
         'Total entities created: 1'
@@ -459,7 +459,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValueOnce({ id: 1, name: 'Staff' })
         .mockResolvedValueOnce({ id: 2, name: 'Staff2' });
       await handlers.addStaffBatch({
-        company_id: companyId,
+        location_id: companyId,
         staff_data: [{ name: 'Staff' }, { name: 'Staff2' }],
       });
 
@@ -469,7 +469,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValueOnce({ id: 21, title: 'Service2' })
         .mockResolvedValueOnce({ id: 22, title: 'Service3' });
       await handlers.addServicesBatch({
-        company_id: companyId,
+        location_id: companyId,
         services_data: [
           { title: 'Service', price_min: 50, duration: 1800 },
           { title: 'Service2', price_min: 60, duration: 1800 },
@@ -477,7 +477,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         ],
       });
 
-      statusResult = await handlers.status({ company_id: companyId });
+      statusResult = await handlers.status({ location_id: companyId });
       expect(statusResult.content[0]?.text).toContain(
         'Total entities created: 6'
       ); // 1 cat + 2 staff + 3 services
@@ -489,7 +489,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
     it('should track partial success when some entities fail', async () => {
       const companyId = 654;
 
-      await handlers.start({ company_id: companyId });
+      await handlers.start({ location_id: companyId });
 
       // Mock mixed success/failure for staff creation
       mockClient.createStaff = jest
@@ -499,7 +499,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValueOnce({ id: 3, name: 'Carol' });
 
       const result = await handlers.addStaffBatch({
-        company_id: companyId,
+        location_id: companyId,
         staff_data: [
           { name: 'Alice', specialization: 'Hair' },
           { name: 'Bob', specialization: 'Nails' },
@@ -519,14 +519,14 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
     it('should allow workflow to continue after partial failures', async () => {
       const companyId = 987;
 
-      await handlers.start({ company_id: companyId });
+      await handlers.start({ location_id: companyId });
 
       // Staff with partial failure
       mockClient.createStaff = jest
         .fn()
         .mockResolvedValueOnce({ id: 1, name: 'Staff1' });
       await handlers.addStaffBatch({
-        company_id: companyId,
+        location_id: companyId,
         staff_data: [{ name: 'Staff1' }],
       });
 
@@ -535,7 +535,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .fn()
         .mockResolvedValue({ id: 10, title: 'Cat1' });
       const result = await handlers.addCategories({
-        company_id: companyId,
+        location_id: companyId,
         categories: [{ title: 'Cat1' }],
       });
 
@@ -549,17 +549,17 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
     it('should require authentication for all operations', async () => {
       mockClient.isAuthenticated = jest.fn().mockReturnValue(false);
 
-      const startResult = await handlers.start({ company_id: 123 });
+      const startResult = await handlers.start({ location_id: 123 });
       expect(startResult.isError).toBe(true);
       expect(startResult.content[0]?.text).toContain('Authentication required');
 
-      const resumeResult = await handlers.resume({ company_id: 123 });
+      const resumeResult = await handlers.resume({ location_id: 123 });
       expect(resumeResult.isError).toBe(true);
       expect(resumeResult.content[0]?.text).toContain(
         'Authentication required'
       );
 
-      const statusResult = await handlers.status({ company_id: 123 });
+      const statusResult = await handlers.status({ location_id: 123 });
       expect(statusResult.isError).toBe(true);
       expect(statusResult.content[0]?.text).toContain(
         'Authentication required'
@@ -569,11 +569,11 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
     it('should reject test bookings if prerequisites missing', async () => {
       const companyId = 111;
 
-      await handlers.start({ company_id: companyId });
+      await handlers.start({ location_id: companyId });
 
       // Try to create bookings without staff/services
       const result1 = await handlers.createTestBookings({
-        company_id: companyId,
+        location_id: companyId,
         count: 2,
       });
       expect(result1.isError).toBe(true);
@@ -584,13 +584,13 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .fn()
         .mockResolvedValue({ id: 1, name: 'Staff' });
       await handlers.addStaffBatch({
-        company_id: companyId,
+        location_id: companyId,
         staff_data: [{ name: 'Staff' }],
       });
 
       // Still should fail without services
       const result2 = await handlers.createTestBookings({
-        company_id: companyId,
+        location_id: companyId,
         count: 2,
       });
       expect(result2.isError).toBe(true);
@@ -602,7 +602,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
     it('should distribute bookings across staff and services', async () => {
       const companyId = 222;
 
-      await handlers.start({ company_id: companyId });
+      await handlers.start({ location_id: companyId });
 
       // Setup staff and services
       await stateManager.checkpoint(companyId, 'staff', [1, 2, 3]);
@@ -617,7 +617,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         });
 
       await handlers.createTestBookings({
-        company_id: companyId,
+        location_id: companyId,
         count: 6,
       });
 
@@ -646,7 +646,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
     it('should respect max booking count limit', async () => {
       const companyId = 333;
 
-      await handlers.start({ company_id: companyId });
+      await handlers.start({ location_id: companyId });
       await stateManager.checkpoint(companyId, 'staff', [1]);
       await stateManager.checkpoint(companyId, 'services', [10]);
 
@@ -654,7 +654,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
 
       // Max is 10
       await handlers.createTestBookings({
-        company_id: companyId,
+        location_id: companyId,
         count: 10,
       });
 
@@ -664,7 +664,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
     it('should handle booking creation failures gracefully', async () => {
       const companyId = 444;
 
-      await handlers.start({ company_id: companyId });
+      await handlers.start({ location_id: companyId });
       await stateManager.checkpoint(companyId, 'staff', [1]);
       await stateManager.checkpoint(companyId, 'services', [10]);
 
@@ -676,12 +676,12 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValueOnce({ id: 102 });
 
       const result = await handlers.createTestBookings({
-        company_id: companyId,
+        location_id: companyId,
         count: 3,
       });
 
       // Should only checkpoint successful bookings
-      expect(result.content[0]?.text).toContain('Test bookings created: 2');
+      expect(result.content[0]?.text).toContain('Test appointments created: 2');
 
       const state = await stateManager.load(companyId);
       expect(state?.checkpoints['test_bookings']?.entity_ids).toEqual([
@@ -696,15 +696,15 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
       const companyId2 = 1002;
 
       // Start sessions for both companies
-      await handlers.start({ company_id: companyId1 });
-      await handlers.start({ company_id: companyId2 });
+      await handlers.start({ location_id: companyId1 });
+      await handlers.start({ location_id: companyId2 });
 
       // Progress company 1
       mockClient.createServiceCategory = jest
         .fn()
         .mockResolvedValue({ id: 10, title: 'Cat1' });
       await handlers.addCategories({
-        company_id: companyId1,
+        location_id: companyId1,
         categories: [{ title: 'Cat1' }],
       });
 
@@ -713,7 +713,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .fn()
         .mockResolvedValue({ id: 1, name: 'Staff' });
       await handlers.addStaffBatch({
-        company_id: companyId2,
+        location_id: companyId2,
         staff_data: [{ name: 'Staff' }],
       });
 
@@ -733,7 +733,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
     it('should maintain checkpoint metadata and timestamps', async () => {
       const companyId = 555;
 
-      await handlers.start({ company_id: companyId });
+      await handlers.start({ location_id: companyId });
 
       const beforeTime = Date.now();
 
@@ -741,7 +741,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .fn()
         .mockResolvedValue({ id: 10, title: 'Test' });
       await handlers.addCategories({
-        company_id: companyId,
+        location_id: companyId,
         categories: [{ title: 'Test' }],
       });
 

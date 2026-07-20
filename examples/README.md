@@ -8,10 +8,10 @@ This directory contains examples demonstrating how to use the Altegio.Pro MCP Se
 
 Demonstrates direct usage of the Altegio client:
 - Logging in with email/password
-- Fetching companies
-- Getting company details
-- Retrieving bookings
-- Getting booking details
+- Fetching locations
+- Getting location details
+- Retrieving appointments
+- Getting appointment details
 - Logging out
 
 **Run:**
@@ -60,8 +60,8 @@ The primary use case is integration with AI assistants like Claude Desktop.
 4. Use natural language to interact:
    ```
    "I need to set up Altegio integration for my business"
-   "Show me today's bookings for my barbershop"
-   "What companies do I have access to?"
+   "Show me today's appointments for my barbershop"
+   "What locations do I have access to?"
    ```
 
 ### 3. Custom MCP Server Integration
@@ -101,32 +101,32 @@ The MCP server exposes these tools:
 - `altegio_login` - Login with email/password
 - `altegio_logout` - Logout and clear credentials
 
-### Companies
-- `list_companies` - Get all accessible companies
+### Locations
+- `list_locations` - Get all accessible locations
 
-### Bookings
-- `list_bookings` - List bookings with filters
-- `get_booking` - Get booking details
+### Appointments
+- `list_appointments` - List appointments with filters
+- `get_appointment` - Get appointment details
 
 ## Available Prompts
 
 Prompts provide guided workflows:
 
 ### altegio_setup
-Guides through authentication and company selection.
+Guides through authentication and location selection.
 
 **Usage in AI assistant:**
 ```
 "I need to set up Altegio"
 ```
 
-### altegio_get_bookings
-Helps retrieve bookings for a specific company and date range.
+### altegio_get_appointments
+Helps retrieve appointments for a specific location and date range.
 
 **Usage in AI assistant:**
 ```
-"Show me this week's bookings"
-"Get bookings for company 12345"
+"Show me this week's appointments"
+"Get appointments for location 12345"
 ```
 
 ## Environment Variables
@@ -162,10 +162,10 @@ Optional:
 - Check that you're using the correct email/password
 - Ensure your account has API access enabled
 
-**"Company not found"**
-- Run `list_companies` to see available companies
-- Verify the company ID is correct
-- Check that your user has access to the company
+**"Location not found"**
+- Run `list_locations` to see available locations
+- Verify the location ID is correct
+- Check that your user has access to the location
 
 **"Rate limit exceeded"**
 - Default: 200 requests per minute

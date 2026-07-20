@@ -19,28 +19,28 @@ export const getScheduleTool = defineTool({
   name: 'get_schedule',
   category: 'Schedule',
   description:
-    '[Schedule] Get employee schedule for a date range. AUTHENTICATION REQUIRED - administrative access to view staff working schedule. User must be logged in and have access to the company. Returns schedule entries with dates, times, and session lengths.',
+    '[Schedule] Get staff member schedule for a date range. AUTHENTICATION REQUIRED - administrative access to view staff working schedule. User must be logged in and have access to the location. Returns schedule entries with dates, times, and session lengths.',
   annotations: {
     title: 'Get Schedule',
     readOnlyHint: true,
     openWorldHint: true,
   },
   input: z.object({
-    company_id: z.number().int().positive().describe('ID of the company'),
-    staff_id: z.number().int().positive().describe('ID of the staff member'),
+    location_id: z.number().int().positive().describe('Location ID'),
+    team_member_id: z.number().int().positive().describe('Team member ID'),
     start_date: z.string().describe('Start date (YYYY-MM-DD format)'),
     end_date: z.string().describe('End date (YYYY-MM-DD format)'),
   }),
   outputSchema: scheduleOutput,
   handler: async ({ input, client }) => {
     const schedule = await client.getSchedule(
-      input.company_id,
-      input.staff_id,
+      input.location_id,
+      input.team_member_id,
       input.start_date,
       input.end_date
     );
 
-    const summary = `Found ${schedule.length} schedule ${schedule.length === 1 ? 'entry' : 'entries'} for staff ${input.staff_id}:\n\n`;
+    const summary = `Found ${schedule.length} schedule ${schedule.length === 1 ? 'entry' : 'entries'} for team member ${input.team_member_id}:\n\n`;
     const scheduleList = schedule
       .map(
         (s, idx) =>
@@ -59,15 +59,15 @@ export const createScheduleTool = defineTool({
   name: 'create_schedule',
   category: 'Schedule',
   description:
-    '[Schedule] Create employee work schedule. AUTHENTICATION REQUIRED - administrative access to create staff working schedule. Defines when an employee is available to work (e.g., "Monday 9:00-18:00"). Use this to set up or modify work hours.',
+    '[Schedule] Create staff member work schedule. AUTHENTICATION REQUIRED - administrative access to create staff working schedule. Defines when a staff member is available to work (e.g., "Monday 9:00-18:00"). Use this to set up or modify work hours.',
   annotations: {
     title: 'Create Schedule',
     openWorldHint: true,
     idempotentHint: false,
   },
   input: z.object({
-    company_id: z.number().int().positive().describe('ID of the company'),
-    staff_id: z.number().int().positive().describe('ID of the staff member'),
+    location_id: z.number().int().positive().describe('Location ID'),
+    team_member_id: z.number().int().positive().describe('Team member ID'),
     dates: z
       .array(dateSchema)
       .min(1)
@@ -81,10 +81,10 @@ export const createScheduleTool = defineTool({
   }),
   outputSchema: scheduleEntityOutput,
   handler: async ({ input, client }) => {
-    const schedule = await client.setSchedule(input.company_id, {
+    const schedule = await client.setSchedule(input.location_id, {
       schedules_to_set: [
         {
-          team_member_id: input.staff_id,
+          team_member_id: input.team_member_id,
           dates: input.dates,
           slots: input.slots,
         },
@@ -93,7 +93,7 @@ export const createScheduleTool = defineTool({
 
     const slotsStr = input.slots.map((s) => `${s.from}-${s.to}`).join(', ');
     return {
-      text: `Successfully created schedule for staff ${input.staff_id} on ${input.dates.join(', ')}:\nSlots: ${slotsStr}\nEntries returned: ${schedule.length}`,
+      text: `Successfully created schedule for team member ${input.team_member_id} on ${input.dates.join(', ')}:\nSlots: ${slotsStr}\nEntries returned: ${schedule.length}`,
       structuredContent: { items: schedule, count: schedule.length },
     };
   },
@@ -103,15 +103,15 @@ export const updateScheduleTool = defineTool({
   name: 'update_schedule',
   category: 'Schedule',
   description:
-    '[Schedule] Update employee work schedule. AUTHENTICATION REQUIRED - administrative access to modify staff working schedule. Replaces work hours for specified dates.',
+    '[Schedule] Update staff member work schedule. AUTHENTICATION REQUIRED - administrative access to modify staff working schedule. Replaces work hours for specified dates.',
   annotations: {
     title: 'Update Schedule',
     openWorldHint: true,
     idempotentHint: true,
   },
   input: z.object({
-    company_id: z.number().int().positive().describe('ID of the company'),
-    staff_id: z.number().int().positive().describe('ID of the staff member'),
+    location_id: z.number().int().positive().describe('Location ID'),
+    team_member_id: z.number().int().positive().describe('Team member ID'),
     dates: z
       .array(dateSchema)
       .min(1)
@@ -123,10 +123,10 @@ export const updateScheduleTool = defineTool({
   }),
   outputSchema: scheduleEntityOutput,
   handler: async ({ input, client }) => {
-    const schedule = await client.setSchedule(input.company_id, {
+    const schedule = await client.setSchedule(input.location_id, {
       schedules_to_set: [
         {
-          team_member_id: input.staff_id,
+          team_member_id: input.team_member_id,
           dates: input.dates,
           slots: input.slots,
         },
@@ -134,7 +134,7 @@ export const updateScheduleTool = defineTool({
     });
 
     return {
-      text: `Successfully updated schedule for staff ${input.staff_id} on ${input.dates.join(', ')}\nEntries returned: ${schedule.length}`,
+      text: `Successfully updated schedule for team member ${input.team_member_id} on ${input.dates.join(', ')}\nEntries returned: ${schedule.length}`,
       structuredContent: { items: schedule, count: schedule.length },
     };
   },
@@ -144,32 +144,32 @@ export const deleteScheduleTool = defineTool({
   name: 'delete_schedule',
   category: 'Schedule',
   description:
-    '[Schedule] Delete employee work schedule for specified dates. AUTHENTICATION REQUIRED - administrative access to remove staff working schedule. Makes the specified dates non-working days.',
+    '[Schedule] Delete staff member work schedule for specified dates. AUTHENTICATION REQUIRED - administrative access to remove staff working schedule. Makes the specified dates non-working days.',
   annotations: {
     title: 'Delete Schedule',
     destructiveHint: true,
     openWorldHint: true,
   },
   input: z.object({
-    company_id: z.number().int().positive().describe('ID of the company'),
-    staff_id: z.number().int().positive().describe('ID of the staff member'),
+    location_id: z.number().int().positive().describe('Location ID'),
+    team_member_id: z.number().int().positive().describe('Team member ID'),
     dates: z
       .array(dateSchema)
       .min(1)
       .describe('Dates to delete schedule for (YYYY-MM-DD format)'),
   }),
   handler: async ({ input, client }) => {
-    await client.setSchedule(input.company_id, {
+    await client.setSchedule(input.location_id, {
       schedules_to_delete: [
         {
-          team_member_id: input.staff_id,
+          team_member_id: input.team_member_id,
           dates: input.dates,
         },
       ],
     });
 
     return {
-      text: `Successfully deleted schedule for staff ${input.staff_id} on ${input.dates.join(', ')}`,
+      text: `Successfully deleted schedule for team member ${input.team_member_id} on ${input.dates.join(', ')}`,
     };
   },
 });

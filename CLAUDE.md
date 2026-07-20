@@ -72,16 +72,16 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 **Category-organized with [Prefix] tags for LLM navigation:**
 
 **[Auth] Authentication (2):** login, logout
-**[Company] Company (1):** list_companies
+**[Location] Location (1):** list_locations
 **[Staff] Staff CRUD (4):** get, create, update, delete
 **[Positions] Positions CRUD (4):** get, create, update, delete
 **[Services] Services (3):** get, create, update
 **[Categories] Service Categories (1):** get
 **[Schedule] Schedule CRUD (4):** get, create, update, delete
-**[Bookings] Bookings CRUD (4):** get, create, update, delete
+**[Appointments] Appointments CRUD (4):** get, create, update, delete
 **[Settings] Location Settings (6):** get/update appointment settings, get/update online booking settings, get/create booking forms
 **[Resources] Resources (1):** get (read-only; API has no create)
-**[Onboarding] Wizard (12):** start, resume, status, batch imports (positions, staff, categories, services), set schedules, import clients, test bookings, preview, rollback
+**[Onboarding] Wizard (12):** start, resume, status, batch imports (positions, staff, categories, services), set schedules, import clients, test appointments, preview, rollback
 
 ### Architecture
 
@@ -148,15 +148,15 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 - **OpenAPI Spec (corporate):** `../biz.erp.api.docs/docs/altegio/en/openapi.yml` (see OPENAPI.md)
 
 **B2B Endpoints (require user_token):**
-- `GET /staff/{company_id}` - staff with admin details
-- `GET /company/{company_id}/services` - services list (optional service_id)
-- `GET /records/{company_id}` - bookings/appointments
-- `GET /schedule/{company_id}/{staff_id}/{start_date}/{end_date}` - view employee schedule
-- `PUT /schedule/{company_id}` - create/update employee work schedule
-- `DELETE /schedule/{company_id}/{staff_id}/{date}` - delete employee work schedule
+- `GET /staff/{location_id}` - staff with admin details
+- `GET /company/{location_id}/services` - services list (optional service_id)
+- `GET /records/{location_id}` - appointments
+- `GET /schedule/{location_id}/{team_member_id}/{start_date}/{end_date}` - view staff member schedule
+- `PUT /schedule/{location_id}` - create/update staff member work schedule
+- `DELETE /schedule/{location_id}/{team_member_id}/{date}` - delete staff member work schedule
 
 **Public Endpoint (partner_token only):**
-- `GET /service_categories/{company_id}` - categories (no auth alternative)
+- `GET /service_categories/{location_id}` - categories (no auth alternative)
 
 ### Common Patterns
 

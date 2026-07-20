@@ -171,12 +171,12 @@ After setup, Claude Desktop will have:
 - `altegio_logout` - Clear credentials
 
 **Business Management:**
-- `list_companies` - Get managed companies
-- `get_bookings` - View appointments
+- `list_locations` - Get managed locations
+- `get_appointments` - View appointments
 - `get_staff` - View all staff (B2B)
 - `get_services` - View services (B2B)
 - `get_service_categories` - View categories
-- `get_schedule` - View employee schedules
+- `get_schedule` - View staff member schedules
 
 ---
 
@@ -261,8 +261,8 @@ In Claude Desktop, try:
 
 ```
 "Use altegio_login to authenticate with my credentials"
-"List my companies using list_companies"
-"Show staff for company ID 123"
+"List my locations using list_locations"
+"Show staff for location ID 123"
 ```
 
 ---

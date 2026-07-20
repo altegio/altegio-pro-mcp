@@ -23,8 +23,8 @@ export class ToolHandlers {
 
   login = (args: unknown) => this.run(defs.loginTool, args);
   logout = () => this.run(defs.logoutTool, {});
-  listCompanies = (args?: unknown) => this.run(defs.listCompaniesTool, args);
-  getBookings = (args: unknown) => this.run(defs.getBookingsTool, args);
+  listLocations = (args?: unknown) => this.run(defs.listLocationsTool, args);
+  getAppointments = (args: unknown) => this.run(defs.getAppointmentsTool, args);
   getStaff = (args: unknown) => this.run(defs.getStaffTool, args);
   getServices = (args: unknown) => this.run(defs.getServicesTool, args);
   getServiceCategories = (args: unknown) =>
@@ -42,7 +42,10 @@ export class ToolHandlers {
   deleteStaff = (args: unknown) => this.run(defs.deleteStaffTool, args);
   createService = (args: unknown) => this.run(defs.createServiceTool, args);
   updateService = (args: unknown) => this.run(defs.updateServiceTool, args);
-  createBooking = (args: unknown) => this.run(defs.createBookingTool, args);
-  updateBooking = (args: unknown) => this.run(defs.updateBookingTool, args);
-  deleteBooking = (args: unknown) => this.run(defs.deleteBookingTool, args);
+  createAppointment = (args: unknown) =>
+    this.run(defs.createAppointmentTool, args);
+  updateAppointment = (args: unknown) =>
+    this.run(defs.updateAppointmentTool, args);
+  deleteAppointment = (args: unknown) =>
+    this.run(defs.deleteAppointmentTool, args);
 }

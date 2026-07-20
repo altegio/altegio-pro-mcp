@@ -91,7 +91,7 @@ export const ScheduleSlotInputSchema = z.object({
 });
 
 export const ScheduleBatchItemSchema = z.object({
-  staff_id: z.coerce.number(),
+  team_member_id: z.coerce.number(),
   dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).min(1),
   slots: z.array(ScheduleSlotInputSchema).min(1),
 });

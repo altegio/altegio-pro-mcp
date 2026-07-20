@@ -23,7 +23,7 @@ describe('ToolHandlers - Staff CRUD', () => {
       mockClient.createStaff.mockResolvedValue(mockStaff as any);
 
       const result = await handlers.createStaff({
-        company_id: 456,
+        location_id: 456,
         name: 'John Doe',
         specialization: 'Stylist',
         position_id: 1,
@@ -54,7 +54,7 @@ describe('ToolHandlers - Staff CRUD', () => {
       );
 
       const result = await handlers.createStaff({
-        company_id: 456,
+        location_id: 456,
         name: 'John',
         specialization: 'Stylist',
         position_id: 1,
@@ -77,8 +77,8 @@ describe('ToolHandlers - Staff CRUD', () => {
       mockClient.updateStaff.mockResolvedValue(mockStaff as any);
 
       const result = await handlers.updateStaff({
-        company_id: 456,
-        staff_id: 123,
+        location_id: 456,
+        team_member_id: 123,
         name: 'John Smith',
       });
 
@@ -96,8 +96,8 @@ describe('ToolHandlers - Staff CRUD', () => {
       mockClient.deleteStaff.mockResolvedValue(undefined);
 
       const result = await handlers.deleteStaff({
-        company_id: 456,
-        staff_id: 123,
+        location_id: 456,
+        team_member_id: 123,
       });
 
       expect((result.content[0] as any).text).toContain(

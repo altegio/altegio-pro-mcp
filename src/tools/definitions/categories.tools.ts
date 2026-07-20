@@ -6,18 +6,18 @@ export const getServiceCategoriesTool = defineTool({
   name: 'get_service_categories',
   category: 'Categories',
   description:
-    '[Categories] Get list of service categories at a company. PUBLIC API - NO AUTHENTICATION REQUIRED. Use this for online booking - shows how services are organized. PAGINATION STRATEGY: May return many categories (20+). RECOMMENDED: Start with count=20-30. Categories help organize services, so showing initial set is usually sufficient.',
+    '[Categories] Get list of service categories at a location. PUBLIC API - NO AUTHENTICATION REQUIRED. Use this for online booking - shows how services are organized. PAGINATION STRATEGY: May return many categories (20+). RECOMMENDED: Start with count=20-30. Categories help organize services, so showing initial set is usually sufficient.',
   annotations: {
     title: 'Get Service Categories',
     readOnlyHint: true,
     openWorldHint: true,
   },
   input: z.object({
-    company_id: z
+    location_id: z
       .number()
       .int()
       .positive()
-      .describe('ID of the company to get service categories for'),
+      .describe('ID of the location to get service categories for'),
     category_id: z
       .number()
       .int()
@@ -46,14 +46,14 @@ export const getServiceCategoriesTool = defineTool({
   }),
   outputSchema: categoriesOutput,
   handler: async ({ input, client }) => {
-    const { company_id, category_id, ...listParams } = input;
+    const { location_id, category_id, ...listParams } = input;
     const categories = await client.getServiceCategories(
-      company_id,
+      location_id,
       category_id,
       Object.keys(listParams).length > 0 ? listParams : undefined
     );
 
-    const summary = `Found ${categories.length} service ${categories.length === 1 ? 'category' : 'categories'} for company ${company_id}:\n\n`;
+    const summary = `Found ${categories.length} service ${categories.length === 1 ? 'category' : 'categories'} for location ${location_id}:\n\n`;
     const categoriesList = categories
       .map(
         (c, idx) =>

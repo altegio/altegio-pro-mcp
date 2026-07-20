@@ -85,7 +85,7 @@ curl -s -X POST http://localhost:8080/mcp \
   -H "mcp-session-id: $SESSION_ID" \
   -d '{"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}'
 
-# Call a tool (e.g., list_companies)
+# Call a tool (e.g., list_locations)
 curl -s -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -H "mcp-session-id: $SESSION_ID" \
@@ -94,7 +94,7 @@ curl -s -X POST http://localhost:8080/mcp \
     "id": 3,
     "method": "tools/call",
     "params": {
-      "name": "list_companies",
+      "name": "list_locations",
       "arguments": {"count": 5}
     }
   }'
@@ -159,14 +159,14 @@ r = json.loads(body) if body.strip() else None
 tools = r.get('result',{}).get('tools',[]) if r else []
 print(f'2. Tools list: {len(tools)} tools found {\"(OK)\" if len(tools) > 0 else \"(FAIL)\"}')
 
-# Call list_companies
+# Call list_locations
 resp = post({'jsonrpc':'2.0','id':3,'method':'tools/call',
-    'params':{'name':'list_companies','arguments':{'count':3}}}, session_id)
+    'params':{'name':'list_locations','arguments':{'count':3}}}, session_id)
 parts = resp.split('\r\n\r\n', 1)
 body = parts[1] if len(parts) > 1 else ''
 r = json.loads(body) if body.strip() else None
 has_result = r and 'result' in r and not r.get('result',{}).get('isError')
-print(f'3. list_companies: {\"OK\" if has_result else \"FAIL\"}')
+print(f'3. list_locations: {\"OK\" if has_result else \"FAIL\"}')
 
 # Terminate session
 subprocess.run(['curl', '-s', '-X', 'DELETE', BASE, '-H', f'mcp-session-id: {session_id}'],

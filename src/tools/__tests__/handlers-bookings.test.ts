@@ -4,7 +4,7 @@ import { AuthenticationError } from '../../utils/errors.js';
 
 jest.mock('../../providers/altegio-client.js');
 
-describe('ToolHandlers - Bookings CRUD', () => {
+describe('ToolHandlers - Appointments CRUD', () => {
   let handlers: ToolHandlers;
   let mockClient: jest.Mocked<AltegioClient>;
 
@@ -17,8 +17,8 @@ describe('ToolHandlers - Bookings CRUD', () => {
     handlers = new ToolHandlers(mockClient);
   });
 
-  describe('createBooking', () => {
-    it('should create booking successfully', async () => {
+  describe('createAppointment', () => {
+    it('should create appointment successfully', async () => {
       const mockBooking = {
         id: 999,
         staff_id: 123,
@@ -26,15 +26,17 @@ describe('ToolHandlers - Bookings CRUD', () => {
       };
       mockClient.createBooking.mockResolvedValue(mockBooking as any);
 
-      const result = await handlers.createBooking({
-        company_id: 456,
-        staff_id: 123,
+      const result = await handlers.createAppointment({
+        location_id: 456,
+        team_member_id: 123,
         services: [{ id: 789 }],
         datetime: '2025-11-01T10:00:00',
         client: { name: 'Jane', phone: '9876543210' },
       });
 
-      expect(result.content[0]?.text).toContain('Successfully created booking');
+      expect(result.content[0]?.text).toContain(
+        'Successfully created appointment'
+      );
       expect(result.content[0]?.text).toContain('999');
       expect(mockClient.createBooking).toHaveBeenCalledWith(456, {
         staff_id: 123,
@@ -49,9 +51,9 @@ describe('ToolHandlers - Bookings CRUD', () => {
         new AuthenticationError('Not authenticated. Call altegio_login first.')
       );
 
-      const result = await handlers.createBooking({
-        company_id: 456,
-        staff_id: 123,
+      const result = await handlers.createAppointment({
+        location_id: 456,
+        team_member_id: 123,
         services: [{ id: 789 }],
         datetime: '2025-11-01T10:00:00',
         client: { name: 'Jane', phone: '123' },
@@ -61,34 +63,38 @@ describe('ToolHandlers - Bookings CRUD', () => {
     });
   });
 
-  describe('updateBooking', () => {
-    it('should update booking successfully', async () => {
+  describe('updateAppointment', () => {
+    it('should update appointment successfully', async () => {
       const mockBooking = { id: 999, datetime: '2025-11-02T10:00:00' };
       mockClient.updateBooking.mockResolvedValue(mockBooking as any);
 
-      const result = await handlers.updateBooking({
-        company_id: 456,
+      const result = await handlers.updateAppointment({
+        location_id: 456,
         record_id: 999,
         datetime: '2025-11-02T10:00:00',
       });
 
-      expect(result.content[0]?.text).toContain('Successfully updated booking');
+      expect(result.content[0]?.text).toContain(
+        'Successfully updated appointment'
+      );
       expect(mockClient.updateBooking).toHaveBeenCalledWith(456, 999, {
         datetime: '2025-11-02T10:00:00',
       });
     });
   });
 
-  describe('deleteBooking', () => {
-    it('should delete booking successfully', async () => {
+  describe('deleteAppointment', () => {
+    it('should delete appointment successfully', async () => {
       mockClient.deleteBooking.mockResolvedValue(undefined);
 
-      const result = await handlers.deleteBooking({
-        company_id: 456,
+      const result = await handlers.deleteAppointment({
+        location_id: 456,
         record_id: 999,
       });
 
-      expect(result.content[0]?.text).toContain('Successfully deleted booking');
+      expect(result.content[0]?.text).toContain(
+        'Successfully deleted appointment'
+      );
       expect(mockClient.deleteBooking).toHaveBeenCalledWith(456, 999);
     });
   });

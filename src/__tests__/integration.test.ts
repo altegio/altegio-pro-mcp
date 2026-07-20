@@ -19,8 +19,8 @@ describe('Tool Integration', () => {
     expect(handlers).toBeDefined();
     expect(typeof handlers.login).toBe('function');
     expect(typeof handlers.logout).toBe('function');
-    expect(typeof handlers.listCompanies).toBe('function');
-    expect(typeof handlers.getBookings).toBe('function');
+    expect(typeof handlers.listLocations).toBe('function');
+    expect(typeof handlers.getAppointments).toBe('function');
   });
 
   it('should handle login with proper response structure', async () => {
@@ -81,15 +81,15 @@ describe('Tool Integration', () => {
     expect(result.content[0]?.text).toContain('email');
   });
 
-  it('should validate company_id is a number', async () => {
+  it('should validate location_id is a number', async () => {
     const client = new AltegioClient({
       partnerToken: 'test-token',
       userToken: 'user-token',
     });
     const handlers = new ToolHandlers(client);
 
-    const result = await handlers.getBookings({
-      company_id: 'not-a-number',
+    const result = await handlers.getAppointments({
+      location_id: 'not-a-number',
     });
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain('Invalid parameters');
