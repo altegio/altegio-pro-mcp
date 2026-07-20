@@ -9,7 +9,7 @@ export const OnboardingPhaseSchema = z.enum([
   'schedules',
   'clients',
   'test_bookings',
-  'complete'
+  'complete',
 ]);
 
 export type OnboardingPhase = z.infer<typeof OnboardingPhaseSchema>;
@@ -19,7 +19,7 @@ export const CheckpointSchema = z.object({
   completed: z.boolean(),
   entity_ids: z.array(z.number()),
   timestamp: z.string(),
-  metadata: z.record(z.unknown()).optional()
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type Checkpoint = z.infer<typeof CheckpointSchema>;
@@ -30,8 +30,8 @@ export const OnboardingStateSchema = z.object({
   phase: OnboardingPhaseSchema,
   started_at: z.string(),
   updated_at: z.string(),
-  checkpoints: z.record(CheckpointSchema),
-  conversation_context: z.record(z.unknown())
+  checkpoints: z.record(z.string(), CheckpointSchema),
+  conversation_context: z.record(z.string(), z.unknown()),
 });
 
 export type OnboardingState = z.infer<typeof OnboardingStateSchema>;
@@ -43,7 +43,7 @@ export const StaffBatchItemSchema = z.object({
   phone: z.string().optional(),
   email: z.string().email().optional(),
   position_id: z.coerce.number().optional(),
-  api_id: z.string().optional()
+  api_id: z.string().optional(),
 });
 
 export const ServiceBatchItemSchema = z.object({
@@ -52,23 +52,25 @@ export const ServiceBatchItemSchema = z.object({
   price_max: z.coerce.number().optional(),
   duration: z.coerce.number(),
   category_id: z.coerce.number().optional(),
-  api_id: z.string().optional()
+  api_id: z.string().optional(),
 });
 
-export const ClientBatchItemSchema = z.object({
-  name: z.string().min(1),
-  phone: z.string().optional(),
-  email: z.string().email().optional(),
-  surname: z.string().optional(),
-  comment: z.string().optional()
-}).refine(data => data.phone || data.email, {
-  message: 'Either phone or email is required'
-});
+export const ClientBatchItemSchema = z
+  .object({
+    name: z.string().min(1),
+    phone: z.string().optional(),
+    email: z.string().email().optional(),
+    surname: z.string().optional(),
+    comment: z.string().optional(),
+  })
+  .refine((data) => data.phone || data.email, {
+    message: 'Either phone or email is required',
+  });
 
 export const CategoryBatchItemSchema = z.object({
   title: z.string().min(1),
   api_id: z.string().optional(),
-  weight: z.number().optional()
+  weight: z.number().optional(),
 });
 
 export const StaffBatchSchema = z.array(StaffBatchItemSchema);

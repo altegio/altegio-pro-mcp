@@ -36,7 +36,7 @@ Feature requests are tracked as GitHub issues. Include:
 
 ### Prerequisites
 
-- Node.js >= 18
+- Node.js >= 20
 - npm
 - Git
 - Altegio Partner Token from [developer.alteg.io](https://developer.alteg.io)

@@ -9,7 +9,7 @@ export default {
       useESM: true,
       tsconfig: {
         module: 'ES2022',
-        target: 'ES2022'
+        target: 'ES2023'
       },
       diagnostics: {
         ignoreCodes: [151002]

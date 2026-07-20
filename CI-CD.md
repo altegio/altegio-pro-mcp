@@ -39,7 +39,7 @@ gh pr merge --merge
 
 **Workflow:** `.github/workflows/ci.yml`
 - Lint, typecheck, format check
-- Tests on Node.js 18, 20, 22
+- Tests on Node.js 20, 22, 24
 - Build verification
 - Security audit (`npm audit`)
 

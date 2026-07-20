@@ -83,7 +83,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ### Prerequisites
 
-- Node.js >= 18
+- Node.js >= 20
 - Altegio Partner Token from [developer.alteg.io](https://developer.alteg.io)
 
 ### Installation
