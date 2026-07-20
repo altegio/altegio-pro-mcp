@@ -3,7 +3,7 @@ import { OnboardingStateManager } from '../providers/onboarding-state-manager.js
 import { z } from 'zod';
 import { parseCSV } from '../utils/csv-parser.js';
 import { logger } from '../utils/logger.js';
-import { withErrorHandling } from './handlers.js';
+import { withErrorHandling } from './tool-result.js';
 import { AuthenticationError } from '../utils/errors.js';
 import {
   StaffBatchSchema,
