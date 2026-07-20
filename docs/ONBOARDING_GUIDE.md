@@ -10,20 +10,20 @@ The onboarding wizard provides **12 specialized tools** to help new users quickl
 - Hybrid input: conversational or CSV/JSON bulk import
 - Checkpoint/resume: automatically recover from errors
 - Persistent state: track progress across sessions
-- Test data generation: create sample bookings
+- Test data generation: create sample appointments
 - Phase-level rollback: undo specific setup steps
 
 **Recommended setup order:**
 `positions → staff → categories → services → schedules → clients → test_bookings`
 
-Positions come first so staff can reference `position_id`. Work schedules come after staff — without them the booking grid stays empty and the location isn't operational.
+Positions come first so staff can reference `position_id`. Work schedules come after staff — without them the appointment grid stays empty and the location isn't operational.
 
 ### New steps
 
 **Add positions (before staff):**
 ```typescript
 onboarding_add_positions({
-  company_id: 123456,
+  location_id: 123456,
   positions: [
     { title: "Senior Stylist", api_id: "pos-senior" },
     { title: "Manicurist" },
@@ -37,10 +37,10 @@ onboarding_add_positions({
 **Set work schedules (after staff):**
 ```typescript
 onboarding_set_schedules({
-  company_id: 123456,
+  location_id: 123456,
   schedules: [
     {
-      staff_id: 101,                       // from onboarding_add_staff_batch response
+      team_member_id: 101,                       // from onboarding_add_staff_batch response
       dates: ["2026-08-01", "2026-08-02"],
       slots: [{ from: "09:00", to: "18:00" }]
     }
@@ -59,11 +59,11 @@ altegio_login({
   password: "your-password"
 })
 
-// Start onboarding for your company
+// Start onboarding for your location
 onboarding_start({
-  company_id: 123456
+  location_id: 123456
 })
-// Response: "Onboarding session initialized for company 123456
+// Response: "Onboarding session initialized for location 123456
 //           State saved to ~/.altegio-mcp/onboarding/123456/
 //           Next steps: Add service categories, then staff and services"
 ```
@@ -72,7 +72,7 @@ onboarding_start({
 
 ```typescript
 onboarding_add_categories({
-  company_id: 123456,
+  location_id: 123456,
   categories: [
     { title: "Hair Services", api_id: "hair", weight: 1 },
     { title: "Nail Services", api_id: "nails", weight: 2 },
@@ -89,7 +89,7 @@ onboarding_add_categories({
 **Option A: JSON Array**
 ```typescript
 onboarding_add_staff_batch({
-  company_id: 123456,
+  location_id: 123456,
   staff_data: [
     {
       name: "Alice Johnson",
@@ -109,7 +109,7 @@ onboarding_add_staff_batch({
 **Option B: CSV String**
 ```typescript
 onboarding_add_staff_batch({
-  company_id: 123456,
+  location_id: 123456,
   staff_data: `name,specialization,phone,email
 Alice Johnson,Senior Stylist,+1234567890,alice@salon.com
 Bob Smith,Nail Technician,+1234567891,bob@salon.com
@@ -126,7 +126,7 @@ Carol White,Massage Therapist,+1234567892,carol@salon.com`
 
 ```typescript
 onboarding_add_services_batch({
-  company_id: 123456,
+  location_id: 123456,
   services_data: [
     {
       title: "Women's Haircut",
@@ -158,7 +158,7 @@ onboarding_add_services_batch({
 
 ```typescript
 onboarding_import_clients({
-  company_id: 123456,
+  location_id: 123456,
   clients_csv: `name,phone,email,surname,comment
 Sarah Miller,+1234560001,sarah@example.com,Miller,VIP client
 John Davis,+1234560002,john@example.com,Davis,
@@ -171,16 +171,16 @@ Emma Wilson,+1234560003,,Wilson,Prefers email contact`
 //           Checkpoint saved at phase: clients"
 ```
 
-### 6. Generate Test Bookings
+### 6. Generate Test Appointments
 
 ```typescript
-onboarding_create_test_bookings({
-  company_id: 123456,
+onboarding_create_test_appointments({
+  location_id: 123456,
   count: 5
 })
 
-// Response: "Successfully created 5 test bookings
-//           Booking IDs: [301, 302, 303, 304, 305]
+// Response: "Successfully created 5 test appointments
+//           Appointment IDs: [301, 302, 303, 304, 305]
 //           Distributed across next 7 days
 //           Staff used: [101, 102, 103]
 //           Services used: [201, 202, 203]
@@ -191,10 +191,10 @@ onboarding_create_test_bookings({
 
 ```typescript
 onboarding_status({
-  company_id: 123456
+  location_id: 123456
 })
 
-// Response: "Onboarding Status for Company 123456
+// Response: "Onboarding Status for Location 123456
 //           Current phase: complete
 //           Started: 2025-01-29T10:30:00.000Z
 //
@@ -301,10 +301,10 @@ If an error interrupts the onboarding process:
 altegio_login({ email: "...", password: "..." })
 
 onboarding_resume({
-  company_id: 123456
+  location_id: 123456
 })
 
-// Response: "Onboarding session resumed for company 123456
+// Response: "Onboarding session resumed for location 123456
 //           Current phase: services
 //
 //           Completed:
@@ -321,10 +321,10 @@ Save progress manually at any point:
 
 ```typescript
 onboarding_checkpoint({
-  company_id: 123456
+  location_id: 123456
 })
 
-// Response: "Checkpoint saved for company 123456
+// Response: "Checkpoint saved for location 123456
 //           Phase: services
 //           Timestamp: 2025-01-29T10:45:30.000Z"
 ```
@@ -335,21 +335,21 @@ Undo a phase and delete created entities:
 
 ```typescript
 onboarding_rollback_phase({
-  company_id: 123456,
+  location_id: 123456,
   phase_name: "test_bookings"
 })
 
 // Response: "Rollback preview for phase: test_bookings
-//           Entities to delete: 5 bookings
+//           Entities to delete: 5 appointments
 //           IDs: [301, 302, 303, 304, 305]
 //
 //           Confirm deletion? This action cannot be undone."
 
 // After confirmation:
 // "Successfully rolled back phase: test_bookings
-//  Deleted 5 bookings
+//  Deleted 5 appointments
 //  State reset to phase: clients
-//  You can now re-run onboarding_create_test_bookings() with different parameters"
+//  You can now re-run onboarding_create_test_appointments() with different parameters"
 ```
 
 **Rollback order (reverse dependency):**
@@ -363,6 +363,8 @@ onboarding_rollback_phase({
 
 Supported `phase_name` values for `onboarding_rollback_phase`: `positions`, `staff`, `services`, `categories`, `schedules`, `clients`, `test_bookings`.
 
+> **Note:** The tool that creates test appointments is `onboarding_create_test_appointments`, but its rollback `phase_name` is `test_bookings`. The phase key is a persisted state value and remains `test_bookings` even though the tool was renamed.
+
 ## Error Handling
 
 ### Partial Success
@@ -371,7 +373,7 @@ If some entries fail during batch import:
 
 ```typescript
 onboarding_add_staff_batch({
-  company_id: 123456,
+  location_id: 123456,
   staff_data: [
     { name: "Alice", specialization: "Stylist", phone: "+1234567890" },
     { name: "", specialization: "Invalid" },  // Missing required field
@@ -399,7 +401,7 @@ Automatic checkpoint before error, allowing safe resume:
 // System automatically saves checkpoint with created IDs before throwing error
 
 // Resume in new session:
-onboarding_resume({ company_id: 123456 })
+onboarding_resume({ location_id: 123456 })
 // Response shows which entities were successfully created before error
 ```
 
@@ -447,18 +449,18 @@ Built-in handling for API rate limits (200 req/min):
 }
 ```
 
-### Multi-Company Isolation
+### Multi-Location Isolation
 
-Each company has isolated state directory, allowing parallel onboarding:
+Each location has isolated state directory, allowing parallel onboarding:
 
 ```typescript
-// Company A onboarding
-onboarding_start({ company_id: 111111 })
-onboarding_add_staff_batch({ company_id: 111111, ... })
+// Location A onboarding
+onboarding_start({ location_id: 111111 })
+onboarding_add_staff_batch({ location_id: 111111, ... })
 
-// Company B onboarding (independent)
-onboarding_start({ company_id: 222222 })
-onboarding_add_staff_batch({ company_id: 222222, ... })
+// Location B onboarding (independent)
+onboarding_start({ location_id: 222222 })
+onboarding_add_staff_batch({ location_id: 222222, ... })
 
 // States saved separately:
 // ~/.altegio-mcp/onboarding/111111/state.json
@@ -474,11 +476,11 @@ Full onboarding from scratch to operational platform:
 altegio_login({ email: "owner@salon.com", password: "secure123" })
 
 // 2. Start onboarding
-onboarding_start({ company_id: 123456 })
+onboarding_start({ location_id: 123456 })
 
 // 3. Create service categories
 onboarding_add_categories({
-  company_id: 123456,
+  location_id: 123456,
   categories: [
     { title: "Hair Services", weight: 1 },
     { title: "Nail Services", weight: 2 }
@@ -488,7 +490,7 @@ onboarding_add_categories({
 
 // 4. Import staff from CSV
 onboarding_add_staff_batch({
-  company_id: 123456,
+  location_id: 123456,
   staff_data: `name,specialization,phone,email
 Alice Johnson,Senior Stylist,+1234567890,alice@salon.com
 Bob Smith,Nail Technician,+1234567891,bob@salon.com
@@ -498,7 +500,7 @@ Carol White,Manicurist,+1234567892,carol@salon.com`
 
 // 5. Add services
 onboarding_add_services_batch({
-  company_id: 123456,
+  location_id: 123456,
   services_data: `title,price_min,price_max,duration,category_id
 Women's Haircut,50,60,60,501
 Hair Coloring,80,150,120,501
@@ -509,7 +511,7 @@ Pedicure,45,60,60,502`
 
 // 6. Import clients
 onboarding_import_clients({
-  company_id: 123456,
+  location_id: 123456,
   clients_csv: `name,phone,email,surname
 Sarah Miller,+1234560001,sarah@example.com,Miller
 John Davis,+1234560002,john@example.com,Davis
@@ -517,17 +519,17 @@ Emma Wilson,+1234560003,emma@example.com,Wilson`
 })
 // Created client IDs: [1001, 1002, 1003]
 
-// 7. Generate test bookings
-onboarding_create_test_bookings({
-  company_id: 123456,
+// 7. Generate test appointments
+onboarding_create_test_appointments({
+  location_id: 123456,
   count: 5
 })
-// Created booking IDs: [301, 302, 303, 304, 305]
+// Created appointment IDs: [301, 302, 303, 304, 305]
 
 // 8. Verify completion
-onboarding_status({ company_id: 123456 })
+onboarding_status({ location_id: 123456 })
 // Status: complete
-// Total entities: 3 categories, 3 staff, 4 services, 3 clients, 5 bookings
+// Total entities: 3 categories, 3 staff, 4 services, 3 clients, 5 appointments
 ```
 
 **Time estimate:** 5-10 minutes for typical salon setup (vs 30+ minutes manual entry)
@@ -540,8 +542,8 @@ onboarding_status({ company_id: 123456 })
 ### Error: "Category ID not found"
 **Solution:** Run `onboarding_add_categories()` before `onboarding_add_services_batch()`
 
-### Error: "No staff or services available for test bookings"
-**Solution:** Create at least 1 staff member and 1 service before generating test bookings
+### Error: "No staff or services available for test appointments"
+**Solution:** Create at least 1 staff member and 1 service before generating test appointments
 
 ### CSV parsing fails with quoted fields
 **Solution:** Use double quotes for fields containing commas:
@@ -558,57 +560,57 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 
 ### Control Tools
 
-**`onboarding_start(company_id)`**
+**`onboarding_start(location_id)`**
 - Initialize new onboarding session
 - Creates state file with `phase: "init"`
 - Returns: session ID and next steps
 
-**`onboarding_resume(company_id)`**
+**`onboarding_resume(location_id)`**
 - Load existing state from file
 - Display progress summary
 - Suggest next action based on current phase
 
-**`onboarding_status(company_id)`**
+**`onboarding_status(location_id)`**
 - Show current phase, completed steps, entity counts
 - Display checkpoint timestamps
 - Read-only, no state changes
 
 ### Data Input Tools
 
-**`onboarding_add_categories(company_id, categories)`**
+**`onboarding_add_categories(location_id, categories)`**
 - Create service category hierarchy
 - Input: `[{title, api_id?, weight?}, ...]`
 - Returns: created category IDs
 
-**`onboarding_add_positions(company_id, positions)`**
+**`onboarding_add_positions(location_id, positions)`**
 - Bulk create staff positions/roles from JSON array or CSV string
 - Required: `title`
 - Optional: `api_id`
 - Run before staff so staff can reference `position_id`
 
-**`onboarding_add_staff_batch(company_id, staff_data)`**
+**`onboarding_add_staff_batch(location_id, staff_data)`**
 - Bulk add staff from JSON array or CSV string
 - Required: `name`
 - Optional: `specialization`, `phone`, `email`, `position_id`, `api_id`
 
-**`onboarding_add_services_batch(company_id, services_data)`**
+**`onboarding_add_services_batch(location_id, services_data)`**
 - Bulk add services from JSON array or CSV string
 - Required: `title`, `price_min`, `duration`
 - Optional: `price_max`, `category_id`, `api_id`
 
-**`onboarding_set_schedules(company_id, schedules)`**
+**`onboarding_set_schedules(location_id, schedules)`**
 - Set work schedules (working hours) for staff members
-- Each entry: `staff_id`, `dates` (YYYY-MM-DD[]), `slots` (`[{from, to}]` in HH:MM)
+- Each entry: `team_member_id`, `dates` (YYYY-MM-DD[]), `slots` (`[{from, to}]` in HH:MM)
 - Use staff IDs returned by `onboarding_add_staff_batch`
-- Without schedules the booking grid stays empty
+- Without schedules the appointment grid stays empty
 
-**`onboarding_import_clients(company_id, clients_csv)`**
+**`onboarding_import_clients(location_id, clients_csv)`**
 - Import client database from CSV
 - Required: `name` + (`phone` OR `email`)
 - Optional: `surname`, `comment`
 - Deduplicates by phone/email
 
-**`onboarding_create_test_bookings(company_id, count?)`**
+**`onboarding_create_test_appointments(location_id, count?)`**
 - Generate sample appointments (default: 5)
 - Requires: at least 1 staff + 1 service
 - Distributes across next 7 days
@@ -620,11 +622,11 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 - Types: 'staff', 'services', 'clients'
 - Shows structured preview with validation errors
 
-**`onboarding_checkpoint(company_id)`**
+**`onboarding_checkpoint(location_id)`**
 - Manual save point (auto-checkpoints also happen)
 - Returns: checkpoint ID and timestamp
 
-**`onboarding_rollback_phase(company_id, phase_name)`**
+**`onboarding_rollback_phase(location_id, phase_name)`**
 - Delete entities from specified phase
 - Reset state to previous checkpoint
 - Confirmation required for destructive action
@@ -645,7 +647,7 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 
 4. **Check status regularly** during multi-step onboarding:
    ```typescript
-   onboarding_status({ company_id: 123456 })
+   onboarding_status({ location_id: 123456 })
    ```
 
 5. **Test with small batches** before full import (10-20 rows)
@@ -654,7 +656,7 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 
 7. **Use rollback for corrections** rather than manual deletion:
    ```typescript
-   onboarding_rollback_phase({ company_id: 123456, phase_name: "staff" })
+   onboarding_rollback_phase({ location_id: 123456, phase_name: "staff" })
    ```
 
 ## Next Steps
@@ -663,16 +665,16 @@ After completing onboarding:
 
 1. **Verify data:** Use existing tools to check created entities
    ```typescript
-   get_staff({ company_id: 123456 })
-   get_services({ company_id: 123456 })
-   get_bookings({ company_id: 123456 })
+   get_staff({ location_id: 123456 })
+   get_services({ location_id: 123456 })
+   get_appointments({ location_id: 123456 })
    ```
 
 2. **Customize settings:** Update staff schedules, service configurations
 
-3. **Start operations:** Create real bookings using `create_booking()`
+3. **Start operations:** Create real appointments using `create_appointment()`
 
-4. **Monitor performance:** Check booking patterns, popular services
+4. **Monitor performance:** Check appointment patterns, popular services
 
 5. **Scale as needed:** Add more staff, services, or locations using batch tools
 

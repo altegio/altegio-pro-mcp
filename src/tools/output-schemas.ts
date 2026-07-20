@@ -149,7 +149,7 @@ export const onboardingStatusOutput = entitySchema(
         services: numProp,
         categories: numProp,
         clients: numProp,
-        bookings: numProp,
+        appointments: numProp,
       },
     },
     created_at: strProp,

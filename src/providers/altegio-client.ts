@@ -164,7 +164,7 @@ export class AltegioClient {
         );
       case 403:
         throw new AltegioApiError(
-          `Access denied for ${context}. Check company permissions.`,
+          `Access denied for ${context}. Check location permissions.`,
           403,
           body
         );
@@ -345,11 +345,14 @@ export class AltegioClient {
       `/records/${companyId}${queryParams}`
     );
 
-    return this.handleResponse<AltegioBooking[]>(response, 'fetch bookings');
+    return this.handleResponse<AltegioBooking[]>(
+      response,
+      'fetch appointments'
+    );
   }
 
   /**
-   * Get staff for a company (B2B API, requires user auth)
+   * Get staff for a location (B2B API, requires user auth)
    */
   async getStaff(
     companyId: number,
@@ -366,7 +369,7 @@ export class AltegioClient {
   }
 
   /**
-   * Get services for booking (B2B API, requires user auth)
+   * Get services for a location (B2B API, requires user auth)
    */
   async getServices(
     companyId: number,
@@ -406,7 +409,7 @@ export class AltegioClient {
   }
 
   /**
-   * Get company positions (B2B API, requires user auth)
+   * Get location positions (B2B API, requires user auth)
    */
   async getPositions(companyId: number): Promise<AltegioPosition[]> {
     this.requireAuth();
@@ -417,7 +420,7 @@ export class AltegioClient {
   }
 
   /**
-   * Get employee schedule for a date range (B2B API, requires user auth)
+   * Get staff member schedule for a date range (B2B API, requires user auth)
    */
   async getSchedule(
     companyId: number,
@@ -772,7 +775,7 @@ export class AltegioClient {
       body: JSON.stringify(data),
     });
 
-    return this.handleResponse<AltegioBooking>(response, 'create booking');
+    return this.handleResponse<AltegioBooking>(response, 'create appointment');
   }
 
   async updateBooking(
@@ -790,7 +793,7 @@ export class AltegioClient {
       body: JSON.stringify(data),
     });
 
-    return this.handleResponse<AltegioBooking>(response, 'update booking');
+    return this.handleResponse<AltegioBooking>(response, 'update appointment');
   }
 
   async deleteBooking(companyId: number, recordId: number): Promise<void> {
@@ -800,7 +803,7 @@ export class AltegioClient {
       method: 'DELETE',
     });
 
-    await this.handleVoidResponse(response, 'delete booking');
+    await this.handleVoidResponse(response, 'delete appointment');
   }
 
   // ========== Clients CRUD Operations ==========

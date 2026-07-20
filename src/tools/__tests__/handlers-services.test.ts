@@ -22,7 +22,7 @@ describe('ToolHandlers - Services CRUD', () => {
       mockClient.createService.mockResolvedValue(mockService as any);
 
       const result = await handlers.createService({
-        company_id: 456,
+        location_id: 456,
         title: 'Haircut',
         category_id: 10,
       });
@@ -43,7 +43,7 @@ describe('ToolHandlers - Services CRUD', () => {
       );
 
       const result = await handlers.createService({
-        company_id: 456,
+        location_id: 456,
         title: 'Test',
         category_id: 1,
       });
@@ -60,7 +60,7 @@ describe('ToolHandlers - Services CRUD', () => {
       mockClient.updateService.mockResolvedValue(mockService as any);
 
       const result = await handlers.updateService({
-        company_id: 456,
+        location_id: 456,
         service_id: 789,
         title: 'New Haircut',
       });

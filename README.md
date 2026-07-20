@@ -8,14 +8,14 @@
 
 MCP server for Altegio.Pro business management API - B2B integration for salon/spa owners and administrators.
 
-**Target users:** Business owners managing their Altegio companies
+**Target users:** Business owners managing their Altegio locations
 **Authentication:** All operations require user login (obtained via `altegio_login`)
 **Focus:** Administrative B2B operations only (no public booking features)
 
 ## Features
 
 - **42 MCP tools** including 12 onboarding wizard tools for first-time setup
-- **CRUD operations** for staff, services, bookings, schedules, and positions management
+- **CRUD operations** for staff, services, appointments, schedules, and positions management
 - **Location settings**: appointment calendar, online booking, booking forms, resources
 - **Conversational onboarding** with bulk CSV/JSON import and checkpoint/resume
 - **Dual transport:** stdio for Claude Desktop, HTTP for cloud deployments
@@ -32,17 +32,17 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 - `altegio_login` - Authenticate with email/password
 - `altegio_logout` - Clear stored credentials
 
-### 🏢 Company Management
-- `list_companies` - Get managed companies (requires auth)
+### 🏢 Location Management
+- `list_locations` - Get managed locations (requires auth)
 
 ### 👥 Staff Management
-- `get_staff` - View employees with admin details
-- `create_staff` - Add new employee
-- `update_staff` - Modify employee details
-- `delete_staff` - Remove employee
+- `get_staff` - View staff members with admin details
+- `create_staff` - Add new staff member
+- `update_staff` - Modify staff member details
+- `delete_staff` - Remove staff member
 
 ### 📋 Positions Management
-- `get_positions` - List company positions/roles
+- `get_positions` - List location positions/roles
 - `create_position` - Create new position (Manager, Stylist, etc.)
 - `update_position` - Modify position details
 - `delete_position` - Remove position
@@ -54,16 +54,16 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 - `update_service` - Modify service details
 
 ### 📅 Schedule Management
-- `get_schedule` - View employee work schedules
-- `create_schedule` - Set employee work hours
+- `get_schedule` - View staff member work schedules
+- `create_schedule` - Set staff member work hours
 - `update_schedule` - Modify work schedule
 - `delete_schedule` - Remove schedule entry
 
-### 📖 Bookings Management
-- `get_bookings` - View appointments
-- `create_booking` - Create client appointment
-- `update_booking` - Modify existing appointment
-- `delete_booking` - Cancel appointment
+### 📖 Appointments Management
+- `get_appointments` - View appointments
+- `create_appointment` - Create client appointment
+- `update_appointment` - Modify existing appointment
+- `delete_appointment` - Cancel appointment
 
 ### ⚙️ Location Settings
 - `get_appointment_settings` / `update_appointment_settings` - Appointment calendar defaults (record type, group capacity)
@@ -84,7 +84,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 - `onboarding_add_services_batch` - Bulk import services (CSV/JSON)
 - `onboarding_set_schedules` - Set staff work schedules
 - `onboarding_import_clients` - Import client database
-- `onboarding_create_test_bookings` - Generate sample data
+- `onboarding_create_test_appointments` - Generate sample data
 - `onboarding_preview_data` - Validate before import
 - `onboarding_rollback_phase` - Undo specific phase
 
@@ -140,11 +140,11 @@ See [CLAUDE_DESKTOP_SETUP.md](CLAUDE_DESKTOP_SETUP.md) for detailed setup.
 ```typescript
 // 1. Login and start
 altegio_login({ email: "owner@salon.com", password: "..." })
-onboarding_start({ company_id: 123456 })
+onboarding_start({ location_id: 123456 })
 
 // 2. Create categories
 onboarding_add_categories({
-  company_id: 123456,
+  location_id: 123456,
   categories: [
     { title: "Hair Services" },
     { title: "Nail Services" }
@@ -153,7 +153,7 @@ onboarding_add_categories({
 
 // 3. Import staff (CSV or JSON)
 onboarding_add_staff_batch({
-  company_id: 123456,
+  location_id: 123456,
   staff_data: `name,specialization,phone
 Alice Johnson,Senior Stylist,+1234567890
 Bob Smith,Nail Technician,+1234567891`
@@ -161,7 +161,7 @@ Bob Smith,Nail Technician,+1234567891`
 
 // 4. Add services
 onboarding_add_services_batch({
-  company_id: 123456,
+  location_id: 123456,
   services_data: [
     { title: "Haircut", price_min: 50, duration: 60 },
     { title: "Manicure", price_min: 30, duration: 45 }
@@ -170,17 +170,17 @@ onboarding_add_services_batch({
 
 // 5. Import clients
 onboarding_import_clients({
-  company_id: 123456,
+  location_id: 123456,
   clients_csv: `name,phone,email
 Sarah Miller,+1234560001,sarah@example.com
 John Davis,+1234560002,john@example.com`
 })
 
-// 6. Generate test bookings
-onboarding_create_test_bookings({ company_id: 123456, count: 5 })
+// 6. Generate test appointments
+onboarding_create_test_appointments({ location_id: 123456, count: 5 })
 
 // 7. Check progress
-onboarding_status({ company_id: 123456 })
+onboarding_status({ location_id: 123456 })
 ```
 
 **Key Features:**

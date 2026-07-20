@@ -13,15 +13,15 @@ export const getResourcesTool = defineTool({
     openWorldHint: true,
   },
   input: z.object({
-    company_id: z.number().int().positive().describe('Company ID'),
+    location_id: z.number().int().positive().describe('Location ID'),
   }),
   outputSchema: resourcesOutput,
   handler: async ({ input, client }) => {
-    const resources = await client.getResources(input.company_id);
+    const resources = await client.getResources(input.location_id);
 
     if (!resources || resources.length === 0) {
       return {
-        text: 'No resources found for this company.',
+        text: 'No resources found for this location.',
         structuredContent: { items: [], count: 0 },
       };
     }

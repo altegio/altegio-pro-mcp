@@ -48,7 +48,7 @@ export function registerTools(server: Server, client: AltegioClient): string[] {
     onboarding_add_services_batch: (args) => onboarding.addServicesBatch(args),
     onboarding_add_categories: (args) => onboarding.addCategories(args),
     onboarding_import_clients: (args) => onboarding.importClients(args),
-    onboarding_create_test_bookings: (args) =>
+    onboarding_create_test_appointments: (args) =>
       onboarding.createTestBookings(args),
     onboarding_preview_data: (args) => onboarding.previewData(args),
     onboarding_rollback_phase: (args) => onboarding.rollbackPhase(args),

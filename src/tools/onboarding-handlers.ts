@@ -22,42 +22,42 @@ import type {
   SetScheduleRequest,
 } from '../types/altegio.types.js';
 
-const CompanyIdSchema = z.object({
-  company_id: z.number(),
+const LocationIdSchema = z.object({
+  location_id: z.number(),
 });
 
 const StaffBatchArgsSchema = z.object({
-  company_id: z.number(),
+  location_id: z.number(),
   staff_data: z.union([StaffBatchSchema, z.string()]),
 });
 
 const ServiceBatchArgsSchema = z.object({
-  company_id: z.number(),
+  location_id: z.number(),
   services_data: z.union([ServiceBatchSchema, z.string()]),
 });
 
 const CategoryArgsSchema = z.object({
-  company_id: z.number(),
+  location_id: z.number(),
   categories: CategoryBatchSchema,
 });
 
 const PositionBatchArgsSchema = z.object({
-  company_id: z.number(),
+  location_id: z.number(),
   positions: z.union([PositionBatchSchema, z.string()]),
 });
 
 const ScheduleBatchArgsSchema = z.object({
-  company_id: z.number(),
+  location_id: z.number(),
   schedules: ScheduleBatchSchema,
 });
 
 const ClientImportArgsSchema = z.object({
-  company_id: z.number(),
+  location_id: z.number(),
   clients_csv: z.string(),
 });
 
 const TestBookingsArgsSchema = z.object({
-  company_id: z.number(),
+  location_id: z.number(),
   count: z.number().min(1).max(10).default(5),
 });
 
@@ -67,7 +67,7 @@ const PreviewArgsSchema = z.object({
 });
 
 const RollbackArgsSchema = z.object({
-  company_id: z.number(),
+  location_id: z.number(),
   phase_name: z.string(),
 });
 
@@ -89,15 +89,15 @@ export class OnboardingHandlers {
     return withErrorHandling('onboarding_start', async () => {
       this.requireAuth();
 
-      const { company_id } = CompanyIdSchema.parse(args);
-      const state = await this.stateManager.start(company_id);
+      const { location_id } = LocationIdSchema.parse(args);
+      const state = await this.stateManager.start(location_id);
 
       return {
         content: [
           {
             type: 'text' as const,
             text:
-              `Onboarding session started for company ${company_id}.\n\n` +
+              `Onboarding session started for location ${location_id}.\n\n` +
               `Current phase: ${state.phase}\n` +
               `Started at: ${state.started_at}\n\n` +
               `Recommended steps (in order):\n` +
@@ -107,7 +107,7 @@ export class OnboardingHandlers {
               `4. Add services: onboarding_add_services_batch\n` +
               `5. Set work schedules: onboarding_set_schedules\n` +
               `6. Import clients: onboarding_import_clients\n` +
-              `7. Create test bookings: onboarding_create_test_bookings`,
+              `7. Create test appointments: onboarding_create_test_appointments`,
           },
         ],
       };
@@ -118,12 +118,12 @@ export class OnboardingHandlers {
     return withErrorHandling('onboarding_resume', async () => {
       this.requireAuth();
 
-      const { company_id } = CompanyIdSchema.parse(args);
-      const state = await this.stateManager.load(company_id);
+      const { location_id } = LocationIdSchema.parse(args);
+      const state = await this.stateManager.load(location_id);
 
       if (!state) {
         throw new Error(
-          `No onboarding session found for company ${company_id}`
+          `No onboarding session found for location ${location_id}`
         );
       }
 
@@ -140,7 +140,7 @@ export class OnboardingHandlers {
           {
             type: 'text' as const,
             text:
-              `Onboarding session for company ${company_id}\n\n` +
+              `Onboarding session for location ${location_id}\n\n` +
               `Current phase: ${state.phase}\n` +
               `Started: ${state.started_at}\n\n` +
               `Completed:\n${completedPhases || '  (none yet)'}\n\n` +
@@ -155,12 +155,12 @@ export class OnboardingHandlers {
     return withErrorHandling('onboarding_status', async () => {
       this.requireAuth();
 
-      const { company_id } = CompanyIdSchema.parse(args);
-      const state = await this.stateManager.load(company_id);
+      const { location_id } = LocationIdSchema.parse(args);
+      const state = await this.stateManager.load(location_id);
 
       if (!state) {
         throw new Error(
-          `No onboarding session found for company ${company_id}`
+          `No onboarding session found for location ${location_id}`
         );
       }
 
@@ -174,7 +174,7 @@ export class OnboardingHandlers {
           {
             type: 'text' as const,
             text:
-              `Onboarding Status - Company ${company_id}\n\n` +
+              `Onboarding Status - Location ${location_id}\n\n` +
               `Phase: ${state.phase}\n` +
               `Total entities created: ${totalEntities}\n` +
               `Phases completed: ${Object.keys(state.checkpoints).length}`,
@@ -188,7 +188,7 @@ export class OnboardingHandlers {
     return withErrorHandling('onboarding_add_positions', async () => {
       this.requireAuth();
 
-      const { company_id, positions } = PositionBatchArgsSchema.parse(args);
+      const { location_id, positions } = PositionBatchArgsSchema.parse(args);
 
       // Parse CSV if string
       let positionsArray =
@@ -207,7 +207,7 @@ export class OnboardingHandlers {
             api_id: position.api_id,
           };
           const result = await this.client.createPosition(
-            company_id,
+            location_id,
             positionRequest
           );
           created.push(result.id);
@@ -217,8 +217,8 @@ export class OnboardingHandlers {
       }
 
       // Checkpoint
-      await this.stateManager.checkpoint(company_id, 'positions', created);
-      await this.stateManager.updatePhase(company_id, 'staff');
+      await this.stateManager.checkpoint(location_id, 'positions', created);
+      await this.stateManager.updatePhase(location_id, 'staff');
 
       return {
         content: [
@@ -243,7 +243,7 @@ export class OnboardingHandlers {
     return withErrorHandling('onboarding_add_staff_batch', async () => {
       this.requireAuth();
 
-      const { company_id, staff_data } = StaffBatchArgsSchema.parse(args);
+      const { location_id, staff_data } = StaffBatchArgsSchema.parse(args);
 
       // Parse CSV if string
       let staffArray =
@@ -267,7 +267,7 @@ export class OnboardingHandlers {
             is_user_invite: false,
           };
           const result = await this.client.createStaff(
-            company_id,
+            location_id,
             staffRequest
           );
           created.push(result.id);
@@ -277,8 +277,8 @@ export class OnboardingHandlers {
       }
 
       // Checkpoint
-      await this.stateManager.checkpoint(company_id, 'staff', created);
-      await this.stateManager.updatePhase(company_id, 'categories');
+      await this.stateManager.checkpoint(location_id, 'staff', created);
+      await this.stateManager.updatePhase(location_id, 'categories');
 
       return {
         content: [
@@ -301,7 +301,7 @@ export class OnboardingHandlers {
     return withErrorHandling('onboarding_add_categories', async () => {
       this.requireAuth();
 
-      const { company_id, categories } = CategoryArgsSchema.parse(args);
+      const { location_id, categories } = CategoryArgsSchema.parse(args);
 
       const created: number[] = [];
       const errors: string[] = [];
@@ -314,7 +314,7 @@ export class OnboardingHandlers {
             weight: category.weight,
           };
           const result = await this.client.createServiceCategory(
-            company_id,
+            location_id,
             categoryRequest
           );
           created.push(result.id);
@@ -324,8 +324,8 @@ export class OnboardingHandlers {
       }
 
       // Checkpoint
-      await this.stateManager.checkpoint(company_id, 'categories', created);
-      await this.stateManager.updatePhase(company_id, 'services');
+      await this.stateManager.checkpoint(location_id, 'categories', created);
+      await this.stateManager.updatePhase(location_id, 'services');
 
       return {
         content: [
@@ -348,7 +348,7 @@ export class OnboardingHandlers {
     return withErrorHandling('onboarding_add_services_batch', async () => {
       this.requireAuth();
 
-      const { company_id, services_data } = ServiceBatchArgsSchema.parse(args);
+      const { location_id, services_data } = ServiceBatchArgsSchema.parse(args);
 
       // Parse CSV if string
       let servicesArray =
@@ -372,7 +372,7 @@ export class OnboardingHandlers {
             duration: service.duration,
           };
           const result = await this.client.createService(
-            company_id,
+            location_id,
             serviceRequest
           );
           created.push(result.id);
@@ -382,8 +382,8 @@ export class OnboardingHandlers {
       }
 
       // Checkpoint
-      await this.stateManager.checkpoint(company_id, 'services', created);
-      await this.stateManager.updatePhase(company_id, 'schedules');
+      await this.stateManager.checkpoint(location_id, 'services', created);
+      await this.stateManager.updatePhase(location_id, 'schedules');
 
       return {
         content: [
@@ -406,7 +406,7 @@ export class OnboardingHandlers {
     return withErrorHandling('onboarding_set_schedules', async () => {
       this.requireAuth();
 
-      const { company_id, schedules } = ScheduleBatchArgsSchema.parse(args);
+      const { location_id, schedules } = ScheduleBatchArgsSchema.parse(args);
 
       if (schedules.length === 0) {
         throw new Error('No schedules provided.');
@@ -414,26 +414,26 @@ export class OnboardingHandlers {
 
       const request: SetScheduleRequest = {
         schedules_to_set: schedules.map((s) => ({
-          team_member_id: s.staff_id,
+          team_member_id: s.team_member_id,
           dates: s.dates,
           slots: s.slots,
         })),
       };
 
-      await this.client.setSchedule(company_id, request);
+      await this.client.setSchedule(location_id, request);
 
-      const staffIds = [...new Set(schedules.map((s) => s.staff_id))];
+      const staffIds = [...new Set(schedules.map((s) => s.team_member_id))];
 
       // Checkpoint — store the full set in metadata so rollback can delete it
-      await this.stateManager.checkpoint(company_id, 'schedules', staffIds, {
+      await this.stateManager.checkpoint(location_id, 'schedules', staffIds, {
         schedules,
       });
-      await this.stateManager.updatePhase(company_id, 'clients');
+      await this.stateManager.updatePhase(location_id, 'clients');
 
       const summary = schedules
         .map(
           (s) =>
-            `  - staff ${s.staff_id}: ${s.dates.length} day(s), ${s.slots
+            `  - team member ${s.team_member_id}: ${s.dates.length} day(s), ${s.slots
               .map((sl) => `${sl.from}-${sl.to}`)
               .join(', ')}`
         )
@@ -457,7 +457,7 @@ export class OnboardingHandlers {
     return withErrorHandling('onboarding_import_clients', async () => {
       this.requireAuth();
 
-      const { company_id, clients_csv } = ClientImportArgsSchema.parse(args);
+      const { location_id, clients_csv } = ClientImportArgsSchema.parse(args);
 
       // Parse CSV
       const parsedClients = parseCSV(clients_csv);
@@ -478,7 +478,7 @@ export class OnboardingHandlers {
             comment: client.comment,
           };
           const result = await this.client.createClient(
-            company_id,
+            location_id,
             clientRequest
           );
           created.push(result.id);
@@ -488,8 +488,8 @@ export class OnboardingHandlers {
       }
 
       // Checkpoint
-      await this.stateManager.checkpoint(company_id, 'clients', created);
-      await this.stateManager.updatePhase(company_id, 'test_bookings');
+      await this.stateManager.checkpoint(location_id, 'clients', created);
+      await this.stateManager.updatePhase(location_id, 'test_bookings');
 
       return {
         content: [
@@ -501,7 +501,7 @@ export class OnboardingHandlers {
               (errors.length
                 ? `✗ ${errors.length} failed:\n  ${errors.join('\n  ')}\n`
                 : '') +
-              `\nNext: Create test bookings with onboarding_create_test_bookings`,
+              `\nNext: Create test appointments with onboarding_create_test_appointments`,
           },
         ],
       };
@@ -509,74 +509,81 @@ export class OnboardingHandlers {
   }
 
   async createTestBookings(args: unknown) {
-    return withErrorHandling('onboarding_create_test_bookings', async () => {
-      this.requireAuth();
+    return withErrorHandling(
+      'onboarding_create_test_appointments',
+      async () => {
+        this.requireAuth();
 
-      const { company_id, count } = TestBookingsArgsSchema.parse(args);
-      const state = await this.stateManager.load(company_id);
+        const { location_id, count } = TestBookingsArgsSchema.parse(args);
+        const state = await this.stateManager.load(location_id);
 
-      if (!state) {
-        throw new Error(
-          `No onboarding session found for company ${company_id}`
-        );
-      }
-
-      const staffIds = state.checkpoints['staff']?.entity_ids || [];
-      const serviceIds = state.checkpoints['services']?.entity_ids || [];
-
-      if (staffIds.length === 0 || serviceIds.length === 0) {
-        throw new Error(
-          'No staff or services found. Complete previous steps first.'
-        );
-      }
-
-      const created: number[] = [];
-
-      for (let i = 0; i < count; i++) {
-        const staffId = staffIds[i % staffIds.length]!;
-        const serviceId = serviceIds[i % serviceIds.length]!;
-
-        // Generate booking 1-7 days in future
-        const daysAhead = 1 + (i % 7);
-        const date = new Date();
-        date.setDate(date.getDate() + daysAhead);
-        const datetime = date.toISOString().split('T')[0] + ' 10:00:00';
-
-        try {
-          const booking = await this.client.createBooking(company_id, {
-            staff_id: staffId,
-            services: [{ id: serviceId }],
-            datetime,
-            client: {
-              name: `Test Client ${i + 1}`,
-              phone: `+100000000${i}`,
-            },
-          });
-          created.push(booking.id);
-        } catch (error) {
-          logger.warn({ error }, 'Failed to create test booking');
+        if (!state) {
+          throw new Error(
+            `No onboarding session found for location ${location_id}`
+          );
         }
+
+        const staffIds = state.checkpoints['staff']?.entity_ids || [];
+        const serviceIds = state.checkpoints['services']?.entity_ids || [];
+
+        if (staffIds.length === 0 || serviceIds.length === 0) {
+          throw new Error(
+            'No staff or services found. Complete previous steps first.'
+          );
+        }
+
+        const created: number[] = [];
+
+        for (let i = 0; i < count; i++) {
+          const staffId = staffIds[i % staffIds.length]!;
+          const serviceId = serviceIds[i % serviceIds.length]!;
+
+          // Generate appointment 1-7 days in future
+          const daysAhead = 1 + (i % 7);
+          const date = new Date();
+          date.setDate(date.getDate() + daysAhead);
+          const datetime = date.toISOString().split('T')[0] + ' 10:00:00';
+
+          try {
+            const appointment = await this.client.createBooking(location_id, {
+              staff_id: staffId,
+              services: [{ id: serviceId }],
+              datetime,
+              client: {
+                name: `Test Client ${i + 1}`,
+                phone: `+100000000${i}`,
+              },
+            });
+            created.push(appointment.id);
+          } catch (error) {
+            logger.warn({ error }, 'Failed to create test appointment');
+          }
+        }
+
+        await this.stateManager.checkpoint(
+          location_id,
+          'test_bookings',
+          created
+        );
+        await this.stateManager.updatePhase(location_id, 'complete');
+
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text:
+                `Test appointments created: ${created.length}\n\n` +
+                `Onboarding complete! ✓\n\n` +
+                `Summary:\n` +
+                `  - Staff: ${staffIds.length}\n` +
+                `  - Services: ${serviceIds.length}\n` +
+                `  - Test appointments: ${created.length}\n\n` +
+                `Your platform is ready to use!`,
+            },
+          ],
+        };
       }
-
-      await this.stateManager.checkpoint(company_id, 'test_bookings', created);
-      await this.stateManager.updatePhase(company_id, 'complete');
-
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text:
-              `Test bookings created: ${created.length}\n\n` +
-              `Onboarding complete! ✓\n\n` +
-              `Summary:\n` +
-              `  - Staff: ${staffIds.length}\n` +
-              `  - Services: ${serviceIds.length}\n` +
-              `  - Test bookings: ${created.length}\n\n` +
-              `Your platform is ready to use!`,
-          },
-        ],
-      };
-    });
+    );
   }
 
   async previewData(args: unknown) {
@@ -637,8 +644,8 @@ export class OnboardingHandlers {
     return withErrorHandling('onboarding_rollback_phase', async () => {
       this.requireAuth();
 
-      const { company_id, phase_name } = RollbackArgsSchema.parse(args);
-      const state = await this.stateManager.load(company_id);
+      const { location_id, phase_name } = RollbackArgsSchema.parse(args);
+      const state = await this.stateManager.load(location_id);
 
       if (!state || !state.checkpoints[phase_name]) {
         throw new Error(`No checkpoint found for phase: ${phase_name}`);
@@ -653,28 +660,28 @@ export class OnboardingHandlers {
       for (const id of entityIds) {
         try {
           if (phase_name === 'staff') {
-            await this.client.deleteStaff(company_id, id);
+            await this.client.deleteStaff(location_id, id);
             deletedCount.success++;
           } else if (phase_name === 'positions') {
-            await this.client.deletePosition(company_id, id);
+            await this.client.deletePosition(location_id, id);
             deletedCount.success++;
           } else if (phase_name === 'schedules') {
             // entity_ids are staff IDs; dates come from checkpoint metadata
             const meta = (checkpoint.metadata?.schedules ?? []) as Array<{
-              staff_id: number;
+              team_member_id: number;
               dates: string[];
             }>;
             const dates = meta
-              .filter((s) => s.staff_id === id)
+              .filter((s) => s.team_member_id === id)
               .flatMap((s) => s.dates);
             if (dates.length > 0) {
-              await this.client.setSchedule(company_id, {
+              await this.client.setSchedule(location_id, {
                 schedules_to_delete: [{ team_member_id: id, dates }],
               });
             }
             deletedCount.success++;
           } else if (phase_name === 'test_bookings') {
-            await this.client.deleteBooking(company_id, id);
+            await this.client.deleteBooking(location_id, id);
             deletedCount.success++;
           } else if (phase_name === 'services') {
             servicesNote =
@@ -690,7 +697,7 @@ export class OnboardingHandlers {
                 'deleteClient' in this.client &&
                 typeof this.client.deleteClient === 'function'
               ) {
-                await (this.client as any).deleteClient(company_id, id);
+                await (this.client as any).deleteClient(location_id, id);
                 deletedCount.success++;
               } else {
                 servicesNote =

@@ -28,19 +28,19 @@ describe('Onboarding Handlers', () => {
 
   describe('start', () => {
     it('should initialize onboarding session', async () => {
-      const result = await handlers.start({ company_id: 123 });
+      const result = await handlers.start({ location_id: 123 });
 
       expect(result.content).toBeDefined();
       expect(result.content[0]).toBeDefined();
       const textContent = result.content[0]?.text;
       expect(textContent).toContain('Onboarding session started');
-      expect(textContent).toContain('company 123');
+      expect(textContent).toContain('location 123');
     });
 
     it('should return error if not authenticated', async () => {
       mockClient.isAuthenticated.mockReturnValue(false);
 
-      const result = await handlers.start({ company_id: 123 });
+      const result = await handlers.start({ location_id: 123 });
       expect(result.isError).toBe(true);
       expect(result.content[0]?.text).toContain('Authentication required');
     });
@@ -48,17 +48,17 @@ describe('Onboarding Handlers', () => {
 
   describe('resume', () => {
     it('should show progress summary', async () => {
-      await handlers.start({ company_id: 123 });
+      await handlers.start({ location_id: 123 });
       await stateManager.checkpoint(123, 'staff', [1, 2, 3]);
 
-      const result = await handlers.resume({ company_id: 123 });
+      const result = await handlers.resume({ location_id: 123 });
 
       const textContent = result.content[0]?.text;
       expect(textContent).toContain('staff: 3 entities created');
     });
 
     it('should handle no existing session', async () => {
-      const result = await handlers.resume({ company_id: 999 });
+      const result = await handlers.resume({ location_id: 999 });
       expect(result.isError).toBe(true);
       expect(result.content[0]?.text).toContain('No onboarding session found');
     });
@@ -66,8 +66,8 @@ describe('Onboarding Handlers', () => {
 
   describe('status', () => {
     it('should show current status', async () => {
-      await handlers.start({ company_id: 123 });
-      const result = await handlers.status({ company_id: 123 });
+      await handlers.start({ location_id: 123 });
+      const result = await handlers.status({ location_id: 123 });
 
       const textContent = result.content[0]?.text;
       expect(textContent).toContain('Phase: init');
@@ -76,7 +76,7 @@ describe('Onboarding Handlers', () => {
 
   describe('addStaffBatch', () => {
     it('should create staff from JSON array', async () => {
-      await handlers.start({ company_id: 123 });
+      await handlers.start({ location_id: 123 });
 
       mockClient.createStaff = jest
         .fn()
@@ -84,7 +84,7 @@ describe('Onboarding Handlers', () => {
         .mockResolvedValueOnce({ id: 2, name: 'Bob' });
 
       const result = await handlers.addStaffBatch({
-        company_id: 123,
+        location_id: 123,
         staff_data: [
           { name: 'Alice', specialization: 'Hairdresser' },
           { name: 'Bob', specialization: 'Nail Tech' },
@@ -96,7 +96,7 @@ describe('Onboarding Handlers', () => {
     });
 
     it('should create staff from CSV string', async () => {
-      await handlers.start({ company_id: 123 });
+      await handlers.start({ location_id: 123 });
 
       mockClient.createStaff = jest
         .fn()
@@ -105,7 +105,7 @@ describe('Onboarding Handlers', () => {
       const csv = 'name,specialization\nAlice,Hairdresser';
 
       const result = await handlers.addStaffBatch({
-        company_id: 123,
+        location_id: 123,
         staff_data: csv,
       });
 
@@ -122,7 +122,7 @@ describe('Onboarding Handlers', () => {
 
   describe('addCategories', () => {
     it('should create service categories', async () => {
-      await handlers.start({ company_id: 123 });
+      await handlers.start({ location_id: 123 });
 
       mockClient.createServiceCategory = jest
         .fn()
@@ -130,7 +130,7 @@ describe('Onboarding Handlers', () => {
         .mockResolvedValueOnce({ id: 11, title: 'Nail Services' });
 
       const result = await handlers.addCategories({
-        company_id: 123,
+        location_id: 123,
         categories: [
           { title: 'Hair Services', weight: 1 },
           { title: 'Nail Services', weight: 2 },
@@ -144,7 +144,7 @@ describe('Onboarding Handlers', () => {
 
   describe('addServicesBatch', () => {
     it('should create services from JSON array', async () => {
-      await handlers.start({ company_id: 123 });
+      await handlers.start({ location_id: 123 });
       await stateManager.checkpoint(123, 'categories', [10]);
 
       mockClient.createService = jest
@@ -153,7 +153,7 @@ describe('Onboarding Handlers', () => {
         .mockResolvedValueOnce({ id: 21, title: 'Manicure' });
 
       const result = await handlers.addServicesBatch({
-        company_id: 123,
+        location_id: 123,
         services_data: [
           { title: 'Haircut', price_min: 50, duration: 1800, category_id: 10 },
           { title: 'Manicure', price_min: 30, duration: 1200, category_id: 10 },
@@ -167,7 +167,7 @@ describe('Onboarding Handlers', () => {
 
   describe('importClients', () => {
     it('should import clients from CSV', async () => {
-      await handlers.start({ company_id: 123 });
+      await handlers.start({ location_id: 123 });
 
       mockClient.createClient = jest
         .fn()
@@ -178,7 +178,7 @@ describe('Onboarding Handlers', () => {
         'name,phone,email\nJohn,+1234567890,john@test.com\nJane,+0987654321,jane@test.com';
 
       const result = await handlers.importClients({
-        company_id: 123,
+        location_id: 123,
         clients_csv: csv,
       });
 
@@ -189,26 +189,26 @@ describe('Onboarding Handlers', () => {
 
   describe('createTestBookings', () => {
     it('should generate test bookings', async () => {
-      await handlers.start({ company_id: 123 });
+      await handlers.start({ location_id: 123 });
       await stateManager.checkpoint(123, 'staff', [1, 2]);
       await stateManager.checkpoint(123, 'services', [10, 11]);
 
       mockClient.createBooking = jest.fn().mockResolvedValue({ id: 100 });
 
       const result = await handlers.createTestBookings({
-        company_id: 123,
+        location_id: 123,
         count: 3,
       });
 
-      expect(result.content[0]?.text).toContain('Test bookings created: 3');
+      expect(result.content[0]?.text).toContain('Test appointments created: 3');
       expect(mockClient.createBooking).toHaveBeenCalledTimes(3);
     });
 
     it('should return error if no staff exist', async () => {
-      await handlers.start({ company_id: 123 });
+      await handlers.start({ location_id: 123 });
 
       const result = await handlers.createTestBookings({
-        company_id: 123,
+        location_id: 123,
         count: 2,
       });
       expect(result.isError).toBe(true);
@@ -259,13 +259,13 @@ describe('Onboarding Handlers', () => {
 
   describe('rollbackPhase', () => {
     it('should delete staff entities and reset checkpoint', async () => {
-      await handlers.start({ company_id: 123 });
+      await handlers.start({ location_id: 123 });
       await stateManager.checkpoint(123, 'staff', [1, 2, 3]);
 
       mockClient.deleteStaff = jest.fn().mockResolvedValue(true);
 
       const result = await handlers.rollbackPhase({
-        company_id: 123,
+        location_id: 123,
         phase_name: 'staff',
       });
 
@@ -279,13 +279,13 @@ describe('Onboarding Handlers', () => {
     });
 
     it('should delete booking entities', async () => {
-      await handlers.start({ company_id: 123 });
+      await handlers.start({ location_id: 123 });
       await stateManager.checkpoint(123, 'test_bookings', [100, 101]);
 
       mockClient.deleteBooking = jest.fn().mockResolvedValue(true);
 
       const result = await handlers.rollbackPhase({
-        company_id: 123,
+        location_id: 123,
         phase_name: 'test_bookings',
       });
 
@@ -294,11 +294,11 @@ describe('Onboarding Handlers', () => {
     });
 
     it('should handle services (no delete API)', async () => {
-      await handlers.start({ company_id: 123 });
+      await handlers.start({ location_id: 123 });
       await stateManager.checkpoint(123, 'services', [20, 21]);
 
       const result = await handlers.rollbackPhase({
-        company_id: 123,
+        location_id: 123,
         phase_name: 'services',
       });
 
@@ -309,13 +309,13 @@ describe('Onboarding Handlers', () => {
     });
 
     it('should delete positions', async () => {
-      await handlers.start({ company_id: 123 });
+      await handlers.start({ location_id: 123 });
       await stateManager.checkpoint(123, 'positions', [5, 6]);
 
       mockClient.deletePosition = jest.fn().mockResolvedValue(undefined);
 
       const result = await handlers.rollbackPhase({
-        company_id: 123,
+        location_id: 123,
         phase_name: 'positions',
       });
 
@@ -324,15 +324,15 @@ describe('Onboarding Handlers', () => {
     });
 
     it('should delete schedules using metadata dates', async () => {
-      await handlers.start({ company_id: 123 });
+      await handlers.start({ location_id: 123 });
       await stateManager.checkpoint(123, 'schedules', [1], {
-        schedules: [{ staff_id: 1, dates: ['2026-08-01'], slots: [] }],
+        schedules: [{ team_member_id: 1, dates: ['2026-08-01'], slots: [] }],
       });
 
       mockClient.setSchedule = jest.fn().mockResolvedValue([]);
 
       const result = await handlers.rollbackPhase({
-        company_id: 123,
+        location_id: 123,
         phase_name: 'schedules',
       });
 
@@ -351,10 +351,10 @@ describe('Onboarding Handlers', () => {
     });
 
     it('should return error if no checkpoint exists', async () => {
-      await handlers.start({ company_id: 123 });
+      await handlers.start({ location_id: 123 });
 
       const result = await handlers.rollbackPhase({
-        company_id: 123,
+        location_id: 123,
         phase_name: 'staff',
       });
       expect(result.isError).toBe(true);
@@ -364,7 +364,7 @@ describe('Onboarding Handlers', () => {
 
   describe('addPositions', () => {
     it('should create positions and advance phase to staff', async () => {
-      await handlers.start({ company_id: 123 });
+      await handlers.start({ location_id: 123 });
 
       mockClient.createPosition = jest
         .fn()
@@ -372,7 +372,7 @@ describe('Onboarding Handlers', () => {
         .mockResolvedValueOnce({ id: 6, title: 'Manager' });
 
       const result = await handlers.addPositions({
-        company_id: 123,
+        location_id: 123,
         positions: [{ title: 'Stylist' }, { title: 'Manager' }],
       });
 
@@ -386,14 +386,14 @@ describe('Onboarding Handlers', () => {
     });
 
     it('should create positions from CSV string', async () => {
-      await handlers.start({ company_id: 123 });
+      await handlers.start({ location_id: 123 });
 
       mockClient.createPosition = jest
         .fn()
         .mockResolvedValue({ id: 5, title: 'Stylist' });
 
       const result = await handlers.addPositions({
-        company_id: 123,
+        location_id: 123,
         positions: 'title\nStylist',
       });
 
@@ -407,15 +407,15 @@ describe('Onboarding Handlers', () => {
 
   describe('setSchedules', () => {
     it('should set work schedules and advance phase to clients', async () => {
-      await handlers.start({ company_id: 123 });
+      await handlers.start({ location_id: 123 });
 
       mockClient.setSchedule = jest.fn().mockResolvedValue([]);
 
       const result = await handlers.setSchedules({
-        company_id: 123,
+        location_id: 123,
         schedules: [
           {
-            staff_id: 1,
+            team_member_id: 1,
             dates: ['2026-08-01', '2026-08-02'],
             slots: [{ from: '09:00', to: '18:00' }],
           },
@@ -438,7 +438,7 @@ describe('Onboarding Handlers', () => {
 
   describe('phase order', () => {
     it('addServicesBatch advances phase to schedules', async () => {
-      await handlers.start({ company_id: 123 });
+      await handlers.start({ location_id: 123 });
       await stateManager.checkpoint(123, 'categories', [10]);
 
       mockClient.createService = jest
@@ -446,7 +446,7 @@ describe('Onboarding Handlers', () => {
         .mockResolvedValue({ id: 20, title: 'Haircut' });
 
       await handlers.addServicesBatch({
-        company_id: 123,
+        location_id: 123,
         services_data: [
           { title: 'Haircut', price_min: 50, duration: 1800, category_id: 10 },
         ],

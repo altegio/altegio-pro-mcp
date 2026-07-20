@@ -6,7 +6,7 @@ export const loginTool = defineTool({
   name: 'altegio_login',
   category: 'Auth',
   description:
-    '[Auth] Login to Altegio with email and password. REQUIRED for administrative operations: getting user companies (list_companies with my=1), viewing bookings, and other business management tasks. Ask user for credentials when they request administrative data.',
+    '[Auth] Login to Altegio with email and password. REQUIRED for administrative operations: getting user locations (list_locations with my=1), viewing appointments, and other business management tasks. Ask user for credentials when they request administrative data.',
   annotations: {
     title: 'Login to Altegio',
     openWorldHint: true,

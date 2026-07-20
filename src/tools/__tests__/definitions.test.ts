@@ -29,14 +29,14 @@ describe('factory tool definitions', () => {
       true
     );
     expect(
-      defs.deleteBookingTool.toMcpTool().annotations?.destructiveHint
+      defs.deleteAppointmentTool.toMcpTool().annotations?.destructiveHint
     ).toBe(true);
   });
 
-  it('get_staff preserves required company_id and outputSchema', () => {
+  it('get_staff preserves required location_id and outputSchema', () => {
     const spec = defs.getStaffTool.toMcpTool();
-    expect(spec.inputSchema.properties).toHaveProperty('company_id');
-    expect(spec.inputSchema.required).toContain('company_id');
+    expect(spec.inputSchema.properties).toHaveProperty('location_id');
+    expect(spec.inputSchema.required).toContain('location_id');
     expect(spec.outputSchema).toBeDefined();
   });
 
