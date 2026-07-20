@@ -24,6 +24,14 @@ dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log
+
+# Firebase (not used — VM/Docker deployment)
+.firebase/
+.firebaserc
+
+# Stray nested clones of the OpenAPI spec repo (canonical: ../biz.erp.api.docs)
+/api.docs/
 
 # Temporary and backup files
 *.old
