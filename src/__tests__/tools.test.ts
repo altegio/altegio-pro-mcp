@@ -41,10 +41,12 @@ describe('Tool Registration', () => {
     expect(toolNames).toContain('update_booking');
     expect(toolNames).toContain('delete_booking');
 
-    // Onboarding tools (10)
+    // Onboarding tools (12)
     expect(toolNames).toContain('onboarding_start');
     expect(toolNames).toContain('onboarding_resume');
     expect(toolNames).toContain('onboarding_status');
+    expect(toolNames).toContain('onboarding_add_positions');
+    expect(toolNames).toContain('onboarding_set_schedules');
     expect(toolNames).toContain('onboarding_add_staff_batch');
     expect(toolNames).toContain('onboarding_add_services_batch');
     expect(toolNames).toContain('onboarding_add_categories');
@@ -64,8 +66,19 @@ describe('Tool Registration', () => {
     expect(toolNames).toContain('update_position');
     expect(toolNames).toContain('delete_position');
 
-    // Total: 16 + 10 + 3 + 4 = 33 tools
-    expect(toolNames.length).toBe(33);
+    // Location settings tools (6)
+    expect(toolNames).toContain('get_appointment_settings');
+    expect(toolNames).toContain('update_appointment_settings');
+    expect(toolNames).toContain('get_online_booking_settings');
+    expect(toolNames).toContain('update_online_booking_settings');
+    expect(toolNames).toContain('get_booking_forms');
+    expect(toolNames).toContain('create_booking_form');
+
+    // Resources tool (1)
+    expect(toolNames).toContain('get_resources');
+
+    // Total: 30 factory + 12 onboarding = 42 tools
+    expect(toolNames.length).toBe(42);
   });
 
   it('should create server with tools', () => {

@@ -14,18 +14,19 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Features
 
-- **33 MCP tools** including 10 onboarding wizard tools for first-time setup
+- **42 MCP tools** including 12 onboarding wizard tools for first-time setup
 - **CRUD operations** for staff, services, bookings, schedules, and positions management
+- **Location settings**: appointment calendar, online booking, booking forms, resources
 - **Conversational onboarding** with bulk CSV/JSON import and checkpoint/resume
 - **Dual transport:** stdio for Claude Desktop, HTTP for cloud deployments
-- **TypeScript** with full type safety and comprehensive tests (157 passing)
+- **TypeScript** with full type safety and comprehensive tests (387 passing)
 - **Auto-deploy CI/CD** via VM cron (git pull + docker compose rebuild every 2 min)
 - **Rate limiting** and **retry logic** with exponential backoff
 - **Secure credential storage** in `~/.altegio-mcp/`
 
 ## Available Tools
 
-**33 tools organized by category** for complete business management:
+**42 tools organized by category** for complete business management:
 
 ### 🔐 Authentication
 - `altegio_login` - Authenticate with email/password
@@ -64,14 +65,24 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 - `update_booking` - Modify existing appointment
 - `delete_booking` - Cancel appointment
 
+### ⚙️ Location Settings
+- `get_appointment_settings` / `update_appointment_settings` - Appointment calendar defaults (record type, group capacity)
+- `get_online_booking_settings` / `update_online_booking_settings` - Online booking behavior
+- `get_booking_forms` / `create_booking_form` - Online booking widgets
+
+### 🪑 Resources
+- `get_resources` - List cabinets/equipment (read-only; API has no create)
+
 ### 🚀 Onboarding Wizard
 **Conversational first-time setup assistant:**
 - `onboarding_start` - Initialize setup session
 - `onboarding_resume` - Resume interrupted setup
 - `onboarding_status` - Check progress
-- `onboarding_add_categories` - Bulk create service categories
+- `onboarding_add_positions` - Bulk create positions/roles (run before staff)
 - `onboarding_add_staff_batch` - Bulk import staff (CSV/JSON)
+- `onboarding_add_categories` - Bulk create service categories
 - `onboarding_add_services_batch` - Bulk import services (CSV/JSON)
+- `onboarding_set_schedules` - Set staff work schedules
 - `onboarding_import_clients` - Import client database
 - `onboarding_create_test_bookings` - Generate sample data
 - `onboarding_preview_data` - Validate before import
@@ -284,7 +295,7 @@ src/
 
 ### Testing
 
-- **157 tests** (23 suites) covering authentication, all tools, error handling, pagination
+- **387 tests** (30 suites) covering authentication, all tools, error handling, pagination
 - **Jest** for unit tests with mocked API responses
 - **Test isolation** with temporary credentials directory
 - Run: `npm test` or `npm run test:coverage`

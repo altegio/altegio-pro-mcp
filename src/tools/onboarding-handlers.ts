@@ -10,12 +10,16 @@ import {
   ServiceBatchSchema,
   ClientBatchSchema,
   CategoryBatchSchema,
+  PositionBatchSchema,
+  ScheduleBatchSchema,
 } from '../types/onboarding.types.js';
 import type {
   CreateStaffRequest,
   CreateServiceRequest,
   CreateClientRequest,
   CreateCategoryRequest,
+  CreatePositionRequest,
+  SetScheduleRequest,
 } from '../types/altegio.types.js';
 
 const CompanyIdSchema = z.object({
@@ -35,6 +39,16 @@ const ServiceBatchArgsSchema = z.object({
 const CategoryArgsSchema = z.object({
   company_id: z.number(),
   categories: CategoryBatchSchema,
+});
+
+const PositionBatchArgsSchema = z.object({
+  company_id: z.number(),
+  positions: z.union([PositionBatchSchema, z.string()]),
+});
+
+const ScheduleBatchArgsSchema = z.object({
+  company_id: z.number(),
+  schedules: ScheduleBatchSchema,
 });
 
 const ClientImportArgsSchema = z.object({
@@ -86,12 +100,14 @@ export class OnboardingHandlers {
               `Onboarding session started for company ${company_id}.\n\n` +
               `Current phase: ${state.phase}\n` +
               `Started at: ${state.started_at}\n\n` +
-              `Next steps:\n` +
-              `1. Add service categories: onboarding_add_categories\n` +
+              `Recommended steps (in order):\n` +
+              `1. Add positions: onboarding_add_positions\n` +
               `2. Add staff: onboarding_add_staff_batch\n` +
-              `3. Add services: onboarding_add_services_batch\n` +
-              `4. Import clients: onboarding_import_clients\n` +
-              `5. Create test bookings: onboarding_create_test_bookings`,
+              `3. Add service categories: onboarding_add_categories\n` +
+              `4. Add services: onboarding_add_services_batch\n` +
+              `5. Set work schedules: onboarding_set_schedules\n` +
+              `6. Import clients: onboarding_import_clients\n` +
+              `7. Create test bookings: onboarding_create_test_bookings`,
           },
         ],
       };
@@ -162,6 +178,61 @@ export class OnboardingHandlers {
               `Phase: ${state.phase}\n` +
               `Total entities created: ${totalEntities}\n` +
               `Phases completed: ${Object.keys(state.checkpoints).length}`,
+          },
+        ],
+      };
+    });
+  }
+
+  async addPositions(args: unknown) {
+    return withErrorHandling('onboarding_add_positions', async () => {
+      this.requireAuth();
+
+      const { company_id, positions } = PositionBatchArgsSchema.parse(args);
+
+      // Parse CSV if string
+      let positionsArray =
+        typeof positions === 'string' ? parseCSV(positions) : positions;
+
+      // Validate with Zod
+      positionsArray = PositionBatchSchema.parse(positionsArray);
+
+      const created: number[] = [];
+      const errors: string[] = [];
+
+      for (const position of positionsArray) {
+        try {
+          const positionRequest: CreatePositionRequest = {
+            title: position.title,
+            api_id: position.api_id,
+          };
+          const result = await this.client.createPosition(
+            company_id,
+            positionRequest
+          );
+          created.push(result.id);
+        } catch (error) {
+          errors.push(`${position.title}: ${(error as Error).message}`);
+        }
+      }
+
+      // Checkpoint
+      await this.stateManager.checkpoint(company_id, 'positions', created);
+      await this.stateManager.updatePhase(company_id, 'staff');
+
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text:
+              `Positions batch processing complete:\n\n` +
+              `✓ ${created.length} positions created\n` +
+              (errors.length
+                ? `✗ ${errors.length} failed:\n  ${errors.join('\n  ')}\n`
+                : '') +
+              `\nCreated position IDs: [${created.join(', ')}]\n` +
+              `Use these position_id values when adding staff.\n` +
+              `\nNext: Add staff with onboarding_add_staff_batch`,
           },
         ],
       };
@@ -312,7 +383,7 @@ export class OnboardingHandlers {
 
       // Checkpoint
       await this.stateManager.checkpoint(company_id, 'services', created);
-      await this.stateManager.updatePhase(company_id, 'clients');
+      await this.stateManager.updatePhase(company_id, 'schedules');
 
       return {
         content: [
@@ -324,7 +395,58 @@ export class OnboardingHandlers {
               (errors.length
                 ? `✗ ${errors.length} failed:\n  ${errors.join('\n  ')}\n`
                 : '') +
-              `\nNext: Import clients with onboarding_import_clients`,
+              `\nNext: Set work schedules with onboarding_set_schedules`,
+          },
+        ],
+      };
+    });
+  }
+
+  async setSchedules(args: unknown) {
+    return withErrorHandling('onboarding_set_schedules', async () => {
+      this.requireAuth();
+
+      const { company_id, schedules } = ScheduleBatchArgsSchema.parse(args);
+
+      if (schedules.length === 0) {
+        throw new Error('No schedules provided.');
+      }
+
+      const request: SetScheduleRequest = {
+        schedules_to_set: schedules.map((s) => ({
+          team_member_id: s.staff_id,
+          dates: s.dates,
+          slots: s.slots,
+        })),
+      };
+
+      await this.client.setSchedule(company_id, request);
+
+      const staffIds = [...new Set(schedules.map((s) => s.staff_id))];
+
+      // Checkpoint — store the full set in metadata so rollback can delete it
+      await this.stateManager.checkpoint(company_id, 'schedules', staffIds, {
+        schedules,
+      });
+      await this.stateManager.updatePhase(company_id, 'clients');
+
+      const summary = schedules
+        .map(
+          (s) =>
+            `  - staff ${s.staff_id}: ${s.dates.length} day(s), ${s.slots
+              .map((sl) => `${sl.from}-${sl.to}`)
+              .join(', ')}`
+        )
+        .join('\n');
+
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text:
+              `Work schedules set for ${staffIds.length} staff member(s):\n\n` +
+              `${summary}\n\n` +
+              `Next: Import clients with onboarding_import_clients`,
           },
         ],
       };
@@ -532,6 +654,24 @@ export class OnboardingHandlers {
         try {
           if (phase_name === 'staff') {
             await this.client.deleteStaff(company_id, id);
+            deletedCount.success++;
+          } else if (phase_name === 'positions') {
+            await this.client.deletePosition(company_id, id);
+            deletedCount.success++;
+          } else if (phase_name === 'schedules') {
+            // entity_ids are staff IDs; dates come from checkpoint metadata
+            const meta = (checkpoint.metadata?.schedules ?? []) as Array<{
+              staff_id: number;
+              dates: string[];
+            }>;
+            const dates = meta
+              .filter((s) => s.staff_id === id)
+              .flatMap((s) => s.dates);
+            if (dates.length > 0) {
+              await this.client.setSchedule(company_id, {
+                schedules_to_delete: [{ team_member_id: id, dates }],
+              });
+            }
             deletedCount.success++;
           } else if (phase_name === 'test_bookings') {
             await this.client.deleteBooking(company_id, id);

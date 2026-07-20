@@ -233,6 +233,64 @@ export const apiMapping: Record<string, ApiMapping> = {
     pathParams: ['location_id'],
     bodyParams: ['schedules_to_delete'],
   },
+
+  // ==========================================
+  // Location settings
+  // ==========================================
+  get_appointment_settings: {
+    path: '/company/{location_id}/settings/timetable',
+    method: 'get',
+    operationId: 'get_appointment_calendar_settings',
+    pathParams: ['location_id'],
+  },
+  update_appointment_settings: {
+    path: '/company/{location_id}/settings/timetable',
+    method: 'patch',
+    operationId: 'update_appointment_calendar_settings',
+    pathParams: ['location_id'],
+    bodyParams: ['record_type', 'activity_record_clients_count_max'],
+  },
+  get_online_booking_settings: {
+    path: '/company/{location_id}/settings/online',
+    method: 'get',
+    operationId: 'get_online_booking_settings',
+    pathParams: ['location_id'],
+  },
+  update_online_booking_settings: {
+    path: '/company/{location_id}/settings/online',
+    method: 'patch',
+    operationId: 'update_online_booking_settings',
+    pathParams: ['location_id'],
+    bodyParams: [
+      'any_master',
+      'confirm_number',
+      'seance_delay_step',
+      'activity_online_record_clients_count_max',
+    ],
+  },
+  get_booking_forms: {
+    path: '/company/{location_id}/booking_forms',
+    method: 'get',
+    operationId: 'get_booking_widget_list',
+    pathParams: ['location_id'],
+  },
+  create_booking_form: {
+    path: '/company/{location_id}/booking_forms',
+    method: 'post',
+    operationId: 'create_booking_widget',
+    pathParams: ['location_id'],
+    bodyParams: ['title'],
+  },
+
+  // ==========================================
+  // Resources (read-only)
+  // ==========================================
+  get_resources: {
+    path: '/resources/{location_id}',
+    method: 'get',
+    operationId: 'get_resource_list',
+    pathParams: ['location_id'],
+  },
 };
 
 /**
@@ -245,6 +303,8 @@ export const unmappedTools: string[] = [
   'onboarding_start',
   'onboarding_resume',
   'onboarding_status',
+  'onboarding_add_positions',
+  'onboarding_set_schedules',
   'onboarding_add_staff_batch',
   'onboarding_add_services_batch',
   'onboarding_add_categories',

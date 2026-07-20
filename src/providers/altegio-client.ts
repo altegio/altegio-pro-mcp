@@ -13,6 +13,10 @@ import type {
   AltegioBookingParams,
   AltegioCompaniesParams,
   AltegioListParams,
+  AppointmentSettings,
+  OnlineBookingSettings,
+  BookingForm,
+  AltegioResource,
 } from '../types/altegio.types.js';
 import { CredentialManager } from './credential-manager.js';
 import { AuthenticationError, AltegioApiError } from '../utils/errors.js';
@@ -605,6 +609,151 @@ export class AltegioClient {
     );
 
     await this.handleVoidResponse(response, 'delete position');
+  }
+
+  // ========== Location Settings & Resources ==========
+
+  /**
+   * Get appointment calendar settings (B2B API, requires user auth)
+   * GET /company/{location_id}/settings/timetable
+   */
+  async getAppointmentSettings(
+    companyId: number
+  ): Promise<AppointmentSettings> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      `/company/${companyId}/settings/timetable`
+    );
+
+    return this.handleResponse<AppointmentSettings>(
+      response,
+      'fetch appointment settings'
+    );
+  }
+
+  /**
+   * Update appointment calendar settings (B2B API, requires user auth)
+   * PATCH /company/{location_id}/settings/timetable
+   */
+  async updateAppointmentSettings(
+    companyId: number,
+    data: import('../types/altegio.types.js').UpdateAppointmentSettingsRequest
+  ): Promise<AppointmentSettings> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      `/company/${companyId}/settings/timetable`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      }
+    );
+
+    return this.handleResponse<AppointmentSettings>(
+      response,
+      'update appointment settings'
+    );
+  }
+
+  /**
+   * Get online booking settings (B2B API, requires user auth)
+   * GET /company/{location_id}/settings/online
+   */
+  async getOnlineBookingSettings(
+    companyId: number
+  ): Promise<OnlineBookingSettings> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      `/company/${companyId}/settings/online`
+    );
+
+    return this.handleResponse<OnlineBookingSettings>(
+      response,
+      'fetch online booking settings'
+    );
+  }
+
+  /**
+   * Update online booking settings (B2B API, requires user auth)
+   * PATCH /company/{location_id}/settings/online
+   */
+  async updateOnlineBookingSettings(
+    companyId: number,
+    data: import('../types/altegio.types.js').UpdateOnlineBookingSettingsRequest
+  ): Promise<OnlineBookingSettings> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      `/company/${companyId}/settings/online`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      }
+    );
+
+    return this.handleResponse<OnlineBookingSettings>(
+      response,
+      'update online booking settings'
+    );
+  }
+
+  /**
+   * Get booking (appointment) forms (B2B API, requires user auth)
+   * GET /company/{location_id}/booking_forms
+   */
+  async getBookingForms(companyId: number): Promise<BookingForm[]> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      `/company/${companyId}/booking_forms`
+    );
+
+    return this.handleResponse<BookingForm[]>(response, 'fetch booking forms');
+  }
+
+  /**
+   * Create a booking (appointment) form (B2B API, requires user auth)
+   * POST /company/{location_id}/booking_forms
+   */
+  async createBookingForm(
+    companyId: number,
+    data: import('../types/altegio.types.js').CreateBookingFormRequest
+  ): Promise<BookingForm> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      `/company/${companyId}/booking_forms`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      }
+    );
+
+    return this.handleResponse<BookingForm>(response, 'create booking form');
+  }
+
+  /**
+   * Get resources at a location (B2B API, requires user auth).
+   * Read-only: the API does not expose resource creation.
+   * GET /resources/{location_id}
+   */
+  async getResources(companyId: number): Promise<AltegioResource[]> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(`/resources/${companyId}`);
+
+    return this.handleResponse<AltegioResource[]>(response, 'fetch resources');
   }
 
   // ========== Bookings CRUD Operations ==========

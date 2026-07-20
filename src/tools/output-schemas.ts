@@ -175,3 +175,45 @@ export const previewOutput = entitySchema(
   },
   ['total', 'fields', 'preview']
 );
+
+// ========== Location Settings & Resources ==========
+
+export const appointmentSettingsOutput = entitySchema(
+  {
+    record_type: numProp,
+    activity_record_clients_count_max: numProp,
+    is_show_newsletter_agreement: boolProp,
+    is_show_personal_data_processing_agreement: boolProp,
+  },
+  ['record_type', 'activity_record_clients_count_max']
+);
+
+export const onlineSettingsOutput = entitySchema(
+  {
+    confirm_number: boolProp,
+    any_master: boolProp,
+    seance_delay_step: numProp,
+    activity_online_record_clients_count_max: numProp,
+  },
+  [
+    'confirm_number',
+    'any_master',
+    'seance_delay_step',
+    'activity_online_record_clients_count_max',
+  ]
+);
+
+export const bookingFormsOutput = listSchema(
+  { id: idProp, title: strProp, is_default: boolProp },
+  ['id', 'title']
+);
+
+export const bookingFormEntityOutput = entitySchema(
+  { id: idProp, title: strProp },
+  ['id', 'title']
+);
+
+export const resourcesOutput = listSchema({ id: idProp, title: strProp }, [
+  'id',
+  'title',
+]);

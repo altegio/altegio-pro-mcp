@@ -58,6 +58,42 @@ export const onboardingTools: McpToolSpec[] = [
     outputSchema: output.onboardingStatusOutput,
   },
   {
+    name: 'onboarding_add_positions',
+    description:
+      '[Onboarding] Bulk create staff positions/roles (e.g. Manager, Stylist, Receptionist) from a JSON array or CSV string. Create positions BEFORE staff so staff can reference position_id. Accepts title (required) and api_id. Creates checkpoint for rollback.',
+    annotations: {
+      title: 'Batch Add Positions',
+      openWorldHint: true,
+      idempotentHint: false,
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        company_id: { type: 'number', description: 'Company ID' },
+        positions: {
+          description:
+            'JSON array of position objects or CSV string with headers: title,api_id',
+          oneOf: [
+            {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  title: { type: 'string' },
+                  api_id: { type: 'string' },
+                },
+                required: ['title'],
+              },
+            },
+            { type: 'string' },
+          ],
+        },
+      },
+      required: ['company_id', 'positions'],
+    },
+    outputSchema: output.batchImportOutput,
+  },
+  {
     name: 'onboarding_add_staff_batch',
     description:
       'Bulk add staff members from JSON array or CSV string. Accepts name, specialization, phone, email, position_id, api_id. Creates checkpoint for rollback.',
@@ -134,6 +170,55 @@ export const onboardingTools: McpToolSpec[] = [
         },
       },
       required: ['company_id', 'services_data'],
+    },
+    outputSchema: output.batchImportOutput,
+  },
+  {
+    name: 'onboarding_set_schedules',
+    description:
+      '[Onboarding] Set work schedules (working hours) for staff members. AUTHENTICATION REQUIRED. Accepts an array of { staff_id, dates[], slots[{from,to}] }. Use the staff IDs returned by onboarding_add_staff_batch. Without schedules the booking grid stays empty. Creates checkpoint for rollback.',
+    annotations: {
+      title: 'Set Work Schedules',
+      openWorldHint: true,
+      idempotentHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        company_id: { type: 'number', description: 'Company ID' },
+        schedules: {
+          type: 'array',
+          description: 'Array of per-staff schedule entries',
+          items: {
+            type: 'object',
+            properties: {
+              staff_id: { type: 'number', description: 'Staff member ID' },
+              dates: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Dates in YYYY-MM-DD format',
+              },
+              slots: {
+                type: 'array',
+                description: 'Working time intervals for each date',
+                items: {
+                  type: 'object',
+                  properties: {
+                    from: {
+                      type: 'string',
+                      description: 'Start time (HH:MM)',
+                    },
+                    to: { type: 'string', description: 'End time (HH:MM)' },
+                  },
+                  required: ['from', 'to'],
+                },
+              },
+            },
+            required: ['staff_id', 'dates', 'slots'],
+          },
+        },
+      },
+      required: ['company_id', 'schedules'],
     },
     outputSchema: output.batchImportOutput,
   },

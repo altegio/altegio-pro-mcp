@@ -3,6 +3,7 @@ import { z } from 'zod';
 // Phase enum
 export const OnboardingPhaseSchema = z.enum([
   'init',
+  'positions',
   'staff',
   'categories',
   'services',
@@ -73,12 +74,38 @@ export const CategoryBatchItemSchema = z.object({
   weight: z.number().optional(),
 });
 
+export const PositionBatchItemSchema = z.object({
+  title: z.string().min(1),
+  api_id: z.string().optional(),
+});
+
+export const ScheduleSlotInputSchema = z.object({
+  from: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/)
+    .describe('Start time (HH:MM)'),
+  to: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/)
+    .describe('End time (HH:MM)'),
+});
+
+export const ScheduleBatchItemSchema = z.object({
+  staff_id: z.coerce.number(),
+  dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).min(1),
+  slots: z.array(ScheduleSlotInputSchema).min(1),
+});
+
 export const StaffBatchSchema = z.array(StaffBatchItemSchema);
 export const ServiceBatchSchema = z.array(ServiceBatchItemSchema);
 export const ClientBatchSchema = z.array(ClientBatchItemSchema);
 export const CategoryBatchSchema = z.array(CategoryBatchItemSchema);
+export const PositionBatchSchema = z.array(PositionBatchItemSchema);
+export const ScheduleBatchSchema = z.array(ScheduleBatchItemSchema);
 
 export type StaffBatchItem = z.infer<typeof StaffBatchItemSchema>;
 export type ServiceBatchItem = z.infer<typeof ServiceBatchItemSchema>;
 export type ClientBatchItem = z.infer<typeof ClientBatchItemSchema>;
 export type CategoryBatchItem = z.infer<typeof CategoryBatchItemSchema>;
+export type PositionBatchItem = z.infer<typeof PositionBatchItemSchema>;
+export type ScheduleBatchItem = z.infer<typeof ScheduleBatchItemSchema>;

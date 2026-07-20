@@ -152,6 +152,26 @@ Carol White,Massage Therapist,+1234567892,carol@salon.com`;
       expect(state?.checkpoints['services']?.entity_ids).toEqual([
         20, 21, 22, 23,
       ]);
+      expect(state?.phase).toBe('schedules');
+
+      // Step 4.5: Set work schedules for staff
+      mockClient.setSchedule = jest.fn().mockResolvedValue([]);
+      const schedulesResult = await handlers.setSchedules({
+        company_id: companyId,
+        schedules: [
+          {
+            staff_id: 1,
+            dates: ['2026-08-01', '2026-08-02'],
+            slots: [{ from: '09:00', to: '18:00' }],
+          },
+        ],
+      });
+      expect(schedulesResult.content[0]?.text).toContain(
+        'Work schedules set for 1'
+      );
+
+      state = await stateManager.load(companyId);
+      expect(state?.checkpoints['schedules']).toBeDefined();
       expect(state?.phase).toBe('clients');
 
       // Step 5: Import clients from CSV
@@ -209,10 +229,11 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
       expect(bookingsResult.content[0]?.text).toContain('Test bookings: 5');
 
       // Verify all checkpoints are in place
-      expect(Object.keys(state?.checkpoints || {})).toHaveLength(5);
+      expect(Object.keys(state?.checkpoints || {})).toHaveLength(6);
       expect(state?.checkpoints['categories']?.completed).toBe(true);
       expect(state?.checkpoints['staff']?.completed).toBe(true);
       expect(state?.checkpoints['services']?.completed).toBe(true);
+      expect(state?.checkpoints['schedules']?.completed).toBe(true);
       expect(state?.checkpoints['clients']?.completed).toBe(true);
       expect(state?.checkpoints['test_bookings']?.completed).toBe(true);
     });
@@ -253,7 +274,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
           { title: 'Test Service', price_min: 50, duration: 1800 },
         ],
       });
-      expect((await stateManager.load(companyId))?.phase).toBe('clients');
+      expect((await stateManager.load(companyId))?.phase).toBe('schedules');
     });
 
     it('should verify state persistence across operations', async () => {
@@ -382,7 +403,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
       expect(text).toContain('categories: 2 entities created');
       expect(text).toContain('staff: 3 entities created');
       expect(text).toContain('services: 1 entities created');
-      expect(text).toContain('Current phase: clients');
+      expect(text).toContain('Current phase: schedules');
     });
 
     it('should handle resume with no session', async () => {
