@@ -278,7 +278,7 @@ describe('Onboarding Handlers', () => {
       expect(state?.checkpoints['staff']).toBeUndefined();
     });
 
-    it('should delete booking entities', async () => {
+    it('should delete test appointment entities', async () => {
       await handlers.start({ location_id: 123 });
       await stateManager.checkpoint(123, 'test_bookings', [100, 101]);
 
@@ -286,11 +286,13 @@ describe('Onboarding Handlers', () => {
 
       const result = await handlers.rollbackPhase({
         location_id: 123,
-        phase_name: 'test_bookings',
+        phase_name: 'test_appointments',
       });
 
       expect(mockClient.deleteBooking).toHaveBeenCalledTimes(2);
-      expect(result.content[0]?.text).toContain('Rolled back test_bookings');
+      expect(result.content[0]?.text).toContain(
+        'Rolled back test_appointments'
+      );
     });
 
     it('should handle services (no delete API)', async () => {

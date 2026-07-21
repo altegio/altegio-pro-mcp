@@ -37,7 +37,10 @@ export const getResourcesTool = defineTool({
 
     return {
       text: `Found ${resources.length} resource(s):\n\n${list}`,
-      structuredContent: { items: resources, count: resources.length },
+      structuredContent: {
+        items: resources.map((r) => ({ id: r.id, title: r.title })),
+        count: resources.length,
+      },
     };
   },
 });

@@ -329,7 +329,7 @@ export class AltegioClient {
       : '';
     const response = await this.apiRequest(`/companies${queryParams}`);
 
-    return this.handleResponse<AltegioCompany[]>(response, 'fetch companies');
+    return this.handleResponse<AltegioCompany[]>(response, 'fetch locations');
   }
 
   async getBookings(

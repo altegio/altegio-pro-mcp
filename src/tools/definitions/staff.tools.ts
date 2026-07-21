@@ -6,7 +6,7 @@ export const getStaffTool = defineTool({
   name: 'get_staff',
   category: 'Staff',
   description:
-    '[Staff] Get list of staff members for a location. AUTHENTICATION REQUIRED - administrative access to view all staff with full details (not just public booking info). User must be logged in and have access to the location. PAGINATION STRATEGY: May return many staff (100+). RECOMMENDED: Start with count=30-50 to show initial options. User can browse and request more if needed. This saves context for large salons.',
+    '[Staff] Get list of staff members for a location. AUTHENTICATION REQUIRED - administrative access to view all staff with full details (not just public online-booking info). User must be logged in and have access to the location. PAGINATION STRATEGY: May return many staff (100+). RECOMMENDED: Start with count=30-50 to show initial options. User can browse and request more if needed. This saves context for large salons.',
   annotations: {
     title: 'Get Staff',
     readOnlyHint: true,
@@ -55,7 +55,19 @@ export const getStaffTool = defineTool({
 
     return {
       text: summary + staffList,
-      structuredContent: { items: staff, count: staff.length },
+      structuredContent: {
+        items: staff.map((s) => ({
+          id: s.id,
+          name: s.name,
+          specialization: s.specialization,
+          rating: s.rating,
+          position_id: s.position?.id,
+          position_title: s.position?.title,
+          hidden: s.hidden,
+          fired: s.fired,
+        })),
+        count: staff.length,
+      },
     };
   },
 });

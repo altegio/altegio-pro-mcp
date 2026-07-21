@@ -63,7 +63,10 @@ export const getServiceCategoriesTool = defineTool({
 
     return {
       text: summary + categoriesList,
-      structuredContent: { items: categories, count: categories.length },
+      structuredContent: {
+        items: categories.map((c) => ({ id: c.id, title: c.title })),
+        count: categories.length,
+      },
     };
   },
 });

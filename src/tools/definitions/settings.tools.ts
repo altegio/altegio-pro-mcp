@@ -13,7 +13,7 @@ export const getAppointmentSettingsTool = defineTool({
   name: 'get_appointment_settings',
   category: 'Settings',
   description:
-    '[Settings] Get appointment calendar settings for a location. AUTHENTICATION REQUIRED. Returns the default appointment type (record_type: 0 mixed, 1 individual, 2 group event) and the maximum number of seats in a group event.',
+    '[Settings] Get appointment calendar settings for a location. AUTHENTICATION REQUIRED. Returns the default appointment type (0 mixed, 1 individual, 2 group event) and the maximum number of seats in a group event.',
   annotations: {
     title: 'Get Appointment Settings',
     readOnlyHint: true,
@@ -28,9 +28,15 @@ export const getAppointmentSettingsTool = defineTool({
     return {
       text:
         `Appointment calendar settings:\n` +
-        `- Default appointment type (record_type): ${s.record_type}\n` +
+        `- Default appointment type: ${s.record_type}\n` +
         `- Max seats per group event: ${s.activity_record_clients_count_max}`,
-      structuredContent: s,
+      structuredContent: {
+        appointment_type: s.record_type,
+        group_event_max_seats: s.activity_record_clients_count_max,
+        is_show_newsletter_agreement: s.is_show_newsletter_agreement,
+        is_show_personal_data_processing_agreement:
+          s.is_show_personal_data_processing_agreement,
+      },
     };
   },
 });
@@ -47,7 +53,7 @@ export const updateAppointmentSettingsTool = defineTool({
   },
   input: z.object({
     location_id: z.number().int().positive().describe('Location ID'),
-    record_type: z
+    appointment_type: z
       .number()
       .int()
       .min(0)
@@ -55,7 +61,7 @@ export const updateAppointmentSettingsTool = defineTool({
       .describe(
         'Default appointment type: 0 - Mixed, 1 - Individual, 2 - Group event'
       ),
-    activity_record_clients_count_max: z
+    group_event_max_seats: z
       .number()
       .int()
       .min(1)
@@ -72,14 +78,35 @@ export const updateAppointmentSettingsTool = defineTool({
   }),
   outputSchema: appointmentSettingsOutput,
   handler: async ({ input, client }) => {
-    const { location_id, ...data } = input;
-    const s = await client.updateAppointmentSettings(location_id, data);
+    const {
+      location_id,
+      appointment_type,
+      group_event_max_seats,
+      is_show_newsletter_agreement,
+      is_show_personal_data_processing_agreement,
+    } = input;
+    const s = await client.updateAppointmentSettings(location_id, {
+      record_type: appointment_type,
+      activity_record_clients_count_max: group_event_max_seats,
+      ...(is_show_newsletter_agreement !== undefined
+        ? { is_show_newsletter_agreement }
+        : {}),
+      ...(is_show_personal_data_processing_agreement !== undefined
+        ? { is_show_personal_data_processing_agreement }
+        : {}),
+    });
     return {
       text:
         `Appointment calendar settings updated:\n` +
-        `- Default appointment type (record_type): ${s.record_type}\n` +
+        `- Default appointment type: ${s.record_type}\n` +
         `- Max seats per group event: ${s.activity_record_clients_count_max}`,
-      structuredContent: s,
+      structuredContent: {
+        appointment_type: s.record_type,
+        group_event_max_seats: s.activity_record_clients_count_max,
+        is_show_newsletter_agreement: s.is_show_newsletter_agreement,
+        is_show_personal_data_processing_agreement:
+          s.is_show_personal_data_processing_agreement,
+      },
     };
   },
 });
@@ -109,7 +136,13 @@ export const getOnlineBookingSettingsTool = defineTool({
         `- Confirm number via SMS: ${s.confirm_number}\n` +
         `- Delay to next session (min): ${s.seance_delay_step}\n` +
         `- Max seats per group event: ${s.activity_online_record_clients_count_max}`,
-      structuredContent: s,
+      structuredContent: {
+        confirm_number: s.confirm_number,
+        any_team_member: s.any_master,
+        session_delay_step: s.seance_delay_step,
+        online_group_event_max_seats:
+          s.activity_online_record_clients_count_max,
+      },
     };
   },
 });
@@ -126,9 +159,9 @@ export const updateOnlineBookingSettingsTool = defineTool({
   },
   input: z.object({
     location_id: z.number().int().positive().describe('Location ID'),
-    any_master: z.boolean().describe('"Any team member" mode'),
+    any_team_member: z.boolean().describe('"Any team member" mode'),
     confirm_number: z.boolean().describe('Confirm client number via SMS'),
-    seance_delay_step: z
+    session_delay_step: z
       .number()
       .int()
       .min(0)
@@ -136,7 +169,7 @@ export const updateOnlineBookingSettingsTool = defineTool({
       .describe(
         'Delay to the next session, minutes 0-1380 (up to 23h) in increments of 30'
       ),
-    activity_online_record_clients_count_max: z
+    online_group_event_max_seats: z
       .number()
       .int()
       .min(1)
@@ -145,8 +178,19 @@ export const updateOnlineBookingSettingsTool = defineTool({
   }),
   outputSchema: onlineSettingsOutput,
   handler: async ({ input, client }) => {
-    const { location_id, ...data } = input;
-    const s = await client.updateOnlineBookingSettings(location_id, data);
+    const {
+      location_id,
+      any_team_member,
+      confirm_number,
+      session_delay_step,
+      online_group_event_max_seats,
+    } = input;
+    const s = await client.updateOnlineBookingSettings(location_id, {
+      any_master: any_team_member,
+      confirm_number,
+      seance_delay_step: session_delay_step,
+      activity_online_record_clients_count_max: online_group_event_max_seats,
+    });
     return {
       text:
         `Online booking settings updated:\n` +
@@ -154,7 +198,13 @@ export const updateOnlineBookingSettingsTool = defineTool({
         `- Confirm number via SMS: ${s.confirm_number}\n` +
         `- Delay to next session (min): ${s.seance_delay_step}\n` +
         `- Max seats per group event: ${s.activity_online_record_clients_count_max}`,
-      structuredContent: s,
+      structuredContent: {
+        confirm_number: s.confirm_number,
+        any_team_member: s.any_master,
+        session_delay_step: s.seance_delay_step,
+        online_group_event_max_seats:
+          s.activity_online_record_clients_count_max,
+      },
     };
   },
 });
@@ -194,7 +244,14 @@ export const getBookingFormsTool = defineTool({
 
     return {
       text: `Found ${forms.length} booking form(s):\n\n${list}`,
-      structuredContent: { items: forms, count: forms.length },
+      structuredContent: {
+        items: forms.map((f) => ({
+          id: f.id,
+          title: f.title,
+          is_default: f.is_default,
+        })),
+        count: forms.length,
+      },
     };
   },
 });

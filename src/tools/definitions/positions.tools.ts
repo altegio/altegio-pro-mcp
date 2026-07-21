@@ -32,7 +32,14 @@ export const getPositionsTool = defineTool({
 
     return {
       text: `Found ${positions.length} position(s):\n\n${positionsList}`,
-      structuredContent: { items: positions, count: positions.length },
+      structuredContent: {
+        items: positions.map((p) => ({
+          id: p.id,
+          title: p.title,
+          api_id: p.api_id,
+        })),
+        count: positions.length,
+      },
     };
   },
 });

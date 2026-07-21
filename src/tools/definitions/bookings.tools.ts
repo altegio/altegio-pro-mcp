@@ -75,7 +75,20 @@ export const getAppointmentsTool = defineTool({
 
     return {
       text: summary + appointmentsList,
-      structuredContent: { items: appointments, count: appointments.length },
+      structuredContent: {
+        items: appointments.map((b) => ({
+          id: b.id,
+          datetime: b.datetime,
+          date: b.date,
+          status: b.status,
+          team_member_id: b.staff_id,
+          team_member_name: b.staff?.name,
+          client_name: b.client?.name,
+          client_phone: b.client?.phone,
+          services: b.services,
+        })),
+        count: appointments.length,
+      },
     };
   },
 });
@@ -97,7 +110,7 @@ export const createAppointmentTool = defineTool({
     datetime: z
       .string()
       .describe('Appointment datetime (ISO format: YYYY-MM-DDTHH:MM:SS)'),
-    seance_length: z
+    session_length: z
       .number()
       .positive()
       .optional()
@@ -121,16 +134,20 @@ export const createAppointmentTool = defineTool({
   }),
   outputSchema: bookingEntityOutput,
   handler: async ({ input, client }) => {
-    const { location_id, team_member_id, ...appointmentData } = input;
+    const { location_id, team_member_id, session_length, ...appointmentData } =
+      input;
     const appointment = await client.createBooking(location_id, {
       staff_id: team_member_id,
+      ...(session_length !== undefined
+        ? { seance_length: session_length }
+        : {}),
       ...appointmentData,
     });
     return {
       text: `Successfully created appointment:\nID: ${appointment.id}\nTeam member ID: ${appointment.staff_id}\nDate: ${appointment.datetime || appointment.date}`,
       structuredContent: {
         id: appointment.id,
-        staff_id: appointment.staff_id,
+        team_member_id: appointment.staff_id,
         datetime: appointment.datetime,
         date: appointment.date,
       },
@@ -150,7 +167,7 @@ export const updateAppointmentTool = defineTool({
   },
   input: z.object({
     location_id: z.number().int().positive().describe('Location ID'),
-    record_id: z.number().int().positive().describe('Appointment/record ID'),
+    appointment_id: z.number().int().positive().describe('Appointment ID'),
     team_member_id: z
       .number()
       .int()
@@ -162,7 +179,7 @@ export const updateAppointmentTool = defineTool({
       .optional()
       .describe('Array of service objects'),
     datetime: z.string().optional().describe('New appointment datetime'),
-    seance_length: z
+    session_length: z
       .number()
       .positive()
       .optional()
@@ -180,16 +197,29 @@ export const updateAppointmentTool = defineTool({
   }),
   outputSchema: bookingEntityOutput,
   handler: async ({ input, client }) => {
-    const { location_id, record_id, team_member_id, ...updateData } = input;
-    const appointment = await client.updateBooking(location_id, record_id, {
-      ...(team_member_id !== undefined ? { staff_id: team_member_id } : {}),
-      ...updateData,
-    });
+    const {
+      location_id,
+      appointment_id,
+      team_member_id,
+      session_length,
+      ...updateData
+    } = input;
+    const appointment = await client.updateBooking(
+      location_id,
+      appointment_id,
+      {
+        ...(team_member_id !== undefined ? { staff_id: team_member_id } : {}),
+        ...(session_length !== undefined
+          ? { seance_length: session_length }
+          : {}),
+        ...updateData,
+      }
+    );
     return {
-      text: `Successfully updated appointment ${record_id}:\nDate: ${appointment.datetime || appointment.date}`,
+      text: `Successfully updated appointment ${appointment_id}:\nDate: ${appointment.datetime || appointment.date}`,
       structuredContent: {
         id: appointment.id,
-        staff_id: appointment.staff_id,
+        team_member_id: appointment.staff_id,
         datetime: appointment.datetime,
         date: appointment.date,
       },
@@ -209,16 +239,16 @@ export const deleteAppointmentTool = defineTool({
   },
   input: z.object({
     location_id: z.number().int().positive().describe('Location ID'),
-    record_id: z
+    appointment_id: z
       .number()
       .int()
       .positive()
-      .describe('Appointment/record ID to delete'),
+      .describe('Appointment ID to delete'),
   }),
   handler: async ({ input, client }) => {
-    await client.deleteBooking(input.location_id, input.record_id);
+    await client.deleteBooking(input.location_id, input.appointment_id);
     return {
-      text: `Successfully deleted appointment ${input.record_id} from location ${input.location_id}`,
+      text: `Successfully deleted appointment ${input.appointment_id} from location ${input.location_id}`,
     };
   },
 });
