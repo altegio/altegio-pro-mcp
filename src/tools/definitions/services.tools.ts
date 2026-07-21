@@ -6,7 +6,7 @@ export const getServicesTool = defineTool({
   name: 'get_services',
   category: 'Services',
   description:
-    '[Services] Get list of services available at a location. AUTHENTICATION REQUIRED - administrative access to view all services with full pricing, settings, and configuration (not just public booking info). User must be logged in and have access to the location. PAGINATION STRATEGY: May return many services (50+). RECOMMENDED: Start with count=30-50 to show main services. User can request more or use categories for better organization.',
+    '[Services] Get list of services available at a location. AUTHENTICATION REQUIRED - administrative access to view all services with full pricing, settings, and configuration (not just public online-booking info). User must be logged in and have access to the location. PAGINATION STRATEGY: May return many services (50+). RECOMMENDED: Start with count=30-50 to show main services. User can request more or use categories for better organization.',
   annotations: {
     title: 'Get Services',
     readOnlyHint: true,
@@ -54,7 +54,18 @@ export const getServicesTool = defineTool({
 
     return {
       text: summary + servicesList,
-      structuredContent: { items: services, count: services.length },
+      structuredContent: {
+        items: services.map((s) => ({
+          id: s.id,
+          title: s.title,
+          cost: s.cost,
+          duration: s.duration,
+          category_id: s.category_id,
+          active: s.active,
+          discount: s.discount,
+        })),
+        count: services.length,
+      },
     };
   },
 });

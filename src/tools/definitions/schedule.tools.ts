@@ -40,17 +40,23 @@ export const getScheduleTool = defineTool({
       input.end_date
     );
 
-    const summary = `Found ${schedule.length} schedule ${schedule.length === 1 ? 'entry' : 'entries'} for team member ${input.team_member_id}:\n\n`;
-    const scheduleList = schedule
+    const items = schedule.map((s) => ({
+      date: s.date,
+      time: s.time,
+      session_length: s.seance_length,
+    }));
+
+    const summary = `Found ${items.length} schedule ${items.length === 1 ? 'entry' : 'entries'} for team member ${input.team_member_id}:\n\n`;
+    const scheduleList = items
       .map(
         (s, idx) =>
-          `${idx + 1}. ${s.date} at ${s.time} (${s.seance_length} min)`
+          `${idx + 1}. ${s.date} at ${s.time} (${s.session_length} min)`
       )
       .join('\n');
 
     return {
       text: summary + scheduleList,
-      structuredContent: { items: schedule, count: schedule.length },
+      structuredContent: { items, count: items.length },
     };
   },
 });
@@ -91,10 +97,15 @@ export const createScheduleTool = defineTool({
       ],
     });
 
+    const items = schedule.map((s) => ({
+      date: s.date,
+      time: s.time,
+      session_length: s.seance_length,
+    }));
     const slotsStr = input.slots.map((s) => `${s.from}-${s.to}`).join(', ');
     return {
-      text: `Successfully created schedule for team member ${input.team_member_id} on ${input.dates.join(', ')}:\nSlots: ${slotsStr}\nEntries returned: ${schedule.length}`,
-      structuredContent: { items: schedule, count: schedule.length },
+      text: `Successfully created schedule for team member ${input.team_member_id} on ${input.dates.join(', ')}:\nSlots: ${slotsStr}\nEntries returned: ${items.length}`,
+      structuredContent: { items, count: items.length },
     };
   },
 });
@@ -133,9 +144,14 @@ export const updateScheduleTool = defineTool({
       ],
     });
 
+    const items = schedule.map((s) => ({
+      date: s.date,
+      time: s.time,
+      session_length: s.seance_length,
+    }));
     return {
-      text: `Successfully updated schedule for team member ${input.team_member_id} on ${input.dates.join(', ')}\nEntries returned: ${schedule.length}`,
-      structuredContent: { items: schedule, count: schedule.length },
+      text: `Successfully updated schedule for team member ${input.team_member_id} on ${input.dates.join(', ')}\nEntries returned: ${items.length}`,
+      structuredContent: { items, count: items.length },
     };
   },
 });

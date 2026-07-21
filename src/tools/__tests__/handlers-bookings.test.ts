@@ -70,7 +70,7 @@ describe('ToolHandlers - Appointments CRUD', () => {
 
       const result = await handlers.updateAppointment({
         location_id: 456,
-        record_id: 999,
+        appointment_id: 999,
         datetime: '2025-11-02T10:00:00',
       });
 
@@ -89,7 +89,7 @@ describe('ToolHandlers - Appointments CRUD', () => {
 
       const result = await handlers.deleteAppointment({
         location_id: 456,
-        record_id: 999,
+        appointment_id: 999,
       });
 
       expect(result.content[0]?.text).toContain(

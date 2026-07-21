@@ -53,7 +53,15 @@ export const listLocationsTool = defineTool({
 
     return {
       text: summary + locationsList,
-      structuredContent: { items: locations, count: locations.length },
+      structuredContent: {
+        items: locations.map((c) => ({
+          id: c.id,
+          title: c.title,
+          address: c.address,
+          phone: c.phone,
+        })),
+        count: locations.length,
+      },
     };
   },
 });

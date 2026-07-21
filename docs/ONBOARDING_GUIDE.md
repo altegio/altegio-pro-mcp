@@ -14,7 +14,7 @@ The onboarding wizard provides **12 specialized tools** to help new users quickl
 - Phase-level rollback: undo specific setup steps
 
 **Recommended setup order:**
-`positions → staff → categories → services → schedules → clients → test_bookings`
+`positions → staff → categories → services → schedules → clients → test_appointments`
 
 Positions come first so staff can reference `position_id`. Work schedules come after staff — without them the appointment grid stays empty and the location isn't operational.
 
@@ -184,7 +184,7 @@ onboarding_create_test_appointments({
 //           Distributed across next 7 days
 //           Staff used: [101, 102, 103]
 //           Services used: [201, 202, 203]
-//           Checkpoint saved at phase: test_bookings"
+//           Checkpoint saved at phase: test_appointments"
 ```
 
 ### 7. Check Status
@@ -203,7 +203,7 @@ onboarding_status({
 //           ✓ staff - 3 entities created (2025-01-29T10:32:45.000Z)
 //           ✓ services - 3 entities created (2025-01-29T10:34:20.000Z)
 //           ✓ clients - 3 entities created (2025-01-29T10:36:00.000Z)
-//           ✓ test_bookings - 5 entities created (2025-01-29T10:37:30.000Z)
+//           ✓ test_appointments - 5 entities created (2025-01-29T10:37:30.000Z)
 //
 //           Status: Onboarding complete!"
 ```
@@ -336,24 +336,24 @@ Undo a phase and delete created entities:
 ```typescript
 onboarding_rollback_phase({
   location_id: 123456,
-  phase_name: "test_bookings"
+  phase_name: "test_appointments"
 })
 
-// Response: "Rollback preview for phase: test_bookings
+// Response: "Rollback preview for phase: test_appointments
 //           Entities to delete: 5 appointments
 //           IDs: [301, 302, 303, 304, 305]
 //
 //           Confirm deletion? This action cannot be undone."
 
 // After confirmation:
-// "Successfully rolled back phase: test_bookings
+// "Successfully rolled back phase: test_appointments
 //  Deleted 5 appointments
 //  State reset to phase: clients
 //  You can now re-run onboarding_create_test_appointments() with different parameters"
 ```
 
 **Rollback order (reverse dependency):**
-1. `test_bookings` (depends on staff, services, clients) — deleted via API
+1. `test_appointments` (depends on staff, services, clients) — deleted via API
 2. `clients` (standalone)
 3. `schedules` (depends on staff) — deleted via API
 4. `services` (depends on categories) — checkpoint cleared, entities remain (no delete API)
@@ -361,9 +361,9 @@ onboarding_rollback_phase({
 6. `staff` (depends on positions) — deleted via API
 7. `positions` (standalone) — deleted via API
 
-Supported `phase_name` values for `onboarding_rollback_phase`: `positions`, `staff`, `services`, `categories`, `schedules`, `clients`, `test_bookings`.
+Supported `phase_name` values for `onboarding_rollback_phase`: `positions`, `staff`, `services`, `categories`, `schedules`, `clients`, `test_appointments`.
 
-> **Note:** The tool that creates test appointments is `onboarding_create_test_appointments`, but its rollback `phase_name` is `test_bookings`. The phase key is a persisted state value and remains `test_bookings` even though the tool was renamed.
+> **Note:** Pass `phase_name: "test_appointments"` to roll back test appointments. Internally the persisted phase key remains `test_bookings` (backward-compatible on-disk state under `~/.altegio-mcp/onboarding/`); the MCP maps the agent-facing name to it, so no legacy term is exposed to the agent.
 
 ## Error Handling
 

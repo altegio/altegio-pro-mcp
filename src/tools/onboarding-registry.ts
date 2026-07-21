@@ -335,7 +335,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_rollback_phase',
     description:
-      'Delete all entities from specific phase and reset checkpoint. Supports: staff, services, test_bookings, categories, clients. WARNING: Destructive operation.',
+      'Delete all entities from specific phase and reset checkpoint. Supports: positions, staff, categories, services, schedules, clients, test_appointments. WARNING: Destructive operation.',
     annotations: {
       title: 'Rollback Onboarding Phase',
       destructiveHint: true,
@@ -348,7 +348,7 @@ export const onboardingTools: McpToolSpec[] = [
         phase_name: {
           type: 'string',
           description:
-            'Phase to rollback (staff, services, test_bookings, categories, clients)',
+            'Phase to rollback (positions, staff, categories, services, schedules, clients, test_appointments)',
         },
       },
       required: ['location_id', 'phase_name'],

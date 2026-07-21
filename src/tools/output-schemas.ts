@@ -57,8 +57,8 @@ export const bookingsOutput = listSchema(
     datetime: strProp,
     date: strProp,
     status: strProp,
-    staff_id: idProp,
-    staff_name: strProp,
+    team_member_id: idProp,
+    team_member_name: strProp,
     client_name: strProp,
     client_phone: strProp,
     services: { type: 'array' as const, items: { type: 'object' as const } },
@@ -104,7 +104,7 @@ export const positionsOutput = listSchema(
 );
 
 export const scheduleOutput = listSchema(
-  { date: strProp, time: strProp, seance_length: numProp },
+  { date: strProp, time: strProp, session_length: numProp },
   ['date']
 );
 
@@ -126,12 +126,12 @@ export const positionEntityOutput = entitySchema(
 );
 
 export const scheduleEntityOutput = listSchema(
-  { date: strProp, time: strProp, seance_length: numProp },
+  { date: strProp, time: strProp, session_length: numProp },
   ['date']
 );
 
 export const bookingEntityOutput = entitySchema(
-  { id: idProp, staff_id: numProp, datetime: strProp, date: strProp },
+  { id: idProp, team_member_id: numProp, datetime: strProp, date: strProp },
   ['id']
 );
 
@@ -139,7 +139,7 @@ export const bookingEntityOutput = entitySchema(
 
 export const onboardingStatusOutput = entitySchema(
   {
-    company_id: numProp,
+    location_id: numProp,
     phase: numProp,
     completed: boolProp,
     entity_counts: {
@@ -155,7 +155,7 @@ export const onboardingStatusOutput = entitySchema(
     created_at: strProp,
     updated_at: strProp,
   },
-  ['company_id', 'phase']
+  ['location_id', 'phase']
 );
 
 export const batchImportOutput = entitySchema(
@@ -180,26 +180,26 @@ export const previewOutput = entitySchema(
 
 export const appointmentSettingsOutput = entitySchema(
   {
-    record_type: numProp,
-    activity_record_clients_count_max: numProp,
+    appointment_type: numProp,
+    group_event_max_seats: numProp,
     is_show_newsletter_agreement: boolProp,
     is_show_personal_data_processing_agreement: boolProp,
   },
-  ['record_type', 'activity_record_clients_count_max']
+  ['appointment_type', 'group_event_max_seats']
 );
 
 export const onlineSettingsOutput = entitySchema(
   {
     confirm_number: boolProp,
-    any_master: boolProp,
-    seance_delay_step: numProp,
-    activity_online_record_clients_count_max: numProp,
+    any_team_member: boolProp,
+    session_delay_step: numProp,
+    online_group_event_max_seats: numProp,
   },
   [
     'confirm_number',
-    'any_master',
-    'seance_delay_step',
-    'activity_online_record_clients_count_max',
+    'any_team_member',
+    'session_delay_step',
+    'online_group_event_max_seats',
   ]
 );
 

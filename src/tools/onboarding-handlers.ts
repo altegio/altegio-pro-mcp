@@ -22,6 +22,14 @@ import type {
   SetScheduleRequest,
 } from '../types/altegio.types.js';
 
+/**
+ * Map an internal persisted phase key to its agent-facing name so no legacy
+ * terminology leaks into tool output. The persisted state keeps the original key.
+ */
+function toAgentPhase(phase: string): string {
+  return phase === 'test_bookings' ? 'test_appointments' : phase;
+}
+
 const LocationIdSchema = z.object({
   location_id: z.number(),
 });
@@ -98,7 +106,7 @@ export class OnboardingHandlers {
             type: 'text' as const,
             text:
               `Onboarding session started for location ${location_id}.\n\n` +
-              `Current phase: ${state.phase}\n` +
+              `Current phase: ${toAgentPhase(state.phase)}\n` +
               `Started at: ${state.started_at}\n\n` +
               `Recommended steps (in order):\n` +
               `1. Add positions: onboarding_add_positions\n` +
@@ -131,7 +139,7 @@ export class OnboardingHandlers {
         .filter(([, checkpoint]) => checkpoint.completed)
         .map(
           ([phase, checkpoint]) =>
-            `  - ${phase}: ${checkpoint.entity_ids.length} entities created`
+            `  - ${toAgentPhase(phase)}: ${checkpoint.entity_ids.length} entities created`
         )
         .join('\n');
 
@@ -141,7 +149,7 @@ export class OnboardingHandlers {
             type: 'text' as const,
             text:
               `Onboarding session for location ${location_id}\n\n` +
-              `Current phase: ${state.phase}\n` +
+              `Current phase: ${toAgentPhase(state.phase)}\n` +
               `Started: ${state.started_at}\n\n` +
               `Completed:\n${completedPhases || '  (none yet)'}\n\n` +
               `Continue with next step based on current phase.`,
@@ -175,7 +183,7 @@ export class OnboardingHandlers {
             type: 'text' as const,
             text:
               `Onboarding Status - Location ${location_id}\n\n` +
-              `Phase: ${state.phase}\n` +
+              `Phase: ${toAgentPhase(state.phase)}\n` +
               `Total entities created: ${totalEntities}\n` +
               `Phases completed: ${Object.keys(state.checkpoints).length}`,
           },
@@ -644,11 +652,19 @@ export class OnboardingHandlers {
     return withErrorHandling('onboarding_rollback_phase', async () => {
       this.requireAuth();
 
-      const { location_id, phase_name } = RollbackArgsSchema.parse(args);
+      const { location_id, phase_name: requestedPhase } =
+        RollbackArgsSchema.parse(args);
+      // Agent-facing "test_appointments" maps to the internal persisted phase key.
+      const phase_name =
+        requestedPhase === 'test_appointments'
+          ? 'test_bookings'
+          : requestedPhase;
       const state = await this.stateManager.load(location_id);
 
       if (!state || !state.checkpoints[phase_name]) {
-        throw new Error(`No checkpoint found for phase: ${phase_name}`);
+        throw new Error(
+          `No checkpoint found for phase: ${toAgentPhase(requestedPhase)}`
+        );
       }
 
       const checkpoint = state.checkpoints[phase_name];
@@ -731,7 +747,7 @@ export class OnboardingHandlers {
           {
             type: 'text' as const,
             text:
-              `Rolled back ${phase_name}: processed ${entityIds.length} entities\n` +
+              `Rolled back ${toAgentPhase(requestedPhase)}: processed ${entityIds.length} entities\n` +
               `✓ Successfully handled: ${deletedCount.success}\n` +
               (deletedCount.failed > 0
                 ? `✗ Failed: ${deletedCount.failed}\n`
