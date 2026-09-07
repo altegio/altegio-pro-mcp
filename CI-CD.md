@@ -13,6 +13,7 @@ Proxy: mcp-proxy (Cloud Run) → mcp.alteg.io
 | Service | VM Port | Public URL |
 |---------|---------|------------|
 | altegio-pro-mcp | 3000 | `https://mcp.alteg.io/pro/mcp` |
+| altegio-pro-mcp (facets) | 3000 | `https://mcp.alteg.io/pro/mcp/<facet>` |
 | bi-data | 8080 | `https://mcp.alteg.io/bi-data/mcp` |
 
 ## Quick Start
@@ -64,6 +65,14 @@ gh pr merge --merge
 Routes external traffic to VM internal IP:
 - `/pro/*` → `10.132.0.3:3000`
 - `/bi-data/*` → `10.132.0.3:8080`
+
+**Facets need no proxy change.** The proxy forwards everything under `/pro/*`
+with the `/pro` prefix stripped, so `https://mcp.alteg.io/pro/mcp/<facet>`
+arrives at the service as `/mcp/<facet>`, which the app already serves (see
+[README → Facets](README.md#facets)). Adding or removing a facet is a change in
+this repository only — no route, audience or scope in
+`altegio-mcp-platform/mcp-proxy/routes.json` is touched. An unknown facet is
+answered by the service itself with `404` and a JSON-RPC shaped error.
 
 ## Monitoring
 

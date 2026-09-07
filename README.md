@@ -90,6 +90,75 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 **Note:** Services DELETE operation is not available in Altegio API. All write operations require user authentication via `altegio_login`. See [Onboarding Guide](docs/ONBOARDING_GUIDE.md) for first-time setup workflows.
 
+## Facets
+
+Every tool lives on one surface. A **facet** is a fixed, filtered view of that
+surface served on its own HTTP sub-path, for hosts that cap how many tools may
+be active at once. A facet never changes what a tool does, carries no separate
+credential and is not a product boundary ([ADR-001](docs/architecture/2026-09-07-mcp-platform-architecture.md) D3).
+
+| Endpoint | Serves |
+|---|---|
+| `/mcp` | **Every tool that exists today** — the default view, unchanged for current clients |
+| `/mcp/ops` | Appointments (the daily work; clients and journal tools join as they land) |
+| `/mcp/catalog` | Services, service categories, team members, positions, work schedules, resources, location settings |
+| `/mcp/finance` | Analytics (visits, payments and payroll join as they land) |
+| `/mcp/marketing` | Base tools only for now (loyalty, notifications and chain tools join as they land) |
+| `/mcp/analytics` | The analytics pack and the report builder |
+| `/mcp/onboarding` | The 12 onboarding walkthrough tools |
+
+Rules:
+
+- Every facet always serves `altegio_login`, `altegio_logout` and
+  `list_locations` — no tool works before authentication, and nearly every tool
+  needs a `location_id`.
+- Membership is declared once in [`src/tools/facets.ts`](src/tools/facets.ts) as
+  explicit tool names plus tool-name prefixes (`analytics_*`, `onboarding_*`),
+  and the index is computed once at startup. `tools/list` is therefore identical
+  for every connection to a given path and deterministically ordered (category,
+  then name), as MCP 2026-07-28 requires.
+- Calling a tool the facet does not serve returns a `MethodNotFound` error that
+  names the paths which do serve it.
+- An unknown facet path answers `404` with a JSON-RPC shaped error listing the
+  available facets.
+- **stdio exposes everything**; facets are an HTTP concern only.
+- Publicly the paths are `https://mcp.alteg.io/pro/mcp` and
+  `https://mcp.alteg.io/pro/mcp/<facet>` — the platform proxy strips the `/pro`
+  prefix, so facets need no proxy change.
+
+Set `MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING=true` to drop the onboarding
+walkthrough from `/mcp` and serve it only on `/mcp/onboarding`. It is off by
+default: turning it on is a visible change for current clients of `/mcp`.
+
+## Resources and prompts
+
+Besides tools, the server serves MCP **resources** (documents a session can read
+instead of guessing) and **prompts** (named workflows a person picks in a host).
+Both are available on every facet and on stdio.
+
+| Resource URI | Content |
+|---|---|
+| `altegio://docs/product-logic` | The product model: chains and locations, team members and clients, the service catalog, scheduling and booking, the visit and payment lifecycle, loyalty, finance and inventory |
+| `altegio://docs/glossary` | The canonical vocabulary — the approved term for every concept and the synonyms never to use |
+| `altegio://docs/onboarding-guide` | The onboarding walkthrough guide: phase order, accepted CSV and JSON shapes, resuming and rolling back |
+
+| Prompt | What it does |
+|---|---|
+| `onboarding_walkthrough` | Guides a first-time location setup through the onboarding tools in the order that leaves the digital schedule working. Optional `location_id`; without it the walkthrough lists the locations and asks |
+
+Both are driven by small registries — [`src/resources/registry.ts`](src/resources/registry.ts)
+and [`src/prompts/registry.ts`](src/prompts/registry.ts) — so a tool pack adds
+its own resources or prompts by exporting one module and adding a single import
+line to `src/resources/index.ts` or `src/prompts/index.ts`. `resources/list` is
+ordered by URI and `prompts/list` by name.
+
+The two markdown documents are read from `docs/` at runtime; set
+`ALTEGIO_DOCS_DIR` if a deployment keeps them elsewhere.
+
+The `initialize` result also carries a server `instructions` paragraph naming
+the domains available today, the facets and the packs being added. Override it
+with `MCP_SERVER_INSTRUCTIONS`.
+
 ## Quick Start
 
 ### Prerequisites
@@ -239,6 +308,9 @@ See [CI-CD.md](CI-CD.md) for details.
 | `ALTEGIO_USER_TOKEN` | No | - | Pre-seeded user token (stdio single-user only) |
 | `CREDENTIALS_DIR` | No | `~/.altegio-mcp` | Directory for stored user tokens |
 | `REQUIRE_DELEGATED_IDENTITY` | No | `false` | HTTP mode: require a proxy-verified identity per request |
+| `MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING` | No | `false` | Drop `onboarding_*` from the default `/mcp` facet |
+| `MCP_SERVER_INSTRUCTIONS` | No | built-in | Override the `initialize` instructions paragraph |
+| `ALTEGIO_DOCS_DIR` | No | `<pkg>/docs` | Where the `altegio://docs/*` markdown documents are read from |
 | `LOG_LEVEL` | No | `info` | `debug\|info\|warn\|error` |
 | `NODE_ENV` | No | `development` | `development\|production` |
 | `RATE_LIMIT_REQUESTS` | No | `200` | Max requests per minute |
@@ -284,18 +356,21 @@ npm run lint         # Check code style
 src/
   config/        # Configuration and validation
   providers/     # API clients (altegio-client.ts)
+  prompts/       # Prompt registry + modules (onboarding.prompts.ts)
+  resources/     # Resource registry + modules (docs.resources.ts, glossary.ts)
   tools/         # MCP tool handlers & registry
+    facets.ts    # Static facet membership (ADR-001 D3)
   types/         # TypeScript interfaces
   utils/         # Logging, errors, helpers
   __tests__/     # Jest unit tests
   index.ts       # stdio server entry
-  http-server.ts # HTTP server entry
+  http-server.ts # HTTP server entry (/mcp and /mcp/<facet>)
   server.ts      # Shared MCP server setup
 ```
 
 ### Testing
 
-- **387 tests** (30 suites) covering authentication, all tools, error handling, pagination
+- **427 tests** (32 suites) covering authentication, all tools, facets and `tools/list` ordering, resources and prompts, error handling, pagination
 - **Jest** for unit tests with mocked API responses
 - **Test isolation** with temporary credentials directory
 - Run: `npm test` or `npm run test:coverage`
