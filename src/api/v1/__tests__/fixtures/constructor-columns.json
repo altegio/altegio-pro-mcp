@@ -76,7 +76,7 @@
       "expression_columns": null,
       "expression_slug": null,
       "metric_type_slug": "plain",
-      "is_default": true,
+      "is_default": false,
       "is_groupable": true,
       "is_granularity": false,
       "is_filterable": true
@@ -96,7 +96,7 @@
       "expression_columns": null,
       "expression_slug": null,
       "metric_type_slug": "plain",
-      "is_default": true,
+      "is_default": false,
       "is_groupable": true,
       "is_granularity": false,
       "is_filterable": true
@@ -116,7 +116,7 @@
       "expression_columns": null,
       "expression_slug": "TODATE_DAY",
       "metric_type_slug": "plain",
-      "is_default": true,
+      "is_default": false,
       "is_groupable": false,
       "is_granularity": true,
       "is_filterable": true
@@ -196,7 +196,7 @@
       "expression_columns": null,
       "expression_slug": null,
       "metric_type_slug": "plain",
-      "is_default": true,
+      "is_default": false,
       "is_groupable": true,
       "is_granularity": false,
       "is_filterable": true
@@ -236,7 +236,7 @@
       "expression_columns": null,
       "expression_slug": null,
       "metric_type_slug": "plain",
-      "is_default": true,
+      "is_default": false,
       "is_groupable": true,
       "is_granularity": false,
       "is_filterable": true
@@ -276,7 +276,7 @@
       "expression_columns": null,
       "expression_slug": null,
       "metric_type_slug": "plain",
-      "is_default": true,
+      "is_default": false,
       "is_groupable": true,
       "is_granularity": false,
       "is_filterable": true
@@ -296,7 +296,7 @@
       "expression_columns": null,
       "expression_slug": null,
       "metric_type_slug": "plain",
-      "is_default": true,
+      "is_default": false,
       "is_groupable": true,
       "is_granularity": false,
       "is_filterable": true

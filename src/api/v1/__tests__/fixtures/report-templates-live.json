@@ -1,0 +1,176 @@
+{
+  "success": true,
+  "data": [
+    {
+      "id": "01953eb6-12e6-74c9-8193-5e22f05116c5",
+      "name": "By employees",
+      "slug": "template_services_goods_master_sales",
+      "description": "Revenue per employee",
+      "type": "static"
+    },
+    {
+      "id": "01953eba-e829-7d87-84c8-253e210bb12a",
+      "name": "By services",
+      "slug": "template_services_goods_services_sales",
+      "description": "Revenue by service",
+      "type": "static"
+    },
+    {
+      "id": "01953ebb-1efd-72cc-a88a-c0d5824e9673",
+      "name": "By clients",
+      "slug": "template_service_goods_client_sales",
+      "description": "Client revenue and visits",
+      "type": "static"
+    },
+    {
+      "id": "01953ebb-5a31-7cfd-a697-ac27cdf11870",
+      "name": "Financial report",
+      "slug": "template_financial_expenses_report",
+      "description": "All income and expense items",
+      "type": "static"
+    },
+    {
+      "id": "01953ebb-a365-7209-a02f-ca073bdc847c",
+      "name": "Cash register report (sales)",
+      "slug": "template_service_goods_daily_sales",
+      "description": "Goods and services sold per day",
+      "type": "static"
+    },
+    {
+      "id": "01953ebb-f888-7fd7-921b-ec50dd97e92d",
+      "name": "Cash register operations",
+      "slug": "template_financial_daily_report",
+      "description": "Income and expenses by payment method",
+      "type": "static"
+    },
+    {
+      "id": "01953ebc-28ed-77c7-90dd-459a33ccdfd0",
+      "name": "Sales analysis",
+      "slug": "template_service_goods_goods_sales",
+      "description": "Detailed goods information",
+      "type": "static"
+    },
+    {
+      "id": "01953ebc-5cda-7f84-9b29-6204651b47fd",
+      "name": "Client retention",
+      "slug": "template_service_goods_client_retention",
+      "description": "How often clients return and for which services",
+      "type": "static"
+    },
+    {
+      "id": "01953ebc-86bf-73b7-8dbb-a80fa1d449c3",
+      "name": "Occupancy",
+      "slug": "template_master_schedules_fill",
+      "description": "Employee workload",
+      "type": "static"
+    },
+    {
+      "id": "01953ebc-b70e-776c-a5d5-7eb9919f5f66",
+      "name": "Group events attendance",
+      "slug": "template_services_goods_activity_fill",
+      "description": "Group events fill rate",
+      "type": "static"
+    },
+    {
+      "id": "01953ebc-efbf-7451-968c-18baf18be9eb",
+      "name": "Memberships report",
+      "slug": "template_loyalty_abonements",
+      "description": "Balances of issued memberships",
+      "type": "static"
+    },
+    {
+      "id": "01953ebd-adea-7f5f-a5ae-54af014b147f",
+      "name": "Certificates report",
+      "slug": "template_loyalty_certificates",
+      "description": "Balances of issued certificates",
+      "type": "static"
+    },
+    {
+      "id": "01953ebe-df94-7fc5-8092-dea9aa212335",
+      "name": "Goods and services sales",
+      "slug": "template_services_goods_sales",
+      "description": "Compare goods and services sales metrics over the period",
+      "type": "static"
+    },
+    {
+      "id": "01953ebf-541e-7577-aaa1-be26b60234da",
+      "name": "Client sales",
+      "slug": "template_services_goods_client_sales_extended",
+      "description": "Compare client activity metrics over the period",
+      "type": "static"
+    },
+    {
+      "id": "01953ebf-a9f4-7b7d-9c98-aea70406faaf",
+      "name": "Record sources",
+      "slug": "template_services_goods_record_sources",
+      "description": "Compare record sources over the period",
+      "type": "static"
+    },
+    {
+      "id": "01953ec0-809e-79e2-9cf8-b3a2a1e8e410",
+      "name": "Employee sales",
+      "slug": "template_services_goods_master_sales_extended",
+      "description": "Compare employee performance metrics over the period",
+      "type": "static"
+    },
+    {
+      "id": "01953ec0-bf82-71a4-a337-4307d91e5a63",
+      "name": "Revenue by cash registers",
+      "slug": "template_financial_accounts_report",
+      "description": "Detailed revenue by cash register for the period",
+      "type": "static"
+    },
+    {
+      "id": "019647c3-2eb3-74c1-b0dc-84fd63437084",
+      "name": "Employee dynamics — services",
+      "slug": "template_services_goods_master_sales_services_dynamic",
+      "description": "Services revenue per employee over time",
+      "type": "dynamic"
+    },
+    {
+      "id": "019647e8-f392-7b50-ac90-b3c98b3f5e19",
+      "name": "Financial report (dynamic)",
+      "slug": "template_financial_expenses_report_dynamic",
+      "description": "All income and expense items over time",
+      "type": "dynamic"
+    },
+    {
+      "id": "019647fe-8e58-7a30-a98b-1a6b57e6fcbd",
+      "name": "P&L (Profits and Loss)",
+      "slug": "template_financial_profits_and_loss",
+      "description": "Income and expense dynamics",
+      "type": "dynamic"
+    },
+    {
+      "id": "01964807-0f44-7cf0-82ce-ee401177fa06",
+      "name": "Employee dynamics — goods",
+      "slug": "template_services_goods_master_sales_goods_dynamic",
+      "description": "Goods revenue per employee over time",
+      "type": "dynamic"
+    },
+    {
+      "id": "01964807-681a-7bb2-9dd5-c741896cc44b",
+      "name": "Employee dynamics — records",
+      "slug": "template_services_goods_master_records_dynamic",
+      "description": "Records count and average check per employee over time",
+      "type": "dynamic"
+    },
+    {
+      "id": "019648f5-989f-7fe2-aca7-b5e2d8ab879c",
+      "name": "Service dynamics",
+      "slug": "template_services_goods_services_sales_dynamic",
+      "description": "Revenue per service over time",
+      "type": "dynamic"
+    },
+    {
+      "id": "0196490e-7a12-78e1-9f16-7ec7eb1f5289",
+      "name": "Client dynamics",
+      "slug": "template_services_goods_client_sales_dynamic",
+      "description": "Revenue per client over time",
+      "type": "dynamic"
+    }
+  ],
+  "meta": {
+    "count": 24
+  }
+}

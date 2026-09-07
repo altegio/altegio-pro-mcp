@@ -573,7 +573,17 @@ export async function listReportFields(
 
   let fields = all.filter((field) => field.dataset === input.dataset);
   if (!input.include_derived) {
-    fields = fields.filter((field) => field.is_curated);
+    // The registry marks curated *metrics* with `is_default`, but leaves
+    // dimensions and granularities unmarked — including `team_member_name`,
+    // the single most-asked-for grouping. Filtering on `is_default` alone would
+    // hide everything a report can be grouped by, so keep those too. The
+    // mechanically derived aggregates are neither, and stay hidden.
+    fields = fields.filter(
+      (field) =>
+        field.is_curated ||
+        field.kind === 'dimension' ||
+        field.kind === 'granularity'
+    );
   }
   if (input.search) {
     const needle = input.search.toLowerCase();

@@ -2,10 +2,12 @@
  * Opt-in live suite: calls the real analytics endpoints against the demo
  * location and re-records the golden fixtures.
  *
- * Skipped unless `ALTEGIO_E2E=1`. It needs a partner token
- * (`ALTEGIO_API_TOKEN`) and the demo credentials (`ALTEGIO_TEST_LOGIN`,
- * `ALTEGIO_TEST_PASSWORD`) in the environment — never in a file in this
- * repository, which is public.
+ * Skipped unless `ALTEGIO_E2E=1`. It needs a partner token in
+ * `ALTEGIO_PARTNER_TOKEN` (or `ALTEGIO_LIVE_API_TOKEN`) and the demo
+ * credentials in `ALTEGIO_TEST_LOGIN` / `ALTEGIO_TEST_PASSWORD` — from the
+ * environment, never from a file in this repository, which is public. The
+ * partner token is read from its own variable because the shared Jest setup
+ * pins `ALTEGIO_API_TOKEN` to a dummy value for every other suite.
  *
  *   ALTEGIO_E2E=1 CREDENTIALS_DIR=/tmp/altegio-mcp-live npx jest analytics-live
  *
@@ -89,6 +91,74 @@ function record(name: string, payload: unknown): void {
   );
 }
 
+/** Fields of the registry the adapter reads; the rest is noise in a golden. */
+const REGISTRY_FIELDS = [
+  'id',
+  'table_name',
+  'table_title',
+  'column_name',
+  'column_name_alias',
+  'title',
+  'data_type',
+  'data_type_slug',
+  'expression_slug',
+  'metric_type_slug',
+  'is_default',
+  'is_groupable',
+  'is_granularity',
+  'is_filterable',
+] as const;
+
+const AGGREGATE_SUFFIXES = [
+  '_count_distinct',
+  '_count',
+  '_sum',
+  '_avg',
+  '_min',
+  '_max',
+];
+
+/**
+ * Keep one row per distinct column stem plus a dozen mechanical aggregates.
+ * The identifier space is {raw field} x {aggregate}, so the stems are what the
+ * renaming rules have to cover.
+ */
+export function trimColumnRegistry(payload: unknown): unknown {
+  const rows = ((payload as { data?: unknown[] })?.data ?? []) as Array<
+    Record<string, unknown>
+  >;
+  const stemOf = (alias: string) => {
+    for (const suffix of AGGREGATE_SUFFIXES) {
+      if (alias.endsWith(suffix)) return alias.slice(0, -suffix.length);
+    }
+    return alias;
+  };
+
+  const seen = new Set<string>();
+  const kept: Array<Record<string, unknown>> = [];
+  let derived = 0;
+  for (const row of rows) {
+    const trimmed = Object.fromEntries(
+      REGISTRY_FIELDS.map((key) => [key, row[key]])
+    );
+    const alias = String(row.column_name_alias ?? row.column_name ?? '');
+    const stem = stemOf(alias);
+    if (stem === alias) {
+      if (seen.has(stem)) continue;
+      seen.add(stem);
+      kept.push(trimmed);
+    } else if (derived < 12) {
+      kept.push(trimmed);
+      derived++;
+    }
+  }
+  return {
+    success: true,
+    data: kept,
+    meta: { count: kept.length, recorded_total: rows.length },
+  };
+}
+
 const describeLive = LIVE ? describe : describe.skip;
 
 describeLive('analytics endpoints against the demo location', () => {
@@ -98,15 +168,11 @@ describeLive('analytics endpoints against the demo location', () => {
   beforeAll(async () => {
     const login = process.env.ALTEGIO_TEST_LOGIN;
     const password = process.env.ALTEGIO_TEST_PASSWORD;
-    const partnerToken = process.env.ALTEGIO_API_TOKEN;
-    if (
-      !login ||
-      !password ||
-      !partnerToken ||
-      partnerToken.startsWith('test-')
-    ) {
+    const partnerToken =
+      process.env.ALTEGIO_PARTNER_TOKEN ?? process.env.ALTEGIO_LIVE_API_TOKEN;
+    if (!login || !password || !partnerToken) {
       throw new Error(
-        'The live suite needs ALTEGIO_API_TOKEN, ALTEGIO_TEST_LOGIN and ALTEGIO_TEST_PASSWORD in the environment.'
+        'The live suite needs ALTEGIO_PARTNER_TOKEN (or ALTEGIO_LIVE_API_TOKEN), ALTEGIO_TEST_LOGIN and ALTEGIO_TEST_PASSWORD in the environment.'
       );
     }
     client = new AltegioClient({ partnerToken }, CREDENTIALS_DIR);
@@ -213,13 +279,19 @@ describeLive('analytics endpoints against the demo location', () => {
   }, 120_000);
 
   it('records the report builder catalogues', async () => {
-    await capture(
-      'constructor-columns',
+    // The field registry has 565 rows; only one row per distinct column stem
+    // plus a sample of the mechanical aggregates is kept, which is what the
+    // vocabulary guard in `live-registry.test.ts` needs and keeps the golden
+    // file readable. The small hand-built wiring fixtures are left alone.
+    const columns = await callAnalytics(
+      httpFromClient(client),
       `${base}/analytics_constructor/columns`,
-      'report_builder'
+      { kind: 'report_builder', context: 'record the field registry' }
     );
+    record('constructor-columns-live', trimColumnRegistry(columns));
+
     await capture(
-      'constructor-report-templates',
+      'report-templates-live',
       `${base}/analytics_constructor/report_templates?include[]=report_template_columns&include[]=report_template_filters&include[]=report_template_groupings`,
       'report_builder'
     );
