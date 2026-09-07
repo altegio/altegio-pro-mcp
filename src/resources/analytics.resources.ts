@@ -26,6 +26,20 @@ import {
   METRIC_DEFINITIONS,
 } from '../capabilities/analytics/metrics-registry.js';
 import {
+  ANALYSIS_NOTES,
+  DIAGNOSTIC_PLAYS,
+  METRIC_RELATIONSHIPS,
+  QUESTION_ROUTES,
+  SLICING_NOTES,
+} from '../capabilities/analytics/playbook.js';
+import {
+  CODED_VALUES,
+  DATASET_USES,
+  ENTITY_MODEL,
+  LEDGER_NOTE,
+  METRIC_SOURCES,
+} from '../capabilities/analytics/data-model.js';
+import {
   DATASETS,
   DATASET_DESCRIPTIONS,
   type Dataset,
@@ -37,6 +51,8 @@ import {
 
 export const GLOSSARY_URI = 'altegio://analytics/glossary';
 export const COVERAGE_URI = 'altegio://analytics/coverage';
+export const PLAYBOOK_URI = 'altegio://analytics/playbook';
+export const DATA_MODEL_URI = 'altegio://analytics/data-model';
 export const REPORT_FIELDS_URI_TEMPLATE =
   'altegio://analytics/report-fields/{dataset}';
 export const REPORT_CSV_URI_TEMPLATE =
@@ -106,6 +122,124 @@ export function renderGlossary(): string {
     DATASETS.map(
       (dataset) => `- **${dataset}** — ${DATASET_DESCRIPTIONS[dataset]}`
     ).join('\n'),
+    '',
+  ].join('\n');
+}
+
+// ========== playbook ==========
+
+export function renderPlaybook(): string {
+  const relationships = METRIC_RELATIONSHIPS.map(
+    (relationship) =>
+      `- **${relationship.title}**\n  - \`${relationship.identity}\`\n  - ${relationship.use}`
+  ).join('\n');
+
+  const plays = DIAGNOSTIC_PLAYS.map((play) => {
+    const steps = play.steps
+      .map((step, index) => `${index + 1}. ${step}`)
+      .join('\n');
+    return `### ${play.symptom}\n\n${steps}\n\n_Read it as:_ ${play.read}`;
+  }).join('\n\n');
+
+  const routes = QUESTION_ROUTES.map(
+    (route) => `| ${route.question} | \`${route.tool}\` |`
+  ).join('\n');
+
+  const slicing = SLICING_NOTES.map(
+    (note) => `- **${note.dimension}.** ${note.how}`
+  ).join('\n');
+
+  const notes = ANALYSIS_NOTES.map(
+    (note) => `- **${note.title}.** ${note.text}`
+  ).join('\n');
+
+  return [
+    '# Analytics playbook — how to analyse a location',
+    '',
+    'Read this before answering an open question about a location’s performance.',
+    'It turns the raw metrics into an investigation: how they decompose, which',
+    'tool answers which question, what to slice by, and the order to look in.',
+    'What each metric *means* is in `altegio://analytics/glossary`; what this',
+    'server cannot answer is in `altegio://analytics/coverage`.',
+    '',
+    '## How the metrics relate (decompose before you conclude)',
+    '',
+    relationships,
+    '',
+    '## Which tool answers which question',
+    '',
+    '| Question | Tool |',
+    '|---|---|',
+    routes,
+    '',
+    '## Diagnostic plays (symptom → the order to investigate)',
+    '',
+    plays,
+    '',
+    '## What you can slice by',
+    '',
+    slicing,
+    '',
+    '## Analysis technique',
+    '',
+    notes,
+    '',
+  ].join('\n');
+}
+
+// ========== data model ==========
+
+export function renderDataModel(): string {
+  const entities = ENTITY_MODEL.map(
+    (node) => `- **${node.name}** — ${node.is}\n  - ${node.carries}`
+  ).join('\n');
+
+  const sources = METRIC_SOURCES.map(
+    (source) => `| ${source.family} | ${source.from} | ${source.note} |`
+  ).join('\n');
+
+  const coded = CODED_VALUES.map(
+    (value) => `- **${value.field}** — ${value.values}\n  - ${value.meaning}`
+  ).join('\n');
+
+  const datasets = DATASET_USES.map(
+    (use) => `- **${use.dataset}** — ${use.reachFor}`
+  ).join('\n');
+
+  return [
+    '# Analytics data model — where each number comes from',
+    '',
+    'The shape of the objects behind the metrics, for reading the numbers rather',
+    'than building against them. For the platform in full, read',
+    '`altegio://docs/product-logic`; for how to reason with these numbers, read',
+    '`altegio://analytics/playbook`.',
+    '',
+    '## The spine: appointment → visit → client',
+    '',
+    'A booking creates an **appointment** (scheduled time). When the client comes',
+    'and pays, that becomes a **visit** (the money), attributed to a **client**.',
+    'Only an arrived appointment turns into revenue, so appointment counts and',
+    'revenue can move apart — the difference is the attendance gap.',
+    '',
+    entities,
+    '',
+    '## Which object each metric is computed from',
+    '',
+    '| Metric family | Computed from | What to remember |',
+    '|---|---|---|',
+    sources,
+    '',
+    '## Two ledgers',
+    '',
+    LEDGER_NOTE,
+    '',
+    '## Coded values an answer carries',
+    '',
+    coded,
+    '',
+    '## The four report-builder datasets — what to reach for each',
+    '',
+    datasets,
     '',
   ].join('\n');
 }
@@ -207,6 +341,22 @@ export function listAnalyticsResources(): ResourceEntry[] {
         'Which analytics this server can produce and which reports exist only in the web interface, with the closest available alternative for each gap.',
       mimeType: 'text/markdown',
     },
+    {
+      uri: PLAYBOOK_URI,
+      name: 'analytics-playbook',
+      title: 'Analytics playbook',
+      description:
+        'How to analyse a location, not just what the numbers mean: how metrics decompose (revenue = traffic × average check, occupancy = booked / scheduled), which tool answers which question, what you can slice by, and symptom-driven diagnostic plays for revenue drops, low occupancy, weak retention, no-shows and booking channels. Read this before answering an open performance question.',
+      mimeType: 'text/markdown',
+    },
+    {
+      uri: DATA_MODEL_URI,
+      name: 'analytics-data-model',
+      title: 'Analytics data model',
+      description:
+        'Where each number comes from: the appointment → visit → client spine, which object every metric family is computed from, the two ledgers (money and products), the coded values an answer carries (visit status, payment status, source, client priority, money units), and what each report-builder dataset aggregates. Read this to know what a figure means and what it can be sliced by.',
+      mimeType: 'text/markdown',
+    },
   ];
 }
 
@@ -254,6 +404,18 @@ export async function readAnalyticsResource(
   if (uri === COVERAGE_URI) {
     return {
       contents: [{ uri, mimeType: 'text/markdown', text: renderCoverage() }],
+    };
+  }
+
+  if (uri === PLAYBOOK_URI) {
+    return {
+      contents: [{ uri, mimeType: 'text/markdown', text: renderPlaybook() }],
+    };
+  }
+
+  if (uri === DATA_MODEL_URI) {
+    return {
+      contents: [{ uri, mimeType: 'text/markdown', text: renderDataModel() }],
     };
   }
 

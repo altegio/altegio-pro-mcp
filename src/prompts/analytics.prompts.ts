@@ -48,6 +48,13 @@ const periodArgument: PromptArgument = {
 
 export const ANALYTICS_PROMPTS: readonly PromptEntry[] = [
   {
+    name: 'analytics_location_health_check',
+    title: 'Location health check',
+    description:
+      'Diagnose a location end to end when there is no specific complaint: pull the headline, split every movement into traffic versus spend, find where demand leaks (no-shows, cancellations, idle time), and finish with the single change with the largest expected effect. Follows the analytics playbook.',
+    arguments: [locationArgument, periodArgument],
+  },
+  {
     name: 'analytics_monthly_review',
     title: 'Monthly business review',
     description:
@@ -128,6 +135,21 @@ export function getAnalyticsPrompt(
 
   let text: string;
   switch (name) {
+    case 'analytics_location_health_check':
+      text = [
+        `Run a full health check on location ${locationId} for the period "${period}".`,
+        '',
+        'First read the `altegio://analytics/playbook` resource — it has the metric identities and the diagnostic order this check follows. Then work through the numbers, not the raw payloads:',
+        `1. analytics_get_overview for location_id=${locationId}, period=${period}. This is the headline: revenue and its services/products split, average check, occupancy, appointments by outcome, and the new/returning/active/lost client mix, each against the previous period.`,
+        '2. For every headline metric that moved by more than ten percent, decompose it before concluding: was revenue traffic (clients_active, visits) or spend (average_check)? Is the appointment count healthy but the attendance rate weak?',
+        `3. analytics_get_daily_series with metric=revenue — the shape of the period, the best and worst days, any weekly rhythm.`,
+        '4. analytics_get_appointments_breakdown by source, then by visit_status — where demand comes from and how much of it leaks to no-shows and cancellations. Call out the no-show share explicitly.',
+        '5. analytics_run_report on "Revenue by team member" and "Revenue by service" — the two tables that explain the headline, and the "Occupancy" template if capacity looks off.',
+        '',
+        'Finish with three to five sentences an owner can act on: what grew, what shrank, what is leaking (no-shows, cancellations, idle time), and the single change with the largest expected effect. Report absolute money next to every percentage. If a tool reports a missing access right or a switched-off module, say so plainly instead of guessing the number — missing is not zero.',
+      ].join('\n');
+      break;
+
     case 'analytics_monthly_review':
       text = [
         `Review location ${locationId} for the period "${period}".`,

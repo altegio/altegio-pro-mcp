@@ -8,6 +8,8 @@
 import {
   COVERAGE_URI,
   GLOSSARY_URI,
+  PLAYBOOK_URI,
+  DATA_MODEL_URI,
   REPORT_CSV_URI_TEMPLATE,
   REPORT_FIELDS_URI_TEMPLATE,
   listAnalyticsResourceTemplates,
@@ -24,10 +26,12 @@ import { DATASETS } from '../../capabilities/analytics/vocabulary.js';
 beforeEach(() => clearReportStore());
 
 describe('resource listing', () => {
-  it('offers the glossary and the coverage note as fixed resources', () => {
+  it('offers the glossary, coverage, playbook and data model as fixed resources', () => {
     expect(listAnalyticsResources().map((entry) => entry.uri)).toEqual([
       GLOSSARY_URI,
       COVERAGE_URI,
+      PLAYBOOK_URI,
+      DATA_MODEL_URI,
     ]);
   });
 
@@ -80,6 +84,31 @@ describe('coverage resource', () => {
     // Every gap must offer a next step, even if that step is "none".
     const gaps = text.split('- **').slice(1);
     expect(gaps.length).toBeGreaterThan(5);
+  });
+});
+
+describe('playbook resource', () => {
+  it('gives the decomposition identities and a diagnostic order', async () => {
+    const read = (await readAnalyticsResource(PLAYBOOK_URI))!;
+    const text = read.contents[0]!.text;
+
+    expect(read.contents[0]!.mimeType).toBe('text/markdown');
+    expect(text).toContain('revenue_total');
+    expect(text).toContain('Diagnostic plays');
+    expect(text).toContain('Revenue is down');
+    expect(text).toContain('Which tool answers which question');
+  });
+});
+
+describe('data model resource', () => {
+  it('maps the appointment → visit → client spine and the datasets', async () => {
+    const read = (await readAnalyticsResource(DATA_MODEL_URI))!;
+    const text = read.contents[0]!.text;
+
+    expect(text).toContain('appointment → visit → client');
+    expect(text).toContain('Two ledgers');
+    expect(text).toContain('visit_status');
+    expect(text).toContain('team_member_schedules');
   });
 });
 
