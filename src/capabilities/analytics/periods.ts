@@ -193,10 +193,7 @@ export interface PeriodInput {
  * be resolved (the location is not in the authenticated user's location list) —
  * presets then resolve in UTC and the returned period says so.
  */
-export function resolvePeriod(
-  input: PeriodInput,
-  timezone?: string
-): Period {
+export function resolvePeriod(input: PeriodInput, timezone?: string): Period {
   const zone = timezone && isValidTimezone(timezone) ? timezone : 'UTC';
 
   if (input.period && (input.date_from || input.date_to)) {

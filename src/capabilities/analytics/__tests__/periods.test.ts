@@ -41,9 +41,9 @@ describe('resolvePreset', () => {
     ['last_quarter', '2026-04-01', '2026-06-30'],
     ['this_year', '2026-01-01', '2026-09-09'],
   ])('%s resolves to %s…%s in UTC', (preset, from, to) => {
-    expect(resolvePreset(preset as (typeof PERIOD_PRESETS)[number], 'UTC')).toEqual(
-      { date_from: from, date_to: to }
-    );
+    expect(
+      resolvePreset(preset as (typeof PERIOD_PRESETS)[number], 'UTC')
+    ).toEqual({ date_from: from, date_to: to });
   });
 
   it('resolves the same instant to a different day per timezone', () => {
@@ -84,9 +84,9 @@ describe('resolvePeriod', () => {
 
   it('falls back to UTC when the timezone is missing or unusable', () => {
     expect(resolvePeriod({ period: 'today' }).timezone).toBe('UTC');
-    expect(
-      resolvePeriod({ period: 'today' }, 'Not/AZone').timezone
-    ).toBe('UTC');
+    expect(resolvePeriod({ period: 'today' }, 'Not/AZone').timezone).toBe(
+      'UTC'
+    );
   });
 
   it('accepts an explicit range and records no preset', () => {

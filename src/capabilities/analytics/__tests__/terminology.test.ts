@@ -135,9 +135,9 @@ describe('analytics terminology', () => {
         team_member_ids: '9001,9002',
       })!;
       expect(findForbiddenWords(rendered.description)).toEqual([]);
-      expect(
-        findForbiddenWords(rendered.messages[0]!.content.text)
-      ).toEqual([]);
+      expect(findForbiddenWords(rendered.messages[0]!.content.text)).toEqual(
+        []
+      );
     }
   });
 
@@ -218,7 +218,9 @@ describe('visit status and appointment source mapping', () => {
     expect(appointmentSourceFromLabel('Booking form "Main site"')).toBe(
       'online_booking_widget'
     );
-    expect(appointmentSourceFromLabel('Some partner integration')).toBe('other');
+    expect(appointmentSourceFromLabel('Some partner integration')).toBe(
+      'other'
+    );
   });
 });
 

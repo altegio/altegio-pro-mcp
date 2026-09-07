@@ -13,10 +13,7 @@
  */
 import type { AltegioHttp } from '../altegio-http.js';
 import { queryString, v2Path } from '../altegio-http.js';
-import {
-  callEnveloped,
-  callRawArray,
-} from './analytics-http.js';
+import { callEnveloped, callRawArray } from './analytics-http.js';
 import type {
   AnalyticsApi,
   AnalyticsFilterQuery,
@@ -60,7 +57,10 @@ import {
   visitStatusFromLabel,
   visitStatusToLegacyCode,
 } from '../../capabilities/analytics/vocabulary.js';
-import { chartPointToDay, toDottedDate } from '../../capabilities/analytics/periods.js';
+import {
+  chartPointToDay,
+  toDottedDate,
+} from '../../capabilities/analytics/periods.js';
 import { AnalyticsInputError } from '../../capabilities/analytics/errors.js';
 
 // ========== value parsing ==========
@@ -147,11 +147,7 @@ function filterQuery(query: AnalyticsFilterQuery): string {
 }
 
 /** Turn a chart row into a canonical daily series. */
-function toSeries(
-  row: unknown,
-  key: string,
-  timezone: string
-): DailySeries {
+function toSeries(row: unknown, key: string, timezone: string): DailySeries {
   const r = record(row);
   const points: DailyPoint[] = [];
   for (const point of list(r.data)) {
@@ -205,9 +201,7 @@ export class V1AnalyticsAdapter implements AnalyticsApi {
         products: comparedMoney(data.income_goods_stats),
       },
       average_check: comparedMoney(data.income_average_stats),
-      average_services_check: comparedMoney(
-        data.income_average_services_stats
-      ),
+      average_services_check: comparedMoney(data.income_average_services_stats),
       occupancy_percent: comparedCount(
         data.fullness_stats,
         'current_percent',
@@ -798,10 +792,7 @@ export class V1AnalyticsAdapter implements AnalyticsApi {
       team_member_id: query.team_member_id,
       points: list(rows).map((row) => {
         const r = record(row);
-        return [
-          String(r.date ?? ''),
-          toPercent(r.workload) ?? 0,
-        ] as const;
+        return [String(r.date ?? ''), toPercent(r.workload) ?? 0] as const;
       }),
     };
   }
@@ -815,7 +806,10 @@ export class V1AnalyticsAdapter implements AnalyticsApi {
       v2Path(
         `/locations/${query.location_id}/clients/${query.client_id}/attendances_statistic`
       ),
-      { kind: 'client_visits', context: 'read the visit history of this client' }
+      {
+        kind: 'client_visits',
+        context: 'read the visit history of this client',
+      }
     );
     // JSON:API: `data.attributes`, with a flat fallback for the compact serializer.
     const attributes = record(
@@ -823,7 +817,9 @@ export class V1AnalyticsAdapter implements AnalyticsApi {
     );
     return {
       client_id: query.client_id,
-      successful_visits_count: toNumber(attributes.successful_attendances_count),
+      successful_visits_count: toNumber(
+        attributes.successful_attendances_count
+      ),
       failed_visits_count: toNumber(attributes.failed_attendances_count),
       spent_total: toMoney(attributes.spent_amount),
       paid_total: toMoney(attributes.paid_amount),

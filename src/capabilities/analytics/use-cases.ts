@@ -41,11 +41,7 @@ import {
   putReportCsv,
   type StoredReport,
 } from './report-store.js';
-import {
-  DATASET_TABLE,
-  REPORT_TEMPLATES,
-  type Dataset,
-} from './vocabulary.js';
+import { DATASET_TABLE, REPORT_TEMPLATES, type Dataset } from './vocabulary.js';
 
 /** A `resource_link` content block, for output that does not fit inline. */
 export interface ResourceLinkBlock {
@@ -199,7 +195,8 @@ export async function getDailySeries(
     structuredContent: {
       ...periodBlock(ctx),
       metric: input.metric,
-      unit: unit === 'money' ? 'money' : unit === 'percent' ? 'percent' : 'count',
+      unit:
+        unit === 'money' ? 'money' : unit === 'percent' ? 'percent' : 'count',
       ...(currency ? { currency } : {}),
       series,
     },
@@ -243,7 +240,10 @@ export async function getAppointmentsBreakdown(
   ].join('\n');
 
   return {
-    text: slices.length === 0 ? `No appointments in ${ctx.period.date_from}…${ctx.period.date_to}.` : text,
+    text:
+      slices.length === 0
+        ? `No appointments in ${ctx.period.date_from}…${ctx.period.date_to}.`
+        : text,
     structuredContent: {
       ...periodBlock(ctx),
       group_by: input.group_by,
@@ -354,9 +354,7 @@ export async function getForecast(
 
   const forecast = await api.getForecast({
     location_id: input.location_id,
-    ...(period
-      ? { date_from: period.date_from, date_to: period.date_to }
-      : {}),
+    ...(period ? { date_from: period.date_from, date_to: period.date_to } : {}),
   });
 
   if (forecast.is_empty) {

@@ -11,10 +11,7 @@
  * localized label, and the English wording is what the vocabulary module maps
  * to canonical keys.
  */
-import {
-  requireUserToken,
-  type AltegioHttp,
-} from '../altegio-http.js';
+import { requireUserToken, type AltegioHttp } from '../altegio-http.js';
 import {
   mapAnalyticsHttpError,
   type AnalyticsEndpointKind,

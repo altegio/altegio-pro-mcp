@@ -90,9 +90,7 @@ describe('queryString', () => {
         blank: '',
         flag: false,
       })
-    ).toBe(
-      '?date_from=2026-08-01&team_member_id=9001&flag=false'
-    );
+    ).toBe('?date_from=2026-08-01&team_member_id=9001&flag=false');
   });
 
   it('returns an empty string when nothing is left', () => {

@@ -11,8 +11,16 @@ import type { AltegioClient } from '../../../providers/altegio-client.js';
 import * as definitions from '../../../tools/definitions/index.js';
 import type { DefinedTool } from '../../../tools/factory.js';
 import { clearTimezoneCache } from '../location-timezone.js';
-import { clearReportStore, getReportCsv, parseReportUri } from '../report-store.js';
-import { OWNED_REPORT_PREFIX, definitionMatches, shortHash } from '../use-cases.js';
+import {
+  clearReportStore,
+  getReportCsv,
+  parseReportUri,
+} from '../report-store.js';
+import {
+  OWNED_REPORT_PREFIX,
+  definitionMatches,
+  shortHash,
+} from '../use-cases.js';
 import { findForbiddenWords } from '../vocabulary.js';
 
 const FIXTURES = path.join(__dirname, '../../../api/v1/__tests__/fixtures');
@@ -60,8 +68,7 @@ function fakeClient(
       });
       for (const [pattern, target] of routes) {
         if (!pattern.test(requestPath)) continue;
-        const body =
-          typeof target === 'string' ? fixture(target) : target;
+        const body = typeof target === 'string' ? fixture(target) : target;
         return new Response(JSON.stringify(body), { status: 200 });
       }
       throw new Error(`no fixture routed for ${requestPath}`);
@@ -203,7 +210,9 @@ describe('analytics_get_daily_series', () => {
       currency: 'EUR',
     });
     const series = (
-      result.structuredContent as { series: Array<{ key: string; points: unknown[] }> }
+      result.structuredContent as {
+        series: Array<{ key: string; points: unknown[] }>;
+      }
     ).series;
     expect(series[0]!.key).toBe('revenue_total');
     expect(series[0]!.points[0]).toEqual(['2026-08-01', 430.5]);
@@ -576,7 +585,9 @@ describe('analytics_run_report — report ownership rule', () => {
       report_groupings: Array<{ column_id: string }>;
     };
     expect(body.type).toBe('dynamic');
-    expect(body.report_groupings).toEqual([{ column_id: 'c-sales-date-month' }]);
+    expect(body.report_groupings).toEqual([
+      { column_id: 'c-sales-date-month' },
+    ]);
   });
 
   it('names the unknown field and the tool that lists the real ones', async () => {
@@ -589,7 +600,10 @@ describe('analytics_run_report — report ownership rule', () => {
         group_by: ['team_member_name'],
         period: 'last_month',
       },
-      [...base, [/analytics_constructor\/reports$/, { success: true, data: [] }]]
+      [
+        ...base,
+        [/analytics_constructor\/reports$/, { success: true, data: [] }],
+      ]
     );
     expect(result.isError).toBe(true);
     expect(result.content[0]!.text).toContain('profit_margin_of_the_universe');
@@ -615,7 +629,10 @@ describe('analytics_run_report — report ownership rule', () => {
     const { result } = await call(
       'analytics_run_report',
       { location_id: 4564, template_id: 't-nope', period: 'last_month' },
-      [...base, [/analytics_constructor\/reports$/, { success: true, data: [] }]]
+      [
+        ...base,
+        [/analytics_constructor\/reports$/, { success: true, data: [] }],
+      ]
     );
     expect(result.isError).toBe(true);
     expect(result.content[0]!.text).toContain(
@@ -629,7 +646,11 @@ describe('analytics_run_report — report ownership rule', () => {
       data: {
         header: {
           groupings: [
-            { key: 'g_1', report_grouping_id: 'rg-1', column_id: 'c-sales-master' },
+            {
+              key: 'g_1',
+              report_grouping_id: 'rg-1',
+              column_id: 'c-sales-master',
+            },
           ],
           columns: [
             {
@@ -642,11 +663,19 @@ describe('analytics_run_report — report ownership rule', () => {
         },
         rows: Array.from({ length: 205 }, (_, i) => ({
           groupings: [
-            { key: 'g_1', column_id: 'c-sales-master', value: `Team member ${i}` },
+            {
+              key: 'g_1',
+              column_id: 'c-sales-master',
+              value: `Team member ${i}`,
+            },
           ],
-          columns: [{ key: 'c_1', column_id: 'c-sales-revenue', value: i * 10 }],
+          columns: [
+            { key: 'c_1', column_id: 'c-sales-revenue', value: i * 10 },
+          ],
         })),
-        summary: { columns: [{ key: 'c_1', column_id: 'c-sales-revenue', value: 1 }] },
+        summary: {
+          columns: [{ key: 'c_1', column_id: 'c-sales-revenue', value: 1 }],
+        },
       },
       meta: [],
     };
@@ -660,7 +689,10 @@ describe('analytics_run_report — report ownership rule', () => {
       },
       [
         [/analytics_constructor\/columns/, 'constructor-columns'],
-        [/analytics_constructor\/report_templates/, 'constructor-report-templates'],
+        [
+          /analytics_constructor\/report_templates/,
+          'constructor-report-templates',
+        ],
         [/analytics_constructor\/reports$/, 'constructor-reports'],
         [/analytics_constructor\/reports\/r-owned\?/, 'constructor-report'],
         [/reports\/[^/]+\/data/, wide],
@@ -677,7 +709,9 @@ describe('analytics_run_report — report ownership rule', () => {
     expect(content.truncated).toBe(true);
     expect(content.full_report_rows).toBe(205);
 
-    const link = result.content.find((block) => block.type === 'resource_link')!;
+    const link = result.content.find(
+      (block) => block.type === 'resource_link'
+    )!;
     expect(link.uri).toBe(content.full_report_uri);
     expect(link.name).toContain('.csv');
 

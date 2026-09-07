@@ -83,12 +83,7 @@ export function overviewSummary(
       overview.currency,
       'money'
     ),
-    comparedText(
-      'Occupancy',
-      overview.occupancy_percent,
-      null,
-      'percent'
-    ),
+    comparedText('Occupancy', overview.occupancy_percent, null, 'percent'),
     `Appointments: ${overview.appointments.total_count ?? 'n/a'} total, ${overview.appointments.completed_count ?? 'n/a'} completed, ${overview.appointments.cancelled_count ?? 'n/a'} cancelled (${formatChange(overview.appointments.change_percent)} vs previous period)`,
     `Clients: ${overview.clients.active_count ?? 'n/a'} came in the period — ${overview.clients.new_count ?? 'n/a'} new, ${overview.clients.returning_count ?? 'n/a'} returning; ${overview.clients.lost_count ?? 'n/a'} lost of ${overview.clients.total_in_base ?? 'n/a'} in the client base`,
   ];
@@ -110,7 +105,8 @@ export function seriesSummary(
     const values = one.points.map(([, value]) => value);
     const total = values.reduce((sum, value) => sum + value, 0);
     const peak = one.points.reduce<[string, number] | null>(
-      (best, point) => (best === null || point[1] > best[1] ? [...point] : best),
+      (best, point) =>
+        best === null || point[1] > best[1] ? [...point] : best,
       null
     );
     const aggregate =

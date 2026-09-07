@@ -76,7 +76,10 @@ interface ExtendedOperation {
   operationId?: string;
   parameters?: Array<{ name: string; in: string }>;
   requestBody?: {
-    content?: Record<string, { schema?: { properties?: Record<string, unknown> } }>;
+    content?: Record<
+      string,
+      { schema?: { properties?: Record<string, unknown> } }
+    >;
   };
 }
 
@@ -429,7 +432,9 @@ describe('Spec Compliance', () => {
           ([, mapping]) => `${mapping.method} ${mapping.path}`
         )
       );
-      const unused = [...extendedCatalog.keys()].filter((key) => !used.has(key));
+      const unused = [...extendedCatalog.keys()].filter(
+        (key) => !used.has(key)
+      );
       expect(unused).toEqual([]);
     });
   });
@@ -498,9 +503,9 @@ describe('Spec Compliance', () => {
       for (const [tool, mapping] of allApiMappings()) {
         const source = mappingSource(mapping);
         if (source === 'extended') {
-          expect(
-            extendedCatalog.has(`${mapping.method} ${mapping.path}`)
-          ).toBe(true);
+          expect(extendedCatalog.has(`${mapping.method} ${mapping.path}`)).toBe(
+            true
+          );
         } else if (specAvailable) {
           const pathObj = findPathInSpec(mapping.path);
           expect(pathObj?.[mapping.method]).toBeDefined();

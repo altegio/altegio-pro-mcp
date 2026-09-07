@@ -344,7 +344,10 @@ export const analyticsGetLoyaltyProgramResultsTool = defineTool({
     currency: str,
     clients: { type: 'object' as const },
     revenue: { type: 'object' as const },
-    visits_by_day: { type: 'array' as const, items: { type: 'object' as const } },
+    visits_by_day: {
+      type: 'array' as const,
+      items: { type: 'object' as const },
+    },
     revenue_by_day: {
       type: 'array' as const,
       items: { type: 'object' as const },
@@ -365,7 +368,10 @@ export const analyticsGetForecastTool = defineTool({
   category: 'Analytics',
   description:
     '[Analytics] Model forecast of revenue and visit count next to what actually happened, so the owner can see whether the location is running ahead of or behind expectation. Answers "are we on track this month", "what revenue should we expect". This is a forecast comparison, not client segmentation. The forecast is an optional module: when it is switched off for the location, or when there is not enough visit history yet, the tool says so instead of failing — use analytics_get_overview for the actuals in that case.',
-  annotations: { title: 'Analytics: revenue and visits forecast', ...READ_ONLY },
+  annotations: {
+    title: 'Analytics: revenue and visits forecast',
+    ...READ_ONLY,
+  },
   input: z.object({
     location_id: locationId,
     ...periodFields,
@@ -608,8 +614,7 @@ const reportTableOutput = objectSchema({
 export const analyticsRunReportTool = defineTool({
   name: 'analytics_run_report',
   category: 'Analytics',
-  description:
-    `[Analytics] Run a report and get a table back: either a built-in template by template_id, or an ad-hoc report built from a dataset, the fields you want and what to group them by. This is how you answer "revenue by team member last month", "top services by revenue", "sales per client", "income and expenses by month", "P&L for the quarter", "occupancy hours per stylist". Get template_id from analytics_list_report_templates and field keys from analytics_list_report_fields. At most ${REPORT_ROW_CAP} rows come back inline; a longer table is attached as a CSV resource link that stays readable for 30 minutes. Note: the report builder has no delete, so this tool keeps exactly one report per template or ad-hoc shape, named "[Altegio Assistant] …", creating it on first use and reusing it afterwards — the period travels per run and never creates a second report. Needs the Analytics access right and an active subscription.`,
+  description: `[Analytics] Run a report and get a table back: either a built-in template by template_id, or an ad-hoc report built from a dataset, the fields you want and what to group them by. This is how you answer "revenue by team member last month", "top services by revenue", "sales per client", "income and expenses by month", "P&L for the quarter", "occupancy hours per stylist". Get template_id from analytics_list_report_templates and field keys from analytics_list_report_fields. At most ${REPORT_ROW_CAP} rows come back inline; a longer table is attached as a CSV resource link that stays readable for 30 minutes. Note: the report builder has no delete, so this tool keeps exactly one report per template or ad-hoc shape, named "[Altegio Assistant] …", creating it on first use and reusing it afterwards — the period travels per run and never creates a second report. Needs the Analytics access right and an active subscription.`,
   annotations: {
     title: 'Analytics: run a report',
     // Not marked read-only on purpose: running a template requires a stored
@@ -698,8 +703,7 @@ export const analyticsListSavedReportsTool = defineTool({
 export const analyticsRunSavedReportTool = defineTool({
   name: 'analytics_run_saved_report',
   category: 'Analytics',
-  description:
-    `[Analytics] Run a report that already exists in the location’s report builder for a period you choose, and get the table back. Get report_id from analytics_list_saved_reports. The report’s own period filter is overridden per run, so nothing stored is changed. At most ${REPORT_ROW_CAP} rows come back inline; a longer table is attached as a CSV resource link readable for 30 minutes. Needs the Analytics access right and an active subscription.`,
+  description: `[Analytics] Run a report that already exists in the location’s report builder for a period you choose, and get the table back. Get report_id from analytics_list_saved_reports. The report’s own period filter is overridden per run, so nothing stored is changed. At most ${REPORT_ROW_CAP} rows come back inline; a longer table is attached as a CSV resource link readable for 30 minutes. Needs the Analytics access right and an active subscription.`,
   annotations: { title: 'Analytics: run a saved report', ...READ_ONLY },
   input: z.object({
     location_id: locationId,

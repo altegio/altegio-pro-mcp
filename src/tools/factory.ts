@@ -100,10 +100,7 @@ export function defineTool<T extends ZodType>(
           client,
         });
         const result: ToolResult = {
-          content: [
-            { type: 'text' as const, text },
-            ...(extraContent ?? []),
-          ],
+          content: [{ type: 'text' as const, text }, ...(extraContent ?? [])],
         };
         if (structuredContent !== undefined) {
           result.structuredContent = structuredContent;

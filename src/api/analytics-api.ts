@@ -357,7 +357,11 @@ export interface SavedReport {
   created_at: string | null;
   /** Filters of the stored report, needed to override the period at run time. */
   filters?: Array<{ filter_id: string; column_id: string; operator: string }>;
-  columns?: Array<{ report_column_id: string; column_id: string; title: string | null }>;
+  columns?: Array<{
+    report_column_id: string;
+    column_id: string;
+    title: string | null;
+  }>;
   groupings?: Array<{ report_grouping_id: string; column_id: string }>;
 }
 

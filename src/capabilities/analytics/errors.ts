@@ -109,7 +109,9 @@ function backendFieldErrors(body: unknown): string | undefined {
     errors as Record<string, unknown>
   )) {
     const cleaned = field.replace(/^\[|\]$/g, '');
-    const text = Array.isArray(messages) ? messages.join('; ') : String(messages);
+    const text = Array.isArray(messages)
+      ? messages.join('; ')
+      : String(messages);
     parts.push(`${cleaned}: ${text}`);
   }
   return parts.length > 0 ? parts.join(' | ') : undefined;

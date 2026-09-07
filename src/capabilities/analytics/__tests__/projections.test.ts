@@ -107,7 +107,9 @@ describe('overviewSummary', () => {
     const text = overviewSummary(overview, period, previousPeriod(period));
     expect(text).toContain('2026-08-01…2026-08-03');
     expect(text).toContain('compared with 2026-07-29…2026-07-31');
-    expect(text).toContain('Total revenue: 12,480.5 EUR (+14% vs previous period)');
+    expect(text).toContain(
+      'Total revenue: 12,480.5 EUR (+14% vs previous period)'
+    );
     expect(text).toContain('Average check');
     expect(text).toContain('Occupancy: 63.4%');
     expect(text).toContain('63 new, 178 returning');
@@ -143,7 +145,13 @@ describe('seriesSummary', () => {
   it('averages a percent series instead of summing it', () => {
     const text = seriesSummary(
       'occupancy',
-      [{ key: 'occupancy_percent', label: 'Occupancy', points: series[0]!.points }],
+      [
+        {
+          key: 'occupancy_percent',
+          label: 'Occupancy',
+          points: series[0]!.points,
+        },
+      ],
       period,
       'percent',
       null
@@ -250,10 +258,7 @@ describe('projectReportTable', () => {
   });
 
   it('keeps unknown columns under their own key rather than dropping data', () => {
-    const projected = projectReportTable(
-      { ...table, column_ids: {} },
-      fields
-    );
+    const projected = projectReportTable({ ...table, column_ids: {} }, fields);
     expect(projected.columns.map((c) => c.key)).toEqual(['g_1', 'c_1', 'c_2']);
   });
 
@@ -387,6 +392,8 @@ describe('report CSV store', () => {
       run_id: 'abc123',
     });
     expect(parseReportUri('altegio://analytics/glossary')).toBeNull();
-    expect(parseReportUri('altegio://reports/4564/../etc/passwd.csv')).toBeNull();
+    expect(
+      parseReportUri('altegio://reports/4564/../etc/passwd.csv')
+    ).toBeNull();
   });
 });

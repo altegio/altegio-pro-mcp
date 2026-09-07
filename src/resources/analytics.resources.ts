@@ -73,9 +73,7 @@ export interface ReportFieldEntry {
 
 export interface ResourceDeps {
   /** Live field catalogue for one dataset, when the caller can reach the API. */
-  listReportFields?: (
-    dataset: Dataset
-  ) => Promise<readonly ReportFieldEntry[]>;
+  listReportFields?: (dataset: Dataset) => Promise<readonly ReportFieldEntry[]>;
 }
 
 // ========== glossary ==========
@@ -249,17 +247,13 @@ export async function readAnalyticsResource(
 ): Promise<ResourceContents | null> {
   if (uri === GLOSSARY_URI) {
     return {
-      contents: [
-        { uri, mimeType: 'text/markdown', text: renderGlossary() },
-      ],
+      contents: [{ uri, mimeType: 'text/markdown', text: renderGlossary() }],
     };
   }
 
   if (uri === COVERAGE_URI) {
     return {
-      contents: [
-        { uri, mimeType: 'text/markdown', text: renderCoverage() },
-      ],
+      contents: [{ uri, mimeType: 'text/markdown', text: renderCoverage() }],
     };
   }
 

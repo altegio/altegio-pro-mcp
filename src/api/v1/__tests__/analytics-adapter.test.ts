@@ -121,7 +121,9 @@ describe('V1AnalyticsAdapter — key metrics', () => {
   });
 
   it('sends the canonical team member alias and English labels', async () => {
-    const { api, calls } = adapter([[/analytics\/overall/, 'analytics-overall']]);
+    const { api, calls } = adapter([
+      [/analytics\/overall/, 'analytics-overall'],
+    ]);
     await api.getOverview({ ...period, team_member_id: 9001, position_id: 7 });
 
     const call = calls[0]!;
@@ -132,7 +134,9 @@ describe('V1AnalyticsAdapter — key metrics', () => {
   });
 
   it('maps the created_by_user_id filter onto the wire parameter', async () => {
-    const { api, calls } = adapter([[/analytics\/overall/, 'analytics-overall']]);
+    const { api, calls } = adapter([
+      [/analytics\/overall/, 'analytics-overall'],
+    ]);
     await api.getOverview({ ...period, created_by_user_id: 555 });
     expect(calls[0]!.path).toContain('user_id=555');
   });
@@ -532,7 +536,10 @@ describe('V1AnalyticsAdapter — report builder', () => {
 
   it('gives templates their canonical names and datasets', async () => {
     const { api } = adapter([
-      [/analytics_constructor\/report_templates/, 'constructor-report-templates'],
+      [
+        /analytics_constructor\/report_templates/,
+        'constructor-report-templates',
+      ],
     ]);
     const templates = await api.listReportTemplates({ location_id: 4564 });
 
@@ -554,7 +561,10 @@ describe('V1AnalyticsAdapter — report builder', () => {
 
   it('reads the template definition when asked for it', async () => {
     const { api, calls } = adapter([
-      [/analytics_constructor\/report_templates/, 'constructor-report-templates'],
+      [
+        /analytics_constructor\/report_templates/,
+        'constructor-report-templates',
+      ],
     ]);
     const templates = await api.listReportTemplates({
       location_id: 4564,
@@ -567,7 +577,11 @@ describe('V1AnalyticsAdapter — report builder', () => {
       { column_id: 'c-sales-visits', title: null },
     ]);
     expect(templates[1]!.filters).toEqual([
-      { column_id: 'c-sched-date', operator: 'BETWEEN', value: '2026-01-01,2026-12-31' },
+      {
+        column_id: 'c-sched-date',
+        operator: 'BETWEEN',
+        value: '2026-01-01,2026-12-31',
+      },
     ]);
     expect(templates[0]!.groupings).toEqual(['c-sales-master']);
   });
@@ -703,7 +717,9 @@ describe('V1AnalyticsAdapter — error mapping', () => {
         {
           status: 422,
           body: {
-            meta: { errors: { '[date_to]': ['The maximum interval is 365 days'] } },
+            meta: {
+              errors: { '[date_to]': ['The maximum interval is 365 days'] },
+            },
           },
         },
       ],

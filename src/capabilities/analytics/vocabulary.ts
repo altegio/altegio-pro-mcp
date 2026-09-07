@@ -198,7 +198,9 @@ const LABEL_REPLACEMENTS: ReadonlyArray<readonly [RegExp, string]> = [
 ];
 
 function capitalize(text: string): string {
-  return text.length === 0 ? text : text.charAt(0).toUpperCase() + text.slice(1);
+  return text.length === 0
+    ? text
+    : text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function startsUpperCase(text: string): boolean {
@@ -291,11 +293,15 @@ export type AppointmentSource = (typeof APPOINTMENT_SOURCES)[number];
  */
 export function appointmentSourceFromLabel(label: string): AppointmentSource {
   const text = label.toLowerCase();
-  if (/mobile app/.test(text) && /(receptionist|administrator|admin)/.test(text))
+  if (
+    /mobile app/.test(text) &&
+    /(receptionist|administrator|admin)/.test(text)
+  )
     return 'receptionist_mobile_app';
   if (/(admin api|administrator api)/.test(text)) return 'admin_api';
   if (/^(receptionist|administrator)$/.test(text.trim())) return 'receptionist';
-  if (/(widget|booking form|website)/.test(text)) return 'online_booking_widget';
+  if (/(widget|booking form|website)/.test(text))
+    return 'online_booking_widget';
   if (/(client app|mobile app)/.test(text)) return 'client_app';
   if (/^api$/.test(text.trim())) return 'api';
   return 'other';
@@ -321,7 +327,8 @@ export const DATASET_TABLE: Readonly<Record<Dataset, string>> = {
 };
 
 export const DATASET_DESCRIPTIONS: Readonly<Record<Dataset, string>> = {
-  sales: 'Services and products sold: revenue, appointments, visits, clients, occupancy, group events, product margin.',
+  sales:
+    'Services and products sold: revenue, appointments, visits, clients, occupancy, group events, product margin.',
   financial_transactions:
     'Income and expenses cash flow: revenue and expense items, cash and non-cash settlement, accounts, suppliers.',
   loyalty:
