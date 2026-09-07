@@ -17,6 +17,16 @@
       "operations": 57
     }
   ],
+  "canonicalAliases": {
+    "company_group_id": "chain_id",
+    "company_id": "location_id",
+    "good_id": "product_id",
+    "master_id": "team_member_id",
+    "record_id": "appointment_id",
+    "salon_group_id": "chain_id",
+    "salon_id": "location_id",
+    "staff_id": "team_member_id"
+  },
   "operationCount": 317,
   "curatedCount": 25,
   "domains": [

@@ -139,6 +139,7 @@ const KEY_ORDER = [
   'catalogVersion',
   'generator',
   'sources',
+  'canonicalAliases',
   'operationCount',
   'curatedCount',
   'domains',
@@ -193,7 +194,12 @@ const KEY_RANK = new Map(KEY_ORDER.map((k, i) => [k, i]));
  * sort alphabetically — ranking them would order `status` or `name` by their
  * meaning in a catalog entry rather than by their own spelling.
  */
-const UNRANKED_SUBTREES = new Set(['schema', 'properties', 'param_renames']);
+const UNRANKED_SUBTREES = new Set([
+  'schema',
+  'properties',
+  'param_renames',
+  'canonicalAliases',
+]);
 
 // ---------------------------------------------------------------------------
 // Spec repository discovery
@@ -815,6 +821,7 @@ export function buildCatalog({ docsRoot, overlayDir }) {
       catalogVersion: CATALOG_VERSION,
       generator: 'scripts/catalog/build.mjs',
       sources,
+      canonicalAliases: CANONICAL_ALIASES,
       operationCount: operations.length,
       curatedCount,
       domains,
