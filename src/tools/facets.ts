@@ -32,7 +32,15 @@ export type FacetName = (typeof FACET_NAMES)[number];
 /** Key of the default view served on `/mcp`. */
 export const DEFAULT_FACET = 'default';
 
-export type FacetKey = FacetName | typeof DEFAULT_FACET;
+/**
+ * Key of the unfiltered view: every registered tool, no exclusions. stdio uses
+ * it — a desktop host connects to one process and must see the whole surface,
+ * including packs the default HTTP view holds back. It has no HTTP route.
+ */
+export const ALL_TOOLS_FACET = 'all';
+
+export type FacetKey =
+  FacetName | typeof DEFAULT_FACET | typeof ALL_TOOLS_FACET;
 
 export function isFacetName(value: string): value is FacetName {
   return (FACET_NAMES as readonly string[]).includes(value);
@@ -223,6 +231,7 @@ export function buildFacetIndex(
   };
 
   const members = new Map<FacetKey, readonly string[]>();
+  members.set(ALL_TOOLS_FACET, [...toolNames]);
   members.set(
     DEFAULT_FACET,
     toolNames.filter((name) => inDefault(name))
@@ -240,7 +249,7 @@ export function buildFacetIndex(
   }
 
   return {
-    keys: [DEFAULT_FACET, ...FACET_NAMES],
+    keys: [ALL_TOOLS_FACET, DEFAULT_FACET, ...FACET_NAMES],
     members: (facet) => members.get(facet) ?? [],
     includes: (facet, toolName) => sets.get(facet)?.has(toolName) ?? false,
     facetsProviding: (toolName) =>

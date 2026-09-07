@@ -96,7 +96,7 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 - **HTTP** → `dist/http-server.js` → Production on VM (port 3000), public via `https://mcp.alteg.io/pro/mcp`
   - `/health` - health check
   - `/mcp` - MCP Streamable HTTP (POST for messages, GET for SSE stream, DELETE for session termination)
-  - `/mcp/<facet>` - the same protocol on a static filtered tool list; facets: `ops`, `catalog`, `finance`, `marketing`, `analytics`, `onboarding` (ADR-001 D3). stdio always exposes everything.
+  - `/mcp/<facet>` - the same protocol on a static filtered tool list; facets: `ops`, `catalog`, `finance`, `marketing`, `analytics`, `onboarding` (ADR-001 D3). stdio uses the unfiltered `all` view and always exposes everything.
 
 **Resources & prompts:**
 - Resources: `altegio://docs/product-logic`, `altegio://docs/glossary`, `altegio://docs/onboarding-guide`

@@ -121,7 +121,8 @@ Rules:
   names the paths which do serve it.
 - An unknown facet path answers `404` with a JSON-RPC shaped error listing the
   available facets.
-- **stdio exposes everything**; facets are an HTTP concern only.
+- **stdio exposes everything** — `src/index.ts` uses the unfiltered `all` view,
+  which has no HTTP route. Facets are an HTTP concern only.
 - Publicly the paths are `https://mcp.alteg.io/pro/mcp` and
   `https://mcp.alteg.io/pro/mcp/<facet>` — the platform proxy strips the `/pro`
   prefix, so facets need no proxy change.
@@ -370,7 +371,7 @@ src/
 
 ### Testing
 
-- **427 tests** (32 suites) covering authentication, all tools, facets and `tools/list` ordering, resources and prompts, error handling, pagination
+- **429 tests** (32 suites) covering authentication, all tools, facets and `tools/list` ordering, resources and prompts, error handling, pagination
 - **Jest** for unit tests with mocked API responses
 - **Test isolation** with temporary credentials directory
 - Run: `npm test` or `npm run test:coverage`

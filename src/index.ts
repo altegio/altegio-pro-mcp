@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import './config/env.js';
 import { createServer, startServer } from './server.js';
+import { ALL_TOOLS_FACET } from './tools/facets.js';
 import { createLogger } from './utils/logger.js';
 
 const logger = createLogger('main');
@@ -8,7 +9,8 @@ const logger = createLogger('main');
 export async function main(): Promise<void> {
   try {
     logger.info('Creating MCP server...');
-    const server = createServer();
+    // stdio serves one host process: the whole tool surface, unfiltered.
+    const server = createServer({ facet: ALL_TOOLS_FACET });
 
     logger.info('Starting server...');
     await startServer(server);
