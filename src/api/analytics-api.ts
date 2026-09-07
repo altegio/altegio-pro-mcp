@@ -382,6 +382,11 @@ export interface ReportTable {
   rows: Array<Record<string, string | number | null>>;
   totals: Record<string, string | number | null>;
   row_count: number;
+  /**
+   * Response column key → report-builder registry id. Internal: the capability
+   * layer uses it to rename columns to canonical field keys, then drops it.
+   */
+  column_ids?: Record<string, string>;
 }
 
 // ========== The port ==========

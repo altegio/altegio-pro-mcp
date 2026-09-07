@@ -82,3 +82,19 @@ export function queryString(
 export function includeParams(includes: readonly string[]): string {
   return includes.map((i) => `include[]=${encodeURIComponent(i)}`).join('&');
 }
+
+/**
+ * Prefix that reaches the internal `/api/v2` tree through a transport bound to
+ * the `/api/v1` base.
+ *
+ * The WHATWG URL parser — which `fetch` uses — normalizes the `..` segment, so
+ * `<base>/api/v1` + `/../v2/locations/1/...` resolves to `/api/v2/locations/1/…`.
+ * Only one endpoint needs this (per-client visit counts); everything else lives
+ * under v1. `src/api/__tests__/altegio-http.test.ts` pins the normalization.
+ */
+export const V2_PATH_PREFIX = '/../v2';
+
+/** Build a path below `/api/v2` for a transport bound to `/api/v1`. */
+export function v2Path(suffix: string): string {
+  return `${V2_PATH_PREFIX}${suffix.startsWith('/') ? suffix : `/${suffix}`}`;
+}
