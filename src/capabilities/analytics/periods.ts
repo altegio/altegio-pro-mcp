@@ -53,7 +53,9 @@ function parseDay(value: string, field: string): number {
     );
   }
   const ms = Date.parse(`${value}T00:00:00Z`);
-  if (Number.isNaN(ms)) {
+  // `Date.parse` rolls impossible dates over (2026-02-30 becomes 2026-03-02),
+  // so compare the round-trip instead of only checking for NaN.
+  if (Number.isNaN(ms) || new Date(ms).toISOString().slice(0, 10) !== value) {
     throw new AnalyticsInputError(
       `${field} is not a valid calendar date: "${value}".`
     );
