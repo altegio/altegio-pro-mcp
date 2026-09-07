@@ -1,6 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import { createServer } from '../server.js';
 import { registerTools } from '../tools/registry.js';
+import { ALL_TOOLS_FACET } from '../tools/facets.js';
 import { AltegioClient } from '../providers/altegio-client.js';
 import { ToolHandlers } from '../tools/handlers.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -21,7 +22,9 @@ describe('Tool Registration', () => {
       partnerToken: 'test-token',
     });
 
-    const toolNames = registerTools(server, client);
+    const toolNames = registerTools(server, client, {
+      facet: ALL_TOOLS_FACET,
+    });
 
     // Core tools (16)
     expect(toolNames).toContain('altegio_login');
@@ -82,8 +85,24 @@ describe('Tool Registration', () => {
     expect(toolNames).toContain('altegio_describe_operation');
     expect(toolNames).toContain('altegio_call_operation');
 
-    // Total: 30 CRUD + 3 executor + 12 onboarding = 45 tools
-    expect(toolNames.length).toBe(45);
+    // Analytics pack (14)
+    expect(toolNames).toContain('analytics_get_overview');
+    expect(toolNames).toContain('analytics_get_daily_series');
+    expect(toolNames).toContain('analytics_get_appointments_breakdown');
+    expect(toolNames).toContain('analytics_get_receptionist_performance');
+    expect(toolNames).toContain('analytics_get_loyalty_program_results');
+    expect(toolNames).toContain('analytics_get_forecast');
+    expect(toolNames).toContain('analytics_get_day_end_report');
+    expect(toolNames).toContain('analytics_get_team_member_occupancy');
+    expect(toolNames).toContain('analytics_get_client_visit_stats');
+    expect(toolNames).toContain('analytics_list_report_templates');
+    expect(toolNames).toContain('analytics_list_report_fields');
+    expect(toolNames).toContain('analytics_run_report');
+    expect(toolNames).toContain('analytics_list_saved_reports');
+    expect(toolNames).toContain('analytics_run_saved_report');
+
+    // Total: 30 CRUD + 3 executor + 14 analytics + 12 onboarding = 59 tools
+    expect(toolNames.length).toBe(59);
   });
 
   it('should create server with tools', () => {

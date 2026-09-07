@@ -10,9 +10,14 @@
  * ```
  */
 import { onboardingPrompts } from './onboarding.prompts.js';
+export { analyticsPrompts } from './analytics.module.js';
+import { analyticsPrompts } from './analytics.module.js';
 import type { PromptModule } from './registry.js';
 
-export const promptModules: readonly PromptModule[] = [onboardingPrompts];
+export const promptModules: readonly PromptModule[] = [
+  onboardingPrompts,
+  analyticsPrompts,
+];
 
 export {
   collectPrompts,

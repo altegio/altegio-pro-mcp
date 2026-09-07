@@ -1,0 +1,104 @@
+{
+  "success": true,
+  "data": {
+    "stats": {
+      "clients": 21,
+      "clients_average": 64.3,
+      "records": 28,
+      "records_average": 48.2,
+      "visit_records": 26,
+      "visit_records_average": 50.1,
+      "non_visit_records": 2,
+      "non_visit_records_average": 22.0,
+      "targets": 31,
+      "targets_paid": 1180.5,
+      "goods": 6,
+      "goods_paid": 168.0,
+      "certificates": 1,
+      "certificates_paid": 50.0,
+      "abonement": 2,
+      "abonement_paid": 190.0
+    },
+    "paids": {
+      "accounts": [
+        {
+          "title": "Cash",
+          "amount": 740.5
+        },
+        {
+          "title": "Cards",
+          "amount": 612.0
+        }
+      ],
+      "discount": [
+        {
+          "title": "Promotion Discount",
+          "amount": 42.5
+        },
+        {
+          "title": "Written off bonuses",
+          "amount": 18.0
+        }
+      ],
+      "total": {
+        "accounts": 1352.5,
+        "discount": 60.5
+      }
+    },
+    "z_data": {
+      "1785542400": [
+        {
+          "client_id": 0,
+          "client_name": "",
+          "client_phone": "",
+          "client_email": "",
+          "masters": [
+            {
+              "master_id": 9001,
+              "master_name": "Team member A",
+              "service": [
+                {
+                  "item_title": "Haircut",
+                  "first_cost": 40.0,
+                  "discount": 0,
+                  "result_cost": 40.0,
+                  "transactions": [
+                    {
+                      "accounts_amount": 40.0,
+                      "loyalty_amount": 0,
+                      "payment_type": "Cash"
+                    }
+                  ]
+                }
+              ],
+              "good": [
+                {
+                  "item_title": "Hair spray",
+                  "first_cost": 15.0,
+                  "discount": 2.25,
+                  "result_cost": 12.75,
+                  "transactions": [
+                    {
+                      "accounts_amount": 12.75,
+                      "loyalty_amount": 0,
+                      "payment_type": "Cash"
+                    }
+                  ]
+                }
+              ],
+              "others": {
+                "item_title": "Other operations",
+                "first_cost": 10.0,
+                "discount": 0,
+                "result_cost": 10.0,
+                "transactions": []
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "currency": "EUR"
+  },
+  "meta": []
+}

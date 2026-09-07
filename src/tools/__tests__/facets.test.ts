@@ -54,9 +54,14 @@ describe('static facets', () => {
     expect(isFacetName('nope')).toBe(false);
   });
 
-  it('keeps every tool that exists today on the default view', () => {
+  it('keeps every non-pack tool on the default view plus the named analytics entry points', () => {
     const index = buildFacetIndex(names);
-    expect(index.members(DEFAULT_FACET)).toEqual(names);
+    const expected = names.filter(
+      (name) =>
+        !name.startsWith('analytics_') ||
+        DEFAULT_FACET_EXTRA_TOOLS.includes(name)
+    );
+    expect(index.members(DEFAULT_FACET)).toEqual(expected);
   });
 
   it('gives every facet the authentication and location tools', () => {
@@ -114,8 +119,10 @@ describe('static facets', () => {
     expect(index.facetsProviding('altegio_login')).toEqual([...FACET_NAMES]);
   });
 
-  it('ignores facet rules for tools that do not exist yet', () => {
-    const index = buildFacetIndex(names);
+  it('ignores facet rules for tools that do not exist', () => {
+    // Simulate a build without the analytics pack: its rules must be inert.
+    const withoutPack = names.filter((name) => !name.startsWith('analytics_'));
+    const index = buildFacetIndex(withoutPack);
     expect(index.members('analytics')).toEqual([...FACET_BASE_TOOLS]);
     for (const extra of DEFAULT_FACET_EXTRA_TOOLS) {
       expect(index.includes(DEFAULT_FACET, extra)).toBe(false);
@@ -146,18 +153,19 @@ describe('static facets', () => {
     });
   });
 
-  describe('once a domain pack lands', () => {
+  describe('with the analytics pack landed', () => {
     // A pack joins its own facet wholesale, and the default view only gains
     // the entry points named in DEFAULT_FACET_EXTRA_TOOLS.
-    const future = [
-      ...names,
-      'analytics_get_overview',
-      'analytics_run_report',
-      'analytics_get_daily_series',
-    ];
+    const analyticsCount = names.filter((name) =>
+      name.startsWith('analytics_')
+    ).length;
+
+    it('has the whole pack registered', () => {
+      expect(analyticsCount).toBe(14);
+    });
 
     it('admits only the named entry points to the default view', () => {
-      const index = buildFacetIndex(future);
+      const index = buildFacetIndex(names);
       expect(index.includes(DEFAULT_FACET, 'analytics_get_overview')).toBe(
         true
       );
@@ -165,26 +173,28 @@ describe('static facets', () => {
       expect(index.includes(DEFAULT_FACET, 'analytics_get_daily_series')).toBe(
         false
       );
-      expect(index.members(DEFAULT_FACET)).toHaveLength(names.length + 2);
+      expect(index.members(DEFAULT_FACET)).toHaveLength(
+        names.length - analyticsCount + DEFAULT_FACET_EXTRA_TOOLS.length
+      );
     });
 
     it('serves everything on the unfiltered view stdio uses', () => {
-      const index = buildFacetIndex(future);
-      expect(index.members(ALL_TOOLS_FACET)).toEqual(future);
+      const index = buildFacetIndex(names);
+      expect(index.members(ALL_TOOLS_FACET)).toEqual(names);
       // Which is strictly more than the default HTTP view holds back to.
-      expect(index.members(DEFAULT_FACET)).not.toEqual(future);
+      expect(index.members(DEFAULT_FACET)).not.toEqual(names);
       expect(
         index.includes(ALL_TOOLS_FACET, 'analytics_get_daily_series')
       ).toBe(true);
     });
 
     it('admits the whole pack to its own facet and to finance', () => {
-      const index = buildFacetIndex(future);
+      const index = buildFacetIndex(names);
       expect(index.members('analytics')).toHaveLength(
-        FACET_BASE_TOOLS.length + 3
+        FACET_BASE_TOOLS.length + analyticsCount
       );
       expect(index.members('finance')).toHaveLength(
-        FACET_BASE_TOOLS.length + 3
+        FACET_BASE_TOOLS.length + analyticsCount
       );
       expect(index.includes('ops', 'analytics_get_overview')).toBe(false);
     });

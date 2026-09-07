@@ -14,7 +14,11 @@
  */
 import { z, type ZodType } from 'zod';
 import type { AltegioClient } from '../providers/altegio-client.js';
-import { withErrorHandling, type ToolResult } from './tool-result.js';
+import {
+  withErrorHandling,
+  type ToolContent,
+  type ToolResult,
+} from './tool-result.js';
 
 export interface ToolAnnotations {
   title?: string;
@@ -28,6 +32,11 @@ export interface ToolAnnotations {
 export interface HandlerOutput {
   text: string;
   structuredContent?: unknown;
+  /**
+   * Content blocks appended after the text summary — a `resource_link` to
+   * output that does not fit in the result's size budget (ADR-001 D8).
+   */
+  extraContent?: ToolContent[];
 }
 
 export interface ToolContext<T> {
@@ -86,12 +95,12 @@ export function defineTool<T extends ZodType>(
     createHandler: (client: AltegioClient) => (args: unknown) =>
       withErrorHandling(def.name, async () => {
         const input = def.input.parse(args ?? {}) as z.infer<T>;
-        const { text, structuredContent } = await def.handler({
+        const { text, structuredContent, extraContent } = await def.handler({
           input,
           client,
         });
         const result: ToolResult = {
-          content: [{ type: 'text' as const, text }],
+          content: [{ type: 'text' as const, text }, ...(extraContent ?? [])],
         };
         if (structuredContent !== undefined) {
           result.structuredContent = structuredContent;

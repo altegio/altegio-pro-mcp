@@ -14,8 +14,9 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Features
 
-- **45 MCP tools** including 12 onboarding wizard tools for first-time setup
+- **59 MCP tools** including a 14-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
 - **CRUD operations** for staff, services, appointments, schedules, and positions management
+- **Analytics**: key metrics with period comparison, daily series, breakdowns, day-end report, report builder
 - **Location settings**: appointment calendar, online booking, booking forms, resources
 - **Universal API executor**: search, describe and call any of the 317 documented API operations, even the ones without a dedicated tool
 - **Conversational onboarding** with bulk CSV/JSON import and checkpoint/resume
@@ -27,7 +28,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Available Tools
 
-**45 tools organized by category** for complete business management:
+**59 tools organized by category** for complete business management:
 
 ### 🔐 Authentication
 - `altegio_login` - Authenticate with email/password
@@ -102,6 +103,42 @@ pointer to the curated tool: writes go through the curated surface, and executor
 writes require the allowlist from [ADR-001](docs/architecture/2026-09-07-mcp-platform-architecture.md)
 D2. V3 preview operations are described but not callable — the live API does not
 serve them yet. Authentication via `altegio_login` is required.
+### 📊 Analytics
+**Read-only reporting for one location.** Every tool takes `location_id` first and
+either a `period` preset (`today`, `yesterday`, `this_week`, `last_week`,
+`this_month`, `last_month`, `last_30_days`, `this_quarter`, `last_quarter`,
+`this_year`) or an explicit `date_from` + `date_to` pair in `YYYY-MM-DD`. Presets
+resolve in the location's own timezone, ranges over 365 days are refused before
+the call, and amounts come back in major units with an ISO currency code.
+
+- `analytics_get_overview` - Key metrics with a comparison to the previous period of equal length: revenue (total, services, products), average check, occupancy, appointments by outcome, and new / returning / active / lost clients
+- `analytics_get_daily_series` - One metric family day by day as compact `[date, value]` pairs: `revenue`, `appointments` (including online bookings), `occupancy` (with the no-show share of working time) or `clients`
+- `analytics_get_appointments_breakdown` - Appointments split by `source` (online booking, client app, receptionist, API) or by `visit_status` (`waiting`, `confirmed`, `arrived`, `no_show`, `cancelled`), with counts and shares
+- `analytics_get_receptionist_performance` - Front-desk numbers: clients booked, appointments closed, revenue attributed, and the rebooking rate after a visit and after a no-show
+- `analytics_get_loyalty_program_results` - One loyalty program's clients (new vs already known), returns, revenue and per-team-member results
+- `analytics_get_forecast` - Revenue and visit forecast next to the actuals; explains itself when the module is off for the location
+- `analytics_get_day_end_report` - Day-end totals: clients, appointments, services and products sold, memberships and gift cards, takings per account (cash vs card) and write-offs. Per-client detail is off by default and never carries names or phone numbers
+- `analytics_get_team_member_occupancy` - Day-by-day occupancy for up to ten named team members
+- `analytics_get_client_visit_stats` - One client's attended and missed visits, spend and client-account balance
+- `analytics_list_report_templates` - The built-in report templates of the location, each with the question it answers
+- `analytics_list_report_fields` - Canonical field keys of one report-builder dataset (`sales`, `financial_transactions`, `loyalty`, `team_member_schedules`)
+- `analytics_run_report` - Run a template by id, or an ad-hoc report from a dataset, fields, `group_by` and an optional `day`/`week`/`month`/`year` granularity. Returns a table capped at 200 rows; a longer table is attached as a CSV resource link that lives for 30 minutes
+- `analytics_list_saved_reports` / `analytics_run_saved_report` - Re-run a report the owner already has, for any period
+
+**Report ownership.** The report builder has no delete, so `analytics_run_report`
+keeps exactly one report per template or ad-hoc shape, named
+`[Altegio Assistant] <name>`, created on first use and updated in place. The
+period always travels as a per-run filter override, never as a new report. This
+is the one analytics tool that is not marked read-only.
+
+**Access rights.** Analytics needs the Analytics access right in the location;
+the day-end report needs the finance reporting right, occupancy needs access to
+the work schedule, and the report builder needs an active subscription. A user
+who may only see their own numbers can still call
+`analytics_get_receptionist_performance` with their own `created_by_user_id`.
+Not everything the web interface shows is reachable through the API — the
+`altegio://analytics/coverage` resource lists the gaps and the closest
+alternative for each.
 
 ### 🚀 Onboarding Wizard
 **Conversational first-time setup assistant:**
@@ -129,7 +166,7 @@ credential and is not a product boundary ([ADR-001](docs/architecture/2026-09-07
 
 | Endpoint | Serves |
 |---|---|
-| `/mcp` | **Every tool that exists today** — the default view, unchanged for current clients |
+| `/mcp` | **Every tool except the analytics pack**, plus its two entry points `analytics_get_overview` and `analytics_run_report` (47 tools) — the default view, unchanged for current clients |
 | `/mcp/ops` | Appointments (the daily work; clients and journal tools join as they land) |
 | `/mcp/catalog` | Services, service categories, team members, positions, work schedules, resources, location settings |
 | `/mcp/finance` | Analytics (visits, payments and payroll join as they land) |
@@ -391,18 +428,25 @@ scripts/
 src/
   config/        # Configuration and validation
   generated/     # catalog.json (committed, generated - do not edit by hand)
+  api/           # AltegioApi ports and the v1 adapters behind them
+  capabilities/  # Domain use cases, vocabulary, projections
   providers/     # API clients (altegio-client.ts)
   prompts/       # Prompt registry + modules (onboarding.prompts.ts)
   resources/     # Resource registry + modules (docs.resources.ts, glossary.ts)
   tools/         # MCP tool handlers & registry
     facets.ts    # Static facet membership (ADR-001 D3)
   tools/executor/# Universal executor: catalog index, search, describe, call
+  resources/     # MCP resource data and handlers
+  prompts/       # MCP prompt definitions
   types/         # TypeScript interfaces
   utils/         # Logging, errors, helpers
   __tests__/     # Jest unit tests
   index.ts       # stdio server entry
   http-server.ts # HTTP server entry (/mcp and /mcp/<facet>)
   server.ts      # Shared MCP server setup
+
+catalog/
+  extended/      # Hand-written stubs for allowlisted undocumented endpoints
 ```
 
 Regenerate the catalog after pulling the spec repository:
@@ -417,7 +461,20 @@ pipeline and the overlay format.
 
 ### Testing
 
-- **508 tests** (37 suites) covering authentication, all tools, facets and `tools/list` ordering, resources and prompts, the API catalog and executor, error handling, pagination
+- **865 tests** (47 suites, 6 skipped live) covering authentication, all tools, facets and `tools/list` ordering, resources and prompts, the API catalog and executor, analytics golden fixtures and the terminology guard, error handling, pagination
+- **Opt-in live suite** for analytics — re-records the golden fixtures against the demo location:
+
+```bash
+ALTEGIO_E2E=1 \
+ALTEGIO_PARTNER_TOKEN=... ALTEGIO_TEST_LOGIN=... ALTEGIO_TEST_PASSWORD=... \
+CREDENTIALS_DIR=/tmp/altegio-mcp-live \
+npx jest analytics-live
+```
+
+  The partner token has its own variable here because the shared Jest setup pins
+  `ALTEGIO_API_TOKEN` to a dummy value for every other suite. Add
+  `ALTEGIO_E2E_WRITE=1` to also exercise the assistant-owned report in the
+  report builder.
 - **Jest** for unit tests with mocked API responses
 - **Test isolation** with temporary credentials directory
 - Run: `npm test` or `npm run test:coverage`

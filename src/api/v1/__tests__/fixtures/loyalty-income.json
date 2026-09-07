@@ -1,0 +1,39 @@
+{
+  "success": true,
+  "data": {
+    "income_stats": {
+      "new": {
+        "all_sum": 980.5,
+        "returned_sum": 320.0
+      },
+      "old": {
+        "all_sum": 7420.25,
+        "returned_sum": 5210.75
+      },
+      "total": {
+        "all_sum": 8400.75,
+        "returned_sum": 5530.75
+      }
+    },
+    "currency": {
+      "id": 1,
+      "iso": "EUR",
+      "name": "Euro",
+      "symbol": "€",
+      "is_symbol_after_amount": true
+    },
+    "income_stats_by_day": [
+      {
+        "date": "2026-08-01",
+        "new_sum": 120.5,
+        "old_sum": 310.0
+      },
+      {
+        "date": "2026-08-02",
+        "new_sum": 210.0,
+        "old_sum": 302.0
+      }
+    ]
+  },
+  "meta": []
+}

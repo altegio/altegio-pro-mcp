@@ -1,0 +1,38 @@
+{
+  "success": true,
+  "data": {
+    "client_stats": {
+      "new": {
+        "all_count": 24,
+        "lost_count": 3,
+        "returned_count": 9,
+        "returned_percent": 37.5
+      },
+      "old": {
+        "all_count": 96,
+        "lost_count": 11,
+        "returned_count": 64,
+        "returned_percent": 66.7
+      },
+      "total": {
+        "all_count": 120,
+        "lost_count": 14,
+        "returned_count": 73,
+        "returned_percent": 60.8
+      }
+    },
+    "visits_stats_by_day": [
+      {
+        "date": "2026-08-01",
+        "new_count": 2,
+        "old_count": 9
+      },
+      {
+        "date": "2026-08-02",
+        "new_count": 4,
+        "old_count": 12
+      }
+    ]
+  },
+  "meta": []
+}

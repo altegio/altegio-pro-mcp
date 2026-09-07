@@ -1,0 +1,87 @@
+{
+  "success": true,
+  "data": {
+    "prediction_date": "2026-08-31",
+    "income": {
+      "prediction": {
+        "date": "2026-08-31",
+        "value": 13100.0
+      },
+      "actual": {
+        "date": "2026-08-31",
+        "value": 12480.5
+      },
+      "currency": {
+        "id": 1,
+        "iso": "EUR",
+        "name": "Euro",
+        "symbol": "€",
+        "is_symbol_after_amount": true
+      }
+    },
+    "visits_count": {
+      "prediction": {
+        "date": "2026-08-31",
+        "value": 268
+      },
+      "actual": {
+        "date": "2026-08-31",
+        "value": 241
+      }
+    },
+    "income_by_period": {
+      "period": "month",
+      "prediction": [
+        {
+          "date": "2026-07-01",
+          "value": 11800.0
+        },
+        {
+          "date": "2026-08-01",
+          "value": 13100.0
+        }
+      ],
+      "actual": [
+        {
+          "date": "2026-07-01",
+          "value": 10900.0
+        },
+        {
+          "date": "2026-08-01",
+          "value": 12480.5
+        }
+      ],
+      "currency": {
+        "id": 1,
+        "iso": "EUR",
+        "name": "Euro",
+        "symbol": "€",
+        "is_symbol_after_amount": true
+      }
+    },
+    "visits_count_by_period": {
+      "period": "month",
+      "prediction": [
+        {
+          "date": "2026-07-01",
+          "value": 250
+        },
+        {
+          "date": "2026-08-01",
+          "value": 268
+        }
+      ],
+      "actual": [
+        {
+          "date": "2026-07-01",
+          "value": 232
+        },
+        {
+          "date": "2026-08-01",
+          "value": 241
+        }
+      ]
+    }
+  },
+  "meta": []
+}

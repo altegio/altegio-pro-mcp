@@ -1,0 +1,20 @@
+{
+  "success": true,
+  "data": [
+    {
+      "date": "2026-08-01",
+      "workload": 61.5
+    },
+    {
+      "date": "2026-08-02",
+      "workload": 72.0
+    },
+    {
+      "date": "2026-08-03",
+      "workload": 0
+    }
+  ],
+  "meta": {
+    "count": 3
+  }
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "label": "Came",
+    "data": 231
+  },
+  {
+    "label": "Confirmed",
+    "data": 28
+  },
+  {
+    "label": "Expectation",
+    "data": 13
+  },
+  {
+    "label": "Did not come",
+    "data": 18
+  },
+  {
+    "label": "Deleted",
+    "data": 6
+  }
+]

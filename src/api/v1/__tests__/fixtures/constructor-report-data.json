@@ -1,0 +1,119 @@
+{
+  "success": true,
+  "data": {
+    "header": {
+      "groupings": [
+        {
+          "key": "g_1",
+          "report_grouping_id": "rg-1",
+          "column_id": "c-sales-master"
+        }
+      ],
+      "columns": [
+        {
+          "key": "c_1",
+          "report_column_id": "rc-1",
+          "column_id": "c-sales-revenue",
+          "detalization": null
+        },
+        {
+          "key": "c_2",
+          "report_column_id": "rc-2",
+          "column_id": "c-sales-visits",
+          "detalization": null
+        }
+      ]
+    },
+    "rows": [
+      {
+        "groupings": [
+          {
+            "key": "g_1",
+            "column_id": "c-sales-master",
+            "value": "Team member A",
+            "report_grouping_id": "rc"
+          }
+        ],
+        "columns": [
+          {
+            "key": "c_1",
+            "column_id": "c-sales-revenue",
+            "value": 6120.5,
+            "report_grouping_id": "rc"
+          },
+          {
+            "key": "c_2",
+            "column_id": "c-sales-visits",
+            "value": 128,
+            "report_grouping_id": "rc"
+          }
+        ]
+      },
+      {
+        "groupings": [
+          {
+            "key": "g_1",
+            "column_id": "c-sales-master",
+            "value": "Team member B",
+            "report_grouping_id": "rc"
+          }
+        ],
+        "columns": [
+          {
+            "key": "c_1",
+            "column_id": "c-sales-revenue",
+            "value": 4310.0,
+            "report_grouping_id": "rc"
+          },
+          {
+            "key": "c_2",
+            "column_id": "c-sales-visits",
+            "value": 96,
+            "report_grouping_id": "rc"
+          }
+        ]
+      },
+      {
+        "groupings": [
+          {
+            "key": "g_1",
+            "column_id": "c-sales-master",
+            "value": "Team member C, junior",
+            "report_grouping_id": "rc"
+          }
+        ],
+        "columns": [
+          {
+            "key": "c_1",
+            "column_id": "c-sales-revenue",
+            "value": 2050.0,
+            "report_grouping_id": "rc"
+          },
+          {
+            "key": "c_2",
+            "column_id": "c-sales-visits",
+            "value": 41,
+            "report_grouping_id": "rc"
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "columns": [
+        {
+          "key": "c_1",
+          "column_id": "c-sales-revenue",
+          "value": 12480.5,
+          "report_grouping_id": "rc"
+        },
+        {
+          "key": "c_2",
+          "column_id": "c-sales-visits",
+          "value": 265,
+          "report_grouping_id": "rc"
+        }
+      ]
+    }
+  },
+  "meta": []
+}

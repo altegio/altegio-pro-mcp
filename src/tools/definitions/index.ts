@@ -13,3 +13,4 @@ export * from './bookings.tools.js';
 export * from './settings.tools.js';
 export * from './resources.tools.js';
 export * from './executor.tools.js';
+export * from './analytics.tools.js';

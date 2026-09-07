@@ -11,9 +11,33 @@ import {
   ExecutorRefusalError,
 } from '../utils/errors.js';
 
+/** The ordinary text block every tool returns. */
+export interface TextContent {
+  type: 'text';
+  text: string;
+}
+
+/**
+ * A `resource_link` block (MCP 2025-06-18): output too large to inline, offered
+ * as a resource URI the host can read on demand.
+ *
+ * `text?: undefined` keeps the union discriminated *and* keeps `content[i].text`
+ * readable without narrowing, which every existing caller relies on.
+ */
+export interface ResourceLinkContent {
+  type: 'resource_link';
+  uri: string;
+  name: string;
+  description?: string;
+  mimeType?: string;
+  text?: undefined;
+}
+
+export type ToolContent = TextContent | ResourceLinkContent;
+
 export interface ToolResult {
   [key: string]: unknown;
-  content: Array<{ type: 'text'; text: string }>;
+  content: ToolContent[];
   structuredContent?: unknown;
   isError?: boolean;
 }
