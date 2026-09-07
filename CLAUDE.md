@@ -87,7 +87,7 @@ Always check BUILD.md / never add it to Git
 
 MCP server for **B2B business management only** (Altegio.Pro, not public booking /b2c). Local service business business owners, admins and team members manage their operations through authenticated tools
 
-### Tools Available (45 total)
+### Tools Available (59 total)
 
 **Category-organized with [Prefix] tags for LLM navigation:**
 
@@ -101,6 +101,7 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 **[Appointments] Appointments CRUD (4):** get, create, update, delete
 **[Settings] Location Settings (6):** get/update appointment settings, get/update online booking settings, get/create booking forms
 **[Resources] Resources (1):** get (read-only; API has no create)
+**[Analytics] Analytics (14):** get_overview, get_daily_series, get_appointments_breakdown, get_receptionist_performance, get_loyalty_program_results, get_forecast, get_day_end_report, get_team_member_occupancy, get_client_visit_stats, list_report_templates, list_report_fields, run_report, list_saved_reports, run_saved_report
 **[Onboarding] Wizard (12):** start, resume, status, batch imports (positions, staff, categories, services), set schedules, import clients, test appointments, preview, rollback
 **[API] Universal executor (3):** `altegio_search_operations`, `altegio_describe_operation`, `altegio_call_operation` - backed by `src/generated/catalog.json`; reads only (writes refused, see ADR-001 D2)
 
@@ -142,6 +143,13 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 - `AltegioClient.request('GET', path, query)` added - the only client change, typed to the GET literal so the policy is compile-time
 - Executor tools are in `unmappedTools` (they map to the whole catalog, not one endpoint); `spec-compliance.test.ts` asserts that exclusion explicitly
 - Node floor raised to 20.17 (ESM JSON import attributes)
+**Analytics pack (2026-09-07)**
+- **Added 14 tools (45 -> 59):** the `analytics_` pack — key metrics with period comparison, daily series, appointment breakdowns, receptionist performance, loyalty results, forecast, day-end report, team member occupancy, per-client visit history, and the report builder (templates, dataset fields, ad-hoc and saved reports)
+- First domain pack built under ADR-001: `src/api/analytics-api.ts` port + `src/api/v1/analytics-adapter.ts`, capability layer in `src/capabilities/analytics/`, tools in `src/tools/definitions/analytics.tools.ts`
+- Canonical vocabulary is enforced by a unit test over every tool name, schema property, description, resource and prompt text; legacy API words live only in `src/capabilities/analytics/vocabulary.ts` and the adapter
+- Undocumented endpoints are allowlisted in `catalog/extended/analytics.yaml` with golden fixtures; the spec-compliance test now accepts a documented OR an extended operation, and a tool may map to several
+- `src/resources/analytics.resources.ts` and `src/prompts/analytics.prompts.ts` export list/read handlers but are **not wired** into `server.ts` yet — the transport change owns that
+- Money in analytics results is in major units with an ISO currency code (the minor-units rule applies to V3 write payloads)
 
 **Location Onboarding Completion (2026-07-20)**
 - **Added 9 tools (33 → 42):**
@@ -218,7 +226,6 @@ async getStaff(companyId: number) {
 **Secrets Management:**
 - Local: `.env` file (gitignored)
 - Never commit tokens to git
-
 
 **Test isolation:**
 - Tests default to `~/.altegio-mcp/` credentials

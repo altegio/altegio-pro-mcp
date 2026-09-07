@@ -189,7 +189,7 @@ src/
 1. **Names:** `<domain>_<verb>_<object>` in snake case, one prefix per domain so one search hits the whole pack (`clients_search`, `clients_get_card`, `appointments_create`). Core tools may drop the domain when the verb is unambiguous (`book_appointment`).
 2. **Descriptions:** first sentence says what the user gets, in the user's words (owner, administrator, master, client, visit, journal); then when to use it versus a neighbour; then constraints (auth, limits). Keywords a person would type belong in the text — search indexes descriptions and argument descriptions.
 3. **Annotations:** `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` set on every tool; `title` human-readable.
-4. **Parameters:** `location_id` always first and required unless the identity implies a single location; dates in `YYYY-MM-DD`, datetimes in RFC 3339 with offset; money as integer minor units + `currency` (V3 rule).
+4. **Parameters:** `location_id` always first and required unless the identity implies a single location; dates in `YYYY-MM-DD`, datetimes in RFC 3339 with offset; money as integer minor units + `currency` (V3 rule). The minor-units rule governs **write payloads**: analytics and reporting results pass the API's own decimal major-unit amounts through unchanged, always next to an ISO `currency` code, because rounding a reported sum into minor units would invent precision the source does not have.
 5. **Results:** text summary + `structuredContent` with declared `outputSchema`; ids always present so the next call can use them.
 6. **Server `instructions`:** one paragraph naming the domains and the executor, so hosts with tool search know what to look for.
 
