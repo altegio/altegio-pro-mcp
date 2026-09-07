@@ -78,7 +78,7 @@ export const METRIC_SOURCES: readonly MetricSource[] = [
   {
     family: 'Appointments by outcome',
     from: 'Appointment visit status.',
-    note: 'completed = arrived, pending = waiting or confirmed, cancelled = cancelled or no_show. The attendance rate is arrived over booked; the gap is the leak.',
+    note: 'completed = arrived, pending = waiting or confirmed, cancelled = cancelled or no_show. The attendance rate is arrived over booked; the gap is the leak. Marking is a manual step: roughly one past appointment in eight is never moved off waiting or confirmed, so no-show and attendance rates undercount — treat them as a floor and cross-check revenue and visit counts, which do not depend on marking.',
   },
   {
     family: 'New / returning / active / lost clients',

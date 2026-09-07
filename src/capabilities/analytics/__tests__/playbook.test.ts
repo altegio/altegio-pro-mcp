@@ -14,6 +14,7 @@ import {
   QUESTION_ROUTES,
   SLICING_NOTES,
   ANALYSIS_NOTES,
+  BENCHMARKS,
 } from '../playbook.js';
 import { renderPlaybook } from '../../../resources/analytics.resources.js';
 
@@ -58,6 +59,16 @@ describe('analytics playbook', () => {
     expect(METRIC_RELATIONSHIPS.length).toBeGreaterThanOrEqual(5);
     expect(DIAGNOSTIC_PLAYS.length).toBeGreaterThanOrEqual(5);
     expect(ANALYSIS_NOTES.length).toBeGreaterThanOrEqual(3);
+    expect(BENCHMARKS.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('frames benchmarks as a spread, not a target', () => {
+    const text = renderPlaybook();
+    expect(text).toContain('Benchmarks (observed spread, not targets)');
+    // Each benchmark must tell the model how to read it, not just the number.
+    for (const benchmark of BENCHMARKS) {
+      expect(benchmark.read.length).toBeGreaterThan(20);
+    }
   });
 
   it('renders each section into the resource', () => {

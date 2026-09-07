@@ -275,6 +275,46 @@ export interface AnalysisNote {
   readonly text: string;
 }
 
+/**
+ * Observed spread of a few metrics across real locations, to calibrate what a
+ * value means — deliberately a distribution, not a target. A weak model asked
+ * "is 8% no-show bad?" needs to know that most locations sit lower but a big
+ * minority run higher, and that the honest comparison is a location against its
+ * own previous period, not against a global number.
+ */
+export interface Benchmark {
+  readonly metric: string;
+  /** The observed distribution, in words. */
+  readonly observed: string;
+  /** How to use it without over-reading. */
+  readonly read: string;
+}
+
+/** What the spread was measured over — keep it next to the numbers so they age honestly. */
+export const BENCHMARKS_AS_OF =
+  'Observed across ~8,500 locations with at least 50 individual appointments in August 2026. Distributions vary strongly by vertical (clinic vs barbershop vs fitness) and country, so treat them as calibration, never as a pass/fail line.';
+
+export const BENCHMARKS: readonly Benchmark[] = [
+  {
+    metric: 'No-show rate (of resolved appointments)',
+    observed:
+      'Most locations sit low — about 41% at or under 2%, another 21% between 2% and 5% — but a long tail runs high: roughly 24% are above 10%. The average is about 7%.',
+    read: 'Low single digits is normal; above 10% puts a location in the worst quarter and is worth acting on. Compare a location to its own previous period, because the spread across locations is mostly vertical and reminder discipline, not performance.',
+  },
+  {
+    metric: 'Online-booking share',
+    observed:
+      'Extremely dispersed, almost two-humped: about 38% of locations are at or under 5% (front-desk-driven) while about 24% are over 40%. The average is about 23%.',
+    read: 'A low share is headroom to grow self-service, not a verdict — many healthy locations book almost everything at the front desk. Read the trend of this location, not its distance from the average.',
+  },
+  {
+    metric: 'Attendance marking discipline',
+    observed:
+      'About one past appointment in eight is never marked arrived or no-show — it stays waiting or confirmed forever.',
+    read: 'Attendance-based rates (no-show, attendance rate) therefore undercount: they are a floor, not an exact figure. When the unmarked share is large, say the numbers are indicative and lean on revenue and visit counts, which do not depend on marking.',
+  },
+] as const;
+
 export const ANALYSIS_NOTES: readonly AnalysisNote[] = [
   {
     title: 'Decompose before you conclude',

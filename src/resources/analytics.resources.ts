@@ -10,13 +10,17 @@
  *   listAnalyticsResourceTemplates()  → resources/templates/list entries
  *   readAnalyticsResource(uri, deps)  → resources/read contents, or null
  *
- * Four resources:
+ * Resources:
  *  - `altegio://analytics/glossary` — what every metric means, in plain language.
+ *  - `altegio://analytics/coverage` — what analytics this server can and cannot
+ *    produce, so an agent never promises a report that does not exist.
+ *  - `altegio://analytics/playbook` — how to *reason* with the numbers: metric
+ *    decomposition, question→tool routing, diagnostic plays, slicing, benchmarks.
+ *  - `altegio://analytics/data-model` — where each number comes from: the
+ *    appointment→visit→client spine, the two ledgers, the coded values.
  *  - `altegio://analytics/report-fields/{dataset}` — the field catalogue of one
  *    report-builder dataset, for hosts that would rather read it once than call
  *    a tool per question.
- *  - `altegio://analytics/coverage` — what analytics this server can and cannot
- *    produce, so an agent never promises a report that does not exist.
  *  - `altegio://reports/{location_id}/{run_id}.csv` — the full output of a
  *    report run whose table was truncated in the tool result.
  */
@@ -27,6 +31,8 @@ import {
 } from '../capabilities/analytics/metrics-registry.js';
 import {
   ANALYSIS_NOTES,
+  BENCHMARKS,
+  BENCHMARKS_AS_OF,
   DIAGNOSTIC_PLAYS,
   METRIC_RELATIONSHIPS,
   QUESTION_ROUTES,
@@ -153,6 +159,11 @@ export function renderPlaybook(): string {
     (note) => `- **${note.title}.** ${note.text}`
   ).join('\n');
 
+  const benchmarks = BENCHMARKS.map(
+    (benchmark) =>
+      `- **${benchmark.metric}** — ${benchmark.observed}\n  - ${benchmark.read}`
+  ).join('\n');
+
   return [
     '# Analytics playbook — how to analyse a location',
     '',
@@ -183,6 +194,12 @@ export function renderPlaybook(): string {
     '## Analysis technique',
     '',
     notes,
+    '',
+    '## Benchmarks (observed spread, not targets)',
+    '',
+    BENCHMARKS_AS_OF,
+    '',
+    benchmarks,
     '',
   ].join('\n');
 }
