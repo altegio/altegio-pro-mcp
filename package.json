@@ -67,7 +67,8 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,json,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,json,md}\"",
     "typecheck": "tsc --noEmit",
-    "prepare": "husky"
+    "prepare": "husky",
+    "api:inventory": "node scripts/api-inventory/openapi-inventory.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -90,6 +91,7 @@
     "eslint": "^10.7.0",
     "husky": "^9.1.7",
     "jest": "^30.4.2",
+    "js-yaml": "^4.3.2",
     "lint-staged": "^17.1.0",
     "prettier": "^3.9.5",
     "ts-jest": "^29.4.11",
