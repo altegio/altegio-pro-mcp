@@ -10,10 +10,29 @@ import { OnboardingHandlers } from './onboarding-handlers.js';
 import { OnboardingStateManager } from '../providers/onboarding-state-manager.js';
 import { onboardingTools } from './onboarding-registry.js';
 import * as definitions from './definitions/index.js';
-import type { DefinedTool } from './factory.js';
+import {
+  buildFacetIndex,
+  DEFAULT_FACET,
+  type FacetKey,
+  type FacetIndex,
+} from './facets.js';
+import type { DefinedTool, McpToolSpec } from './factory.js';
 import type { ToolResult } from './tool-result.js';
 
 type CallHandler = (args: unknown) => Promise<ToolResult>;
+
+/** A tool spec plus the category that orders it in `tools/list`. */
+interface ToolEntry {
+  readonly spec: McpToolSpec;
+  readonly category: string;
+}
+
+export interface RegisterToolsOptions {
+  /** Which static view to serve. Defaults to the full default view. */
+  readonly facet?: FacetKey;
+  /** Drop the onboarding walkthrough from the default view (config switch). */
+  readonly excludeOnboardingFromDefault?: boolean;
+}
 
 /** Auto-discover every `DefinedTool` exported from the definitions barrel. */
 function collectDefinedTools(): DefinedTool[] {
@@ -27,9 +46,60 @@ function collectDefinedTools(): DefinedTool[] {
   );
 }
 
-export function registerTools(server: Server, client: AltegioClient): string[] {
-  // Factory-defined CRUD tools (auth, company, staff, positions, services,
-  // categories, schedule, bookings) — discovered from ./definitions.
+/**
+ * Total order over tools: category first, then name — both compared as plain
+ * code-unit strings so the result never depends on the host's locale. A
+ * deterministic `tools/list` is required by MCP 2026-07-28 (ADR-001 D7) and
+ * makes tool-surface changes readable in a diff.
+ */
+function compareToolEntries(a: ToolEntry, b: ToolEntry): number {
+  if (a.category !== b.category) {
+    return a.category < b.category ? -1 : 1;
+  }
+  if (a.spec.name !== b.spec.name) {
+    return a.spec.name < b.spec.name ? -1 : 1;
+  }
+  return 0;
+}
+
+/** Build the ordered tool list exactly as `tools/list` returns it. */
+export function orderedToolEntries(): ToolEntry[] {
+  const factoryTools = collectDefinedTools().map((tool) => ({
+    spec: tool.toMcpTool(),
+    category: tool.meta.category,
+  }));
+  // The onboarding wizard keeps hand-written specs; they all share one category.
+  const onboardingEntries = onboardingTools.map((spec) => ({
+    spec,
+    category: 'Onboarding',
+  }));
+  return [...factoryTools, ...onboardingEntries].sort(compareToolEntries);
+}
+
+function outOfFacetError(
+  name: string,
+  facet: FacetKey,
+  index: FacetIndex
+): McpError {
+  const elsewhere = index.facetsProviding(name);
+  const where =
+    elsewhere.length > 0
+      ? ` Reach it on ${elsewhere.map((f) => `/mcp/${f}`).join(' or ')}, or on /mcp.`
+      : ' Reach it on /mcp.';
+  return new McpError(
+    ErrorCode.MethodNotFound,
+    `Tool "${name}" is not served by the "${facet}" view of this endpoint.${where}`
+  );
+}
+
+export function registerTools(
+  server: Server,
+  client: AltegioClient,
+  options: RegisterToolsOptions = {}
+): string[] {
+  // Factory-defined CRUD tools (auth, location, team members, positions,
+  // services, categories, schedules, appointments) — discovered from
+  // ./definitions.
   const factoryTools = collectDefinedTools();
   const handlers = new Map<string, CallHandler>(
     factoryTools.map((tool) => [tool.meta.name, tool.createHandler(client)])
@@ -54,14 +124,21 @@ export function registerTools(server: Server, client: AltegioClient): string[] {
     onboarding_rollback_phase: (args) => onboarding.rollbackPhase(args),
   };
 
-  const allToolDefs = [
-    ...factoryTools.map((tool) => tool.toMcpTool()),
-    ...onboardingTools,
-  ];
+  // One deterministic order for every view, computed once at startup.
+  const entries = orderedToolEntries();
+  const facetIndex = buildFacetIndex(
+    entries.map((entry) => entry.spec.name),
+    { excludeOnboardingFromDefault: options.excludeOnboardingFromDefault }
+  );
+  const facet = options.facet ?? DEFAULT_FACET;
+  const visible = new Set(facetIndex.members(facet));
+  const visibleToolDefs = entries
+    .filter((entry) => visible.has(entry.spec.name))
+    .map((entry) => entry.spec);
 
-  // list handler
+  // list handler — the same list for every connection to this facet
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: allToolDefs,
+    tools: visibleToolDefs,
   }));
 
   // call handler
@@ -72,9 +149,12 @@ export function registerTools(server: Server, client: AltegioClient): string[] {
     if (!handler) {
       throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
     }
+    if (!visible.has(name)) {
+      throw outOfFacetError(name, facet, facetIndex);
+    }
 
     return handler(args);
   });
 
-  return allToolDefs.map((tool) => tool.name);
+  return visibleToolDefs.map((tool) => tool.name);
 }
