@@ -5,6 +5,37 @@
 import { z } from 'zod';
 import { ConfigurationError } from '../utils/errors.js';
 
+/**
+ * Server `instructions` returned in the MCP `initialize` result (ADR-001 §5.6).
+ * One paragraph: what the product is, which domains exist today, where the
+ * static facets live, and what is still being added — so a host with tool
+ * search knows what to look for. Override with `MCP_SERVER_INSTRUCTIONS`.
+ */
+export const DEFAULT_SERVER_INSTRUCTIONS = [
+  'Altegio Pro is the management surface for a local service business — its',
+  'owners, receptionists and team members. Today’s tools cover locations,',
+  'team members and positions, services and service categories, work schedules,',
+  'appointments, location settings, resources, and a guided onboarding',
+  'walkthrough. Call altegio_login first, then list_locations for a location_id.',
+  'The default /mcp endpoint serves the whole surface; narrower static views live',
+  'on /mcp/ops, /mcp/catalog, /mcp/finance, /mcp/marketing, /mcp/analytics and',
+  '/mcp/onboarding for hosts that cap active tools. Analytics, a report builder',
+  'and a universal operation executor are being added as domain packs. Resources',
+  'under altegio://docs/ carry the product model, the onboarding guide and the',
+  'canonical vocabulary; the onboarding_walkthrough prompt drives a first-time',
+  'setup.',
+].join(' ');
+
+/**
+ * An environment flag that accepts the spellings a shell or `.env` file
+ * produces. Unlike `z.coerce.boolean()` this reads `"false"` and `"0"` as
+ * false instead of "any non-empty string is true".
+ */
+const BooleanFlagSchema = z
+  .union([z.boolean(), z.enum(['true', 'false', '1', '0', ''])])
+  .default(false)
+  .transform((value) => value === true || value === 'true' || value === '1');
+
 // Environment variables schema
 export const EnvSchema = z.object({
   // Required
@@ -24,6 +55,19 @@ export const EnvSchema = z.object({
 
   // Credentials storage
   CREDENTIALS_DIR: z.string().optional(),
+
+  // Override the `initialize` instructions paragraph without a rebuild.
+  MCP_SERVER_INSTRUCTIONS: z.string().min(1).optional(),
+
+  // Serve the onboarding walkthrough only on /mcp/onboarding, keeping the
+  // default /mcp view under a host's active-tool cap. Off by default: turning
+  // it on is a visible change for current users of the default endpoint.
+  MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING: BooleanFlagSchema,
+
+  // Where the markdown documents served as `altegio://docs/*` resources live.
+  // Defaults to the `docs/` folder of the installed package (see
+  // src/resources/doc-loader.ts).
+  ALTEGIO_DOCS_DIR: z.string().optional(),
 
   // HTTP deployment: require a proxy-verified delegated identity for every
   // request. Anonymous requests get no user token and cannot login.
@@ -46,6 +90,7 @@ export const ServerConfigSchema = z.object({
   name: z.string().default('altegio-mcp-server'),
   version: z.string().default('1.0.0'),
   description: z.string().optional(),
+  instructions: z.string().min(1).default(DEFAULT_SERVER_INSTRUCTIONS),
   protocolVersion: z.string().default('2025-11-25'),
   capabilities: z
     .object({
@@ -61,6 +106,8 @@ export const ServerConfigSchema = z.object({
         .optional(),
       resources: z
         .object({
+          // `resources/subscribe` is not implemented, so it is not advertised.
+          subscribe: z.boolean().default(false),
           listChanged: z.boolean().default(true),
         })
         .optional(),
@@ -68,6 +115,7 @@ export const ServerConfigSchema = z.object({
     .default({
       tools: { listChanged: true },
       prompts: { listChanged: true },
+      resources: { subscribe: false, listChanged: true },
     }),
 });
 
@@ -138,6 +186,10 @@ export class ConfigLoader {
         NODE_ENV: env.NODE_ENV,
         LOG_LEVEL: env.LOG_LEVEL,
         CREDENTIALS_DIR: env.CREDENTIALS_DIR,
+        MCP_SERVER_INSTRUCTIONS: env.MCP_SERVER_INSTRUCTIONS,
+        MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING:
+          env.MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING,
+        ALTEGIO_DOCS_DIR: env.ALTEGIO_DOCS_DIR,
         REQUIRE_DELEGATED_IDENTITY: env.REQUIRE_DELEGATED_IDENTITY,
         RATE_LIMIT_REQUESTS: env.RATE_LIMIT_REQUESTS,
         RATE_LIMIT_WINDOW_MS: env.RATE_LIMIT_WINDOW_MS,
@@ -151,6 +203,7 @@ export class ConfigLoader {
         name: env.npm_package_name || 'altegio-mcp-server',
         version: env.npm_package_version || '1.0.0',
         description: env.npm_package_description,
+        instructions: envConfig.MCP_SERVER_INSTRUCTIONS,
       });
 
       // Build Altegio client config
