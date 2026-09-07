@@ -417,7 +417,7 @@ pipeline and the overlay format.
 
 ### Testing
 
-- **TESTS_PLACEHOLDER tests** (SUITES_PLACEHOLDER suites) covering authentication, all tools, facets and `tools/list` ordering, resources and prompts, the API catalog and executor, error handling, pagination
+- **508 tests** (37 suites) covering authentication, all tools, facets and `tools/list` ordering, resources and prompts, the API catalog and executor, error handling, pagination
 - **Jest** for unit tests with mocked API responses
 - **Test isolation** with temporary credentials directory
 - Run: `npm test` or `npm run test:coverage`
