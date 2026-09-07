@@ -181,6 +181,11 @@ export function buildRequest(
   const problems: string[] = [];
 
   for (const param of op.parameters) {
+    // Only path and query parameters are the caller's business: headers and
+    // cookies are transport, supplied by the client, so a spec that marks one
+    // required must not block a read.
+    if (param.in !== 'path' && param.in !== 'query') continue;
+
     const required = param.required === true || param.in === 'path';
     const names = lookupOrder(op, param.name);
     const usedName = names.find(

@@ -27,6 +27,18 @@ export interface ApiMapping {
  * Onboarding tools are excluded — they orchestrate multiple API calls
  * and don't map 1:1 to spec endpoints.
  */
+/**
+ * Executor tools (ADR-001 D2). They resolve an operation from
+ * `src/generated/catalog.json` at call time and therefore map to every
+ * documented operation, not to one endpoint — the 1:1 mapping requirement below
+ * does not apply to them.
+ */
+export const executorTools: string[] = [
+  'altegio_search_operations',
+  'altegio_describe_operation',
+  'altegio_call_operation',
+];
+
 export const apiMapping: Record<string, ApiMapping> = {
   // ==========================================
   // Authentication
@@ -298,6 +310,11 @@ export const apiMapping: Record<string, ApiMapping> = {
  */
 export const unmappedTools: string[] = [
   'altegio_logout',
+  // Universal executor (ADR-001 D2): these are backed by the whole generated
+  // catalog rather than by one endpoint, so a 1:1 spec mapping cannot exist.
+  // Their drift check is `npm run catalog:check` plus the tests in
+  // src/tools/executor/__tests__/.
+  ...executorTools,
   'update_position',
   'delete_position',
   'onboarding_start',

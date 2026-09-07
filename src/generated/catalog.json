@@ -13478,33 +13478,6 @@
           "schema": {
             "type": "number"
           }
-        },
-        {
-          "description": "application/vnd.api.v2+json",
-          "name": "Accept",
-          "in": "query",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "description": "Bearer partner_token, User user_token",
-          "name": "Authorization",
-          "in": "query",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "description": "application/json",
-          "name": "Content-Type",
-          "in": "query",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
         }
       ],
       "response": {
@@ -13687,15 +13660,6 @@
           "name": "title",
           "in": "query",
           "required": false,
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "description": "application/json",
-          "name": "Conetnt-Type",
-          "in": "header",
-          "required": true,
           "schema": {
             "type": "string"
           }
@@ -25258,17 +25222,7 @@
           "BearerPartnerUser"
         ]
       },
-      "parameters": [
-        {
-          "description": "application/json",
-          "name": "Conetnt-Type",
-          "in": "header",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
-        }
-      ],
+      "parameters": [],
       "requestBody": {
         "required": false,
         "contentType": "application/json",
@@ -29895,33 +29849,6 @@
           "schema": {
             "type": "number"
           }
-        },
-        {
-          "description": "application/vnd.api.v2+json",
-          "name": "Accept",
-          "in": "query",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "description": "Bearer partner_token, User user_token",
-          "name": "Authorization",
-          "in": "query",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "description": "application/json",
-          "name": "Content-Type",
-          "in": "query",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
         }
       ],
       "response": {
@@ -30676,15 +30603,6 @@
           "schema": {
             "type": "number"
           }
-        },
-        {
-          "description": "application/json",
-          "name": "Conetnt-Type",
-          "in": "header",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
         }
       ],
       "response": {
@@ -30867,15 +30785,6 @@
           "required": true,
           "schema": {
             "type": "number"
-          }
-        },
-        {
-          "description": "Bearer partner_token, User user_token",
-          "name": "Authorizarion",
-          "in": "header",
-          "required": true,
-          "schema": {
-            "type": "string"
           }
         }
       ],

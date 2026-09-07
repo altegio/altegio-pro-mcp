@@ -12,7 +12,7 @@
  * `altegio_call_operation`) and, later, for generated domain tool packs.
  *
  * Usage:
- *   node scripts/catalog/build.mjs [--docs <spec repo>] [--out <file>]
+ *   node scripts/catalog/build.mjs [--docs <spec repo>] [--out <file>] [--overlay <dir>]
  *   node scripts/catalog/build.mjs --check       # fail if the committed file is stale
  *
  * The spec repository is read-only for this project (see OPENAPI.md). When it
@@ -48,11 +48,19 @@ const MAX_SCHEMA_DESCRIPTION = 200;
  */
 const MAX_SCHEMA_BYTES = 8000;
 
-/** Transport plumbing headers the API client always supplies itself. */
+/**
+ * Transport plumbing the API client always supplies itself. Matched by name
+ * whatever the spec claims for `in`: several V1 path files declare `Accept`,
+ * `Authorization` and `Content-Type` as *query* parameters (and misspell two of
+ * them), which would otherwise reach the catalog as required query arguments
+ * and be sent on the query string.
+ */
 const PLUMBING_HEADERS = new Set([
   'accept',
   'authorization',
+  'authorizarion',
   'content-type',
+  'conetnt-type',
   'user-token',
 ]);
 
@@ -206,23 +214,28 @@ const UNRANKED_SUBTREES = new Set([
 // ---------------------------------------------------------------------------
 
 /**
- * Locate the read-only spec repository. Checks (in order) an explicit path, the
- * `ALTEGIO_API_DOCS` env var, then a `biz.erp.api.docs` sibling of the repo root
- * or of any ancestor — the last case is what makes the build work inside a git
- * worktree, where `../biz.erp.api.docs` no longer resolves.
+ * Locate the read-only spec repository.
+ *
+ * An explicit `--docs` path, or `ALTEGIO_API_DOCS`, is authoritative: if the
+ * spec is not there the build reports it missing rather than quietly using some
+ * other checkout. Without either, look for a `biz.erp.api.docs` sibling of the
+ * repo root or of any ancestor — the ancestor walk is what makes the build work
+ * inside a git worktree, where `../biz.erp.api.docs` no longer resolves.
  */
 export function resolveDocsRoot(explicit) {
+  const authoritative = explicit ?? process.env.ALTEGIO_API_DOCS;
   const candidates = [];
-  if (explicit) candidates.push(path.resolve(explicit));
-  if (process.env.ALTEGIO_API_DOCS)
-    candidates.push(path.resolve(process.env.ALTEGIO_API_DOCS));
 
-  let dir = REPO_ROOT;
-  for (let i = 0; i < 8; i++) {
-    candidates.push(path.join(dir, '..', 'biz.erp.api.docs'));
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
+  if (authoritative) {
+    candidates.push(path.resolve(authoritative));
+  } else {
+    let dir = REPO_ROOT;
+    for (let i = 0; i < 8; i++) {
+      candidates.push(path.join(dir, '..', 'biz.erp.api.docs'));
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
   }
 
   for (const candidate of candidates) {
@@ -452,8 +465,7 @@ function pickParameters(pathItem, operation, ctx) {
         ? (resolveRef(raw.$ref, ctx.file, ctx.rootFile)?.value ?? null)
         : raw;
     if (!param || typeof param.name !== 'string') continue;
-    if (param.in === 'header' && PLUMBING_HEADERS.has(param.name.toLowerCase()))
-      continue;
+    if (PLUMBING_HEADERS.has(param.name.toLowerCase())) continue;
 
     const key = `${param.in}:${param.name}`;
     if (seen.has(key)) continue;
@@ -847,6 +859,7 @@ function parseArgs(argv) {
     if (arg === '--check') out.check = true;
     else if (arg === '--docs') out.docs = argv[++i];
     else if (arg === '--out') out.out = argv[++i];
+    else if (arg === '--overlay') out.overlay = argv[++i];
     else if (arg === '--quiet') out.quiet = true;
   }
   return out;
@@ -857,7 +870,9 @@ function main(argv) {
   const outFile = path.resolve(
     args.out ?? path.join(REPO_ROOT, 'src/generated/catalog.json')
   );
-  const overlayDir = path.join(REPO_ROOT, 'catalog/overlay');
+  const overlayDir = path.resolve(
+    args.overlay ?? path.join(REPO_ROOT, 'catalog/overlay')
+  );
 
   const docsRoot = resolveDocsRoot(args.docs);
   if (!docsRoot) {
@@ -872,7 +887,16 @@ function main(argv) {
     return 0;
   }
 
-  const { catalog, warnings } = buildCatalog({ docsRoot, overlayDir });
+  let catalog;
+  let warnings;
+  try {
+    ({ catalog, warnings } = buildCatalog({ docsRoot, overlayDir }));
+  } catch (error) {
+    console.error(
+      `catalog: build failed — ${error instanceof Error ? error.message : String(error)}`
+    );
+    return 1;
+  }
   const serialized = serializeCatalog(catalog);
 
   if (args.check) {

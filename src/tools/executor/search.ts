@@ -191,11 +191,16 @@ function indexOperation(op: CatalogOperation): OperationIndex {
   };
 }
 
-/** Best evidence for one term in one token set: literal, then prefix. */
+/**
+ * Best evidence for one term in one token set: literal, then prefix. Both sides
+ * of a prefix comparison must be long enough to mean something — otherwise a
+ * one-letter path segment like `z_report` matches any word starting with `z`.
+ */
 function termHit(tokens: Set<string>, term: string): number {
   if (tokens.has(term)) return 1;
   if (term.length < MIN_PREFIX_LENGTH) return 0;
   for (const token of tokens) {
+    if (token.length < MIN_PREFIX_LENGTH) continue;
     if (token.startsWith(term) || term.startsWith(token)) return PREFIX_FACTOR;
   }
   return 0;
