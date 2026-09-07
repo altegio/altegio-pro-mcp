@@ -943,7 +943,7 @@ export class V1AnalyticsAdapter implements AnalyticsApi {
       this.http,
       this.builderPath(
         query.location_id,
-        `/reports/${encodeURIComponent(query.report_id)}?include[]=report_columns&include[]=report_filters&include[]=report_groupings`
+        `/reports/${encodeURIComponent(query.report_id)}?include[]=report_columns&include[]=report_filters&include[]=report_groupings&include[]=report_status`
       ),
       { kind: 'report_builder', context: 'read the saved report' }
     );
@@ -1039,6 +1039,17 @@ function mapDataType(slug: string): ReportField['data_type'] {
   }
 }
 
+function reportStatus(value: unknown): SavedReport['status'] {
+  if (!value || typeof value !== 'object') return null;
+  const slug = (value as Record<string, unknown>).status_slug;
+  return slug === 'pending' ||
+    slug === 'success' ||
+    slug === 'error' ||
+    slug === 'deleted'
+    ? slug
+    : null;
+}
+
 function toSavedReport(value: unknown): SavedReport {
   const r = record(value);
   return {
@@ -1049,6 +1060,7 @@ function toSavedReport(value: unknown): SavedReport {
     template_id:
       typeof r.report_template_id === 'string' ? r.report_template_id : null,
     created_at: typeof r.created_at === 'string' ? r.created_at : null,
+    status: reportStatus(r.report_status),
     filters: list(r.report_filters).map((filter) => {
       const f = record(filter);
       return {

@@ -23,7 +23,11 @@ import {
   toFieldKey,
 } from '../vocabulary.js';
 
-const FIXTURES = path.join(__dirname, '../../../api/v1/__tests__/fixtures');
+const FIXTURES = path.join(
+  __dirname,
+  '../../../api/v1/__tests__/fixtures',
+  'live'
+);
 
 interface LiveColumn {
   table_name: string;

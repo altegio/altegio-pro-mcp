@@ -1,0 +1,22 @@
+{
+  "success": true,
+  "data": {
+    "income_sum": 0,
+    "previous_income_sum": 9,
+    "income_sum_daily": [
+      {
+        "date": "2026-08-01",
+        "income_sum": 0
+      },
+      {
+        "date": "2026-08-02",
+        "income_sum": 0
+      },
+      {
+        "date": "2026-08-03",
+        "income_sum": 0
+      }
+    ]
+  },
+  "meta": []
+}

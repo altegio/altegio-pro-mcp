@@ -462,7 +462,7 @@ pipeline and the overlay format.
 ### Testing
 
 - **865 tests** (47 suites, 6 skipped live) covering authentication, all tools, facets and `tools/list` ordering, resources and prompts, the API catalog and executor, analytics golden fixtures and the terminology guard, error handling, pagination
-- **Opt-in live suite** for analytics — re-records the golden fixtures against the demo location:
+- **Opt-in live suite** for analytics — records real API payloads from the demo location (4564) into `src/api/v1/__tests__/fixtures/live/`; the hand-built fixtures next to it drive the unit tests and are not overwritten:
 
 ```bash
 ALTEGIO_E2E=1 \

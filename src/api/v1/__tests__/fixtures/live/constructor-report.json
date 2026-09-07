@@ -1,0 +1,128 @@
+{
+  "success": true,
+  "data": {
+    "report_id": "01a07d17-dd73-7123-85e4-2557c37c5e3d",
+    "name": "[Altegio Assistant] Revenue by team member",
+    "description": "",
+    "kind": "static",
+    "template_id": "01953eb6-12e6-74c9-8193-5e22f05116c5",
+    "created_at": "2026-09-07T21:18:31",
+    "filters": [
+      {
+        "filter_id": "01a07d17-dd73-7123-85e4-2557cc5eaef7",
+        "column_id": "01954bf9-4a1d-7823-b5bb-1826e89b0412",
+        "operator": ""
+      }
+    ],
+    "columns": [
+      {
+        "report_column_id": "01a07d17-dd73-7123-85e4-2557c399138a",
+        "column_id": "01954bf9-4a1d-7823-b5bb-18858f298325",
+        "title": ""
+      },
+      {
+        "report_column_id": "01a07d17-dd73-7123-85e4-2557c4000112",
+        "column_id": "01954bf9-4a1d-7823-b5bb-189b2cc4a670",
+        "title": ""
+      },
+      {
+        "report_column_id": "01a07d17-dd73-7123-85e4-2557c4a5bc43",
+        "column_id": "01954bf9-4a1d-7823-b5bb-18a385a4d93f",
+        "title": ""
+      },
+      {
+        "report_column_id": "01a07d17-dd73-7123-85e4-2557c4acf867",
+        "column_id": "01954bf9-4a1d-7823-b5bb-18b865852e5b",
+        "title": ""
+      },
+      {
+        "report_column_id": "01a07d17-dd73-7123-85e4-2557c4f6bd44",
+        "column_id": "01953e21-1692-7559-982c-043bd60f62d2",
+        "title": ""
+      },
+      {
+        "report_column_id": "01a07d17-dd73-7123-85e4-2557c4fd5e97",
+        "column_id": "019638bf-3553-7220-af2a-1f001e26294b",
+        "title": ""
+      },
+      {
+        "report_column_id": "01a07d17-dd73-7123-85e4-2557c5edc8f7",
+        "column_id": "01953e21-1693-7068-a42a-e7345ecc3960",
+        "title": ""
+      },
+      {
+        "report_column_id": "01a07d17-dd73-7123-85e4-2557c664f218",
+        "column_id": "01953e21-1693-7068-a42a-e73fa0e494f2",
+        "title": ""
+      },
+      {
+        "report_column_id": "01a07d17-dd73-7123-85e4-2557c6cd9aac",
+        "column_id": "01953e21-1693-7068-a42a-e7352cbb8cc4",
+        "title": ""
+      },
+      {
+        "report_column_id": "01a07d17-dd73-7123-85e4-2557c783bf13",
+        "column_id": "01953e21-1693-7068-a42a-e7406303dade",
+        "title": ""
+      },
+      {
+        "report_column_id": "01a07d17-dd73-7123-85e4-2557c79bc5f0",
+        "column_id": "01953e21-1693-7068-a42a-e739a819d10a",
+        "title": ""
+      },
+      {
+        "report_column_id": "01a07d17-dd73-7123-85e4-2557c88ef411",
+        "column_id": "01953e21-1693-7068-a42a-e73a475d750f",
+        "title": ""
+      },
+      {
+        "report_column_id": "01a07d17-dd73-7123-85e4-2557c8d0b182",
+        "column_id": "01953e21-1693-7068-a42a-e73bfd2d81c4",
+        "title": ""
+      },
+      {
+        "report_column_id": "01a07d17-dd73-7123-85e4-2557c9b9a680",
+        "column_id": "01953e21-1693-7068-a42a-e73cb72fef87",
+        "title": ""
+      },
+      {
+        "report_column_id": "01a07d17-dd73-7123-85e4-2557c9df09bb",
+        "column_id": "01953e21-1693-7068-a42a-e73d5befb008",
+        "title": ""
+      },
+      {
+        "report_column_id": "01a07d17-dd73-7123-85e4-2557ca8dd5c8",
+        "column_id": "01953e21-1694-731f-a4d3-1dd2dc5b7770",
+        "title": ""
+      },
+      {
+        "report_column_id": "01a07d17-dd73-7123-85e4-2557cb14b839",
+        "column_id": "01953e21-1694-731f-a4d3-1dd379ace2b1",
+        "title": ""
+      },
+      {
+        "report_column_id": "01a07d17-dd73-7123-85e4-2557cc05246f",
+        "column_id": "01953e21-1693-7068-a42a-e759df4adff6",
+        "title": ""
+      }
+    ],
+    "groupings": [
+      {
+        "report_grouping_id": "01a07d17-dd74-705c-a3e3-a4287faa4967",
+        "column_id": "01954bf9-4a1d-7823-b5bb-18858f298325"
+      },
+      {
+        "report_grouping_id": "01a07d17-dd74-705c-a3e3-a4287fe0c292",
+        "column_id": "01954bf9-4a1d-7823-b5bb-189b2cc4a670"
+      },
+      {
+        "report_grouping_id": "01a07d17-dd74-705c-a3e3-a428809bccf3",
+        "column_id": "01954bf9-4a1d-7823-b5bb-18a385a4d93f"
+      },
+      {
+        "report_grouping_id": "01a07d17-dd74-705c-a3e3-a42881367f8a",
+        "column_id": "01954bf9-4a1d-7823-b5bb-18b865852e5b"
+      }
+    ]
+  }
+}

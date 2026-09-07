@@ -662,8 +662,13 @@ export async function listSavedReports(
 
 // ========== report builder: running reports ==========
 
-/** Date column of each dataset — the filter a period override is applied to. */
-const DATASET_DATE_FIELD: Readonly<Record<Dataset, string>> = {
+/**
+ * Date column of each dataset — the one filter the backend requires on every
+ * report run (`AcColumnService::DATE_FILTER_COLUMN_IDS`): a run without a
+ * BETWEEN override on exactly this column is rejected, whatever other date
+ * filters the report carries.
+ */
+export const DATASET_DATE_FIELD: Readonly<Record<Dataset, string>> = {
   sales: 'date',
   financial_transactions: 'date',
   loyalty: 'created_at',
@@ -699,19 +704,91 @@ function requireField(
 }
 
 /** Period override for a saved report's date filter, when it has one. */
+/**
+ * The stored form of the mandatory date filter. The report builder keeps a
+ * no-op `!= NULL` filter on the dataset's date column (that is what every
+ * built-in template carries) and receives the real period at run time as a
+ * BETWEEN override addressed to that filter's id. Storing the period itself
+ * makes the data-mart build fail.
+ */
+const MANDATORY_DATE_FILTER_PLACEHOLDER = (
+  column_id: string
+): ReportDefinition['filters'][number] => ({
+  column_id,
+  operator: '!=',
+  value: 'NULL',
+});
+
+/** How long one tool call waits for the builder to prepare a report. */
+const REPORT_READY_TIMEOUT_MS = 75_000;
+const REPORT_READY_POLL_MS = 3_000;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Wait until the builder has prepared the report's data mart. Returns the fresh
+ * report on `success`; throws on `error`; returns `null` when still pending
+ * after the timeout so the caller can answer with a "try again shortly".
+ */
+export async function awaitReportReady(
+  api: AnalyticsApi,
+  locationId: number,
+  report: SavedReport,
+  options: { timeoutMs?: number; pollMs?: number } = {}
+): Promise<SavedReport | null> {
+  const timeoutMs = options.timeoutMs ?? REPORT_READY_TIMEOUT_MS;
+  const pollMs = options.pollMs ?? REPORT_READY_POLL_MS;
+  const startedAt = Date.now();
+  let current = report;
+  for (;;) {
+    if (current.status === 'success' || current.status === undefined) {
+      return current;
+    }
+    if (current.status === 'deleted') {
+      throw new AnalyticsUnavailableError(
+        `The report "${current.name}" was deleted in the report builder. Run analytics_run_report again to create it.`
+      );
+    }
+    // `error` right after create/update is the builder's first attempt failing;
+    // it re-queues every report on its hourly refresh, so treat it as "not
+    // ready yet" and let the caller answer with a retry hint instead of failing.
+    if (current.status === 'error') return null;
+    if (Date.now() - startedAt >= timeoutMs) return null;
+    await sleep(pollMs);
+    current = await api.getSavedReport({
+      location_id: locationId,
+      report_id: current.report_id,
+    });
+  }
+}
+
+/** Column ids of the mandatory date column of every dataset present in `fields`. */
+function mandatoryDateColumnIds(fields: readonly ReportField[]): Set<string> {
+  const ids = new Set<string>();
+  for (const dataset of Object.keys(DATASET_DATE_FIELD) as Dataset[]) {
+    const field = fieldsByKey(fields, dataset).get(DATASET_DATE_FIELD[dataset]);
+    if (field) ids.add(field.column_id);
+  }
+  return ids;
+}
+
 function periodOverride(
   report: SavedReport,
   fields: readonly ReportField[],
   period: Period
 ): ReportDataFilterOverride[] {
+  const mandatory = mandatoryDateColumnIds(fields);
   const dateColumnIds = new Set(
     fields
       .filter((field) => field.data_type === 'date')
       .map((field) => field.column_id)
   );
-  const dateFilter = (report.filters ?? []).find((filter) =>
-    dateColumnIds.has(filter.column_id)
-  );
+  const filters = report.filters ?? [];
+  // The backend accepts the period only on the dataset's mandatory date column;
+  // any other date filter is a plain filter, not the period.
+  const dateFilter =
+    filters.find((filter) => mandatory.has(filter.column_id)) ??
+    filters.find((filter) => dateColumnIds.has(filter.column_id));
   if (!dateFilter) return [];
   return [
     {
@@ -857,6 +934,19 @@ export async function runReport(
     }
   }
 
+  // Create/update return the report before its data mart exists; wait for it.
+  if (report.status === undefined) {
+    report = await ctx.api.getSavedReport({
+      location_id: input.location_id,
+      report_id: report.report_id,
+    });
+  }
+  const ready = await awaitReportReady(ctx.api, input.location_id, report);
+  if (!ready) {
+    return pendingResult(report, ctx);
+  }
+  report = ready;
+
   const { table, stored } = await renderTable(
     ctx.api,
     input.location_id,
@@ -874,6 +964,29 @@ export async function runReport(
     ...(input.template_id ? { template_id: input.template_id } : {}),
     ...(input.dataset ? { dataset: input.dataset } : {}),
   });
+}
+
+/** Answer for a report whose data mart is still being prepared. */
+function pendingResult(
+  report: SavedReport,
+  ctx: { period: Period }
+): AnalyticsResult {
+  const status = report.status === 'error' ? 'error' : 'pending';
+  const when =
+    status === 'error'
+      ? 'The builder failed its first attempt and retries every report on its hourly refresh, so try again within the hour'
+      : 'It is still being prepared; try again in about a minute';
+  const text = `The report "${report.name}" has no data yet (builder status: ${status}). ${when}: call analytics_run_saved_report with report_id="${report.report_id}" and the same period (${ctx.period.date_from} – ${ctx.period.date_to}).`;
+  return {
+    text,
+    structuredContent: {
+      status,
+      report_id: report.report_id,
+      report_name: report.name,
+      period: { date_from: ctx.period.date_from, date_to: ctx.period.date_to },
+      retry_with: 'analytics_run_saved_report',
+    },
+  };
 }
 
 async function templateDefinition(
@@ -902,23 +1015,19 @@ async function templateDefinition(
   // Ensure the report can be re-run for any period: it needs a filter on a date
   // column that the run-time override can target.
   const filters = [...(template.filters ?? [])];
-  const dateColumnIds = new Set(
-    fields
-      .filter((field) => field.data_type === 'date')
-      .map((field) => field.column_id)
+  const dataset = template.dataset ?? 'sales';
+  const dateField = fieldsByKey(fields, dataset).get(
+    DATASET_DATE_FIELD[dataset]
   );
-  if (!filters.some((filter) => dateColumnIds.has(filter.column_id))) {
-    const dataset = template.dataset ?? 'sales';
-    const dateField = fieldsByKey(fields, dataset).get(
-      DATASET_DATE_FIELD[dataset]
-    );
-    if (dateField) {
-      filters.push({
-        column_id: dateField.column_id,
-        operator: 'BETWEEN',
-        value: `${input.date_from ?? ''},${input.date_to ?? ''}`,
-      });
-    }
+  // The run-time period override must target the dataset's mandatory date
+  // column; a template filter on another date column does not count.
+  if (
+    dateField &&
+    !filters.some((filter) => filter.column_id === dateField.column_id)
+  ) {
+    // A stored placeholder, exactly as the built-in templates carry it; the
+    // period itself is applied per run as a BETWEEN override on this filter.
+    filters.push(MANDATORY_DATE_FILTER_PLACEHOLDER(dateField.column_id));
   }
 
   return {
@@ -971,13 +1080,7 @@ function adHocDefinition(
 
   const dateField = map.get(DATASET_DATE_FIELD[dataset]);
   const filters = dateField
-    ? [
-        {
-          column_id: dateField.column_id,
-          operator: 'BETWEEN',
-          value: `${input.date_from ?? ''},${input.date_to ?? ''}`,
-        },
-      ]
+    ? [MANDATORY_DATE_FILTER_PLACEHOLDER(dateField.column_id)]
     : [];
 
   const signature = [
@@ -1044,13 +1147,21 @@ export async function runSavedReport(
 ): Promise<AnalyticsResult> {
   const ctx = await context(client, input.location_id, input);
   const rowCap = Math.min(input.row_limit ?? REPORT_ROW_CAP, REPORT_ROW_CAP);
-  const [fields, report] = await Promise.all([
+  const [fields, saved] = await Promise.all([
     ctx.api.listReportFields({ location_id: input.location_id }),
     ctx.api.getSavedReport({
       location_id: input.location_id,
       report_id: input.report_id,
     }),
   ]);
+
+  // A report the builder is still preparing has no data yet.
+  const report = await awaitReportReady(ctx.api, input.location_id, saved, {
+    timeoutMs: 30_000,
+  });
+  if (!report) {
+    return pendingResult(saved, ctx);
+  }
 
   const { table, stored } = await renderTable(
     ctx.api,

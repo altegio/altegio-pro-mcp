@@ -1,0 +1,9 @@
+{
+  "success": true,
+  "data": {
+    "clients_count": 0,
+    "previous_clients_count": 0,
+    "clients_count_daily": []
+  },
+  "meta": []
+}

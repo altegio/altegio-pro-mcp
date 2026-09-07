@@ -23,13 +23,17 @@ import * as path from 'path';
 import { AltegioClient } from '../../../providers/altegio-client.js';
 import { httpFromClient } from '../../altegio-http.js';
 import { V1AnalyticsAdapter } from '../analytics-adapter.js';
+import {
+  awaitReportReady,
+  DATASET_DATE_FIELD,
+} from '../../../capabilities/analytics/use-cases.js';
 import { callAnalytics } from '../analytics-http.js';
 import { resolveLocationTimezone } from '../../../capabilities/analytics/location-timezone.js';
 
 const LIVE = process.env.ALTEGIO_E2E === '1';
 const ALLOW_WRITE = process.env.ALTEGIO_E2E_WRITE === '1';
 const DEMO_LOCATION_ID = 4564;
-const FIXTURES = path.join(__dirname, 'fixtures');
+const FIXTURES = path.join(__dirname, 'fixtures', 'live');
 const CREDENTIALS_DIR = process.env.CREDENTIALS_DIR ?? '/tmp/altegio-mcp-live';
 
 /** A short, recent window so a recording stays small and stable. */
@@ -42,23 +46,55 @@ const PERSONAL_KEYS = [
   'client_email',
   'master_name',
   'staff_name',
-  'name',
   'phone',
   'email',
-  'actor',
 ];
+
+/** Parent keys whose objects describe a person, so their `name` is personal. */
+const PERSON_PARENT_KEYS = [
+  'actor',
+  'staff',
+  'client',
+  'user',
+  'master',
+  'masters',
+];
+/** Keys whose presence marks an object as a person record (not a template, currency or report). */
+const PERSON_MARKER_KEYS = [
+  'phone',
+  'email',
+  'login',
+  'client_id',
+  'master_id',
+  'user_id',
+  'specialization',
+  'rating',
+  'avatar',
+];
+
+function isPersonObject(
+  value: Record<string, unknown>,
+  parentKey: string | undefined
+): boolean {
+  if (parentKey && PERSON_PARENT_KEYS.includes(parentKey)) return true;
+  return PERSON_MARKER_KEYS.some((key) => key in value);
+}
 
 /** Replace personal values in place, keeping the shape intact. */
 export function sanitize(
   value: unknown,
-  seen = new Map<string, string>()
+  seen = new Map<string, string>(),
+  parentKey?: string
 ): unknown {
-  if (Array.isArray(value)) return value.map((item) => sanitize(item, seen));
+  if (Array.isArray(value))
+    return value.map((item) => sanitize(item, seen, parentKey));
   if (!value || typeof value !== 'object') return value;
 
+  const object = value as Record<string, unknown>;
+  const personal = isPersonObject(object, parentKey);
   const out: Record<string, unknown> = {};
-  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
-    if (PERSONAL_KEYS.includes(key)) {
+  for (const [key, item] of Object.entries(object)) {
+    if (PERSONAL_KEYS.includes(key) || (key === 'name' && personal)) {
       if (item === null || item === '' || typeof item === 'number') {
         out[key] = item;
       } else if (typeof item === 'string') {
@@ -75,16 +111,17 @@ export function sanitize(
           out[key] = placeholder;
         }
       } else {
-        out[key] = sanitize(item, seen);
+        out[key] = sanitize(item, seen, key);
       }
       continue;
     }
-    out[key] = sanitize(item, seen);
+    out[key] = sanitize(item, seen, key);
   }
   return out;
 }
 
 function record(name: string, payload: unknown): void {
+  fs.mkdirSync(FIXTURES, { recursive: true });
   fs.writeFileSync(
     path.join(FIXTURES, `${name}.json`),
     `${JSON.stringify(sanitize(payload), null, 2)}\n`
@@ -176,14 +213,19 @@ describeLive('analytics endpoints against the demo location', () => {
       );
     }
     client = new AltegioClient({ partnerToken }, CREDENTIALS_DIR);
-    const result = await client.login(login, password);
-    expect(result.success).toBe(true);
+    // The ERP rate-limits logins per IP and login (403 after a handful of
+    // attempts), so reuse the token cached in CREDENTIALS_DIR between runs and
+    // log in only when there is none.
+    if (!client.isAuthenticated()) {
+      const result = await client.login(login, password);
+      expect(result.success).toBe(true);
+    }
     timezone = await resolveLocationTimezone(client, DEMO_LOCATION_ID);
   }, 60_000);
 
-  afterAll(async () => {
-    await client?.logout();
-  });
+  // No logout on purpose: it would clear the cached token and force a login on
+  // every run, which is what trips the rate limit.
+  afterAll(() => undefined);
 
   /** Raw call plus a recording, so the fixture is what the API really sent. */
   async function capture(
@@ -343,41 +385,96 @@ describeLive('analytics endpoints against the demo location', () => {
         one.name.startsWith('[Altegio Assistant]')
       ).length;
 
+      // Mirror the use case: the stored date filter is the template's `!= NULL`
+      // placeholder on the dataset's mandatory date column; the period is a
+      // run-time BETWEEN override addressed to that filter.
       const dateField = fields.find(
         (field) =>
-          field.data_type === 'date' && field.dataset === template!.dataset
+          field.dataset === template!.dataset &&
+          field.field_key === DATASET_DATE_FIELD[template!.dataset ?? 'sales']
       );
-      const created = await api.createReport({
-        location_id: DEMO_LOCATION_ID,
-        definition: {
-          name: `[Altegio Assistant] ${template!.name}`,
-          template_id: template!.template_id,
-          kind: template!.kind,
-          columns: template!.columns!.map((column) => ({
-            column_id: column.column_id,
-          })),
-          filters: dateField
-            ? [
-                {
-                  column_id: dateField.column_id,
-                  operator: 'BETWEEN',
-                  value: `${PERIOD.date_from},${PERIOD.date_to}`,
-                },
-              ]
-            : [],
-          groupings: template!.groupings!,
-        },
-      });
-      record('constructor-report', { success: true, data: created });
+      expect(dateField).toBeDefined();
+      const templateFilters = (template!.filters ?? []).map((filter) => ({
+        column_id: filter.column_id,
+        operator: filter.operator,
+        value: filter.value,
+      }));
+      const filters = templateFilters.some(
+        (filter) => filter.column_id === dateField!.column_id
+      )
+        ? templateFilters
+        : [
+            ...templateFilters,
+            { column_id: dateField!.column_id, operator: '!=', value: 'NULL' },
+          ];
+      const definition = {
+        name: `[Altegio Assistant] ${template!.name}`,
+        template_id: template!.template_id,
+        kind: template!.kind,
+        columns: template!.columns!.map((column) => ({
+          column_id: column.column_id,
+        })),
+        filters,
+        groupings: template!.groupings!,
+      };
 
+      // Reuse the owned report when it exists (updating it in place), so a
+      // re-run never leaves a second, undeletable report behind.
+      const existing = before.find((one) => one.name === definition.name);
+      let created = existing
+        ? await api.updateReport({
+            location_id: DEMO_LOCATION_ID,
+            report_id: existing.report_id,
+            definition,
+          })
+        : await api.createReport({
+            location_id: DEMO_LOCATION_ID,
+            definition,
+          });
+
+      // The builder prepares the data mart asynchronously; wait for `success`.
+      let full = await api.getSavedReport({
+        location_id: DEMO_LOCATION_ID,
+        report_id: created.report_id,
+      });
+      const ready = await awaitReportReady(api, DEMO_LOCATION_ID, full, {
+        timeoutMs: 150_000,
+        pollMs: 5_000,
+      });
+      full =
+        ready ??
+        (await api.getSavedReport({
+          location_id: DEMO_LOCATION_ID,
+          report_id: created.report_id,
+        }));
+      record('constructor-report', { success: true, data: full });
+      if (!ready) {
+        // The builder's first attempt on an API-created report fails; the hourly
+        // refresh rebuilds it. Record the definition, skip the data assertions.
+        console.warn(
+          `report ${full.report_id} not ready (status: ${full.status}); data not recorded`
+        );
+        return;
+      }
+
+      const periodFilter = (full.filters ?? []).find(
+        (filter) => filter.column_id === dateField!.column_id
+      );
+      expect(periodFilter).toBeDefined();
       const table = await api.runReport({
         location_id: DEMO_LOCATION_ID,
         report_id: created.report_id,
-        filters: (created.filters ?? []).slice(0, 1).map((filter) => ({
-          filter_id: filter.filter_id,
-          operator: 'BETWEEN',
-          value: { from: PERIOD.date_from, to: PERIOD.date_to },
-        })),
+        filters: [
+          {
+            filter_id: periodFilter!.filter_id,
+            operator: 'BETWEEN',
+            value: { from: PERIOD.date_from, to: PERIOD.date_to },
+          },
+        ],
+      });
+      record('constructor-report-data-live', {
+        success: true,
+        data: { columns: table.columns.length, rows: table.rows.length },
       });
       expect(table.columns.length).toBeGreaterThan(0);
 
