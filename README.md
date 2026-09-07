@@ -461,9 +461,20 @@ pipeline and the overlay format.
 
 ### Testing
 
-- **508 tests** (37 suites) covering authentication, all tools, facets and `tools/list` ordering, resources and prompts, the API catalog and executor, error handling, pagination
-- **730 tests** (39 suites) covering authentication, all tools, error handling, pagination, analytics golden fixtures and the terminology guard
-- **Opt-in live suite** for analytics: `ALTEGIO_E2E=1 npx jest analytics-live` re-records the fixtures against the demo location
+- **TESTS_PLACEHOLDER tests** (SUITES_PLACEHOLDER suites) covering authentication, all tools, facets and `tools/list` ordering, resources and prompts, the API catalog and executor, analytics golden fixtures and the terminology guard, error handling, pagination
+- **Opt-in live suite** for analytics — re-records the golden fixtures against the demo location:
+
+```bash
+ALTEGIO_E2E=1 \
+ALTEGIO_PARTNER_TOKEN=... ALTEGIO_TEST_LOGIN=... ALTEGIO_TEST_PASSWORD=... \
+CREDENTIALS_DIR=/tmp/altegio-mcp-live \
+npx jest analytics-live
+```
+
+  The partner token has its own variable here because the shared Jest setup pins
+  `ALTEGIO_API_TOKEN` to a dummy value for every other suite. Add
+  `ALTEGIO_E2E_WRITE=1` to also exercise the assistant-owned report in the
+  report builder.
 - **Jest** for unit tests with mocked API responses
 - **Test isolation** with temporary credentials directory
 - Run: `npm test` or `npm run test:coverage`
