@@ -19,6 +19,16 @@ export interface ApiMapping {
   pathParams: string[];
   queryParams?: string[];
   bodyParams?: string[];
+  /**
+   * Where the operation's contract lives:
+   * - `documented` (default) — the published OpenAPI specification in
+   *   `../biz.erp.api.docs`;
+   * - `extended` — a hand-written stub in `catalog/extended/*.yaml`, the
+   *   allowlist for undocumented endpoints (ADR-001 D4). Those stubs are
+   *   observed shapes, not guarantees, and each one is covered by a golden
+   *   contract test.
+   */
+  source?: 'documented' | 'extended';
 }
 
 /**
@@ -303,7 +313,314 @@ export const apiMapping: Record<string, ApiMapping> = {
     operationId: 'get_resource_list',
     pathParams: ['location_id'],
   },
+
+  // ==========================================
+  // Analytics — tools that call exactly one operation
+  // ==========================================
+  analytics_get_overview: {
+    path: '/company/{location_id}/analytics/overall',
+    method: 'get',
+    operationId: 'get_location_analytics_overall',
+    pathParams: ['location_id'],
+    queryParams: ['date_from', 'date_to', 'team_member_id', 'position_id', 'user_id'],
+  },
+  analytics_get_day_end_report: {
+    path: '/reports/z_report/{location_id}',
+    method: 'get',
+    operationId: 'get_day_end_report_data',
+    pathParams: ['location_id'],
+    queryParams: ['start_date', 'master_id'],
+  },
+  analytics_get_forecast: {
+    path: '/company/{location_id}/analytics/rfm/overall',
+    method: 'get',
+    operationId: 'get_location_analytics_forecast',
+    pathParams: ['location_id'],
+    queryParams: ['start_date', 'end_date'],
+    source: 'extended',
+  },
+  analytics_get_team_member_occupancy: {
+    path: '/company/{location_id}/staff/workload',
+    method: 'get',
+    operationId: 'get_location_team_member_occupancy',
+    pathParams: ['location_id'],
+    queryParams: ['start_date', 'end_date', 'team_member_id'],
+    source: 'extended',
+  },
+  analytics_get_client_visit_stats: {
+    path: '/api/v2/locations/{location_id}/clients/{client_id}/attendances_statistic',
+    method: 'get',
+    operationId: 'get_client_visit_statistics',
+    pathParams: ['location_id', 'client_id'],
+    source: 'extended',
+  },
+  analytics_list_report_fields: {
+    path: '/company/{location_id}/analytics_constructor/columns',
+    method: 'get',
+    operationId: 'list_report_builder_columns',
+    pathParams: ['location_id'],
+    source: 'extended',
+  },
+  analytics_list_saved_reports: {
+    path: '/company/{location_id}/analytics_constructor/reports',
+    method: 'get',
+    operationId: 'list_report_builder_reports',
+    pathParams: ['location_id'],
+    source: 'extended',
+  },
+  analytics_list_report_templates: {
+    path: '/company/{location_id}/analytics_constructor/report_templates',
+    method: 'get',
+    operationId: 'list_report_builder_templates',
+    pathParams: ['location_id'],
+    queryParams: ['include'],
+    source: 'extended',
+  },
 };
+
+/**
+ * Tools that compose several API operations into one answer.
+ *
+ * `apiMapping` holds one operation per tool, which the analytics pack breaks:
+ * a daily series pulls four charts, receptionist performance five endpoints,
+ * running a report the template list plus the field registry plus create/read
+ * plus the data call. Every operation still has to exist in the published spec
+ * or in `catalog/extended/*.yaml`, so the compliance test walks both maps.
+ */
+export const multiApiMapping: Record<string, ApiMapping[]> = {
+  analytics_get_daily_series: [
+    {
+      path: '/company/{location_id}/analytics/overall/charts/income_daily',
+      method: 'get',
+      operationId: 'get_location_analytics_revenue_daily',
+      pathParams: ['location_id'],
+      queryParams: ['date_from', 'date_to', 'team_member_id', 'position_id', 'user_id'],
+    },
+    {
+      path: '/company/{location_id}/analytics/overall/charts/records_daily',
+      method: 'get',
+      operationId: 'get_location_analytics_appointments_daily',
+      pathParams: ['location_id'],
+      queryParams: ['date_from', 'date_to', 'team_member_id', 'position_id', 'user_id'],
+    },
+    {
+      path: '/company/{location_id}/analytics/overall/charts/fullness_daily',
+      method: 'get',
+      operationId: 'get_location_analytics_occupancy_daily',
+      pathParams: ['location_id'],
+      queryParams: ['date_from', 'date_to', 'team_member_id', 'position_id', 'user_id'],
+    },
+    {
+      path: '/company/{location_id}/analytics/overall/charts/clients_daily',
+      method: 'get',
+      operationId: 'get_location_analytics_clients_daily',
+      pathParams: ['location_id'],
+      queryParams: ['date_from', 'date_to', 'team_member_id', 'position_id', 'user_id'],
+      source: 'extended',
+    },
+    {
+      path: '/company/{location_id}/analytics/overall',
+      method: 'get',
+      operationId: 'get_location_analytics_overall',
+      pathParams: ['location_id'],
+      queryParams: ['date_from', 'date_to'],
+    },
+  ],
+  analytics_get_appointments_breakdown: [
+    {
+      path: '/company/{location_id}/analytics/overall/charts/record_source',
+      method: 'get',
+      operationId: 'get_appointment_analytics_by_source',
+      pathParams: ['location_id'],
+      queryParams: ['date_from', 'date_to', 'team_member_id', 'position_id', 'user_id'],
+    },
+    {
+      path: '/company/{location_id}/analytics/overall/charts/record_status',
+      method: 'get',
+      operationId: 'get_appointment_analytics_by_status',
+      pathParams: ['location_id'],
+      queryParams: ['date_from', 'date_to', 'team_member_id', 'position_id', 'user_id'],
+    },
+  ],
+  analytics_get_loyalty_program_results: [
+    {
+      path: '/company/{location_id}/analytics/loyalty_programs/visits',
+      method: 'get',
+      operationId: 'get_loyalty_program_client_statistics',
+      pathParams: ['location_id'],
+      queryParams: ['loyalty_program_id', 'date_from', 'date_to'],
+    },
+    {
+      path: '/company/{location_id}/analytics/loyalty_programs/income',
+      method: 'get',
+      operationId: 'get_loyalty_program_revenue_statistics',
+      pathParams: ['location_id'],
+      queryParams: ['loyalty_program_id', 'date_from', 'date_to'],
+    },
+    {
+      path: '/company/{location_id}/analytics/loyalty_programs/staff',
+      method: 'get',
+      operationId: 'get_loyalty_program_team_member_statistics',
+      pathParams: ['location_id'],
+      queryParams: ['loyalty_program_id', 'date_from', 'date_to'],
+    },
+  ],
+  analytics_get_receptionist_performance: [
+    {
+      path: '/company/{location_id}/analytics/administrator/clients_scheduled',
+      method: 'get',
+      operationId: 'get_location_analytics_receptionist_clients_booked',
+      pathParams: ['location_id'],
+      queryParams: ['date_from', 'date_to', 'user_id', 'include'],
+      source: 'extended',
+    },
+    {
+      path: '/company/{location_id}/analytics/administrator/records_closed',
+      method: 'get',
+      operationId: 'get_location_analytics_receptionist_appointments_closed',
+      pathParams: ['location_id'],
+      queryParams: ['date_from', 'date_to', 'user_id', 'include'],
+      source: 'extended',
+    },
+    {
+      path: '/company/{location_id}/analytics/administrator/income',
+      method: 'get',
+      operationId: 'get_location_analytics_receptionist_revenue',
+      pathParams: ['location_id'],
+      queryParams: ['date_from', 'date_to', 'user_id', 'include'],
+      source: 'extended',
+    },
+    {
+      path: '/company/{location_id}/analytics/administrator/visited_clients_rescheduled',
+      method: 'get',
+      operationId: 'get_location_analytics_receptionist_rebooked_after_visit',
+      pathParams: ['location_id'],
+      queryParams: ['date_from', 'date_to', 'user_id', 'include'],
+      source: 'extended',
+    },
+    {
+      path: '/company/{location_id}/analytics/administrator/canceled_clients_rescheduled',
+      method: 'get',
+      operationId: 'get_location_analytics_receptionist_rebooked_after_no_show',
+      pathParams: ['location_id'],
+      queryParams: ['date_from', 'date_to', 'user_id', 'include'],
+      source: 'extended',
+    },
+  ],
+  analytics_run_report: [
+    {
+      path: '/company/{location_id}/analytics_constructor/report_templates',
+      method: 'get',
+      operationId: 'list_report_builder_templates',
+      pathParams: ['location_id'],
+      queryParams: ['include'],
+      source: 'extended',
+    },
+    {
+      path: '/company/{location_id}/analytics_constructor/columns',
+      method: 'get',
+      operationId: 'list_report_builder_columns',
+      pathParams: ['location_id'],
+      source: 'extended',
+    },
+    {
+      path: '/company/{location_id}/analytics_constructor/reports',
+      method: 'get',
+      operationId: 'list_report_builder_reports',
+      pathParams: ['location_id'],
+      source: 'extended',
+    },
+    {
+      path: '/company/{location_id}/analytics_constructor/reports',
+      method: 'post',
+      operationId: 'create_report_builder_report',
+      pathParams: ['location_id'],
+      bodyParams: [
+        'name',
+        'description',
+        'report_template_id',
+        'type',
+        'report_columns',
+        'report_filters',
+        'report_groupings',
+      ],
+      source: 'extended',
+    },
+    {
+      path: '/company/{location_id}/analytics_constructor/reports/{report_id}',
+      method: 'get',
+      operationId: 'get_report_builder_report',
+      pathParams: ['location_id', 'report_id'],
+      queryParams: ['include'],
+      source: 'extended',
+    },
+    {
+      path: '/company/{location_id}/analytics_constructor/reports/{report_id}',
+      method: 'post',
+      operationId: 'update_report_builder_report',
+      pathParams: ['location_id', 'report_id'],
+      bodyParams: [
+        'name',
+        'description',
+        'report_template_id',
+        'type',
+        'report_columns',
+        'report_filters',
+        'report_groupings',
+      ],
+      source: 'extended',
+    },
+    {
+      path: '/company/{location_id}/analytics_constructor/reports/{report_id}/data',
+      method: 'post',
+      operationId: 'run_report_builder_report',
+      pathParams: ['location_id', 'report_id'],
+      bodyParams: ['filters'],
+      source: 'extended',
+    },
+  ],
+  analytics_run_saved_report: [
+    {
+      path: '/company/{location_id}/analytics_constructor/columns',
+      method: 'get',
+      operationId: 'list_report_builder_columns',
+      pathParams: ['location_id'],
+      source: 'extended',
+    },
+    {
+      path: '/company/{location_id}/analytics_constructor/reports/{report_id}',
+      method: 'get',
+      operationId: 'get_report_builder_report',
+      pathParams: ['location_id', 'report_id'],
+      queryParams: ['include'],
+      source: 'extended',
+    },
+    {
+      path: '/company/{location_id}/analytics_constructor/reports/{report_id}/data',
+      method: 'post',
+      operationId: 'run_report_builder_report',
+      pathParams: ['location_id', 'report_id'],
+      bodyParams: ['filters'],
+      source: 'extended',
+    },
+  ],
+};
+
+/** Every tool → operation pair, from both maps, for the compliance test. */
+export function allApiMappings(): Array<[string, ApiMapping]> {
+  const pairs: Array<[string, ApiMapping]> = Object.entries(apiMapping).map(
+    ([tool, mapping]) => [tool, mapping]
+  );
+  for (const [tool, mappings] of Object.entries(multiApiMapping)) {
+    for (const mapping of mappings) pairs.push([tool, mapping]);
+  }
+  return pairs;
+}
+
+/** Where a mapping's contract is expected to live. */
+export function mappingSource(mapping: ApiMapping): 'documented' | 'extended' {
+  return mapping.source ?? 'documented';
+}
 
 /**
  * Tools that don't map to API endpoints (local operations or orchestrators).

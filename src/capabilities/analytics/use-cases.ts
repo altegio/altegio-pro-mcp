@@ -13,6 +13,7 @@ import { V1AnalyticsAdapter } from '../../api/v1/analytics-adapter.js';
 import type {
   AnalyticsApi,
   ReportDataFilterOverride,
+  ReportDefinition,
   ReportField,
   SavedReport,
 } from '../../api/analytics-api.js';
@@ -821,15 +822,32 @@ export async function runReport(
     : adHocDefinition(input, fields);
 
   const owned = saved.find((report) => report.name === definition.name);
-  const report = owned
-    ? await ctx.api.getSavedReport({
+  let report: SavedReport;
+  if (!owned) {
+    report = await ctx.api.createReport({
+      location_id: input.location_id,
+      definition,
+    });
+  } else {
+    report = await ctx.api.getSavedReport({
+      location_id: input.location_id,
+      report_id: owned.report_id,
+    });
+    // The template or the requested shape may have changed since the report was
+    // created; update the one we own in place rather than leaving a second,
+    // undeletable report behind.
+    if (!definitionMatches(report, definition)) {
+      await ctx.api.updateReport({
         location_id: input.location_id,
-        report_id: owned.report_id,
-      })
-    : await ctx.api.createReport({
-        location_id: input.location_id,
+        report_id: report.report_id,
         definition,
       });
+      report = await ctx.api.getSavedReport({
+        location_id: input.location_id,
+        report_id: report.report_id,
+      });
+    }
+  }
 
   const { table, stored } = await renderTable(
     ctx.api,
@@ -970,6 +988,30 @@ function adHocDefinition(
     filters,
     groupings,
   };
+}
+
+/** Whether a stored report still matches the definition we would create. */
+export function definitionMatches(
+  report: SavedReport,
+  definition: ReportDefinition
+): boolean {
+  const sorted = (values: readonly string[]) => [...values].sort().join(',');
+  const storedColumns = sorted(
+    (report.columns ?? []).map((column) => column.column_id)
+  );
+  const wantedColumns = sorted(
+    definition.columns.map((column) => column.column_id)
+  );
+  const storedGroupings = sorted(
+    (report.groupings ?? []).map((grouping) => grouping.column_id)
+  );
+  const wantedGroupings = sorted(definition.groupings);
+  return (
+    report.kind === definition.kind &&
+    storedColumns === wantedColumns &&
+    storedGroupings === wantedGroupings &&
+    (report.filters ?? []).length >= definition.filters.length
+  );
 }
 
 /** Stable short hash, so one ad-hoc shape maps to one owned report. */

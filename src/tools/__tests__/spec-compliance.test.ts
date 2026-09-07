@@ -1,7 +1,17 @@
 import SwaggerParser from '@apidevtools/swagger-parser';
 import * as path from 'path';
 import * as fs from 'fs';
-import { apiMapping, executorTools, unmappedTools } from '../api-mapping.js';
+import {
+  allApiMappings,
+  apiMapping,
+  executorTools,
+  mappingSource,
+  multiApiMapping,
+  unmappedTools,
+  type ApiMapping,
+} from '../api-mapping.js';
+import * as definitions from '../definitions/index.js';
+import type { DefinedTool } from '../factory.js';
 
 /**
  * Known discrepancies between MCP client code and OpenAPI spec.
@@ -27,6 +37,8 @@ let spec: any;
 let specAvailable = false;
 
 beforeAll(async () => {
+  extendedCatalog = await loadExtendedCatalog();
+
   if (!fs.existsSync(SPEC_PATH)) {
     console.warn(
       `OpenAPI spec not found at ${SPEC_PATH}. Skipping spec compliance tests.\n` +
@@ -51,6 +63,72 @@ function skipIfNoSpec() {
 }
 
 /**
+ * Extended catalog — hand-written stubs for the undocumented endpoints on the
+ * allowlist (ADR-001 D4). A tool may map to a documented operation OR to one of
+ * these; nothing else is allowed.
+ */
+const EXTENDED_DIR = path.resolve(__dirname, '../../../catalog/extended');
+
+interface ExtendedOperation {
+  file: string;
+  path: string;
+  method: string;
+  operationId?: string;
+  parameters?: Array<{ name: string; in: string }>;
+  requestBody?: {
+    content?: Record<string, { schema?: { properties?: Record<string, unknown> } }>;
+  };
+}
+
+async function loadExtendedCatalog(): Promise<Map<string, ExtendedOperation>> {
+  const operations = new Map<string, ExtendedOperation>();
+  if (!fs.existsSync(EXTENDED_DIR)) return operations;
+
+  for (const file of fs.readdirSync(EXTENDED_DIR)) {
+    if (!/\.ya?ml$/.test(file)) continue;
+    // The stubs are valid OpenAPI documents, so the same parser reads them.
+    const doc = (await SwaggerParser.parse(
+      path.join(EXTENDED_DIR, file)
+    )) as unknown as {
+      paths?: Record<string, Record<string, unknown>>;
+    };
+    for (const [specPath, item] of Object.entries(doc?.paths ?? {})) {
+      for (const [method, operation] of Object.entries(item)) {
+        if (!['get', 'post', 'put', 'patch', 'delete'].includes(method))
+          continue;
+        operations.set(`${method} ${specPath}`, {
+          file,
+          path: specPath,
+          method,
+          ...(operation as object),
+        } as ExtendedOperation);
+      }
+    }
+  }
+  return operations;
+}
+
+let extendedCatalog = new Map<string, ExtendedOperation>();
+
+const documentedMappings = allApiMappings().filter(
+  ([, mapping]) => mappingSource(mapping) === 'documented'
+);
+const extendedMappings = allApiMappings().filter(
+  ([, mapping]) => mappingSource(mapping) === 'extended'
+);
+
+/** Deduplicated documented mappings, keyed by tool + operation. */
+function documentedEntries(): Array<[string, ApiMapping]> {
+  const seen = new Set<string>();
+  return documentedMappings.filter(([tool, mapping]) => {
+    const key = `${tool} ${mapping.method} ${mapping.path}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
  * Normalize OpenAPI path template to match our mapping format.
  * Spec uses {location_id} but paths section keys might differ.
  */
@@ -72,7 +150,7 @@ function findPathInSpec(specPath: string): any | null {
 
 describe('Spec Compliance', () => {
   describe('Endpoint existence', () => {
-    for (const [toolName, mapping] of Object.entries(apiMapping)) {
+    for (const [toolName, mapping] of documentedEntries()) {
       it(`${toolName} → ${mapping.method.toUpperCase()} ${mapping.path} exists in spec`, () => {
         if (skipIfNoSpec()) return;
 
@@ -97,7 +175,7 @@ describe('Spec Compliance', () => {
   });
 
   describe('Operation ID match', () => {
-    for (const [toolName, mapping] of Object.entries(apiMapping)) {
+    for (const [toolName, mapping] of documentedEntries()) {
       it(`${toolName} → operationId "${mapping.operationId}"`, () => {
         if (skipIfNoSpec()) return;
 
@@ -111,7 +189,7 @@ describe('Spec Compliance', () => {
   });
 
   describe('Path parameters', () => {
-    for (const [toolName, mapping] of Object.entries(apiMapping)) {
+    for (const [toolName, mapping] of documentedEntries()) {
       if (mapping.pathParams.length === 0) continue;
 
       it(`${toolName} → path params match spec`, () => {
@@ -146,7 +224,7 @@ describe('Spec Compliance', () => {
   });
 
   describe('Query parameters', () => {
-    for (const [toolName, mapping] of Object.entries(apiMapping)) {
+    for (const [toolName, mapping] of documentedEntries()) {
       if (!mapping.queryParams?.length) continue;
 
       it(`${toolName} → query params exist in spec`, () => {
@@ -181,7 +259,7 @@ describe('Spec Compliance', () => {
   });
 
   describe('Request body parameters', () => {
-    for (const [toolName, mapping] of Object.entries(apiMapping)) {
+    for (const [toolName, mapping] of documentedEntries()) {
       if (!mapping.bodyParams?.length) continue;
 
       it(`${toolName} → body params exist in spec`, () => {
@@ -231,7 +309,7 @@ describe('Spec Compliance', () => {
   });
 
   describe('Required fields', () => {
-    for (const [toolName, mapping] of Object.entries(apiMapping)) {
+    for (const [toolName, mapping] of documentedEntries()) {
       if (!mapping.bodyParams?.length) continue;
 
       it(`${toolName} → spec required fields are covered`, () => {
@@ -267,7 +345,7 @@ describe('Spec Compliance', () => {
   });
 
   describe('Deprecation warnings', () => {
-    for (const [toolName, mapping] of Object.entries(apiMapping)) {
+    for (const [toolName, mapping] of documentedEntries()) {
       it(`${toolName} → check if endpoint is deprecated`, () => {
         if (skipIfNoSpec()) return;
 
@@ -287,20 +365,102 @@ describe('Spec Compliance', () => {
     }
   });
 
-  describe('Tool coverage', () => {
-    it('all registered tools are either mapped or explicitly unmapped', () => {
-      // Import tool names from registry (we check at build time)
-      const mappedTools = Object.keys(apiMapping);
-      const allAccountedFor = [...mappedTools, ...unmappedTools];
+  describe('Extended catalog (undocumented endpoints on the allowlist)', () => {
+    it('the catalog directory exists and holds operations', () => {
+      expect(extendedCatalog.size).toBeGreaterThan(0);
+    });
 
-      // This test ensures we don't accidentally add a tool without mapping it.
-      // The actual tool list comes from registry.ts — if a new tool is added
-      // but not mapped here, the test below will catch it.
-      expect(allAccountedFor.length).toBeGreaterThan(0);
+    for (const [toolName, mapping] of extendedMappings) {
+      it(`${toolName} → ${mapping.method.toUpperCase()} ${mapping.path} has an extended stub`, () => {
+        const operation = extendedCatalog.get(
+          `${mapping.method} ${mapping.path}`
+        );
+        expect(operation).toBeDefined();
+        expect(operation?.operationId).toBe(mapping.operationId);
+      });
+
+      if (mapping.pathParams.length > 0) {
+        it(`${toolName} → ${mapping.path} declares its path parameters`, () => {
+          const operation = extendedCatalog.get(
+            `${mapping.method} ${mapping.path}`
+          );
+          const declared = (operation?.parameters ?? [])
+            .filter((p) => p.in === 'path')
+            .map((p) => p.name);
+          for (const param of mapping.pathParams) {
+            expect(declared).toContain(param);
+          }
+        });
+      }
+
+      if (mapping.queryParams?.length) {
+        it(`${toolName} → ${mapping.path} declares its query parameters`, () => {
+          const operation = extendedCatalog.get(
+            `${mapping.method} ${mapping.path}`
+          );
+          const declared = (operation?.parameters ?? [])
+            .filter((p) => p.in === 'query')
+            .map((p) => p.name);
+          for (const param of mapping.queryParams!) {
+            expect(declared).toContain(param);
+          }
+        });
+      }
+
+      if (mapping.bodyParams?.length) {
+        it(`${toolName} → ${mapping.path} declares its body parameters`, () => {
+          const operation = extendedCatalog.get(
+            `${mapping.method} ${mapping.path}`
+          );
+          const schema =
+            operation?.requestBody?.content?.['application/json']?.schema;
+          // Stubs may use a $ref to a component; only check inline shapes.
+          if (!schema?.properties) return;
+          for (const param of mapping.bodyParams!) {
+            expect(Object.keys(schema.properties)).toContain(param);
+          }
+        });
+      }
+    }
+
+    it('every extended operation is reachable through at least one tool', () => {
+      const used = new Set(
+        extendedMappings.map(
+          ([, mapping]) => `${mapping.method} ${mapping.path}`
+        )
+      );
+      const unused = [...extendedCatalog.keys()].filter((key) => !used.has(key));
+      expect(unused).toEqual([]);
+    });
+  });
+
+  describe('Tool coverage', () => {
+    /** Every factory-defined tool discovered from the definitions barrel. */
+    const registeredTools = (Object.values(definitions) as unknown[])
+      .filter(
+        (value): value is DefinedTool =>
+          !!value &&
+          typeof value === 'object' &&
+          'toMcpTool' in value &&
+          'meta' in value
+      )
+      .map((tool) => tool.meta.name);
+
+    it('every registered tool is mapped or explicitly unmapped', () => {
+      const accountedFor = new Set([
+        ...Object.keys(apiMapping),
+        ...Object.keys(multiApiMapping),
+        ...unmappedTools,
+      ]);
+      const missing = registeredTools.filter((tool) => !accountedFor.has(tool));
+      expect(missing).toEqual([]);
     });
 
     it('no tool is both mapped and unmapped', () => {
-      const mapped = new Set(Object.keys(apiMapping));
+      const mapped = new Set([
+        ...Object.keys(apiMapping),
+        ...Object.keys(multiApiMapping),
+      ]);
       const overlap = unmappedTools.filter((t) => mapped.has(t));
       expect(overlap).toEqual([]);
     });
@@ -333,10 +493,25 @@ describe('Spec Compliance', () => {
         ).toBe(true);
       }
     });
+
+    it('every mapping refers to a documented or an extended operation', () => {
+      for (const [tool, mapping] of allApiMappings()) {
+        const source = mappingSource(mapping);
+        if (source === 'extended') {
+          expect(
+            extendedCatalog.has(`${mapping.method} ${mapping.path}`)
+          ).toBe(true);
+        } else if (specAvailable) {
+          const pathObj = findPathInSpec(mapping.path);
+          expect(pathObj?.[mapping.method]).toBeDefined();
+        }
+        expect(typeof tool).toBe('string');
+      }
+    });
   });
 
   describe('HTTP method consistency', () => {
-    for (const [toolName, mapping] of Object.entries(apiMapping)) {
+    for (const [toolName, mapping] of allApiMappings()) {
       it(`${toolName} → client uses ${mapping.method.toUpperCase()}`, () => {
         // This is a static check — validates our mapping is internally consistent
         if (toolName.startsWith('get_') || toolName === 'list_locations') {

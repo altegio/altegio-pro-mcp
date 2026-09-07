@@ -1,0 +1,680 @@
+# Extended catalog — analytics operations that have no entry in the published
+# OpenAPI specification (ADR-001 D4).
+#
+# Every operation listed here is on the explicit allowlist of undocumented
+# endpoints the analytics pack may call. Shapes are recorded as observed, not as
+# guaranteed: an undocumented route serves the ERP web client and can change
+# without notice, so each one is covered by a golden contract test replayed from
+# a recorded fixture, and by the opt-in live suite (ALTEGIO_E2E=1) that
+# re-records those fixtures against the demo location.
+#
+# `x-altegio-source: undocumented` marks the whole file. `x-altegio-permission`
+# records the access right the backend checks, and `x-altegio-caveat` the
+# behaviour that surprised us while integrating.
+#
+# All paths are relative to https://api.alteg.io/api/v1 unless the operation
+# carries `x-altegio-api-version: v2`.
+
+openapi: 3.1.0
+info:
+  title: Altegio analytics — undocumented operations used by the MCP analytics pack
+  version: '2026-09-07'
+  description: >-
+    Hand-written stubs for the undocumented analytics endpoints the
+    `analytics_*` tool pack depends on. Candidates for publication in the
+    Altegio API specification; see ADR-001 §8.2.
+
+x-altegio-source: undocumented
+
+paths:
+  /company/{location_id}/analytics/overall/charts/clients_daily:
+    get:
+      operationId: get_location_analytics_clients_daily
+      summary: Daily client counts (total, new, returning)
+      x-altegio-permission: reports_access | reports_basic_metrics_access | own user_id
+      x-altegio-caveat: >-
+        Returns a raw array with no {success,data,meta} envelope, like the other
+        chart endpoints. Series carry stable slugs.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: date_from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: date_to, in: query, required: true, schema: { type: string, format: date } }
+        - { name: team_member_id, in: query, schema: { type: integer } }
+        - { name: position_id, in: query, schema: { type: integer } }
+        - { name: user_id, in: query, schema: { type: integer } }
+      responses:
+        '200':
+          description: Three series, slugs clients_total, clients_new, clients_returned.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    label: { type: string }
+                    slug:
+                      type: string
+                      enum: [clients_total, clients_new, clients_returned]
+                    data:
+                      type: array
+                      items:
+                        type: array
+                        items: { type: number }
+
+  /company/{location_id}/analytics/administrator/clients_scheduled:
+    get:
+      operationId: get_location_analytics_receptionist_clients_booked
+      summary: Clients booked by receptionists
+      x-altegio-permission: reports_access | reports_admins_access | own user_id
+      x-altegio-caveat: >-
+        With no receptionist matching the filter the response is an all-zero
+        container with HTTP 200, not an error.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: date_from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: date_to, in: query, required: true, schema: { type: string, format: date } }
+        - { name: user_id, in: query, schema: { type: integer } }
+        - name: include
+          in: query
+          description: Repeatable; `clients_count_daily` adds the day-by-day series.
+          schema:
+            type: array
+            items: { type: string, enum: [clients_count_daily] }
+      responses:
+        '200':
+          description: Period totals with the previous-period value.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      clients_count: { type: integer }
+                      previous_clients_count: { type: integer }
+                      clients_count_daily:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            date: { type: string, format: date }
+                            clients_count: { type: integer }
+
+  /company/{location_id}/analytics/administrator/records_closed:
+    get:
+      operationId: get_location_analytics_receptionist_appointments_closed
+      summary: Appointments closed and settled by receptionists
+      x-altegio-permission: reports_access | reports_admins_access | own user_id
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: date_from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: date_to, in: query, required: true, schema: { type: string, format: date } }
+        - { name: user_id, in: query, schema: { type: integer } }
+        - name: include
+          in: query
+          schema:
+            type: array
+            items: { type: string, enum: [records_count_daily] }
+      responses:
+        '200':
+          description: Period totals with the previous-period value.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      records_count: { type: integer }
+                      previous_records_count: { type: integer }
+                      records_count_daily:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            date: { type: string, format: date }
+                            records_count: { type: integer }
+
+  /company/{location_id}/analytics/administrator/income:
+    get:
+      operationId: get_location_analytics_receptionist_revenue
+      summary: Revenue attributed to receptionists
+      x-altegio-permission: reports_access | reports_admins_access | own user_id
+      x-altegio-caveat: >-
+        Includes client account top-ups. Sums are floats in major units; the
+        currency arrives as the shared currency object.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: date_from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: date_to, in: query, required: true, schema: { type: string, format: date } }
+        - { name: user_id, in: query, schema: { type: integer } }
+        - name: include
+          in: query
+          schema:
+            type: array
+            items: { type: string, enum: [income_sum_daily, currency] }
+      responses:
+        '200':
+          description: Period totals with the previous-period value and the currency.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      income_sum: { type: number }
+                      previous_income_sum: { type: number }
+                      currency: { type: object }
+                      income_sum_daily:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            date: { type: string, format: date }
+                            income_sum: { type: number }
+
+  /company/{location_id}/analytics/administrator/visited_clients_rescheduled:
+    get:
+      operationId: get_location_analytics_receptionist_rebooked_after_visit
+      summary: Clients rebooked after an attended visit
+      x-altegio-permission: reports_access | reports_admins_access | own user_id
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: date_from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: date_to, in: query, required: true, schema: { type: string, format: date } }
+        - { name: user_id, in: query, schema: { type: integer } }
+        - name: include
+          in: query
+          schema:
+            type: array
+            items: { type: string, enum: [clients_count_daily] }
+      responses:
+        '200':
+          description: Base count and how many of them rebooked.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      clients_count: { type: integer }
+                      clients_rescheduled_count: { type: integer }
+
+  /company/{location_id}/analytics/administrator/canceled_clients_rescheduled:
+    get:
+      operationId: get_location_analytics_receptionist_rebooked_after_no_show
+      summary: Clients rebooked after a no-show
+      x-altegio-permission: reports_access | reports_admins_access | own user_id
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: date_from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: date_to, in: query, required: true, schema: { type: string, format: date } }
+        - { name: user_id, in: query, schema: { type: integer } }
+        - name: include
+          in: query
+          schema:
+            type: array
+            items: { type: string, enum: [clients_count_daily] }
+      responses:
+        '200':
+          description: Base count and how many of them rebooked.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      clients_count: { type: integer }
+                      clients_rescheduled_count: { type: integer }
+
+  /company/{location_id}/analytics/rfm/overall:
+    get:
+      operationId: get_location_analytics_forecast
+      summary: Revenue and visits forecast versus actuals
+      x-altegio-permission: reports_access + the forecast module enabled for the location
+      x-altegio-caveat: >-
+        Despite the route name this is not RFM segmentation: the payload compares
+        a model forecast with the actuals. With no prediction for the range an
+        empty container is returned with HTTP 200.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: start_date, in: query, schema: { type: string, format: date } }
+        - { name: end_date, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Forecast and actuals, for the period and per bucket.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      prediction_date: { type: [string, 'null'], format: date }
+                      income: { type: object }
+                      visits_count: { type: object }
+                      income_by_period: { type: object }
+                      visits_count_by_period: { type: object }
+
+  /company/{location_id}/staff/workload:
+    get:
+      operationId: get_location_team_member_occupancy
+      summary: Daily occupancy of one team member
+      x-altegio-permission: timetable_access
+      x-altegio-caveat: >-
+        The payload carries no team member id, so a call with several ids returns
+        rows that cannot be attributed — call it once per team member.
+        start_date and end_date are required (HTTP 400 otherwise).
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: start_date, in: query, required: true, schema: { type: string, format: date } }
+        - { name: end_date, in: query, required: true, schema: { type: string, format: date } }
+        - { name: team_member_id, in: query, schema: { type: integer } }
+      responses:
+        '200':
+          description: One row per day with the occupancy percentage.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date: { type: string, format: date }
+                        workload: { type: number }
+
+  /api/v2/locations/{location_id}/clients/{client_id}/attendances_statistic:
+    get:
+      operationId: get_client_visit_statistics
+      summary: Visit statistics of one client
+      x-altegio-api-version: v2
+      x-altegio-permission: clients_access | record_form_access, plus an active subscription
+      x-altegio-caveat: >-
+        Internal JSON:API surface, wrapped read-only. The resource id is
+        "<client_id>_<location_id>", and client account top-ups arrive as an
+        include we do not read.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: client_id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Attended and missed visit counts, money spent and paid, account balance.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      attributes:
+                        type: object
+                        properties:
+                          successful_attendances_count: { type: integer }
+                          failed_attendances_count: { type: integer }
+                          balance_amount: { type: number }
+                          spent_amount: { type: number }
+                          paid_amount: { type: number }
+                          last_successful_attendance_datetime:
+                            type: [string, 'null']
+
+  /company/{location_id}/analytics_constructor/columns:
+    get:
+      operationId: list_report_builder_columns
+      summary: Field registry of the report builder
+      x-altegio-permission: none checked (worth fixing upstream); an active subscription applies
+      x-altegio-caveat: >-
+        Database-driven, not an enum: about 565 visible rows across four
+        datasets, of which roughly 165 are curated and the rest are mechanical
+        aggregate variants. Proxy it, never hard-code it.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Every visible column of every dataset.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        table_name: { type: string }
+                        table_title: { type: string }
+                        column_name: { type: string }
+                        column_name_alias: { type: string }
+                        title: { type: string }
+                        description: { type: string }
+                        data_type: { type: string }
+                        data_type_slug:
+                          type: string
+                          enum: [NUMERICS, DATE, STRING, BOOLEAN]
+                        metric_type_slug:
+                          type: string
+                          enum: [sum, percent, average, minimum, maximum, count, plain]
+                        expression_slug: { type: [string, 'null'] }
+                        is_default: { type: boolean }
+                        is_groupable: { type: boolean }
+                        is_granularity: { type: boolean }
+                        is_filterable: { type: boolean }
+
+  /company/{location_id}/analytics_constructor/report_templates:
+    get:
+      operationId: list_report_builder_templates
+      summary: Built-in report templates
+      x-altegio-permission: reports_access, plus an active subscription
+      x-altegio-caveat: >-
+        Twenty-four templates, seventeen flat and seven time series. The
+        includes carry the column, filter and grouping definition needed to
+        clone a template into a runnable report.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - name: include
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - report_template_columns
+                - report_template_filters
+                - report_template_groupings
+      responses:
+        '200':
+          description: Template list.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                        slug: { type: string }
+                        description: { type: string }
+                        type: { type: string, enum: [static, dynamic] }
+
+  /company/{location_id}/analytics_constructor/reports:
+    get:
+      operationId: list_report_builder_reports
+      summary: Reports saved in the location's report builder
+      x-altegio-permission: reports_access, plus an active subscription
+      x-altegio-caveat: A missing access right answers 404, not 403.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Saved reports.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ReportBuilderReport' }
+    post:
+      operationId: create_report_builder_report
+      summary: Create a report in the location's report builder
+      x-altegio-permission: reports_access, plus an active subscription
+      x-altegio-caveat: >-
+        This generation of the report builder has no delete, so a created report
+        stays visible to the user. The MCP keeps exactly one report per template
+        or ad-hoc shape, named "[Altegio Assistant] …", and reuses it.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportBuilderReportInput' }
+      responses:
+        '200':
+          description: The created report.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data: { $ref: '#/components/schemas/ReportBuilderReport' }
+
+  /company/{location_id}/analytics_constructor/reports/{report_id}:
+    get:
+      operationId: get_report_builder_report
+      summary: Read one saved report with its columns, filters and groupings
+      x-altegio-permission: reports_access, plus an active subscription
+      x-altegio-caveat: >-
+        A report belonging to another location answers 404, and so does a
+        missing access right — 404 does not prove the report is gone.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: report_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - name: include
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [report_columns, report_filters, report_groupings]
+      responses:
+        '200':
+          description: The report.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data: { $ref: '#/components/schemas/ReportBuilderReport' }
+    post:
+      operationId: update_report_builder_report
+      summary: Update one saved report in place
+      x-altegio-permission: reports_access, plus an active subscription
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: report_id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportBuilderReportInput' }
+      responses:
+        '200':
+          description: The updated report.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data: { $ref: '#/components/schemas/ReportBuilderReport' }
+
+  /company/{location_id}/analytics_constructor/reports/{report_id}/data:
+    post:
+      operationId: run_report_builder_report
+      summary: Run a saved report, optionally overriding its filters
+      x-altegio-permission: reports_access, plus an active subscription
+      x-altegio-caveat: >-
+        Unbounded: there is no page, limit or order parameter, so the whole
+        result set arrives in one response. Overriding a BETWEEN filter with
+        {from, to} is the only way to set the period at run time. The `columns`
+        and `summary` blocks name their column id field `report_grouping_id`
+        even though it holds a report column id.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: report_id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                filters:
+                  type: array
+                  items:
+                    type: object
+                    required: [id, operator, value]
+                    properties:
+                      id: { type: string, format: uuid }
+                      operator:
+                        type: string
+                        enum: ['>', '>=', '<', '<=', '=', '!=', 'IN', 'NOT IN', 'LIKE', 'NOT LIKE', 'ILIKE', 'NOT ILIKE', 'BETWEEN', 'IS', 'IS NOT']
+                      value:
+                        oneOf:
+                          - type: string
+                          - type: array
+                            items: { type: string }
+                          - type: object
+                            required: [from, to]
+                            properties:
+                              from: { type: string, format: date }
+                              to: { type: string, format: date }
+      responses:
+        '200':
+          description: A pivot of header, rows and summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      header:
+                        type: object
+                        properties:
+                          groupings:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                key: { type: string }
+                                report_grouping_id: { type: string }
+                                column_id: { type: string }
+                          columns:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                key: { type: string }
+                                report_column_id: { type: string }
+                                column_id: { type: string }
+                                detalization: { type: [object, 'null'] }
+                      rows:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            groupings: { type: array, items: { type: object } }
+                            columns: { type: array, items: { type: object } }
+                      summary:
+                        type: object
+                        properties:
+                          columns: { type: array, items: { type: object } }
+
+components:
+  schemas:
+    ReportBuilderReport:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: [string, 'null'] }
+        report_template_id: { type: [string, 'null'], format: uuid }
+        actor_id: { type: integer }
+        owner_id: { type: integer }
+        type: { type: string, enum: [static, dynamic] }
+        created_at: { type: string }
+        report_columns:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              column_id: { type: string, format: uuid }
+              title: { type: [string, 'null'] }
+        report_filters:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              column_id: { type: string, format: uuid }
+              operator: { type: string }
+              value: { type: string }
+        report_groupings:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              column_id: { type: string, format: uuid }
+
+    ReportBuilderReportInput:
+      type: object
+      required: [name, report_columns, report_filters, report_groupings]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 50 }
+        description: { type: [string, 'null'], maxLength: 200 }
+        report_template_id: { type: [string, 'null'], format: uuid }
+        type: { type: string, enum: [static, dynamic], default: static }
+        report_columns:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [column_id]
+            properties:
+              column_id: { type: string, format: uuid }
+              title: { type: [string, 'null'], maxLength: 255 }
+        report_filters:
+          type: array
+          items:
+            type: object
+            required: [column_id, operator, value]
+            properties:
+              column_id: { type: string, format: uuid }
+              operator: { type: string }
+              value: { type: string, minLength: 1, maxLength: 255 }
+        report_groupings:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [column_id]
+            properties:
+              column_id: { type: string, format: uuid }
