@@ -24,6 +24,13 @@ export default [
     },
   },
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '.worktrees/**'],
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'coverage/**',
+      '.worktrees/**',
+      // Generated catalog (scripts/catalog/build.mjs) — reviewed as data, not code.
+      'src/generated/**',
+    ],
   },
 ];

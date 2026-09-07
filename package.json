@@ -68,7 +68,9 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,json,md}\"",
     "typecheck": "tsc --noEmit",
     "prepare": "husky",
-    "api:inventory": "node scripts/api-inventory/openapi-inventory.mjs"
+    "api:inventory": "node scripts/api-inventory/openapi-inventory.mjs",
+    "catalog:build": "node scripts/catalog/build.mjs",
+    "catalog:check": "node scripts/catalog/build.mjs --check"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
