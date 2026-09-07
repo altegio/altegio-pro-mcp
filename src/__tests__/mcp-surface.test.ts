@@ -10,6 +10,11 @@ import {
   PRODUCT_LOGIC_URI,
 } from '../resources/index.js';
 import { ONBOARDING_WALKTHROUGH_PROMPT } from '../prompts/index.js';
+import { DEFAULT_FACET_EXTRA_TOOLS } from '../tools/facets.js';
+import {
+  COVERAGE_URI as ANALYTICS_COVERAGE_URI,
+  GLOSSARY_URI as ANALYTICS_GLOSSARY_URI,
+} from '../resources/analytics.resources.js';
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 
 /**
@@ -40,11 +45,17 @@ function resourceText(contents: ReadResourceResult['contents']): string {
 }
 
 describe('tools/list per facet', () => {
-  it('serves every tool on the default view, in the registry order', async () => {
+  it('serves every non-pack tool plus the analytics entry points on the default view, in the registry order', async () => {
     const client = await connect();
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name)).toEqual(
-      orderedToolEntries().map((entry) => entry.spec.name)
+      orderedToolEntries()
+        .map((entry) => entry.spec.name)
+        .filter(
+          (name) =>
+            !name.startsWith('analytics_') ||
+            DEFAULT_FACET_EXTRA_TOOLS.includes(name)
+        )
     );
     await client.close();
   });
@@ -145,6 +156,8 @@ describe('resources', () => {
     const client = await connect();
     const { resources } = await client.listResources();
     expect(resources.map((resource) => resource.uri)).toEqual([
+      ANALYTICS_COVERAGE_URI,
+      ANALYTICS_GLOSSARY_URI,
       GLOSSARY_URI,
       ONBOARDING_GUIDE_URI,
       PRODUCT_LOGIC_URI,
@@ -224,7 +237,7 @@ describe('resources', () => {
   it('serves resources on a narrow facet too', async () => {
     const client = await connect('onboarding');
     const { resources } = await client.listResources();
-    expect(resources).toHaveLength(3);
+    expect(resources).toHaveLength(5);
     await client.close();
   });
 });
@@ -234,9 +247,15 @@ describe('prompts', () => {
     const client = await connect();
     const { prompts } = await client.listPrompts();
     expect(prompts.map((prompt) => prompt.name)).toEqual([
+      'analytics_compare_periods',
+      'analytics_monthly_review',
+      'analytics_team_member_review',
       ONBOARDING_WALKTHROUGH_PROMPT,
     ]);
-    expect(prompts[0]?.arguments).toEqual([
+    const walkthrough = prompts.find(
+      (prompt) => prompt.name === ONBOARDING_WALKTHROUGH_PROMPT
+    );
+    expect(walkthrough?.arguments).toEqual([
       {
         name: 'location_id',
         description: expect.stringContaining('location'),

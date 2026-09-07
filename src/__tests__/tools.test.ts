@@ -1,6 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import { createServer } from '../server.js';
 import { registerTools } from '../tools/registry.js';
+import { ALL_TOOLS_FACET } from '../tools/facets.js';
 import { AltegioClient } from '../providers/altegio-client.js';
 import { ToolHandlers } from '../tools/handlers.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -21,7 +22,9 @@ describe('Tool Registration', () => {
       partnerToken: 'test-token',
     });
 
-    const toolNames = registerTools(server, client);
+    const toolNames = registerTools(server, client, {
+      facet: ALL_TOOLS_FACET,
+    });
 
     // Core tools (16)
     expect(toolNames).toContain('altegio_login');

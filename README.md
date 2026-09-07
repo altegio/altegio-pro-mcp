@@ -166,7 +166,7 @@ credential and is not a product boundary ([ADR-001](docs/architecture/2026-09-07
 
 | Endpoint | Serves |
 |---|---|
-| `/mcp` | **Every tool that exists today** — the default view, unchanged for current clients |
+| `/mcp` | **Every tool except the analytics pack**, plus its two entry points `analytics_get_overview` and `analytics_run_report` (47 tools) — the default view, unchanged for current clients |
 | `/mcp/ops` | Appointments (the daily work; clients and journal tools join as they land) |
 | `/mcp/catalog` | Services, service categories, team members, positions, work schedules, resources, location settings |
 | `/mcp/finance` | Analytics (visits, payments and payroll join as they land) |
@@ -461,7 +461,7 @@ pipeline and the overlay format.
 
 ### Testing
 
-- **TESTS_PLACEHOLDER tests** (SUITES_PLACEHOLDER suites) covering authentication, all tools, facets and `tools/list` ordering, resources and prompts, the API catalog and executor, analytics golden fixtures and the terminology guard, error handling, pagination
+- **865 tests** (47 suites, 6 skipped live) covering authentication, all tools, facets and `tools/list` ordering, resources and prompts, the API catalog and executor, analytics golden fixtures and the terminology guard, error handling, pagination
 - **Opt-in live suite** for analytics — re-records the golden fixtures against the demo location:
 
 ```bash
