@@ -1,0 +1,135 @@
+{
+  "success": true,
+  "data": {
+    "stats": {
+      "clients": 0,
+      "clients_average": 0,
+      "records": 0,
+      "records_average": 0,
+      "visit_records": 0,
+      "visit_records_average": 0,
+      "non_visit_records": 0,
+      "non_visit_records_average": 0,
+      "targets": 0,
+      "targets_paid": 0,
+      "goods": 0,
+      "goods_paid": 0,
+      "certificates": 0,
+      "certificates_paid": 0,
+      "abonement": 0,
+      "abonement_paid": 0
+    },
+    "paids": {
+      "accounts": [
+        {
+          "title": "Acquiring edited",
+          "amount": 0
+        },
+        {
+          "title": "Cash",
+          "amount": 0
+        },
+        {
+          "title": "Полученная прибыль",
+          "amount": 0
+        },
+        {
+          "title": "Эквайринг РФИ Банк",
+          "amount": 0
+        },
+        {
+          "title": "Расчетный счет",
+          "amount": 0
+        },
+        {
+          "title": "Сейф",
+          "amount": 0
+        },
+        {
+          "title": "карта 1",
+          "amount": 0
+        },
+        {
+          "title": "Эквайринг ЮKassa",
+          "amount": 0
+        },
+        {
+          "title": "Acquiring other payment method",
+          "amount": 0
+        },
+        {
+          "title": "УСД",
+          "amount": 0
+        },
+        {
+          "title": "Acquiring WayForPay",
+          "amount": 0
+        },
+        {
+          "title": "Initial balance test",
+          "amount": 0
+        },
+        {
+          "title": "Credit card payments",
+          "amount": 0
+        },
+        {
+          "title": "Тест",
+          "amount": 0
+        },
+        {
+          "title": "Acquiring AltPay",
+          "amount": 0
+        },
+        {
+          "title": "Эквайринг LiqPay",
+          "amount": 0
+        },
+        {
+          "title": "Эквайринг Monobank",
+          "amount": 0
+        },
+        {
+          "title": "Acquiring Stripe",
+          "amount": 0
+        },
+        {
+          "title": "Acquiring Fondy",
+          "amount": 0
+        },
+        {
+          "title": "Касса вне платежного метода",
+          "amount": 0
+        },
+        {
+          "title": "Acquiring PagarMe",
+          "amount": 0
+        },
+        {
+          "title": "Acquiring Altegio Pix",
+          "amount": 0
+        },
+        {
+          "title": "Aquisição Uzum Bank",
+          "amount": 0
+        },
+        {
+          "title": "Aquisição Adyen",
+          "amount": 0
+        },
+        {
+          "title": "vadim test",
+          "amount": 0
+        }
+      ],
+      "discount": [],
+      "total": {
+        "accounts": 0,
+        "discount": 0
+      }
+    },
+    "z_data": [],
+    "currency": "₸"
+  },
+  "meta": []
+}

@@ -355,6 +355,12 @@ export interface SavedReport {
   kind: 'static' | 'dynamic';
   template_id: string | null;
   created_at: string | null;
+  /**
+   * Build status of the report's data mart. The builder prepares a report
+   * asynchronously after create/update; `/data` answers only once it is
+   * `success`.
+   */
+  status?: 'pending' | 'success' | 'error' | 'deleted' | null;
   /** Filters of the stored report, needed to override the period at run time. */
   filters?: Array<{ filter_id: string; column_id: string; operator: string }>;
   columns?: Array<{

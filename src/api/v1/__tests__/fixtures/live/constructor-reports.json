@@ -1,0 +1,38 @@
+{
+  "success": true,
+  "data": [
+    {
+      "id": "01a07d11-0b5a-71e5-a061-53ada5993364",
+      "name": "[Altegio Assistant] Revenue by team member",
+      "description": null,
+      "report_template_id": "01953eb6-12e6-74c9-8193-5e22f05116c5",
+      "actor_id": 12842952,
+      "owner_id": 4564,
+      "type": "static",
+      "created_at": "2026-09-07T21:11:04"
+    },
+    {
+      "id": "01a07d13-3a9b-710e-906b-8a7356fc0d49",
+      "name": "[Altegio Assistant] Revenue by team member",
+      "description": null,
+      "report_template_id": "01953eb6-12e6-74c9-8193-5e22f05116c5",
+      "actor_id": 12842952,
+      "owner_id": 4564,
+      "type": "static",
+      "created_at": "2026-09-07T21:13:27"
+    },
+    {
+      "id": "01a07d17-dd73-7123-85e4-2557c37c5e3d",
+      "name": "[Altegio Assistant] Revenue by team member",
+      "description": null,
+      "report_template_id": "01953eb6-12e6-74c9-8193-5e22f05116c5",
+      "actor_id": 12842952,
+      "owner_id": 4564,
+      "type": "static",
+      "created_at": "2026-09-07T21:18:31"
+    }
+  ],
+  "meta": {
+    "count": 3
+  }
+}

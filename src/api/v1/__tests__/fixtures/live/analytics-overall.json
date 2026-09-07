@@ -1,0 +1,92 @@
+{
+  "success": true,
+  "data": {
+    "income_total_stats": {
+      "current_sum": "0",
+      "previous_sum": "338.1",
+      "change_percent": -100,
+      "currency": {
+        "id": 7,
+        "iso": "KZT",
+        "name": "Kazakhstan Tenge",
+        "symbol": "₸",
+        "is_symbol_after_amount": true
+      }
+    },
+    "income_services_stats": {
+      "current_sum": "0",
+      "previous_sum": "318",
+      "change_percent": -100,
+      "currency": {
+        "id": 7,
+        "iso": "KZT",
+        "name": "Kazakhstan Tenge",
+        "symbol": "₸",
+        "is_symbol_after_amount": true
+      }
+    },
+    "income_goods_stats": {
+      "current_sum": "0",
+      "previous_sum": "20.1",
+      "change_percent": -100,
+      "currency": {
+        "id": 7,
+        "iso": "KZT",
+        "name": "Kazakhstan Tenge",
+        "symbol": "₸",
+        "is_symbol_after_amount": true
+      }
+    },
+    "income_average_stats": {
+      "current_sum": "0",
+      "previous_sum": "169.05",
+      "change_percent": -100,
+      "currency": {
+        "id": 7,
+        "iso": "KZT",
+        "name": "Kazakhstan Tenge",
+        "symbol": "₸",
+        "is_symbol_after_amount": true
+      }
+    },
+    "income_average_services_stats": {
+      "current_sum": "0",
+      "previous_sum": "159",
+      "change_percent": -100,
+      "currency": {
+        "id": 7,
+        "iso": "KZT",
+        "name": "Kazakhstan Tenge",
+        "symbol": "₸",
+        "is_symbol_after_amount": true
+      }
+    },
+    "fullness_stats": {
+      "current_percent": 0,
+      "previous_percent": 5.5,
+      "change_percent": -100
+    },
+    "record_stats": {
+      "current_completed_count": 0,
+      "current_completed_percent": null,
+      "current_pending_count": 0,
+      "current_pending_percent": null,
+      "current_canceled_count": 0,
+      "current_canceled_percent": null,
+      "current_total_count": 0,
+      "previous_total_count": 6,
+      "change_percent": -100
+    },
+    "client_stats": {
+      "total_count": 3,
+      "new_count": 0,
+      "new_percent": 0,
+      "return_count": 0,
+      "return_percent": 0,
+      "active_count": 0,
+      "lost_count": 0,
+      "lost_percent": 0
+    }
+  },
+  "meta": []
+}
