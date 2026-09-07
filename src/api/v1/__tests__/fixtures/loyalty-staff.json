@@ -1,0 +1,32 @@
+{
+  "success": true,
+  "data": [
+    {
+      "client_stats": {
+        "all_count": 52,
+        "lost_count": 4,
+        "returned_count": 33,
+        "returned_percent": 63.5
+      },
+      "staff": {
+        "id": 9001,
+        "name": "Team member A"
+      }
+    },
+    {
+      "client_stats": {
+        "all_count": 68,
+        "lost_count": 10,
+        "returned_count": 40,
+        "returned_percent": 58.8
+      },
+      "staff": {
+        "id": 9002,
+        "name": "Team member B"
+      }
+    }
+  ],
+  "meta": {
+    "count": 2
+  }
+}

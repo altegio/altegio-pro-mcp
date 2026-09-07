@@ -1,0 +1,18 @@
+{
+  "success": true,
+  "data": {
+    "records_count": 212,
+    "previous_records_count": 198,
+    "records_count_daily": [
+      {
+        "date": "2026-08-01",
+        "records_count": 11
+      },
+      {
+        "date": "2026-08-02",
+        "records_count": 14
+      }
+    ]
+  },
+  "meta": []
+}

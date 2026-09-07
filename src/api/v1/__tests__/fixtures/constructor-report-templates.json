@@ -1,0 +1,105 @@
+{
+  "success": true,
+  "data": [
+    {
+      "id": "t-master-sales",
+      "name": "Employee sales",
+      "slug": "template_services_goods_master_sales",
+      "description": "Sales by employee",
+      "type": "static",
+      "report_template_columns": [
+        {
+          "id": "tc-1",
+          "report_template_id": "t-master-sales",
+          "column_id": "c-sales-revenue",
+          "title": null
+        },
+        {
+          "id": "tc-2",
+          "report_template_id": "t-master-sales",
+          "column_id": "c-sales-visits",
+          "title": null
+        }
+      ],
+      "report_template_filters": [],
+      "report_template_groupings": [
+        {
+          "id": "tg-1",
+          "report_template_id": "t-master-sales",
+          "column_id": "c-sales-master"
+        }
+      ]
+    },
+    {
+      "id": "t-fullness",
+      "name": "Occupancy",
+      "slug": "template_master_schedules_fill",
+      "description": "Employee occupancy",
+      "type": "static",
+      "report_template_columns": [
+        {
+          "id": "tc-3",
+          "report_template_id": "t-fullness",
+          "column_id": "c-sched-fullness",
+          "title": null
+        }
+      ],
+      "report_template_filters": [
+        {
+          "id": "tf-1",
+          "report_template_id": "t-fullness",
+          "column_id": "c-sched-date",
+          "operator": "BETWEEN",
+          "value": "2026-01-01,2026-12-31"
+        }
+      ],
+      "report_template_groupings": [
+        {
+          "id": "tg-2",
+          "report_template_id": "t-fullness",
+          "column_id": "c-sched-master"
+        }
+      ]
+    },
+    {
+      "id": "t-pnl",
+      "name": "P&L (Profits and Loss)",
+      "slug": "template_financial_profits_and_loss",
+      "description": "Profit and loss",
+      "type": "dynamic",
+      "report_template_columns": [
+        {
+          "id": "tc-4",
+          "report_template_id": "t-pnl",
+          "column_id": "c-fin-profit",
+          "title": null
+        },
+        {
+          "id": "tc-5",
+          "report_template_id": "t-pnl",
+          "column_id": "c-fin-expenses",
+          "title": null
+        }
+      ],
+      "report_template_filters": [
+        {
+          "id": "tf-2",
+          "report_template_id": "t-pnl",
+          "column_id": "c-fin-date",
+          "operator": "BETWEEN",
+          "value": "2026-01-01,2026-12-31"
+        }
+      ],
+      "report_template_groupings": [
+        {
+          "id": "tg-3",
+          "report_template_id": "t-pnl",
+          "column_id": "c-fin-date"
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "count": 3
+  }
+}

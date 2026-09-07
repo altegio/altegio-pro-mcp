@@ -1,0 +1,45 @@
+{
+  "success": true,
+  "data": {
+    "id": "r-owned",
+    "name": "[Altegio Assistant] Revenue by team member",
+    "description": "",
+    "report_template_id": "t-master-sales",
+    "actor_id": 1,
+    "owner_id": 4564,
+    "type": "static",
+    "created_at": "2026-08-01 09:00:00",
+    "report_columns": [
+      {
+        "id": "rc-1",
+        "column_id": "c-sales-revenue",
+        "title": "Revenue"
+      },
+      {
+        "id": "rc-2",
+        "column_id": "c-sales-visits",
+        "title": "Visits"
+      }
+    ],
+    "report_filters": [
+      {
+        "id": "rf-1",
+        "column_id": "c-sales-date",
+        "operator": "BETWEEN",
+        "value": "2026-08-01,2026-08-31"
+      }
+    ],
+    "report_groupings": [
+      {
+        "id": "rg-1",
+        "column_id": "c-sales-master"
+      }
+    ],
+    "report_status": {
+      "status_slug": "success",
+      "status_datetime_at": "2026-08-01 09:00:01",
+      "is_report_viewed": true
+    }
+  },
+  "meta": []
+}

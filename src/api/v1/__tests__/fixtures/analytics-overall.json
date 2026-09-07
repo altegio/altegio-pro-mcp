@@ -1,0 +1,92 @@
+{
+  "success": true,
+  "data": {
+    "income_total_stats": {
+      "current_sum": "12480.50",
+      "previous_sum": "10900.00",
+      "change_percent": 14,
+      "currency": {
+        "id": 1,
+        "iso": "EUR",
+        "name": "Euro",
+        "symbol": "€",
+        "is_symbol_after_amount": true
+      }
+    },
+    "income_services_stats": {
+      "current_sum": "10230.50",
+      "previous_sum": "9100.00",
+      "change_percent": 12,
+      "currency": {
+        "id": 1,
+        "iso": "EUR",
+        "name": "Euro",
+        "symbol": "€",
+        "is_symbol_after_amount": true
+      }
+    },
+    "income_goods_stats": {
+      "current_sum": "2250.00",
+      "previous_sum": "1800.00",
+      "change_percent": 25,
+      "currency": {
+        "id": 1,
+        "iso": "EUR",
+        "name": "Euro",
+        "symbol": "€",
+        "is_symbol_after_amount": true
+      }
+    },
+    "income_average_stats": {
+      "current_sum": "48.75",
+      "previous_sum": "44.20",
+      "change_percent": 10,
+      "currency": {
+        "id": 1,
+        "iso": "EUR",
+        "name": "Euro",
+        "symbol": "€",
+        "is_symbol_after_amount": true
+      }
+    },
+    "income_average_services_stats": {
+      "current_sum": "39.95",
+      "previous_sum": "37.10",
+      "change_percent": 7,
+      "currency": {
+        "id": 1,
+        "iso": "EUR",
+        "name": "Euro",
+        "symbol": "€",
+        "is_symbol_after_amount": true
+      }
+    },
+    "fullness_stats": {
+      "current_percent": 63.4,
+      "previous_percent": 58.1,
+      "change_percent": 9
+    },
+    "record_stats": {
+      "current_completed_count": 231,
+      "current_completed_percent": 78,
+      "current_pending_count": 41,
+      "current_pending_percent": 14,
+      "current_canceled_count": 24,
+      "current_canceled_percent": 8,
+      "current_total_count": 296,
+      "previous_total_count": 268,
+      "change_percent": 10
+    },
+    "client_stats": {
+      "total_count": 1842,
+      "new_count": 63,
+      "new_percent": 26,
+      "return_count": 178,
+      "return_percent": 74,
+      "active_count": 241,
+      "lost_count": 54,
+      "lost_percent": 3
+    }
+  },
+  "meta": []
+}

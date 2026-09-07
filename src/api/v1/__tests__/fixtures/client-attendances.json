@@ -1,0 +1,15 @@
+{
+  "data": {
+    "type": "client_attendances_statistic",
+    "id": "777_4564",
+    "attributes": {
+      "company_id": 4564,
+      "successful_attendances_count": 14,
+      "failed_attendances_count": 2,
+      "balance_amount": 25.0,
+      "spent_amount": 842.5,
+      "paid_amount": 817.5,
+      "last_successful_attendance_datetime": "2026-08-02T11:30:00+02:00"
+    }
+  }
+}

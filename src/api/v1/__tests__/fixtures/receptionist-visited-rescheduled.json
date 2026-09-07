@@ -1,0 +1,15 @@
+{
+  "success": true,
+  "data": {
+    "clients_count": 150,
+    "clients_rescheduled_count": 96,
+    "clients_count_daily": [
+      {
+        "date": "2026-08-01",
+        "clients_count": 8,
+        "clients_rescheduled_count": 5
+      }
+    ]
+  },
+  "meta": []
+}
