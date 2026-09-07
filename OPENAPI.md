@@ -4,7 +4,7 @@
 
 Corporate OpenAPI specification lives in a separate repository cloned alongside this project at `../biz.erp.api.docs/`.
 
-**Main spec file:** `../biz.erp.api.docs/docs/altegio/en/openapi.yml`
+**Spec files:** `../biz.erp.api.docs/docs/en/b2b-v1/openapi.yaml` (v1, legacy but live), `../biz.erp.api.docs/docs/en/b2b-v3/openapi.yaml` (V3 preview, October 2026), `../biz.erp.api.docs/docs/en/public/openapi.yaml`, `../biz.erp.api.docs/docs/en/developers/openapi.yaml`. `docs/en/b2b-v2/openapi.yaml` is internal-only by API-team policy.
 
 ## Workflow
 
@@ -17,8 +17,9 @@ git -C ../biz.erp.api.docs pull origin master
 ## Usage in Development
 
 When implementing new features or fixing bugs, always check the OpenAPI spec first:
-- Main file: `../biz.erp.api.docs/docs/altegio/en/openapi.yml`
-- Responses: `../biz.erp.api.docs/docs/altegio/en/responses/`
+- Main files: `../biz.erp.api.docs/docs/en/b2b-v1/openapi.yaml`, `../biz.erp.api.docs/docs/en/b2b-v3/openapi.yaml`
+- Path items: `../biz.erp.api.docs/docs/en/paths/**` (referenced via `$ref` from the spec files)
+- Schemas and responses: `../biz.erp.api.docs/docs/en/schemas/**`, `../biz.erp.api.docs/docs/en/components/responses/`
 
 ## Critical Rules
 

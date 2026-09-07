@@ -48,3 +48,6 @@ docs/plans/
 # Test scripts (use tests/ directory for real tests)
 test-*.sh
 *-test.sh
+
+# Generated API inventories (backend route map is internal; repo is public)
+/.inventory/

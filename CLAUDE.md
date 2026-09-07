@@ -15,9 +15,10 @@ MCP (Model Context Protocol) server for Altegio.Pro business management API.
    ```bash
    git -C ../biz.erp.api.docs pull origin master
    ```
-2. **Check OpenAPI spec first:** `../biz.erp.api.docs/docs/altegio/en/openapi.yml`
+2. **Check OpenAPI spec first:** v1 `../biz.erp.api.docs/docs/en/b2b-v1/openapi.yaml` (path files in `docs/en/paths/**`), V3 preview `../biz.erp.api.docs/docs/en/b2b-v3/openapi.yaml`; v2 is internal-only
 3. **NEVER modify `../biz.erp.api.docs/`** - separate repo, read-only for this project
 4. **Read Product logic** - `docs/*.md`
+5. **Read the architecture decision record** before adding or reshaping tools: `docs/architecture/2026-09-07-mcp-platform-architecture.md`
 
 ## Quick Start
 
@@ -52,7 +53,8 @@ src/
   http-server.ts # HTTP entry
 
 tests/           # Jest tests
-docs/plans/      # Design docs (keep latest refactoring only)
+docs/architecture/ # Architecture decision records (ADR-001 = platform architecture)
+scripts/api-inventory/ # Spec vs backend route inventory (data in gitignored .inventory/)
 dist/            # Built JS (gitignored)
 ```
 
@@ -145,7 +147,9 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 **Base URL:** `https://api.alteg.io/api/v1`
 **Docs:**
 - Online: https://developer.alteg.io/api (cached at `/tmp/alteg_api.html`)
-- **OpenAPI Spec (corporate):** `../biz.erp.api.docs/docs/altegio/en/openapi.yml` (see OPENAPI.md)
+- **OpenAPI Spec (corporate):** `../biz.erp.api.docs/docs/en/b2b-v1/openapi.yaml` (v1), `../biz.erp.api.docs/docs/en/b2b-v3/openapi.yaml` (V3 preview) — see OPENAPI.md
+- **Architecture decision record:** `docs/architecture/2026-09-07-mcp-platform-architecture.md` (ADR-001: catalog, tiers, facets, V3 migration)
+- **API inventory scripts:** `scripts/api-inventory/` (`npm run api:inventory`; output in gitignored `.inventory/`)
 
 **B2B Endpoints (require user_token):**
 - `GET /staff/{location_id}` - staff with admin details
