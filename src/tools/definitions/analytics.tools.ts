@@ -59,7 +59,7 @@ const segmentFields = {
     .positive()
     .optional()
     .describe(
-      'Report on one team member only. Call get_staff to list the team of a location.'
+      'Report on one team member only. Use the team-member listing tool of this location to find the id.'
     ),
   position_id: z
     .number()
@@ -449,7 +449,7 @@ export const analyticsGetTeamMemberOccupancyTool = defineTool({
       .min(1)
       .max(10)
       .describe(
-        'Team members to report on, at most ten (the API is called once per team member). Call get_staff for the ids.'
+        'Team members to report on, at most ten (the API is called once per team member). Use the team-member listing tool of this location for the ids.'
       ),
     ...periodFields,
   }),
@@ -474,8 +474,8 @@ export const analyticsGetClientVisitStatsTool = defineTool({
   name: 'analytics_get_client_visit_stats',
   category: 'Analytics',
   description:
-    '[Analytics] Visit statistics of one client in this location: visits attended, visits missed, total spent, total paid, the balance on their client account, and the date of their last attended visit. Answers "is this client reliable", "how much has this client spent with us", "does this client have money on account" while looking at a client card. For a table of many clients at once run the "Revenue and visits by client" report template instead. Needs access to client cards in this location.',
-  annotations: { title: 'Analytics: client visit statistics', ...READ_ONLY },
+    '[Analytics] Visit history figures for one client in this location: visits attended, visits missed, total spent, total paid, the balance on their client account, and the date of their last attended visit. Answers "is this client reliable", "how much has this client spent with us", "does this client have money on account" while looking at a client card. For a table of many clients at once run the "Revenue and visits by client" report template instead. Needs access to client cards in this location.',
+  annotations: { title: 'Analytics: client visit history', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
     client_id: z

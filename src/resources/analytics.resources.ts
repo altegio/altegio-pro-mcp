@@ -133,7 +133,7 @@ export function renderCoverage(): string {
     '- Revenue and visits forecast versus actuals, where the module is switched on.',
     '- The day-end report: takings per account, discounts and write-offs, sales totals.',
     '- Occupancy per team member per day.',
-    '- Visit statistics of one client.',
+    '- Visit history figures of one client.',
     '- The report builder: built-in templates, four datasets, and ad-hoc tables grouped by any dimension with an optional day, week, month or year bucket.',
     '',
     '## Not available, and what to use instead',

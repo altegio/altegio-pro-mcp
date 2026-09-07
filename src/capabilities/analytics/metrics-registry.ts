@@ -47,7 +47,7 @@ export const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     key: 'average_check',
     name: 'Average check',
     definition:
-      'Average amount one client leaves per visit. The canonical name is "average check"; "average bill" is not used.',
+      'Average amount one client leaves per visit — the canonical name for this metric across the product.',
     formula:
       '(revenue + client account top-ups) / (unique visits + appointments without a visit + product-sale documents)',
     tool: 'analytics_get_overview',
@@ -293,7 +293,7 @@ export const COVERAGE_GAPS: readonly {
   },
   {
     topic: 'Client segments',
-    reason: 'Reserved for Altegio staff.',
+    reason: 'Reserved for Altegio internal use.',
     alternative: 'None.',
   },
   {
