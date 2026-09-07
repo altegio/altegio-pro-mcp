@@ -196,7 +196,7 @@ export function listAnalyticsResources(): ResourceEntry[] {
       name: 'analytics-glossary',
       title: 'Analytics glossary',
       description:
-        'What each analytics number means: average check formula, lost-client threshold, previous-period rule, phone-based client deduplication, how occupancy is measured, what front-desk performance counts.',
+        'What each analytics number means: average check (average ticket) formula, lost-client threshold, previous-period rule, phone-based client deduplication, how occupancy is measured, what front-desk performance counts.',
       mimeType: 'text/markdown',
     },
     {

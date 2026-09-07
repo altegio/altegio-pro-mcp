@@ -51,3 +51,6 @@ test-*.sh
 
 # Generated API inventories (backend route map is internal; repo is public)
 /.inventory/
+
+# Claude Code agent worktrees (harness-managed, never committed)
+/.claude/worktrees/

@@ -141,7 +141,7 @@ export const analyticsGetOverviewTool = defineTool({
   name: 'analytics_get_overview',
   category: 'Analytics',
   description:
-    '[Analytics] Key metrics of one location for a period, each next to the same metric in the previous period of equal length: total revenue and its services and products split, average check, occupancy, appointments by outcome, and new, returning, active and lost clients. Start here for "how did we do last month", "is revenue up", "how many new clients", "what is our average check", "how busy were we". Optional filters narrow it to one team member, one position or one receptionist. For day-by-day numbers use analytics_get_daily_series; for a table by team member, service or client use analytics_run_report; for today’s till totals use analytics_get_day_end_report. Needs the Analytics access right in this location.',
+    '[Analytics] Key metrics of one location for a period, each next to the same metric in the previous period of equal length: total revenue and its services and products split, average check (average ticket), occupancy, appointments by outcome, and new, returning, active and lost clients. Start here for "how did we do last month", "is revenue up", "how many new clients", "what is our average check", "how busy were we". Optional filters narrow it to one team member, one position or one receptionist. For day-by-day numbers use analytics_get_daily_series; for a table by team member, service or client use analytics_run_report; for today’s till totals use analytics_get_day_end_report. Needs the Analytics access right in this location.',
   annotations: { title: 'Analytics: key metrics', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
