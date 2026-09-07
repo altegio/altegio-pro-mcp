@@ -11,9 +11,20 @@ import {
   ExecutorRefusalError,
 } from '../utils/errors.js';
 
+/** A `resource_link` block (MCP 2025-06-18): output too large to inline. */
+export interface ResourceLinkContent {
+  type: 'resource_link';
+  uri: string;
+  name: string;
+  description?: string;
+  mimeType?: string;
+}
+
+export type ToolContent = { type: 'text'; text: string } | ResourceLinkContent;
+
 export interface ToolResult {
   [key: string]: unknown;
-  content: Array<{ type: 'text'; text: string }>;
+  content: ToolContent[];
   structuredContent?: unknown;
   isError?: boolean;
 }
