@@ -88,6 +88,21 @@ export class PromptExecutionError extends MCPError {
 }
 
 /**
+ * The universal executor declined a call on policy or validation grounds —
+ * a write while only reads are allowlisted (ADR-001 D2), a preview operation,
+ * or arguments that do not satisfy the catalog contract.
+ *
+ * Its message reaches the model verbatim (see `withErrorHandling`), so write it
+ * as the instruction the caller needs, not as a diagnostic.
+ */
+export class ExecutorRefusalError extends MCPError {
+  constructor(message: string, data?: unknown) {
+    super(message, ErrorCode.InvalidRequest, data);
+    this.name = 'ExecutorRefusalError';
+  }
+}
+
+/**
  * Altegio API specific error
  */
 export class AltegioApiError extends Error implements AltegioError {

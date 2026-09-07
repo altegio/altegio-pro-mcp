@@ -1,0 +1,3 @@
+# Generated catalog (scripts/catalog/build.mjs) — deterministic by its own
+# serializer; prettier would reformat it and break `npm run catalog:check`.
+src/generated/

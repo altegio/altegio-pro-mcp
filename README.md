@@ -14,19 +14,20 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Features
 
-- **42 MCP tools** including 12 onboarding wizard tools for first-time setup
+- **45 MCP tools** including 12 onboarding wizard tools for first-time setup
 - **CRUD operations** for staff, services, appointments, schedules, and positions management
 - **Location settings**: appointment calendar, online booking, booking forms, resources
+- **Universal API executor**: search, describe and call any of the 317 documented API operations, even the ones without a dedicated tool
 - **Conversational onboarding** with bulk CSV/JSON import and checkpoint/resume
 - **Dual transport:** stdio for Claude Desktop, HTTP for cloud deployments
-- **TypeScript** with full type safety and comprehensive tests (387 passing)
+- **TypeScript** with full type safety and comprehensive tests (466 passing)
 - **Auto-deploy CI/CD** via VM cron (git pull + docker compose rebuild every 2 min)
 - **Rate limiting** and **retry logic** with exponential backoff
 - **Secure credential storage** in `~/.altegio-mcp/`
 
 ## Available Tools
 
-**42 tools organized by category** for complete business management:
+**45 tools organized by category** for complete business management:
 
 ### 🔐 Authentication
 - `altegio_login` - Authenticate with email/password
@@ -72,6 +73,35 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ### 🪑 Resources
 - `get_resources` - List cabinets/equipment (read-only; API has no create)
+
+### 🧭 API Explorer (universal executor)
+
+Three tools cover the **whole documented Altegio API** — 317 operations — so a
+question that no dedicated tool answers is still answerable, the day the spec
+changes and before anyone curates a tool for it. They are backed by
+[`src/generated/catalog.json`](docs/architecture/catalog.md), built from the
+corporate OpenAPI specs, so they make no spec or network lookups of their own.
+
+- `altegio_search_operations` - Find the operations behind a business question
+  ("loyalty card balance", "cash register shifts"). Returns up to 10 operations
+  with `operationId`, method, canonical path, summary and domain, and names the
+  curated tool when one already exists — **prefer that tool**. Filters: `domain`,
+  `method`, `include_preview` (V3 contract), `limit`.
+- `altegio_describe_operation` - The full contract of one operation: parameters
+  with types and requiredness, request body, response shape, auth requirement,
+  deprecation, spec source, and which legacy parameter names are accepted under
+  canonical ones (`staff_id` is accepted as `team_member_id`).
+- `altegio_call_operation` - Execute a documented **read**. Canonical parameter
+  names are accepted (`location_id`, `team_member_id`, `appointment_id`,
+  `product_id`), required parameters are validated against the catalog, and the
+  result comes back projected and inside a ~4k-token budget with a
+  "narrow the query" hint when it had to be truncated.
+
+**Reads only.** A `POST`, `PUT`, `PATCH` or `DELETE` operation is refused with a
+pointer to the curated tool: writes go through the curated surface, and executor
+writes require the allowlist from [ADR-001](docs/architecture/2026-09-07-mcp-platform-architecture.md)
+D2. V3 preview operations are described but not callable — the live API does not
+serve them yet. Authentication via `altegio_login` is required.
 
 ### 🚀 Onboarding Wizard
 **Conversational first-time setup assistant:**
@@ -164,7 +194,7 @@ with `MCP_SERVER_INSTRUCTIONS`.
 
 ### Prerequisites
 
-- Node.js >= 20
+- Node.js >= 20.17 (ESM JSON import attributes)
 - Altegio Partner Token from [developer.alteg.io](https://developer.alteg.io)
 
 ### Installation
@@ -354,13 +384,19 @@ npm run lint         # Check code style
 ### Project Structure
 
 ```
+catalog/
+  overlay/       # Curation overlay: tier, facets, tool names, projections
+scripts/
+  catalog/       # build.mjs: OpenAPI + overlay -> src/generated/catalog.json
 src/
   config/        # Configuration and validation
+  generated/     # catalog.json (committed, generated - do not edit by hand)
   providers/     # API clients (altegio-client.ts)
   prompts/       # Prompt registry + modules (onboarding.prompts.ts)
   resources/     # Resource registry + modules (docs.resources.ts, glossary.ts)
   tools/         # MCP tool handlers & registry
     facets.ts    # Static facet membership (ADR-001 D3)
+  tools/executor/# Universal executor: catalog index, search, describe, call
   types/         # TypeScript interfaces
   utils/         # Logging, errors, helpers
   __tests__/     # Jest unit tests
@@ -369,9 +405,19 @@ src/
   server.ts      # Shared MCP server setup
 ```
 
+Regenerate the catalog after pulling the spec repository:
+
+```bash
+npm run catalog:build   # rewrite src/generated/catalog.json
+npm run catalog:check   # CI gate: fails if the committed catalog is stale
+```
+
+See [docs/architecture/catalog.md](docs/architecture/catalog.md) for the
+pipeline and the overlay format.
+
 ### Testing
 
-- **429 tests** (32 suites) covering authentication, all tools, facets and `tools/list` ordering, resources and prompts, error handling, pagination
+- **508 tests** (37 suites) covering authentication, all tools, facets and `tools/list` ordering, resources and prompts, the API catalog and executor, error handling, pagination
 - **Jest** for unit tests with mocked API responses
 - **Test isolation** with temporary credentials directory
 - Run: `npm test` or `npm run test:coverage`
@@ -386,6 +432,7 @@ src/
 
 Base URL: `https://api.alteg.io/api/v1`
 Documentation: [developer.alteg.io/api](https://developer.alteg.io/api)
+Generated catalog of every documented operation: [docs/architecture/catalog.md](docs/architecture/catalog.md)
 
 **Authentication:**
 - Partner token: `Authorization: Bearer {token}`

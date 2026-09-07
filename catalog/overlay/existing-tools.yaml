@@ -1,0 +1,218 @@
+# Operations already covered by the hand-written tools in src/tools/definitions/.
+#
+# Seeded from src/tools/api-mapping.ts (ADR-001 D4: "the existing api-mapping is
+# the seed; the generator inverts it"). Recording the taken tool names here keeps
+# a future generated pack from claiming a name a hand-written tool already owns,
+# and marks these operations as `core` so the executor can point the model at the
+# curated tool instead of `altegio_call_operation`.
+#
+# Format: catalog/overlay/_schema.yaml. Tiers here are all `core` — every one of
+# these tools is in today's always-loaded surface.
+
+version: 1
+
+operations:
+  # --- auth ----------------------------------------------------------------
+  authorize_user:
+    domain: auth
+    tier: core
+    tool_name: altegio_login
+    write_allowed: false
+    notes: >
+      Exchanges email and password for a V1 user token. Deprecated the day V3
+      OAuth is live (ADR-001 D6) — never route this through the executor.
+
+  # --- locations -----------------------------------------------------------
+  get_location_list:
+    domain: locations
+    tier: core
+    facets: [ops, catalog, finance, marketing, onboarding]
+    tool_name: list_locations
+    projection: [id, title, city, address, timezone_name]
+    write_allowed: false
+
+  # --- appointments --------------------------------------------------------
+  get_appointment_list:
+    domain: appointments
+    tier: core
+    facets: [ops]
+    tool_name: get_appointments
+    param_renames:
+      staff_id: team_member_id
+    write_allowed: false
+  create_appointment:
+    domain: appointments
+    tier: core
+    facets: [ops]
+    tool_name: create_appointment
+    param_renames:
+      staff_id: team_member_id
+    write_allowed: false
+  update_appointment:
+    domain: appointments
+    tier: core
+    facets: [ops]
+    tool_name: update_appointment
+    param_renames:
+      record_id: appointment_id
+      staff_id: team_member_id
+    write_allowed: false
+  delete_appointment:
+    domain: appointments
+    tier: core
+    facets: [ops]
+    tool_name: delete_appointment
+    param_renames:
+      record_id: appointment_id
+    write_allowed: false
+
+  # --- team members --------------------------------------------------------
+  get_team_member_list:
+    domain: team_members
+    tier: core
+    facets: [ops, catalog]
+    tool_name: get_staff
+    projection: [id, name, specialization, position.title, hidden, fired]
+    write_allowed: false
+  create_team_member_quick:
+    domain: team_members
+    tier: core
+    facets: [catalog, onboarding]
+    tool_name: create_staff
+    write_allowed: false
+  update_team_member:
+    domain: team_members
+    tier: core
+    facets: [catalog]
+    tool_name: update_staff
+    param_renames:
+      staff_id: team_member_id
+    write_allowed: false
+  delete_team_member:
+    domain: team_members
+    tier: core
+    facets: [catalog]
+    tool_name: delete_staff
+    param_renames:
+      staff_id: team_member_id
+    write_allowed: false
+
+  # --- positions -----------------------------------------------------------
+  get_position_list:
+    domain: positions
+    tier: core
+    facets: [catalog, onboarding]
+    tool_name: get_positions
+    projection: [id, title]
+    write_allowed: false
+  create_position_quick:
+    domain: positions
+    tier: core
+    facets: [catalog, onboarding]
+    tool_name: create_position
+    write_allowed: false
+    notes: >
+      update_position and delete_position call /positions/{location_id}/{id},
+      which the V1 spec does not document — they stay in `unmappedTools` until
+      the spec team documents the pair.
+
+  # --- services ------------------------------------------------------------
+  get_service_list:
+    domain: services
+    tier: core
+    facets: [ops, catalog]
+    tool_name: get_services
+    projection: [id, title, category_id, price_min, price_max, duration]
+    write_allowed: false
+  create_service:
+    domain: services
+    tier: core
+    facets: [catalog, onboarding]
+    tool_name: create_service
+    write_allowed: false
+  patch_service:
+    domain: services
+    tier: core
+    facets: [catalog]
+    tool_name: update_service
+    write_allowed: false
+  deprecated_get_service_category_list:
+    domain: services
+    tier: core
+    facets: [catalog, onboarding]
+    tool_name: get_service_categories
+    projection: [id, title, weight]
+    write_allowed: false
+    notes: >
+      Deprecated in the spec but the only service-category listing available to
+      this product; keep until a replacement is documented.
+
+  # --- schedule ------------------------------------------------------------
+  get_team_member_schedule:
+    domain: schedule
+    tier: core
+    facets: [ops, catalog]
+    tool_name: get_schedule
+    param_renames:
+      staff_id: team_member_id
+    write_allowed: false
+  set_team_member_schedule:
+    domain: schedule
+    tier: core
+    facets: [catalog, onboarding]
+    tool_name: create_schedule
+    write_allowed: false
+    notes: >
+      One PUT backs three tools: create_schedule and update_schedule send
+      `schedules_to_set`, delete_schedule sends `schedules_to_delete`.
+
+  # --- location settings ---------------------------------------------------
+  get_appointment_calendar_settings:
+    domain: settings
+    tier: core
+    facets: [catalog, onboarding]
+    tool_name: get_appointment_settings
+    write_allowed: false
+    notes: >
+      Appointment-calendar defaults, NOT the location's working hours — real
+      working hours come from team member schedules.
+  update_appointment_calendar_settings:
+    domain: settings
+    tier: core
+    facets: [catalog, onboarding]
+    tool_name: update_appointment_settings
+    write_allowed: false
+  get_online_booking_settings:
+    domain: online_booking
+    tier: core
+    facets: [catalog, onboarding]
+    tool_name: get_online_booking_settings
+    write_allowed: false
+  update_online_booking_settings:
+    domain: online_booking
+    tier: core
+    facets: [catalog, onboarding]
+    tool_name: update_online_booking_settings
+    write_allowed: false
+  get_booking_widget_list:
+    domain: online_booking
+    tier: core
+    facets: [catalog, onboarding]
+    tool_name: get_booking_forms
+    write_allowed: false
+  create_booking_widget:
+    domain: online_booking
+    tier: core
+    facets: [catalog, onboarding]
+    tool_name: create_booking_form
+    write_allowed: false
+
+  # --- resources -----------------------------------------------------------
+  get_resource_list:
+    domain: resources
+    tier: core
+    facets: [catalog]
+    tool_name: get_resources
+    projection: [id, title]
+    write_allowed: false
+    notes: Read-only — the V1 API has no create endpoint for resources.

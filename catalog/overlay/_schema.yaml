@@ -1,0 +1,119 @@
+# Curation overlay format — ADR-001 D4.
+#
+# This file documents the shape of every `catalog/overlay/<domain>.yaml`. It is
+# itself skipped by the build (files starting with `_` are format docs, not
+# data), so it is safe to keep the annotated example below inline.
+#
+# The overlay is the human-authored half of the catalog: the OpenAPI spec says
+# what an operation *is*, the overlay says how the product exposes it. Anything
+# the build merges into `src/generated/catalog.json` under `curation` comes from
+# here. Unknown fields and invalid `tier` values fail `npm run catalog:build`.
+
+$schema_version: 1
+
+# JSON Schema for one `operations` entry, for editors and reviewers.
+operation_entry:
+  type: object
+  additionalProperties: false
+  properties:
+    domain:
+      type: string
+      description: >
+        Catalog domain in canonical product vocabulary (location, team_member,
+        appointment, visit, client, service, products, membership, gift_card,
+        client_account, analytics, ...). Overrides the domain the build infers
+        from the OpenAPI tag. Plural snake_case, e.g. `team_members`.
+      examples: [team_members, appointments, client_accounts]
+
+    tier:
+      enum: [core, pack, executor-only]
+      description: >
+        Tool surface tier (ADR-001 D2). `core` — always loaded, task-shaped;
+        `pack` — generated domain tool, deferred or reachable through a facet;
+        `executor-only` — no generated tool, reachable only through
+        `altegio_call_operation`.
+
+    facets:
+      type: array
+      items:
+        enum: [ops, catalog, finance, marketing, onboarding]
+      description: >
+        Static transport facets (ADR-001 D3) that expose the generated tool.
+        Empty or absent means the default `/mcp` surface only.
+
+    tool_name:
+      type: string
+      pattern: '^[a-z][a-z0-9_]*$'
+      description: >
+        MCP tool name for the generated (or already hand-written) tool.
+        `<domain>_<verb>_<object>` per ADR-001 §5.1; core tools may drop the
+        domain prefix. One name per operation — when several tools share one
+        operation, name the primary one here and list the rest in `notes`.
+
+    description:
+      type: string
+      description: >
+        Tool description override, in the user's words (ADR-001 §5.2): what the
+        user gets, when to use it versus a neighbour, then constraints. Absent
+        means the build falls back to the OpenAPI summary/description.
+
+    hidden_params:
+      type: array
+      items: { type: string }
+      description: >
+        Parameters removed from the generated tool's input schema — internal
+        flags, transport plumbing, or anything the capability layer fills in.
+
+    param_renames:
+      type: object
+      additionalProperties: { type: string }
+      description: >
+        Legacy spec parameter name → canonical name exposed to the model, e.g.
+        `staff_id: team_member_id`. The V1 API accepts the canonical aliases on
+        the wire, so a rename is a naming decision, not a translation layer.
+      examples:
+        - { staff_id: team_member_id, record_id: appointment_id }
+
+    projection:
+      type: array
+      items: { type: string }
+      description: >
+        Allowlist of result fields kept in `structuredContent` (ADR-001 D8 —
+        never the raw payload). Dot paths address nested fields; a leading
+        `data[].` addresses each item of a list response. Absent means the
+        result passes through under the size budget only.
+      examples:
+        - [id, name, specialization, position.title]
+
+    write_allowed:
+      type: boolean
+      description: >
+        Executor write allowlist (ADR-001 D2). Only operations with
+        `write_allowed: true` may ever be executed by `altegio_call_operation`
+        with a non-GET method. Defaults to false; the current executor
+        iteration refuses every non-GET regardless.
+
+    notes:
+      type: string
+      description: >
+        Free-form curator note kept in the catalog — why an operation is hidden,
+        which extra tools share it, known spec drift. Not shown to the model.
+
+# Annotated example. Copy this shape into `catalog/overlay/<domain>.yaml`.
+example:
+  version: 1
+  operations:
+    get_team_member_list:
+      domain: team_members
+      tier: core
+      facets: [ops, catalog]
+      tool_name: get_staff
+      description: >
+        List the team members of a location with their positions, specializations
+        and ratings. Use this before booking to pick who provides a service.
+      hidden_params: [include_consumables]
+      param_renames:
+        staff_id: team_member_id
+      projection: [id, name, specialization, position.title]
+      write_allowed: false
+      notes: Hand-written tool; the generated pack must not claim this name.

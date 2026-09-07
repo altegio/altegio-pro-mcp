@@ -77,8 +77,13 @@ describe('Tool Registration', () => {
     // Resources tool (1)
     expect(toolNames).toContain('get_resources');
 
-    // Total: 30 factory + 12 onboarding = 42 tools
-    expect(toolNames.length).toBe(42);
+    // Universal executor over the generated API catalog (3, ADR-001 D2)
+    expect(toolNames).toContain('altegio_search_operations');
+    expect(toolNames).toContain('altegio_describe_operation');
+    expect(toolNames).toContain('altegio_call_operation');
+
+    // Total: 30 CRUD + 3 executor + 12 onboarding = 45 tools
+    expect(toolNames.length).toBe(45);
   });
 
   it('should create server with tools', () => {

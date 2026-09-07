@@ -1,7 +1,7 @@
 import SwaggerParser from '@apidevtools/swagger-parser';
 import * as path from 'path';
 import * as fs from 'fs';
-import { apiMapping, unmappedTools } from '../api-mapping.js';
+import { apiMapping, executorTools, unmappedTools } from '../api-mapping.js';
 
 /**
  * Known discrepancies between MCP client code and OpenAPI spec.
@@ -303,6 +303,35 @@ describe('Spec Compliance', () => {
       const mapped = new Set(Object.keys(apiMapping));
       const overlap = unmappedTools.filter((t) => mapped.has(t));
       expect(overlap).toEqual([]);
+    });
+
+    /**
+     * The executor tools (ADR-001 D2) resolve an operation from
+     * `src/generated/catalog.json` at call time, so they map to the whole
+     * catalog rather than to one endpoint. They are excluded from the 1:1
+     * mapping requirement above — and this test makes that exclusion explicit
+     * rather than incidental, so a curated tool cannot slip through by simply
+     * being absent from `apiMapping`.
+     */
+    it('executor tools are declared unmapped, never 1:1 mapped', () => {
+      expect(executorTools).toHaveLength(3);
+      for (const tool of executorTools) {
+        expect(unmappedTools).toContain(tool);
+        expect(apiMapping[tool]).toBeUndefined();
+      }
+    });
+
+    it('every other unmapped tool is a local operation or an orchestrator', () => {
+      const executor = new Set(executorTools);
+      for (const tool of unmappedTools) {
+        if (executor.has(tool)) continue;
+        expect(
+          tool === 'altegio_logout' ||
+            tool.startsWith('onboarding_') ||
+            tool === 'update_position' ||
+            tool === 'delete_position'
+        ).toBe(true);
+      }
     });
   });
 

@@ -5,7 +5,11 @@
  * and any remaining handlers share a single error-mapping implementation.
  */
 import { ZodError } from 'zod';
-import { AuthenticationError, AltegioApiError } from '../utils/errors.js';
+import {
+  AuthenticationError,
+  AltegioApiError,
+  ExecutorRefusalError,
+} from '../utils/errors.js';
 
 export interface ToolResult {
   [key: string]: unknown;
@@ -34,6 +38,9 @@ export async function withErrorHandling(
       message = `Invalid parameters for ${toolName}: ${issues}`;
     } else if (error instanceof AuthenticationError) {
       message = `Authentication required. Call altegio_login before using ${toolName}.`;
+    } else if (error instanceof ExecutorRefusalError) {
+      // Already phrased as the instruction the caller needs; do not decorate.
+      message = error.message;
     } else if (error instanceof AltegioApiError) {
       message = error.message;
     } else if (error instanceof Error) {

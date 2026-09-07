@@ -849,6 +849,70 @@ export class AltegioClient {
     );
   }
 
+  /**
+   * Generic catalog-driven request for the universal executor (ADR-001 D2).
+   *
+   * `method` is typed as `'GET'` on purpose: until the executor write allowlist
+   * lands, only documented reads may be executed, and pinning the literal here
+   * makes that policy a compile-time guarantee instead of a runtime check that
+   * a future caller could forget. Everything else reuses the existing plumbing
+   * — partner + user auth headers, the `application/vnd.api.v2+json` Accept
+   * header, and the typed error mapping.
+   *
+   * Returns the unwrapped payload plus `meta` (page and total counts) when the
+   * V1 `{success, data, meta}` envelope is present.
+   */
+  async request<T = unknown>(
+    method: 'GET',
+    path: string,
+    query?: Record<string, string | number | boolean>
+  ): Promise<{ data: T; meta?: Record<string, unknown> }> {
+    this.requireAuth();
+
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(query ?? {})) {
+      search.append(key, String(value));
+    }
+    const queryString = search.toString();
+    const endpoint =
+      (path.startsWith('/') ? path : `/${path}`) +
+      (queryString ? `?${queryString}` : '');
+    const context = `call ${method} ${path}`;
+
+    const response = await this.apiRequest(endpoint, { method });
+    if (!response.ok) {
+      await this.throwApiError(response, context);
+    }
+
+    const body = (await response.json()) as unknown;
+
+    // V1 wraps payloads in `{success, data, meta}`; a few endpoints and the V3
+    // contract return the payload directly.
+    if (
+      typeof body === 'object' &&
+      body !== null &&
+      'success' in body &&
+      'data' in body
+    ) {
+      const envelope = body as AltegioApiResponse<T>;
+      if (!envelope.success) {
+        throw new AltegioApiError(
+          envelope.meta?.message || `Unexpected response for ${context}`,
+          response.status,
+          envelope
+        );
+      }
+      return {
+        data: envelope.data,
+        ...(envelope.meta
+          ? { meta: envelope.meta as Record<string, unknown> }
+          : {}),
+      };
+    }
+
+    return { data: body as T };
+  }
+
   isAuthenticated(): boolean {
     return !!this.resolveUserToken();
   }

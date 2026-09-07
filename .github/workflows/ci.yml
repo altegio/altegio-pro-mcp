@@ -31,6 +31,12 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      # Catalog drift (ADR-001 D4). The OpenAPI spec repository is private and
+      # not cloned here, so this step reports "skipped" with a notice; it fails
+      # only when the spec IS available and src/generated/catalog.json is stale.
+      - name: Catalog drift check
+        run: npm run catalog:check
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
