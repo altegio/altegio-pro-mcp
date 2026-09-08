@@ -177,20 +177,42 @@ print('Done!')
 
 ## Production Testing
 
-After deployment to the VM (see [CI-CD.md](CI-CD.md)):
+After deployment to the VM (see [CI-CD.md](CI-CD.md)).
+
+> **`/pro/*` is OAuth-protected.** Every request to `https://mcp.alteg.io/pro/*`
+> — including `/pro/health` — needs an `Authorization: Bearer <token>` header with
+> a token carrying the `mcp:pro:read` scope; without it the endpoint returns
+> `401 invalid_token`. Export one first:
+>
+> ```bash
+> export MCP_TOKEN="<your mcp:pro:read bearer>"
+> ```
 
 ```bash
 # Health check via proxy
-curl https://mcp.alteg.io/pro/health
+curl https://mcp.alteg.io/pro/health \
+  -H "Authorization: Bearer $MCP_TOKEN"
 
 # MCP Streamable HTTP — initialize a session
 curl -s -X POST https://mcp.alteg.io/pro/mcp \
+  -H "Authorization: Bearer $MCP_TOKEN" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
 ```
 
 The MCP protocol flow is the same as local — POST requests to `/mcp` with the `mcp-session-id` header.
+
+### Known limitation — live verification from cloud sessions
+
+Reading the authenticated `tools/list` schema from production **cannot be done
+from a cloud Claude Code session**: `/pro/*` needs an `mcp:pro:read` bearer the
+session does not hold, the session is scope-locked to this repository (so it
+cannot reach the `altegio-analytics-agent` project that holds one), and `gcloud`
+is not available to inspect the VM. Until this is resolved, verify a deployed
+schema change **manually with a token** (the curls above) or by re-running the
+tool from an MCP client. Tracked in
+[#30](https://github.com/altegio/altegio-pro-mcp/issues/30).
 
 ## Integration Testing
 
