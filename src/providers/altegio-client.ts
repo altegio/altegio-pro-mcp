@@ -21,6 +21,7 @@ import type {
 import { CredentialManager } from './credential-manager.js';
 import { AuthenticationError, AltegioApiError } from '../utils/errors.js';
 import {
+  getRequestCompanyId,
   getRequestIdentity,
   getRequestUserToken,
   identityKey,
@@ -338,7 +339,16 @@ export class AltegioClient {
       : '';
     const response = await this.apiRequest(`/companies${queryParams}`);
 
-    return this.handleResponse<AltegioCompany[]>(response, 'fetch locations');
+    const locations = await this.handleResponse<AltegioCompany[]>(
+      response,
+      'fetch locations'
+    );
+    // A company-pinned request only ever sees its own location, so a shared
+    // token cannot enumerate the other salons it happens to have access to.
+    const pin = getRequestCompanyId();
+    return pin === undefined
+      ? locations
+      : locations.filter((location) => location.id === pin);
   }
 
   async getBookings(

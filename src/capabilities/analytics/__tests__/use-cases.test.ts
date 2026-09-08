@@ -10,7 +10,11 @@ import * as path from 'path';
 import type { AltegioClient } from '../../../providers/altegio-client.js';
 import * as definitions from '../../../tools/definitions/index.js';
 import type { DefinedTool } from '../../../tools/factory.js';
-import { clearTimezoneCache } from '../location-timezone.js';
+import {
+  clearTimezoneCache,
+  resolveLocationTimezone,
+} from '../location-timezone.js';
+import { runWithContext } from '../../../request-context.js';
 import {
   clearReportStore,
   getReportCsv,
@@ -115,6 +119,33 @@ beforeEach(() => {
 });
 afterEach(() => {
   jest.useRealTimers();
+});
+
+describe('company pin enforcement', () => {
+  it('rejects analytics for a location outside the pinned company', async () => {
+    const { client } = fakeClient([]);
+    await expect(
+      runWithContext({ identity: null, companyId: 4564 }, () =>
+        resolveLocationTimezone(client, 720441)
+      )
+    ).rejects.toThrow(/scoped to company 4564/);
+  });
+
+  it('allows the pinned location through', async () => {
+    const { client } = fakeClient([]);
+    const tz = await runWithContext({ identity: null, companyId: 4564 }, () =>
+      resolveLocationTimezone(client, 4564)
+    );
+    expect(tz).toBe('Europe/Berlin');
+  });
+
+  it('is unaffected when no company is pinned', async () => {
+    const { client } = fakeClient([]);
+    // No pin ⇒ no guard; 720441 is not in the mock list, so it falls back to UTC
+    // (rather than throwing, which is what a mismatched pin would do).
+    const tz = await resolveLocationTimezone(client, 720441);
+    expect(tz).toBe('UTC');
+  });
 });
 
 describe('analytics_get_overview', () => {

@@ -458,6 +458,40 @@ describe('AltegioClient', () => {
       expect(companies).toEqual(mockCompanies);
     });
 
+    it('filters locations to the pinned company (X-Altegio-Company-Id)', async () => {
+      const mockCompanies = [
+        { id: 4564, title: 'Demo Location' },
+        { id: 720441, title: 'Altegio CIS' },
+      ];
+      (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, data: mockCompanies }),
+      } as Response);
+
+      const companies = await runWithContext(
+        { identity: null, userToken: 'shared-token', companyId: 4564 },
+        () => client.getCompanies({ my: 1 })
+      );
+
+      // The shared token can reach both salons upstream, but a pinned request
+      // only ever sees its own — no cross-salon enumeration.
+      expect(companies).toEqual([{ id: 4564, title: 'Demo Location' }]);
+    });
+
+    it('returns all locations when no company is pinned (regression)', async () => {
+      const mockCompanies = [{ id: 4564 }, { id: 720441 }];
+      (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, data: mockCompanies }),
+      } as Response);
+
+      const companies = await runWithContext(
+        { identity: null, userToken: 'shared-token' },
+        () => client.getCompanies({ my: 1 })
+      );
+      expect(companies).toEqual(mockCompanies);
+    });
+
     it('should fetch companies with pagination parameters', async () => {
       // Login first
       const loginResponse = {

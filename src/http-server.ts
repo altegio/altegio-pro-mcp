@@ -8,6 +8,7 @@ import { createServer } from './server.js';
 import { DEFAULT_FACET, FACET_NAMES, type FacetKey } from './tools/facets.js';
 import { createLogger } from './utils/logger.js';
 import {
+  parseCompanyId,
   parseIdentityHeaders,
   parseUserToken,
   runWithContext,
@@ -66,6 +67,7 @@ export function createApp(): {
       const sessionId = req.headers['mcp-session-id'] as string | undefined;
       const identity = parseIdentityHeaders(req.headers);
       const userToken = parseUserToken(req.headers);
+      const companyId = parseCompanyId(req.headers);
 
       try {
         let transport: StreamableHTTPServerTransport;
@@ -93,7 +95,7 @@ export function createApp(): {
 
           const server = createServer({ facet });
           await server.connect(transport);
-          await runWithContext({ identity, userToken }, () =>
+          await runWithContext({ identity, userToken, companyId }, () =>
             transport.handleRequest(req, res, req.body)
           );
           return;
@@ -109,7 +111,7 @@ export function createApp(): {
           return;
         }
 
-        await runWithContext({ identity, userToken }, () =>
+        await runWithContext({ identity, userToken, companyId }, () =>
           transport.handleRequest(req, res, req.body)
         );
       } catch (error) {
@@ -140,6 +142,7 @@ export function createApp(): {
           {
             identity: parseIdentityHeaders(req.headers),
             userToken: parseUserToken(req.headers),
+            companyId: parseCompanyId(req.headers),
           },
           () => transport.handleRequest(req, res)
         );
@@ -167,6 +170,7 @@ export function createApp(): {
           {
             identity: parseIdentityHeaders(req.headers),
             userToken: parseUserToken(req.headers),
+            companyId: parseCompanyId(req.headers),
           },
           () => transport.handleRequest(req, res)
         );

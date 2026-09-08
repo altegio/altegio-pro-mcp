@@ -2,10 +2,13 @@ import { describe, it, expect } from '@jest/globals';
 import {
   parseIdentityHeaders,
   parseUserToken,
+  parseCompanyId,
   runWithIdentity,
   runWithContext,
   getRequestIdentity,
   getRequestUserToken,
+  getRequestCompanyId,
+  assertCompanyAllowed,
   identityKey,
   type RequestIdentity,
 } from '../request-context.js';
@@ -219,6 +222,72 @@ describe('request-context', () => {
         getRequestUserToken()
       );
       expect(token).toBeUndefined();
+    });
+  });
+
+  describe('parseCompanyId', () => {
+    it('reads a positive integer X-Altegio-Company-Id header', () => {
+      expect(parseCompanyId({ 'x-altegio-company-id': '4564' })).toBe(4564);
+    });
+
+    it('is case-insensitive and trims whitespace', () => {
+      expect(parseCompanyId({ 'X-Altegio-Company-Id': '  720441 ' })).toBe(
+        720441
+      );
+    });
+
+    it('returns undefined when absent, blank, or not a positive integer', () => {
+      expect(parseCompanyId({})).toBeUndefined();
+      expect(parseCompanyId({ 'x-altegio-company-id': '  ' })).toBeUndefined();
+      expect(parseCompanyId({ 'x-altegio-company-id': 'abc' })).toBeUndefined();
+      expect(parseCompanyId({ 'x-altegio-company-id': '0' })).toBeUndefined();
+      expect(parseCompanyId({ 'x-altegio-company-id': '-5' })).toBeUndefined();
+      expect(parseCompanyId({ 'x-altegio-company-id': '4.5' })).toBeUndefined();
+    });
+  });
+
+  describe('getRequestCompanyId', () => {
+    it('returns undefined outside any request context', () => {
+      expect(getRequestCompanyId()).toBeUndefined();
+    });
+
+    it('exposes the pinned company inside the context', () => {
+      const seen = runWithContext({ identity: null, companyId: 4564 }, () =>
+        getRequestCompanyId()
+      );
+      expect(seen).toBe(4564);
+    });
+
+    it('is undefined when no company was pinned', () => {
+      const seen = runWithContext({ identity: null, userToken: 'tok' }, () =>
+        getRequestCompanyId()
+      );
+      expect(seen).toBeUndefined();
+    });
+  });
+
+  describe('assertCompanyAllowed', () => {
+    it('is a no-op with no request context (stdio) or no pin', () => {
+      expect(() => assertCompanyAllowed(999)).not.toThrow();
+      expect(() =>
+        runWithContext({ identity: null }, () => assertCompanyAllowed(999))
+      ).not.toThrow();
+    });
+
+    it('allows the pinned company', () => {
+      expect(() =>
+        runWithContext({ identity: null, companyId: 4564 }, () =>
+          assertCompanyAllowed(4564)
+        )
+      ).not.toThrow();
+    });
+
+    it('rejects any other company', () => {
+      expect(() =>
+        runWithContext({ identity: null, companyId: 4564 }, () =>
+          assertCompanyAllowed(720441)
+        )
+      ).toThrow(/scoped to company 4564/);
     });
   });
 });

@@ -15,6 +15,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import crypto from 'node:crypto';
 import { createLogger } from './utils/logger.js';
+import { AltegioApiError } from './utils/errors.js';
 
 const logger = createLogger('request-context');
 
@@ -108,6 +109,33 @@ export function parseUserToken(headers: HeaderBag): string | undefined {
   return value ? value : undefined;
 }
 
+/** Header pinning a request to a single company (location). */
+const COMPANY_ID_HEADER = 'x-altegio-company-id';
+
+/**
+ * Extract a company (location) pin from the request headers.
+ *
+ * When a deployment acts for many salons with ONE shared token (e.g. a
+ * marketplace app's system user, whose token can reach every installed salon),
+ * this header scopes a request to a single company: `list_locations` is filtered
+ * to it and any other company is rejected. This is how one shared token is made
+ * safe for a single-salon instance. Returns `undefined` when the header is
+ * absent, blank, or not a positive integer (a bad value never silently widens
+ * scope beyond what the caller asked — it simply applies no pin, and is logged).
+ */
+export function parseCompanyId(headers: HeaderBag): number | undefined {
+  const raw = headerValue(headers, COMPANY_ID_HEADER)?.trim();
+  if (!raw) {
+    return undefined;
+  }
+  const id = Number(raw);
+  if (!Number.isInteger(id) || id <= 0) {
+    logger.warn({ raw }, 'Ignoring non-integer X-Altegio-Company-Id header');
+    return undefined;
+  }
+  return id;
+}
+
 /**
  * Everything bound to a single request's async context.
  *
@@ -119,6 +147,7 @@ export function parseUserToken(headers: HeaderBag): string | undefined {
 export interface RequestContext {
   identity: RequestIdentity | null;
   userToken?: string;
+  companyId?: number;
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();
@@ -159,6 +188,34 @@ export function getRequestIdentity(): RequestIdentity | null | undefined {
  */
 export function getRequestUserToken(): string | undefined {
   return storage.getStore()?.userToken;
+}
+
+/**
+ * The company (location) this request is pinned to, if any. `undefined` outside a
+ * request context or when no `X-Altegio-Company-Id` header was sent — in which
+ * case no company scoping is applied (today's behavior for every other caller).
+ */
+export function getRequestCompanyId(): number | undefined {
+  return storage.getStore()?.companyId;
+}
+
+/**
+ * Enforce the current request's company (location) pin.
+ *
+ * When a request is pinned via `X-Altegio-Company-Id` — the way a shared-token
+ * deployment (e.g. a marketplace app's system user, whose token can reach every
+ * installed salon) is scoped to a single salon — acting on any OTHER company is
+ * rejected with a 403. Unpinned requests (no header, or stdio) are a no-op, so
+ * every existing caller is unaffected.
+ */
+export function assertCompanyAllowed(companyId: number): void {
+  const pin = getRequestCompanyId();
+  if (pin !== undefined && companyId !== pin) {
+    throw new AltegioApiError(
+      `This deployment is scoped to company ${pin}; company ${companyId} is not accessible.`,
+      403
+    );
+  }
 }
 
 /**
