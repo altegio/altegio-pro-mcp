@@ -14,6 +14,8 @@ import { DEFAULT_FACET_EXTRA_TOOLS } from '../tools/facets.js';
 import {
   COVERAGE_URI as ANALYTICS_COVERAGE_URI,
   GLOSSARY_URI as ANALYTICS_GLOSSARY_URI,
+  PLAYBOOK_URI as ANALYTICS_PLAYBOOK_URI,
+  DATA_MODEL_URI as ANALYTICS_DATA_MODEL_URI,
 } from '../resources/analytics.resources.js';
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 
@@ -157,7 +159,9 @@ describe('resources', () => {
     const { resources } = await client.listResources();
     expect(resources.map((resource) => resource.uri)).toEqual([
       ANALYTICS_COVERAGE_URI,
+      ANALYTICS_DATA_MODEL_URI,
       ANALYTICS_GLOSSARY_URI,
+      ANALYTICS_PLAYBOOK_URI,
       GLOSSARY_URI,
       ONBOARDING_GUIDE_URI,
       PRODUCT_LOGIC_URI,
@@ -237,7 +241,7 @@ describe('resources', () => {
   it('serves resources on a narrow facet too', async () => {
     const client = await connect('onboarding');
     const { resources } = await client.listResources();
-    expect(resources).toHaveLength(5);
+    expect(resources).toHaveLength(7);
     await client.close();
   });
 });
@@ -248,6 +252,7 @@ describe('prompts', () => {
     const { prompts } = await client.listPrompts();
     expect(prompts.map((prompt) => prompt.name)).toEqual([
       'analytics_compare_periods',
+      'analytics_location_health_check',
       'analytics_monthly_review',
       'analytics_team_member_review',
       ONBOARDING_WALKTHROUGH_PROMPT,

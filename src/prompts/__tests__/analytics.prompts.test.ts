@@ -8,8 +8,9 @@ import {
 } from '../analytics.prompts.js';
 
 describe('prompt listing', () => {
-  it('offers the three review prompts', () => {
+  it('offers the health check and the three review prompts', () => {
     expect(listAnalyticsPrompts().map((prompt) => prompt.name)).toEqual([
+      'analytics_location_health_check',
       'analytics_monthly_review',
       'analytics_team_member_review',
       'analytics_compare_periods',
@@ -42,6 +43,19 @@ describe('getAnalyticsPrompt', () => {
     expect(text).toContain('analytics_get_appointments_breakdown');
     expect(text).toContain('analytics_run_report');
     expect(text).toContain('no-show');
+  });
+
+  it('renders the health check as a playbook-driven investigation', () => {
+    const text = getAnalyticsPrompt('analytics_location_health_check', {
+      location_id: '4564',
+      period: 'last_month',
+    })!.messages[0]!.content.text;
+
+    expect(text).toContain('location 4564');
+    expect(text).toContain('altegio://analytics/playbook');
+    expect(text).toContain('analytics_get_overview');
+    expect(text).toContain('decompose');
+    expect(text).toContain('missing is not zero');
   });
 
   it('defaults the period and keeps placeholders visible without arguments', () => {

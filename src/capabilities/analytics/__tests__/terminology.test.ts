@@ -21,10 +21,14 @@ import {
 import {
   GLOSSARY_URI,
   COVERAGE_URI,
+  PLAYBOOK_URI,
+  DATA_MODEL_URI,
   listAnalyticsResourceTemplates,
   listAnalyticsResources,
   renderCoverage,
+  renderDataModel,
   renderGlossary,
+  renderPlaybook,
   renderReportFields,
 } from '../../../resources/analytics.resources.js';
 import {
@@ -93,6 +97,8 @@ describe('analytics terminology', () => {
     const texts = [
       renderGlossary(),
       renderCoverage(),
+      renderPlaybook(),
+      renderDataModel(),
       ...DATASETS.map((dataset) => renderReportFields(dataset)),
       ...listAnalyticsResources().flatMap((entry) => [
         entry.name,
@@ -144,6 +150,8 @@ describe('analytics terminology', () => {
   it('resource URIs stay stable', () => {
     expect(GLOSSARY_URI).toBe('altegio://analytics/glossary');
     expect(COVERAGE_URI).toBe('altegio://analytics/coverage');
+    expect(PLAYBOOK_URI).toBe('altegio://analytics/playbook');
+    expect(DATA_MODEL_URI).toBe('altegio://analytics/data-model');
   });
 });
 

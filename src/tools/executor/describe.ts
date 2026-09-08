@@ -16,6 +16,7 @@ import {
 } from './catalog.js';
 import { enforceBudget, NARROW_HINT } from './budget.js';
 import { searchOperations } from './search.js';
+import { readingNotesFor } from './reading-notes.js';
 
 export interface DescribedParameter {
   /** Canonical name to send. */
@@ -137,6 +138,7 @@ export function describeOperation(operationId: string): DescribeOutput {
 
   const parameters = op.parameters.map((p) => describeParameter(op, p));
   const notes = terminologyNotes(op);
+  const readingNotes = readingNotesFor(op);
   const curatedTool = op.curation?.tool_name;
 
   const structured: Record<string, unknown> = {
@@ -165,6 +167,7 @@ export function describeOperation(operationId: string): DescribeOutput {
     ...(op.curation?.tier ? { tier: op.curation.tier } : {}),
     ...(op.curation?.projection ? { projection: op.curation.projection } : {}),
     ...(notes.length > 0 ? { terminology_notes: notes } : {}),
+    ...(readingNotes.length > 0 ? { reading_notes: readingNotes } : {}),
   };
 
   const budgeted = enforceBudget(structured);
@@ -176,7 +179,7 @@ export function describeOperation(operationId: string): DescribeOutput {
 
   return {
     found: true,
-    text: renderText(op, parameters, notes),
+    text: renderText(op, parameters, notes, readingNotes),
     structuredContent: value,
   };
 }
@@ -184,7 +187,8 @@ export function describeOperation(operationId: string): DescribeOutput {
 function renderText(
   op: CatalogOperation,
   parameters: DescribedParameter[],
-  notes: string[]
+  notes: string[],
+  readingNotes: string[]
 ): string {
   const lines: string[] = [];
 
@@ -251,6 +255,10 @@ function renderText(
   if (notes.length > 0) {
     lines.push('', 'Canonical terminology:');
     for (const note of notes) lines.push(`  - ${note}`);
+  }
+  if (readingNotes.length > 0) {
+    lines.push('', 'Reading the data:');
+    for (const note of readingNotes) lines.push(`  - ${note}`);
   }
 
   return lines.join('\n');

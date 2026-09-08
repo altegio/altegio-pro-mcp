@@ -77,6 +77,22 @@ describe('altegio_describe_operation', () => {
     );
   });
 
+  it('adds reading notes that legend coded fields and point at the analytics resources', () => {
+    const { text, structuredContent } = describeOperation('get_appointment');
+    const readingNotes = structuredContent.reading_notes as string[];
+
+    // The attendance legend is the most valuable note on an appointment read.
+    expect(readingNotes.join('\n')).toContain('-1 no-show');
+    expect(readingNotes.join('\n')).toContain('altegio://analytics/data-model');
+    expect(text).toContain('Reading the data:');
+  });
+
+  it('leaves domains without a legend free of reading notes', () => {
+    // team_members carries no coded-value legend, so no reading_notes are added.
+    const { structuredContent } = describeOperation('get_team_member_list');
+    expect(structuredContent.reading_notes).toBeUndefined();
+  });
+
   it('marks a write as not callable by the executor and points at the tool', () => {
     const { text, structuredContent } = describeOperation('update_appointment');
     expect(structuredContent.callable_by_executor).toBe(false);
