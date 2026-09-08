@@ -22,6 +22,7 @@ import { CredentialManager } from './credential-manager.js';
 import { AuthenticationError, AltegioApiError } from '../utils/errors.js';
 import {
   getRequestIdentity,
+  getRequestUserToken,
   identityKey,
   type RequestIdentity,
 } from '../request-context.js';
@@ -62,6 +63,9 @@ export class AltegioClient {
   /**
    * Resolve the Altegio user token for the CURRENT request.
    *
+   * - Direct token (`X-Altegio-User-Token`): used as-is, ahead of everything
+   *   below. This is the multi-client path — the request names the exact
+   *   Altegio client it acts for, so no login or per-identity storage applies.
    * - No HTTP context (stdio): legacy single-user token / credentials.json.
    * - HTTP but anonymous (`null`): no token when delegated identity is
    *   required; otherwise legacy behavior (transition mode).
@@ -69,6 +73,11 @@ export class AltegioClient {
    *   token and never the legacy file.
    */
   private resolveUserToken(): string | undefined {
+    const direct = getRequestUserToken();
+    if (direct) {
+      return direct;
+    }
+
     const identity = getRequestIdentity();
 
     // stdio, or HTTP transition mode (anonymous + not enforcing delegation).

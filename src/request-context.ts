@@ -92,17 +92,54 @@ export function parseIdentityHeaders(
   return null;
 }
 
-const storage = new AsyncLocalStorage<RequestIdentity | null>();
+/** Header carrying a per-request Altegio user (technical-user) token. */
+const USER_TOKEN_HEADER = 'x-altegio-user-token';
 
 /**
- * Run `fn` with the given identity bound to the current async context.
+ * Extract a directly-supplied Altegio user token from the request headers.
+ *
+ * This is the multi-client path: instead of logging in once and keying a token
+ * by proxy identity, a deployment that serves many Altegio clients sends the
+ * specific client's technical-user token on every request. Returns `undefined`
+ * when the header is absent or blank.
+ */
+export function parseUserToken(headers: HeaderBag): string | undefined {
+  const value = headerValue(headers, USER_TOKEN_HEADER)?.trim();
+  return value ? value : undefined;
+}
+
+/**
+ * Everything bound to a single request's async context.
+ *
+ * `identity` is the proxy-verified caller (`null` when anonymous). `userToken`
+ * is an Altegio user token supplied directly on the request
+ * (`X-Altegio-User-Token`); when present it takes precedence over identity- and
+ * file-scoped tokens (see `AltegioClient.resolveUserToken`).
+ */
+export interface RequestContext {
+  identity: RequestIdentity | null;
+  userToken?: string;
+}
+
+const storage = new AsyncLocalStorage<RequestContext>();
+
+/**
+ * Run `fn` with a full request context (identity + optional direct token)
+ * bound to the current async context.
+ */
+export function runWithContext<T>(context: RequestContext, fn: () => T): T {
+  return storage.run(context, fn);
+}
+
+/**
+ * Run `fn` with just an identity bound (no direct user token).
  * `null` binds an "anonymous HTTP request" context (distinct from stdio).
  */
 export function runWithIdentity<T>(
   identity: RequestIdentity | null,
   fn: () => T
 ): T {
-  return storage.run(identity, fn);
+  return storage.run({ identity }, fn);
 }
 
 /**
@@ -112,7 +149,16 @@ export function runWithIdentity<T>(
  * - object      — the proxy-verified identity for this request.
  */
 export function getRequestIdentity(): RequestIdentity | null | undefined {
-  return storage.getStore();
+  const context = storage.getStore();
+  return context === undefined ? undefined : context.identity;
+}
+
+/**
+ * The Altegio user token supplied directly on the current request, if any.
+ * `undefined` outside a request context or when the header was absent/blank.
+ */
+export function getRequestUserToken(): string | undefined {
+  return storage.getStore()?.userToken;
 }
 
 /**

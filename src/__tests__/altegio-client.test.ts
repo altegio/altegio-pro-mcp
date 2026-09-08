@@ -9,7 +9,11 @@ import {
 import { AltegioClient } from '../providers/altegio-client.js';
 import { AuthenticationError, AltegioApiError } from '../utils/errors.js';
 import { CredentialManager } from '../providers/credential-manager.js';
-import { runWithIdentity, type RequestIdentity } from '../request-context.js';
+import {
+  runWithIdentity,
+  runWithContext,
+  type RequestIdentity,
+} from '../request-context.js';
 import { ToolHandlers } from '../tools/handlers.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -998,6 +1002,75 @@ describe('AltegioClient', () => {
       expect(res.success).toBe(false);
       expect(res.error).toMatch(/proxy-verified identity/);
       expect(fetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('direct request user token (X-Altegio-User-Token)', () => {
+    const idA: RequestIdentity = { kind: 'user', email: 'a@example.com' };
+
+    const mockOnce = (body: unknown, ok = true): void => {
+      (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+        ok,
+        json: async () => body,
+      } as Response);
+    };
+
+    it('uses the direct token as the User part of the Authorization header', async () => {
+      mockOnce({ success: true, data: [] });
+      await runWithContext({ identity: null, userToken: 'client-token' }, () =>
+        client.getCompanies()
+      );
+      expect(fetch).toHaveBeenLastCalledWith(
+        'https://api.alteg.io/api/v1/companies',
+        {
+          headers: {
+            Accept: 'application/vnd.api.v2+json',
+            Authorization: 'Bearer test-partner-token, User client-token',
+          },
+        }
+      );
+    });
+
+    it('authenticates a client with no login and no stored identity token', () => {
+      expect(
+        runWithContext({ identity: null, userToken: 'client-token' }, () =>
+          client.isAuthenticated()
+        )
+      ).toBe(true);
+    });
+
+    it('takes precedence over a logged-in identity token', async () => {
+      mockOnce({
+        success: true,
+        data: { user_token: 'identity-token', id: 1 },
+      });
+      await runWithIdentity(idA, () => client.login('a@example.com', 'pw'));
+
+      // Same identity, but this request names a different client via the header.
+      mockOnce({ success: true, data: [] });
+      await runWithContext({ identity: idA, userToken: 'header-token' }, () =>
+        client.getCompanies()
+      );
+      expect(fetch).toHaveBeenLastCalledWith(
+        'https://api.alteg.io/api/v1/companies',
+        {
+          headers: {
+            Accept: 'application/vnd.api.v2+json',
+            Authorization: 'Bearer test-partner-token, User header-token',
+          },
+        }
+      );
+    });
+
+    it('is honored even when delegated identity is required', () => {
+      const secured = new AltegioClient(mockConfig, testDir, {
+        requireDelegatedIdentity: true,
+      });
+      expect(
+        runWithContext({ identity: null, userToken: 'client-token' }, () =>
+          secured.isAuthenticated()
+        )
+      ).toBe(true);
     });
   });
 });

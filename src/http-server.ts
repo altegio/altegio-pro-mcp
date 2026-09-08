@@ -7,7 +7,11 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { createServer } from './server.js';
 import { DEFAULT_FACET, FACET_NAMES, type FacetKey } from './tools/facets.js';
 import { createLogger } from './utils/logger.js';
-import { parseIdentityHeaders, runWithIdentity } from './request-context.js';
+import {
+  parseIdentityHeaders,
+  parseUserToken,
+  runWithContext,
+} from './request-context.js';
 
 const logger = createLogger('http-server');
 
@@ -61,6 +65,7 @@ export function createApp(): {
     app.post(path, async (req, res) => {
       const sessionId = req.headers['mcp-session-id'] as string | undefined;
       const identity = parseIdentityHeaders(req.headers);
+      const userToken = parseUserToken(req.headers);
 
       try {
         let transport: StreamableHTTPServerTransport;
@@ -88,7 +93,7 @@ export function createApp(): {
 
           const server = createServer({ facet });
           await server.connect(transport);
-          await runWithIdentity(identity, () =>
+          await runWithContext({ identity, userToken }, () =>
             transport.handleRequest(req, res, req.body)
           );
           return;
@@ -104,7 +109,7 @@ export function createApp(): {
           return;
         }
 
-        await runWithIdentity(identity, () =>
+        await runWithContext({ identity, userToken }, () =>
           transport.handleRequest(req, res, req.body)
         );
       } catch (error) {
@@ -131,8 +136,12 @@ export function createApp(): {
       }
 
       try {
-        await runWithIdentity(parseIdentityHeaders(req.headers), () =>
-          transport.handleRequest(req, res)
+        await runWithContext(
+          {
+            identity: parseIdentityHeaders(req.headers),
+            userToken: parseUserToken(req.headers),
+          },
+          () => transport.handleRequest(req, res)
         );
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : String(error);
@@ -154,8 +163,12 @@ export function createApp(): {
       }
 
       try {
-        await runWithIdentity(parseIdentityHeaders(req.headers), () =>
-          transport.handleRequest(req, res)
+        await runWithContext(
+          {
+            identity: parseIdentityHeaders(req.headers),
+            userToken: parseUserToken(req.headers),
+          },
+          () => transport.handleRequest(req, res)
         );
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : String(error);
