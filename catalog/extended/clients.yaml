@@ -1,0 +1,83 @@
+# Extended catalog — client operations that have no entry in the published
+# OpenAPI specification (ADR-001 D4).
+#
+# Every operation listed here is on the explicit allowlist of undocumented
+# endpoints the clients pack may call. Shapes are recorded as observed, not as
+# guaranteed: an undocumented route serves the ERP web client and can change
+# without notice, so each one is covered by a golden contract test replayed from
+# a recorded fixture, and by the opt-in live suite (ALTEGIO_E2E=1).
+#
+# `x-altegio-source: undocumented` marks the whole file. `x-altegio-permission`
+# records the access right the backend checks, and `x-altegio-caveat` the
+# behaviour that surprised us while integrating.
+#
+# All paths are relative to https://api.alteg.io/api/v1.
+
+openapi: 3.1.0
+info:
+  title: Altegio clients — undocumented operations used by the MCP clients pack
+  version: '2026-09-08'
+  description: >-
+    Hand-written stubs for the undocumented client endpoints the `clients_*`
+    tool pack depends on. Candidates for publication in the Altegio API
+    specification; see ADR-001 §8.2.
+
+x-altegio-source: undocumented
+
+paths:
+  /company/{location_id}/clients/autocomplete:
+    get:
+      operationId: autocomplete_clients
+      summary: Fast typeahead lookup of clients by a name/phone/email fragment
+      x-altegio-permission: records_autocomplete_access + edit-location right
+      x-altegio-caveat: >-
+        Answers with a RAW JSON array (no {success,data,meta} envelope). Each row
+        carries the client id, `fullname`, `phone` (and email, surname,
+        patronymic, discount). Also matches walk-in "comers", not only clients.
+        limit defaults to 7 and is capped at 25; a query containing an emoji
+        returns an empty array. Reads its search terms from separate query
+        parameters (name, surname, patronymic, phone, email, card), not one
+        combined term.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - name: name
+          in: query
+          description: Name fragment to search for.
+          schema: { type: string }
+        - name: surname
+          in: query
+          schema: { type: string }
+        - name: patronymic
+          in: query
+          schema: { type: string }
+        - name: phone
+          in: query
+          schema: { type: string }
+        - name: email
+          in: query
+          schema: { type: string }
+        - name: card
+          in: query
+          description: Loyalty-card number fragment.
+          schema: { type: string }
+        - name: limit
+          in: query
+          description: Maximum matches, 1–25 (default 7).
+          schema: { type: integer, minimum: 1, maximum: 25 }
+      responses:
+        '200':
+          description: A raw array of matching clients.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: integer }
+                    fullname: { type: [string, 'null'] }
+                    surname: { type: [string, 'null'] }
+                    patronymic: { type: [string, 'null'] }
+                    phone: { type: [string, 'null'] }
+                    email: { type: [string, 'null'] }
+                    discount: { type: [number, 'null'] }

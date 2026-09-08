@@ -13,11 +13,17 @@
 import { docsResources } from './docs.resources.js';
 export { analyticsResources } from './analytics.module.js';
 import { analyticsResources } from './analytics.module.js';
+export {
+  clientsResources,
+  CLIENTS_SEGMENTATION_URI,
+} from './clients.resources.js';
+import { clientsResources } from './clients.resources.js';
 import type { ResourceModule } from './registry.js';
 
 export const resourceModules: readonly ResourceModule[] = [
   docsResources,
   analyticsResources,
+  clientsResources,
 ];
 
 export {

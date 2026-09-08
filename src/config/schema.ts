@@ -14,16 +14,16 @@ import { ConfigurationError } from '../utils/errors.js';
 export const DEFAULT_SERVER_INSTRUCTIONS = [
   'Altegio Pro is the management surface for a local service business — its',
   'owners, receptionists and team members. Today’s tools cover locations,',
-  'team members and positions, services and service categories, work schedules,',
-  'appointments, location settings, resources, and a guided onboarding',
+  'team members and positions, services and categories, work schedules,',
+  'appointments, the client base (segment, cards, visit history, lookup), analytics',
+  'with a report builder, location settings, resources, and a guided onboarding',
   'walkthrough. Call altegio_login first, then list_locations for a location_id.',
   'The default /mcp endpoint serves the whole surface; narrower static views live',
   'on /mcp/ops, /mcp/catalog, /mcp/finance, /mcp/marketing, /mcp/analytics and',
-  '/mcp/onboarding for hosts that cap active tools. Analytics, a report builder',
-  'and a universal operation executor are being added as domain packs. Resources',
-  'under altegio://docs/ carry the product model, the onboarding guide and the',
-  'canonical vocabulary; the onboarding_walkthrough prompt drives a first-time',
-  'setup.',
+  '/mcp/onboarding for hosts that cap active tools. A universal operation executor',
+  'and more packs are being added. Resources under altegio://docs/ carry the',
+  'product model, the canonical vocabulary and the client-segmentation reference;',
+  'the onboarding_walkthrough prompt drives a first-time setup.',
 ].join(' ');
 
 /**

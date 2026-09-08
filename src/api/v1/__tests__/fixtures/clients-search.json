@@ -1,0 +1,8 @@
+{
+  "success": true,
+  "data": [
+    { "name": "James Smith", "id": 2 },
+    { "name": "Taylor Reed", "id": 3 }
+  ],
+  "meta": { "total_count": 908 }
+}

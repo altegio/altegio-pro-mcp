@@ -101,8 +101,8 @@ describe('Tool Registration', () => {
     expect(toolNames).toContain('analytics_list_saved_reports');
     expect(toolNames).toContain('analytics_run_saved_report');
 
-    // Total: 30 CRUD + 3 executor + 14 analytics + 12 onboarding = 59 tools
-    expect(toolNames.length).toBe(59);
+    // Total: 30 CRUD + 3 executor + 14 analytics + 4 clients + 12 onboarding = 63 tools
+    expect(toolNames.length).toBe(63);
   });
 
   it('should create server with tools', () => {
