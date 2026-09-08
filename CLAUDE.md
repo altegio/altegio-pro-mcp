@@ -87,7 +87,7 @@ Always check BUILD.md / never add it to Git
 
 MCP server for **B2B business management only** (Altegio.Pro, not public booking /b2c). Local service business business owners, admins and team members manage their operations through authenticated tools
 
-### Tools Available (59 total)
+### Tools Available (63 total)
 
 **Category-organized with [Prefix] tags for LLM navigation:**
 
@@ -99,6 +99,7 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 **[Categories] Service Categories (1):** get
 **[Schedule] Schedule CRUD (4):** get, create, update, delete
 **[Appointments] Appointments CRUD (4):** get, create, update, delete
+**[Clients] Client base (4):** `clients_search` (segment & count the base with a fully-typed filter model), `clients_get_card`, `clients_get_visit_history`, `clients_lookup` (autocomplete)
 **[Settings] Location Settings (6):** get/update appointment settings, get/update online booking settings, get/create booking forms
 **[Resources] Resources (1):** get (read-only; API has no create)
 **[Analytics] Analytics (14):** get_overview, get_daily_series, get_appointments_breakdown, get_receptionist_performance, get_loyalty_program_results, get_forecast, get_day_end_report, get_team_member_occupancy, get_client_visit_stats, list_report_templates, list_report_fields, run_report, list_saved_reports, run_saved_report
@@ -134,6 +135,17 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 - `src/utils/` - logging, errors, config, credential manager
 
 ### Change history
+
+**Clients pack — client-base analytics (2026-09-08)**
+- **Added 4 tools (59 → 63):** `clients_search` (POST `/company/{id}/clients/search`), `clients_get_card` (GET `/client/{id}/{id}`), `clients_get_visit_history` (POST `/company/{id}/clients/visits/search`), `clients_lookup` (undocumented GET `/company/{id}/clients/autocomplete`)
+- **Why:** the client base was reachable only through the read-only executor, which refuses POST — so the segmentation search and the visit-history search were unusable. This unblocks client-base analytics.
+- **Segmentation engine:** `clients_search` exposes a fully-typed canonical filter model over the ~40 backend `ClientSearchCriteria*` filter types (spend, visit count/recency, importance, tags, gender, birthday/age, memberships, gift cards, client-account balance, consent, and an appointment-history filter with an `exclude`/invert flag for lapsed/win-back segments). Returns the total match count plus an orderable page.
+- **Architecture:** follows the analytics pack — `src/api/clients-api.ts` port + `src/api/v1/clients-adapter.ts` (+`clients-http.ts`), capability layer in `src/capabilities/clients/` (`vocabulary.ts`, `filters.ts`, `projections.ts`, `errors.ts`, `use-cases.ts`), tools in `src/tools/definitions/clients.tools.ts`. Legacy wire dialect (`record`, `abonement`, `certificate`, `category`, `sold_amount`) is confined to the vocabulary + filters + adapter; everything the model sees is canonical.
+- **Semantic trap documented & tested:** the appointment-history filter numbers visit outcomes {no_show 1, waiting 2, arrived 3, confirmed 4} — different from the visit-history `attendance` code {-1, 0, 1, 2}. Mapped in `vocabulary.ts` and pinned by `filters.test.ts`.
+- **Undocumented endpoints (ADR-001 D4):** `clients/autocomplete` added to `catalog/extended/clients.yaml` with a golden contract test; opt-in live recorder `clients-live.test.ts` (`ALTEGIO_E2E=1`).
+- **RFM:** already exposed — `analytics_get_forecast` maps to `/company/{id}/analytics/rfm/overall` (predicted vs actual revenue/visits; not RFM segments — there is no RFM-segment API). Not duplicated.
+- **Excluded:** the `/segments` API (SalonSegmentsController) segments *salons* for Altegio's own marketing and is gated to ERP super-users — wrong persona.
+- **Docs:** `altegio://docs/clients-segmentation` resource — full filter reference, the two outcome numberings, worked segments (VIPs, win-back, birthday campaigns, membership holders). `clients_*` joins the `ops` facet and the default `/mcp` view.
 
 **API catalog + universal executor (2026-09-07)**
 - **Added 3 tools (42 -> 45):** `altegio_search_operations`, `altegio_describe_operation`, `altegio_call_operation` (ADR-001 D2 executor tier)

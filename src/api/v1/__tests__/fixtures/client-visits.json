@@ -1,0 +1,46 @@
+{
+  "success": true,
+  "data": {
+    "goods_transactions": [
+      {
+        "id": 900,
+        "date": "2026-01-30T10:00:00-05:00",
+        "visit_id": 0,
+        "record_id": 0,
+        "goods": [
+          {
+            "title": "Shampoo",
+            "cost_to_pay": 500,
+            "paid_sum": 500,
+            "payment_status": "paid_full"
+          }
+        ],
+        "staff": { "id": 1, "name": "James Smith" }
+      }
+    ],
+    "records": [
+      {
+        "id": 123,
+        "date": "2026-01-31T12:34:56-05:00",
+        "visit_id": 123,
+        "attendance": 1,
+        "services": [
+          {
+            "title": "Haircut",
+            "cost_to_pay": 1000,
+            "paid_sum": 600,
+            "payment_status": "paid_not_full"
+          }
+        ],
+        "staff": { "id": 1, "name": "James Smith" }
+      }
+    ]
+  },
+  "meta": {
+    "dateCursor": {
+      "previous": { "to": null, "from": null, "count": null },
+      "current": { "to": "2026-01-31", "from": "2026-01-30", "count": 2 },
+      "next": { "to": "2026-01-29", "from": "2026-01-05", "count": 25 }
+    }
+  }
+}

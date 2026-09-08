@@ -1,0 +1,47 @@
+# Curation overlay for the Clients domain (ADR-001 D4).
+#
+# These three operations are exposed by hand-written tools in the `clients_*`
+# pack (src/tools/definitions/clients.tools.ts). The overlay records the tool
+# name and tier so the catalog and the universal executor point at the curated
+# tool instead of trying to call the raw POST endpoint themselves.
+#
+# See catalog/overlay/_schema.yaml for the field reference.
+
+version: 1
+operations:
+  get_client_list:
+    domain: clients
+    tier: core
+    facets: [ops]
+    tool_name: clients_search
+    description: >
+      Segment the client base of one location and count the segment: filter by
+      spend, visit count and recency, loyalty importance, tags, gender,
+      birthday, memberships, gift cards, client-account balance, consent and
+      appointment history (with an exclude flag for lapsed / win-back segments).
+    notes: >
+      Hand-written tool; the generated pack must not claim this name. POST search
+      with a rich typed filter model, so it is not reachable through the
+      read-only executor. Filter reference: altegio://docs/clients-segmentation.
+
+  search_client_visits:
+    domain: clients
+    tier: core
+    facets: [ops]
+    tool_name: clients_get_visit_history
+    description: >
+      One client's visit and purchase history, visit by visit, with outcome,
+      team member, services, products and the amounts sold and paid. Paged by
+      date, newest first.
+    notes: Hand-written tool. Identify the client by client_id or client_phone.
+
+  get_client:
+    domain: clients
+    tier: core
+    facets: [ops]
+    tool_name: clients_get_card
+    description: >
+      The full card of one client: contacts, loyalty importance and discount,
+      lifetime spend, client-account balance, visit count, tags and custom
+      fields.
+    notes: Hand-written tool.

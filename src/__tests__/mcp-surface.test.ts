@@ -8,6 +8,7 @@ import {
   GLOSSARY_URI,
   ONBOARDING_GUIDE_URI,
   PRODUCT_LOGIC_URI,
+  CLIENTS_SEGMENTATION_URI,
 } from '../resources/index.js';
 import { ONBOARDING_WALKTHROUGH_PROMPT } from '../prompts/index.js';
 import { DEFAULT_FACET_EXTRA_TOOLS } from '../tools/facets.js';
@@ -78,6 +79,10 @@ describe('tools/list per facet', () => {
     expect(tools.map((tool) => tool.name).sort()).toEqual([
       'altegio_login',
       'altegio_logout',
+      'clients_get_card',
+      'clients_get_visit_history',
+      'clients_lookup',
+      'clients_search',
       'create_appointment',
       'delete_appointment',
       'get_appointments',
@@ -162,6 +167,7 @@ describe('resources', () => {
       ANALYTICS_DATA_MODEL_URI,
       ANALYTICS_GLOSSARY_URI,
       ANALYTICS_PLAYBOOK_URI,
+      CLIENTS_SEGMENTATION_URI,
       GLOSSARY_URI,
       ONBOARDING_GUIDE_URI,
       PRODUCT_LOGIC_URI,
@@ -241,7 +247,7 @@ describe('resources', () => {
   it('serves resources on a narrow facet too', async () => {
     const client = await connect('onboarding');
     const { resources } = await client.listResources();
-    expect(resources).toHaveLength(7);
+    expect(resources).toHaveLength(8);
     await client.close();
   });
 });

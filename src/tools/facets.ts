@@ -70,9 +70,9 @@ interface FacetRule {
  */
 const FACET_RULES: Record<FacetName, FacetRule> = {
   /**
-   * Daily work: the digital schedule, appointments, clients.
-   * Intended membership (ADR-001 D3) also covers the `clients_*` pack and the
-   * journal tools; neither exists yet.
+   * Daily work: the digital schedule, appointments, clients. The `clients_*`
+   * pack (segmentation, client card, visit history, lookup) joins by prefix;
+   * the journal tools do not exist yet.
    */
   ops: {
     tools: [
@@ -81,7 +81,7 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
       'update_appointment',
       'delete_appointment',
     ],
-    prefixes: [],
+    prefixes: ['clients_'],
   },
 
   /**

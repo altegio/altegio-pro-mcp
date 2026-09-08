@@ -315,6 +315,45 @@ export const apiMapping: Record<string, ApiMapping> = {
   },
 
   // ==========================================
+  // Clients (client base)
+  // ==========================================
+  clients_search: {
+    path: '/company/{location_id}/clients/search',
+    method: 'post',
+    operationId: 'get_client_list',
+    pathParams: ['location_id'],
+    bodyParams: ['filters', 'operation', 'page', 'page_size'],
+  },
+  clients_get_card: {
+    path: '/client/{location_id}/{id}',
+    method: 'get',
+    operationId: 'get_client',
+    pathParams: ['location_id', 'id'],
+  },
+  clients_get_visit_history: {
+    path: '/company/{location_id}/clients/visits/search',
+    method: 'post',
+    operationId: 'search_client_visits',
+    pathParams: ['location_id'],
+    bodyParams: [
+      'client_id',
+      'client_phone',
+      'from',
+      'to',
+      'payment_statuses',
+      'attendance',
+    ],
+  },
+  clients_lookup: {
+    path: '/company/{location_id}/clients/autocomplete',
+    method: 'get',
+    operationId: 'autocomplete_clients',
+    pathParams: ['location_id'],
+    queryParams: ['name', 'limit'],
+    source: 'extended',
+  },
+
+  // ==========================================
   // Analytics — tools that call exactly one operation
   // ==========================================
   analytics_get_overview: {

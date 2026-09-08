@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "data": {
+    "id": 16,
+    "name": "James",
+    "surname": "Smith",
+    "middle_name": "A",
+    "phone": "13155550178",
+    "email": "",
+    "categories": [
+      { "id": 3, "title": "VIP", "color": "#e8d313" },
+      { "id": 4, "title": "Black list", "color": "#0f0f0f" }
+    ],
+    "gender": "Male",
+    "gender_id": 1,
+    "discount": 10,
+    "importance": "Gold",
+    "importance_id": 3,
+    "card": "123456789",
+    "birth_date": "2026-09-21",
+    "comment": "regular",
+    "sms_check": 1,
+    "sms_not": 0,
+    "spent": 71842,
+    "balance": -200,
+    "visits": 34,
+    "last_change_date": "2026-02-01T12:00:00-0500",
+    "custom_fields": { "vip_note": "prefers mornings" }
+  }
+}

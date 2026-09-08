@@ -333,6 +333,10 @@ describe('HTTP server facet wiring, end to end', () => {
       expect([...ops].sort()).toEqual([
         'altegio_login',
         'altegio_logout',
+        'clients_get_card',
+        'clients_get_visit_history',
+        'clients_lookup',
+        'clients_search',
         'create_appointment',
         'delete_appointment',
         'get_appointments',

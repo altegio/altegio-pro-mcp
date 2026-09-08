@@ -28,7 +28,7 @@
     "staff_id": "team_member_id"
   },
   "operationCount": 317,
-  "curatedCount": 25,
+  "curatedCount": 28,
   "domains": [
     {
       "domain": "analytics",
@@ -7923,6 +7923,16 @@
       "response": {
         "contentType": "application/json",
         "statusCode": "200"
+      },
+      "curation": {
+        "description": "The full card of one client: contacts, loyalty importance and discount, lifetime spend, client-account balance, visit count, tags and custom fields.\n",
+        "domain": "clients",
+        "tier": "core",
+        "facets": [
+          "ops"
+        ],
+        "tool_name": "clients_get_card",
+        "notes": "Hand-written tool."
       }
     },
     {
@@ -13215,6 +13225,16 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "description": "Segment the client base of one location and count the segment: filter by spend, visit count and recency, loyalty importance, tags, gender, birthday, memberships, gift cards, client-account balance, consent and appointment history (with an exclude flag for lapsed / win-back segments).\n",
+        "domain": "clients",
+        "tier": "core",
+        "facets": [
+          "ops"
+        ],
+        "tool_name": "clients_search",
+        "notes": "Hand-written tool; the generated pack must not claim this name. POST search with a rich typed filter model, so it is not reachable through the read-only executor. Filter reference: altegio://docs/clients-segmentation.\n"
       }
     },
     {
@@ -13440,6 +13460,16 @@
           },
           "type": "object"
         }
+      },
+      "curation": {
+        "description": "One client's visit and purchase history, visit by visit, with outcome, team member, services, products and the amounts sold and paid. Paged by date, newest first.\n",
+        "domain": "clients",
+        "tier": "core",
+        "facets": [
+          "ops"
+        ],
+        "tool_name": "clients_get_visit_history",
+        "notes": "Hand-written tool. Identify the client by client_id or client_phone."
       }
     },
     {
