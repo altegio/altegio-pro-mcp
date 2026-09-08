@@ -117,8 +117,17 @@ const dailyPoints = {
   type: 'array' as const,
   description: 'One [date, value] pair per day, ascending.',
   items: {
+    // A fixed [date, value] 2-tuple. Under JSON Schema 2020-12 (the dialect
+    // MCP tool result schemas are validated against) positional tuples use
+    // `prefixItems`; the draft-2019 form `items: [ … ]` makes `items` an
+    // array, which fails the 2020-12 meta-schema and gets the whole tool
+    // result rejected by strict clients. `items: false` forbids extra
+    // elements so the pair stays exactly [string, number].
     type: 'array' as const,
-    items: [{ type: 'string' as const }, { type: 'number' as const }],
+    prefixItems: [{ type: 'string' as const }, { type: 'number' as const }],
+    items: false as const,
+    minItems: 2,
+    maxItems: 2,
   },
 };
 
