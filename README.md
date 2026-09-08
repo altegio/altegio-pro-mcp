@@ -407,6 +407,17 @@ for that request.
 > **After a deploy, HTTP callers must run `altegio_login` once more.** Tokens are
 > stored on the container's ephemeral filesystem, so a redeploy clears them.
 
+- **HTTP with a direct token — many clients, no login.** A caller that already
+  holds a client's Altegio user token (e.g. a marketplace app's technical-user
+  token) can send it per request in the **`X-Altegio-User-Token`** header. When
+  present it is used as the `User <token>` part of the upstream `Authorization`
+  header directly, taking precedence over any stored/identity token — so one
+  long-lived deployment can act for many different Altegio clients by sending a
+  different token per request, with **no `altegio_login` and no delegated Google
+  identity**. Nothing is persisted for these requests, and this path is honored
+  even when `REQUIRE_DELEGATED_IDENTITY=true` (the token itself is the
+  authorization). The token never appears in logs or tool responses.
+
 ## Development
 
 ```bash

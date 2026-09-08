@@ -1,8 +1,11 @@
 import { describe, it, expect } from '@jest/globals';
 import {
   parseIdentityHeaders,
+  parseUserToken,
   runWithIdentity,
+  runWithContext,
   getRequestIdentity,
+  getRequestUserToken,
   identityKey,
   type RequestIdentity,
 } from '../request-context.js';
@@ -161,6 +164,61 @@ describe('request-context', () => {
         machineName: 'smoke-probe',
       });
       expect(new Set([a, b, machine]).size).toBe(3);
+    });
+  });
+
+  describe('parseUserToken', () => {
+    it('reads the X-Altegio-User-Token header', () => {
+      expect(
+        parseUserToken({ 'x-altegio-user-token': 'client-token-123' })
+      ).toBe('client-token-123');
+    });
+
+    it('is case-insensitive and trims whitespace', () => {
+      expect(parseUserToken({ 'X-Altegio-User-Token': '  tok  ' })).toBe('tok');
+    });
+
+    it('tolerates array header values', () => {
+      expect(
+        parseUserToken({ 'x-altegio-user-token': ['first', 'second'] })
+      ).toBe('first');
+    });
+
+    it('returns undefined when absent or blank', () => {
+      expect(parseUserToken({})).toBeUndefined();
+      expect(parseUserToken({ 'x-altegio-user-token': '   ' })).toBeUndefined();
+    });
+  });
+
+  describe('runWithContext / getRequestUserToken', () => {
+    it('returns undefined outside any request context (stdio)', () => {
+      expect(getRequestUserToken()).toBeUndefined();
+    });
+
+    it('exposes both the identity and the direct token', () => {
+      const identity: RequestIdentity = { kind: 'user', email: 'x@y.com' };
+      const seen = runWithContext({ identity, userToken: 'tok' }, () => ({
+        id: getRequestIdentity(),
+        token: getRequestUserToken(),
+      }));
+      expect(seen.id).toBe(identity);
+      expect(seen.token).toBe('tok');
+    });
+
+    it('carries a direct token even with an anonymous identity', () => {
+      const seen = runWithContext({ identity: null, userToken: 'tok' }, () => ({
+        id: getRequestIdentity(),
+        token: getRequestUserToken(),
+      }));
+      expect(seen.id).toBeNull();
+      expect(seen.token).toBe('tok');
+    });
+
+    it('runWithIdentity binds no direct token', () => {
+      const token = runWithIdentity({ kind: 'user', email: 'x@y.com' }, () =>
+        getRequestUserToken()
+      );
+      expect(token).toBeUndefined();
     });
   });
 });
