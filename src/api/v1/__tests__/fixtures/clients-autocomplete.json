@@ -1,4 +1,20 @@
 [
-  { "id": 16, "fullname": "James Smith", "surname": "Smith", "patronymic": "A", "phone": "13155550178", "email": "", "discount": 10 },
-  { "id": 21, "fullname": "James Brown", "surname": "Brown", "patronymic": "", "phone": "13155550190", "email": "", "discount": 0 }
+  {
+    "id": 16,
+    "fullname": "James Smith",
+    "surname": "Smith",
+    "patronymic": "A",
+    "phone": "13155550178",
+    "email": "",
+    "discount": 10
+  },
+  {
+    "id": 21,
+    "fullname": "James Brown",
+    "surname": "Brown",
+    "patronymic": "",
+    "phone": "13155550190",
+    "email": "",
+    "discount": 0
+  }
 ]

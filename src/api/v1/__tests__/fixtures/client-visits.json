@@ -8,7 +8,12 @@
         "visit_id": 0,
         "record_id": 0,
         "goods": [
-          { "title": "Shampoo", "cost_to_pay": 500, "paid_sum": 500, "payment_status": "paid_full" }
+          {
+            "title": "Shampoo",
+            "cost_to_pay": 500,
+            "paid_sum": 500,
+            "payment_status": "paid_full"
+          }
         ],
         "staff": { "id": 1, "name": "James Smith" }
       }
@@ -20,7 +25,12 @@
         "visit_id": 123,
         "attendance": 1,
         "services": [
-          { "title": "Haircut", "cost_to_pay": 1000, "paid_sum": 600, "payment_status": "paid_not_full" }
+          {
+            "title": "Haircut",
+            "cost_to_pay": 1000,
+            "paid_sum": 600,
+            "payment_status": "paid_not_full"
+          }
         ],
         "staff": { "id": 1, "name": "James Smith" }
       }
