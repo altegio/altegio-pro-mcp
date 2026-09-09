@@ -10,7 +10,11 @@ import * as path from 'path';
 import type { AltegioClient } from '../../../providers/altegio-client.js';
 import * as definitions from '../../../tools/definitions/index.js';
 import type { DefinedTool } from '../../../tools/factory.js';
-import { clearTimezoneCache } from '../location-timezone.js';
+import {
+  clearTimezoneCache,
+  resolveLocationTimezone,
+} from '../location-timezone.js';
+import { runWithContext } from '../../../request-context.js';
 import {
   clearReportStore,
   getReportCsv,
@@ -115,6 +119,34 @@ beforeEach(() => {
 });
 afterEach(() => {
   jest.useRealTimers();
+});
+
+describe('company-scope enforcement (analytics early gate)', () => {
+  it('rejects analytics for a location outside the declared set', async () => {
+    const { client } = fakeClient([]);
+    await expect(
+      runWithContext({ identity: null, companyIds: new Set([4564]) }, () =>
+        resolveLocationTimezone(client, 720441)
+      )
+    ).rejects.toThrow(/company 720441 is not in scope/);
+  });
+
+  it('allows a location inside the declared set through', async () => {
+    const { client } = fakeClient([]);
+    const tz = await runWithContext(
+      { identity: null, companyIds: new Set([4564, 720441]) },
+      () => resolveLocationTimezone(client, 4564)
+    );
+    expect(tz).toBe('Europe/Berlin');
+  });
+
+  it('is unaffected when no scope is declared', async () => {
+    const { client } = fakeClient([]);
+    // No set ⇒ no guard; 720441 is not in the fake location list, so it falls
+    // back to UTC rather than throwing (which is what an out-of-scope id does).
+    const tz = await resolveLocationTimezone(client, 720441);
+    expect(tz).toBe('UTC');
+  });
 });
 
 describe('analytics_get_overview', () => {

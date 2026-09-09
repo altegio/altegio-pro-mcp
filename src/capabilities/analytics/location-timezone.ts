@@ -14,6 +14,7 @@
  * `date_from`/`date_to` input never depends on this.
  */
 import type { AltegioClient } from '../../providers/altegio-client.js';
+import { assertCompanyAllowed } from '../../request-context.js';
 import { isValidTimezone } from './periods.js';
 
 /** How long a resolved timezone is trusted; locations move zone very rarely. */
@@ -32,6 +33,12 @@ export async function resolveLocationTimezone(
   locationId: number,
   now: number = Date.now()
 ): Promise<string> {
+  // Every location-scoped analytics use-case resolves a timezone first, so this
+  // is the earliest, clearest place to reject a location outside the declared
+  // company scope — before any network round-trip. `apiRequest` enforces the
+  // same scope as a backstop for any path that does not pass through here.
+  assertCompanyAllowed(locationId);
+
   const cached = cache.get(locationId);
   if (cached && cached.expires_at > now) return cached.timezone;
 

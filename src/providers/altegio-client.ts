@@ -21,11 +21,41 @@ import type {
 import { CredentialManager } from './credential-manager.js';
 import { AuthenticationError, AltegioApiError } from '../utils/errors.js';
 import {
+  assertCompanyAllowed,
   getRequestIdentity,
+  getRequestPartnerToken,
   getRequestUserToken,
   identityKey,
+  isCompanyAllowed,
   type RequestIdentity,
 } from '../request-context.js';
+
+/**
+ * The company (location) ID an Altegio request path targets, if any.
+ *
+ * Every location-scoped endpoint in this API carries the company/location ID as
+ * the FIRST purely-numeric path segment, whatever the resource is named:
+ * `/records/{id}`, `/staff/{id}/{staffId}`, `/company/{id}/analytics/…`,
+ * `/client/{id}/{clientId}`, even the v2 `/../v2/locations/{id}/clients/{cid}/…`
+ * bridge — the location ID always comes before any other id in the path. The
+ * only company-less paths are `/companies` (the list, filtered separately) and
+ * `/auth` (login), which carry no numeric segment and so return `undefined`.
+ *
+ * This is what lets `apiRequest` confine EVERY request — curated CRUD tools, the
+ * analytics and clients ports, and the universal executor all funnel through it
+ * — to the declared company scope from one place. The query string is dropped
+ * first so a numeric query value (e.g. `page=2`) is never mistaken for the id.
+ */
+function companyIdFromPath(endpoint: string): number | undefined {
+  const path = endpoint.split('?')[0] ?? endpoint;
+  for (const segment of path.split('/')) {
+    if (/^\d+$/.test(segment)) {
+      const id = Number(segment);
+      if (Number.isInteger(id) && id > 0) return id;
+    }
+  }
+  return undefined;
+}
 
 export interface AltegioClientOptions {
   /**
@@ -130,8 +160,21 @@ export class AltegioClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<Response> {
+    // Confine the request to the caller's declared company scope, if any. This
+    // is the one choke point every upstream call funnels through — curated
+    // tools, the analytics/clients ports, and the executor — so an out-of-scope
+    // company is rejected here regardless of which tool asked (a no-op when no
+    // scope was declared).
+    const targetCompany = companyIdFromPath(endpoint);
+    if (targetCompany !== undefined) {
+      assertCompanyAllowed(targetCompany);
+    }
+
+    // UC2 (application agent) supplies its own partner token per request; UC1
+    // (human via a generic agent) signs with the server's own partner token.
+    const partnerToken = getRequestPartnerToken() ?? this.partnerToken;
     const userToken = this.resolveUserToken();
-    const authParts = [`Bearer ${this.partnerToken}`];
+    const authParts = [`Bearer ${partnerToken}`];
     if (userToken) {
       authParts.push(`User ${userToken}`);
     }
@@ -338,7 +381,15 @@ export class AltegioClient {
       : '';
     const response = await this.apiRequest(`/companies${queryParams}`);
 
-    return this.handleResponse<AltegioCompany[]>(response, 'fetch locations');
+    const locations = await this.handleResponse<AltegioCompany[]>(
+      response,
+      'fetch locations'
+    );
+    // Confine `list_locations` to the declared company scope: a request scoped
+    // via `X-Altegio-Company-Id` only ever sees its own locations, so a shared
+    // user token cannot enumerate the other salons it happens to reach. Unscoped
+    // requests see everything (no-op).
+    return locations.filter((location) => isCompanyAllowed(location.id));
   }
 
   async getBookings(
