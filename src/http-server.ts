@@ -8,7 +8,9 @@ import { createServer } from './server.js';
 import { DEFAULT_FACET, FACET_NAMES, type FacetKey } from './tools/facets.js';
 import { createLogger } from './utils/logger.js';
 import {
+  parseCompanyIds,
   parseIdentityHeaders,
+  parsePartnerToken,
   parseUserToken,
   runWithContext,
 } from './request-context.js';
@@ -66,6 +68,8 @@ export function createApp(): {
       const sessionId = req.headers['mcp-session-id'] as string | undefined;
       const identity = parseIdentityHeaders(req.headers);
       const userToken = parseUserToken(req.headers);
+      const partnerToken = parsePartnerToken(req.headers);
+      const companyIds = parseCompanyIds(req.headers);
 
       try {
         let transport: StreamableHTTPServerTransport;
@@ -93,8 +97,9 @@ export function createApp(): {
 
           const server = createServer({ facet });
           await server.connect(transport);
-          await runWithContext({ identity, userToken }, () =>
-            transport.handleRequest(req, res, req.body)
+          await runWithContext(
+            { identity, userToken, partnerToken, companyIds },
+            () => transport.handleRequest(req, res, req.body)
           );
           return;
         } else {
@@ -109,8 +114,9 @@ export function createApp(): {
           return;
         }
 
-        await runWithContext({ identity, userToken }, () =>
-          transport.handleRequest(req, res, req.body)
+        await runWithContext(
+          { identity, userToken, partnerToken, companyIds },
+          () => transport.handleRequest(req, res, req.body)
         );
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : String(error);
@@ -140,6 +146,8 @@ export function createApp(): {
           {
             identity: parseIdentityHeaders(req.headers),
             userToken: parseUserToken(req.headers),
+            partnerToken: parsePartnerToken(req.headers),
+            companyIds: parseCompanyIds(req.headers),
           },
           () => transport.handleRequest(req, res)
         );
@@ -167,6 +175,8 @@ export function createApp(): {
           {
             identity: parseIdentityHeaders(req.headers),
             userToken: parseUserToken(req.headers),
+            partnerToken: parsePartnerToken(req.headers),
+            companyIds: parseCompanyIds(req.headers),
           },
           () => transport.handleRequest(req, res)
         );

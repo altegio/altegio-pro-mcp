@@ -2,10 +2,16 @@ import { describe, it, expect } from '@jest/globals';
 import {
   parseIdentityHeaders,
   parseUserToken,
+  parsePartnerToken,
+  parseCompanyIds,
   runWithIdentity,
   runWithContext,
   getRequestIdentity,
   getRequestUserToken,
+  getRequestPartnerToken,
+  getRequestCompanyIds,
+  isCompanyAllowed,
+  assertCompanyAllowed,
   identityKey,
   type RequestIdentity,
 } from '../request-context.js';
@@ -219,6 +225,178 @@ describe('request-context', () => {
         getRequestUserToken()
       );
       expect(token).toBeUndefined();
+    });
+  });
+
+  describe('parsePartnerToken (UC2 fork selector)', () => {
+    it('reads the X-Altegio-Partner-Token header', () => {
+      expect(
+        parsePartnerToken({ 'x-altegio-partner-token': 'partner-abc' })
+      ).toBe('partner-abc');
+    });
+
+    it('is case-insensitive and trims whitespace', () => {
+      expect(parsePartnerToken({ 'X-Altegio-Partner-Token': '  ptk  ' })).toBe(
+        'ptk'
+      );
+    });
+
+    it('returns undefined when absent or blank (stays on the UC1 path)', () => {
+      expect(parsePartnerToken({})).toBeUndefined();
+      expect(
+        parsePartnerToken({ 'x-altegio-partner-token': '   ' })
+      ).toBeUndefined();
+    });
+  });
+
+  describe('parseCompanyIds (declared scope)', () => {
+    it('reads a single positive integer', () => {
+      expect([
+        ...(parseCompanyIds({ 'x-altegio-company-id': '4564' }) ?? []),
+      ]).toEqual([4564]);
+    });
+
+    it('reads a comma-separated set', () => {
+      const set = parseCompanyIds({
+        'x-altegio-company-id': '4564, 720441 ,5',
+      });
+      expect(set && [...set].sort((a, b) => a - b)).toEqual([5, 4564, 720441]);
+    });
+
+    it('reads a repeated header presented as an array', () => {
+      const set = parseCompanyIds({
+        'x-altegio-company-id': ['4564', '720441'],
+      });
+      expect(set && [...set].sort((a, b) => a - b)).toEqual([4564, 720441]);
+    });
+
+    it('combines repeated headers and comma-separated values, de-duplicating', () => {
+      const set = parseCompanyIds({
+        'x-altegio-company-id': ['4564,720441', '720441, 5'],
+      });
+      expect(set && [...set].sort((a, b) => a - b)).toEqual([5, 4564, 720441]);
+    });
+
+    it('is case-insensitive', () => {
+      expect([
+        ...(parseCompanyIds({ 'X-Altegio-Company-Id': '4564' }) ?? []),
+      ]).toEqual([4564]);
+    });
+
+    it('ignores non-integer fragments but keeps valid ones', () => {
+      const set = parseCompanyIds({
+        'x-altegio-company-id': '4564, abc, 0, -5, 4.5, 720441',
+      });
+      expect(set && [...set].sort((a, b) => a - b)).toEqual([4564, 720441]);
+    });
+
+    it('returns undefined when absent, blank, or wholly invalid', () => {
+      expect(parseCompanyIds({})).toBeUndefined();
+      expect(parseCompanyIds({ 'x-altegio-company-id': '  ' })).toBeUndefined();
+      expect(
+        parseCompanyIds({ 'x-altegio-company-id': 'abc, 0, -1' })
+      ).toBeUndefined();
+    });
+  });
+
+  describe('getRequestPartnerToken', () => {
+    it('returns undefined outside any request context (stdio)', () => {
+      expect(getRequestPartnerToken()).toBeUndefined();
+    });
+
+    it('exposes the per-request partner token inside the context', () => {
+      const seen = runWithContext(
+        { identity: null, partnerToken: 'ptk', userToken: 'utk' },
+        () => getRequestPartnerToken()
+      );
+      expect(seen).toBe('ptk');
+    });
+
+    it('is undefined on a UC1 request (no partner header)', () => {
+      const seen = runWithContext({ identity: null, userToken: 'utk' }, () =>
+        getRequestPartnerToken()
+      );
+      expect(seen).toBeUndefined();
+    });
+  });
+
+  describe('getRequestCompanyIds', () => {
+    it('returns undefined outside any request context', () => {
+      expect(getRequestCompanyIds()).toBeUndefined();
+    });
+
+    it('exposes the declared scope inside the context', () => {
+      const seen = runWithContext(
+        { identity: null, companyIds: new Set([4564, 720441]) },
+        () => getRequestCompanyIds()
+      );
+      expect(seen && [...seen].sort((a, b) => a - b)).toEqual([4564, 720441]);
+    });
+
+    it('is undefined when no scope was declared', () => {
+      const seen = runWithContext({ identity: null, userToken: 'tok' }, () =>
+        getRequestCompanyIds()
+      );
+      expect(seen).toBeUndefined();
+    });
+  });
+
+  describe('isCompanyAllowed', () => {
+    it('allows any company when no scope is declared', () => {
+      expect(isCompanyAllowed(999)).toBe(true);
+      expect(
+        runWithContext({ identity: null }, () => isCompanyAllowed(999))
+      ).toBe(true);
+    });
+
+    it('allows only companies in the declared set', () => {
+      runWithContext(
+        { identity: null, companyIds: new Set([4564, 720441]) },
+        () => {
+          expect(isCompanyAllowed(4564)).toBe(true);
+          expect(isCompanyAllowed(720441)).toBe(true);
+          expect(isCompanyAllowed(5)).toBe(false);
+        }
+      );
+    });
+  });
+
+  describe('assertCompanyAllowed', () => {
+    it('is a no-op with no request context (stdio) or no declared scope', () => {
+      expect(() => assertCompanyAllowed(999)).not.toThrow();
+      expect(() =>
+        runWithContext({ identity: null }, () => assertCompanyAllowed(999))
+      ).not.toThrow();
+    });
+
+    it('allows every company in a single-element scope', () => {
+      expect(() =>
+        runWithContext({ identity: null, companyIds: new Set([4564]) }, () =>
+          assertCompanyAllowed(4564)
+        )
+      ).not.toThrow();
+    });
+
+    it('allows every company in a multi-element scope', () => {
+      runWithContext(
+        { identity: null, companyIds: new Set([4564, 720441, 5]) },
+        () => {
+          expect(() => assertCompanyAllowed(4564)).not.toThrow();
+          expect(() => assertCompanyAllowed(720441)).not.toThrow();
+          expect(() => assertCompanyAllowed(5)).not.toThrow();
+        }
+      );
+    });
+
+    it('rejects only the companies outside the scope (403)', () => {
+      runWithContext(
+        { identity: null, companyIds: new Set([4564, 720441]) },
+        () => {
+          expect(() => assertCompanyAllowed(999)).toThrow(/not in scope/);
+          // The message lists the declared set so the caller can see the scope.
+          expect(() => assertCompanyAllowed(999)).toThrow(/4564, 720441/);
+        }
+      );
     });
   });
 });

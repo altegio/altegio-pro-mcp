@@ -136,6 +136,15 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 
 ### Change history
 
+**Two-fork, per-request authentication (2026-09-09)**
+- **The Pro MCP now serves two B2B use cases, chosen per request by the presence of `X-Altegio-*` headers:**
+  - **UC1 — human via a generic agent (no `X-Altegio-*` headers):** unchanged. The server signs upstream calls with its OWN partner token (`ALTEGIO_API_TOKEN`); the caller reaches Altegio through `altegio_login` (email + password → user token, stored per identity).
+  - **UC2 — application agent (`X-Altegio-Partner-Token` present):** the caller sends its own partner token + `X-Altegio-User-Token` per request. The upstream credential is `Authorization: Bearer <per-request partner>, User <per-request user>` — the server partner token is never used for these calls.
+- **Fork selector:** `X-Altegio-Partner-Token` present → UC2; absent → UC1 (`getRequestPartnerToken() ?? this.partnerToken` in `apiRequest`).
+- **Declared company-ID set (`X-Altegio-Company-Id`):** optional scope, supporting MULTIPLE IDs (repeated header and/or comma-separated). Trusted exactly as declared — the MCP does not validate/compute/resolve which companies belong to the caller. `list_locations` is filtered to the set; any request targeting a company outside the set is refused with a 403 (only that ID). Enforced centrally in `AltegioClient.apiRequest` (the one choke point every CRUD tool, the analytics/clients ports, and the executor funnel through) by extracting the location ID as the first numeric path segment, plus an early gate in `resolveLocationTimezone`.
+- **Supersedes PR #34 (`feat/company-id-scope`):** generalizes its single-company pin (`companyId?: number`, `assertCompanyAllowed`, single `list_locations` filter) to a set (`companyIds?: ReadonlySet<number>`).
+- **Files:** `src/request-context.ts` (`parsePartnerToken`, `parseCompanyIds`, `getRequestPartnerToken`, `getRequestCompanyIds`, `isCompanyAllowed`, `assertCompanyAllowed`), `src/providers/altegio-client.ts` (per-request partner + central scope guard + `list_locations` filter), `src/http-server.ts` (parse + thread both headers on every route), `src/capabilities/analytics/location-timezone.ts` (early scope gate). Tests in `request-context.test.ts`, `altegio-client.test.ts`, analytics `use-cases.test.ts`.
+
 **Clients pack — client-base analytics (2026-09-08)**
 - **Added 4 tools (59 → 63):** `clients_search` (POST `/company/{id}/clients/search`), `clients_get_card` (GET `/client/{id}/{id}`), `clients_get_visit_history` (POST `/company/{id}/clients/visits/search`), `clients_lookup` (undocumented GET `/company/{id}/clients/autocomplete`)
 - **Why:** the client base was reachable only through the read-only executor, which refuses POST — so the segmentation search and the visit-history search were unusable. This unblocks client-base analytics.

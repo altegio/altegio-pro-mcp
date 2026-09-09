@@ -1073,4 +1073,181 @@ describe('AltegioClient', () => {
       ).toBe(true);
     });
   });
+
+  // Two-fork, per-request authentication:
+  //  - UC1 (human via a generic agent): no X-Altegio-* headers → the server's
+  //    own partner token signs upstream calls.
+  //  - UC2 (application agent): X-Altegio-Partner-Token present → the caller's
+  //    per-request partner token signs upstream calls, alongside its user token.
+  // Plus the declared company-ID set (X-Altegio-Company-Id) confines every op.
+  describe('two-fork auth + company scope', () => {
+    const mockOnce = (body: unknown, ok = true): void => {
+      (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+        ok,
+        json: async () => body,
+      } as Response);
+    };
+
+    describe('UC2 — per-request partner token', () => {
+      it('signs upstream with the per-request partner + user token', async () => {
+        mockOnce({ success: true, data: [] });
+        await runWithContext(
+          {
+            identity: null,
+            partnerToken: 'request-partner',
+            userToken: 'request-user',
+          },
+          () => client.getCompanies()
+        );
+        expect(fetch).toHaveBeenLastCalledWith(
+          'https://api.alteg.io/api/v1/companies',
+          {
+            headers: {
+              Accept: 'application/vnd.api.v2+json',
+              // The caller's partner token, NOT the server's test-partner-token.
+              Authorization: 'Bearer request-partner, User request-user',
+            },
+          }
+        );
+      });
+
+      it('per-request partner overrides the server partner for a scoped op', async () => {
+        mockOnce({ success: true, data: [] });
+        await runWithContext(
+          {
+            identity: null,
+            partnerToken: 'request-partner',
+            userToken: 'request-user',
+            companyIds: new Set([4564]),
+          },
+          () => client.getStaff(4564)
+        );
+        expect(fetch).toHaveBeenLastCalledWith(
+          'https://api.alteg.io/api/v1/staff/4564',
+          {
+            headers: {
+              Accept: 'application/vnd.api.v2+json',
+              Authorization: 'Bearer request-partner, User request-user',
+            },
+          }
+        );
+      });
+    });
+
+    describe('UC1 — server partner token', () => {
+      it('signs upstream with the server partner when no partner header', async () => {
+        mockOnce({ success: true, data: [] });
+        await runWithContext(
+          { identity: null, userToken: 'client-token' },
+          () => client.getCompanies()
+        );
+        expect(fetch).toHaveBeenLastCalledWith(
+          'https://api.alteg.io/api/v1/companies',
+          {
+            headers: {
+              Accept: 'application/vnd.api.v2+json',
+              // The server's own partner token (from mockConfig).
+              Authorization: 'Bearer test-partner-token, User client-token',
+            },
+          }
+        );
+      });
+    });
+
+    describe('declared company-ID set confinement', () => {
+      it('list_locations returns only IDs in the declared set (multi)', async () => {
+        mockOnce({
+          success: true,
+          data: [
+            { id: 4564, title: 'Demo Location' },
+            { id: 720441, title: 'Altegio CIS' },
+            { id: 999, title: 'Someone Else' },
+          ],
+        });
+        const companies = await runWithContext(
+          {
+            identity: null,
+            userToken: 'shared-token',
+            companyIds: new Set([4564, 720441]),
+          },
+          () => client.getCompanies({ my: 1 })
+        );
+        // 999 is reachable by the shared token but not in scope — dropped.
+        expect(companies).toEqual([
+          { id: 4564, title: 'Demo Location' },
+          { id: 720441, title: 'Altegio CIS' },
+        ]);
+      });
+
+      it('list_locations returns all locations when no set is declared', async () => {
+        const all = [{ id: 4564 }, { id: 720441 }, { id: 999 }];
+        mockOnce({ success: true, data: all });
+        const companies = await runWithContext(
+          { identity: null, userToken: 'shared-token' },
+          () => client.getCompanies({ my: 1 })
+        );
+        expect(companies).toEqual(all);
+      });
+
+      it('allows a tool call targeting a company inside the set', async () => {
+        mockOnce({ success: true, data: [] });
+        const staff = await runWithContext(
+          {
+            identity: null,
+            userToken: 'shared-token',
+            companyIds: new Set([4564, 720441]),
+          },
+          () => client.getStaff(720441)
+        );
+        expect(staff).toEqual([]);
+        expect(fetch).toHaveBeenLastCalledWith(
+          'https://api.alteg.io/api/v1/staff/720441',
+          expect.anything()
+        );
+      });
+
+      it('refuses a tool call targeting a company outside the set (rejects only that ID)', async () => {
+        await expect(
+          runWithContext(
+            {
+              identity: null,
+              userToken: 'shared-token',
+              companyIds: new Set([4564, 720441]),
+            },
+            () => client.getBookings(999)
+          )
+        ).rejects.toThrow(/not in scope/);
+        // The out-of-scope request never reaches the upstream API.
+        expect(fetch).not.toHaveBeenCalled();
+      });
+
+      it('confines the universal executor path the same way', async () => {
+        // /records/{id} built for an out-of-scope company is rejected before fetch.
+        await expect(
+          runWithContext(
+            {
+              identity: null,
+              userToken: 'shared-token',
+              companyIds: new Set([4564]),
+            },
+            () => client.request('GET', '/records/720441', { page: 2 })
+          )
+        ).rejects.toThrow(/company 720441 is not in scope/);
+        expect(fetch).not.toHaveBeenCalled();
+      });
+
+      it('applies no confinement without a declared set (stdio / UC1)', async () => {
+        mockOnce({ success: true, data: [] });
+        const staff = await runWithContext(
+          { identity: null, userToken: 'shared-token' },
+          () => client.getStaff(999)
+        );
+        expect(staff).toEqual([]);
+        expect(fetch).toHaveBeenLastCalledWith(
+          'https://api.alteg.io/api/v1/staff/999',
+          expect.anything()
+        );
+      });
+    });
+  });
 });

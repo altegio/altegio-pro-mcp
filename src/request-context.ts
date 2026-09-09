@@ -15,6 +15,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import crypto from 'node:crypto';
 import { createLogger } from './utils/logger.js';
+import { AltegioApiError } from './utils/errors.js';
 
 const logger = createLogger('request-context');
 
@@ -42,6 +43,33 @@ function headerValue(headers: HeaderBag, name: string): string | undefined {
     }
   }
   return undefined;
+}
+
+/**
+ * Case-insensitive multi-value header lookup — every value sent under `name`.
+ *
+ * A header can arrive more than once: Node folds most repeated request headers
+ * into one comma-joined string, but a proxy or a test may still present them as
+ * an array. This returns each raw value so a caller can parse a *set* (see
+ * `parseCompanyIds`), where `headerValue`'s "first value only" would silently
+ * drop the rest.
+ */
+function headerValues(headers: HeaderBag, name: string): string[] {
+  const target = name.toLowerCase();
+  const values: string[] = [];
+  for (const key of Object.keys(headers)) {
+    if (key.toLowerCase() === target) {
+      const value = headers[key];
+      if (Array.isArray(value)) {
+        for (const entry of value) {
+          if (typeof entry === 'string') values.push(entry);
+        }
+      } else if (typeof value === 'string') {
+        values.push(value);
+      }
+    }
+  }
+  return values;
 }
 
 /**
@@ -108,17 +136,98 @@ export function parseUserToken(headers: HeaderBag): string | undefined {
   return value ? value : undefined;
 }
 
+/** Header carrying a per-request Altegio partner token (UC2). */
+const PARTNER_TOKEN_HEADER = 'x-altegio-partner-token';
+
+/**
+ * Extract a per-request Altegio partner token from the request headers.
+ *
+ * This header is the fork selector between the server's two authentication use
+ * cases:
+ *
+ *  - **UC1 — human via a generic agent (header ABSENT):** the server signs
+ *    upstream calls with its OWN partner token (`ALTEGIO_API_TOKEN`) and the
+ *    caller reaches Altegio through `altegio_login` (email + password → user
+ *    token).
+ *  - **UC2 — application agent (header PRESENT):** the caller is itself an
+ *    Altegio application and sends its own partner token per request, alongside
+ *    `X-Altegio-User-Token`. The upstream credential is built from the
+ *    per-request partner token, never the server's.
+ *
+ * Returns `undefined` when the header is absent or blank — which keeps the
+ * request on the UC1 path.
+ */
+export function parsePartnerToken(headers: HeaderBag): string | undefined {
+  const value = headerValue(headers, PARTNER_TOKEN_HEADER)?.trim();
+  return value ? value : undefined;
+}
+
+/** Header declaring the set of company (location) IDs a request may touch. */
+const COMPANY_ID_HEADER = 'x-altegio-company-id';
+
+/**
+ * Extract the declared company (location) scope from the request headers.
+ *
+ * A caller confines a request to a set of companies by sending
+ * `X-Altegio-Company-Id`. Multiple IDs are supported two ways, and may be
+ * combined:
+ *   - the header repeated (`X-Altegio-Company-Id: 1` then `: 2`), and/or
+ *   - a comma-separated value (`X-Altegio-Company-Id: 1,2,3`).
+ *
+ * The set is trusted exactly as declared: the server does not validate,
+ * compute, or resolve which companies belong to the caller — deciding that is
+ * the caller's responsibility. Every operation is then confined to this set
+ * (`assertCompanyAllowed`, and the `list_locations` filter).
+ *
+ * Returns `undefined` when the header is absent or carries no positive integer,
+ * meaning "no scope declared" — no confinement is applied (today's behaviour for
+ * every other caller). Non-integer fragments are ignored and logged; a bad
+ * fragment never silently widens scope. When at least one valid ID is present,
+ * a set of exactly the valid IDs is returned.
+ */
+export function parseCompanyIds(
+  headers: HeaderBag
+): ReadonlySet<number> | undefined {
+  const raw = headerValues(headers, COMPANY_ID_HEADER);
+  if (raw.length === 0) {
+    return undefined;
+  }
+
+  const ids = new Set<number>();
+  for (const fragment of raw.flatMap((value) => value.split(','))) {
+    const trimmed = fragment.trim();
+    if (trimmed === '') continue;
+    const id = Number(trimmed);
+    if (!Number.isInteger(id) || id <= 0) {
+      logger.warn(
+        { fragment: trimmed },
+        'Ignoring non-integer X-Altegio-Company-Id fragment'
+      );
+      continue;
+    }
+    ids.add(id);
+  }
+
+  return ids.size > 0 ? ids : undefined;
+}
+
 /**
  * Everything bound to a single request's async context.
  *
  * `identity` is the proxy-verified caller (`null` when anonymous). `userToken`
  * is an Altegio user token supplied directly on the request
  * (`X-Altegio-User-Token`); when present it takes precedence over identity- and
- * file-scoped tokens (see `AltegioClient.resolveUserToken`).
+ * file-scoped tokens (see `AltegioClient.resolveUserToken`). `partnerToken` is a
+ * per-request Altegio partner token (`X-Altegio-Partner-Token`, UC2); when
+ * present it replaces the server's own partner token when signing upstream
+ * calls. `companyIds` is the declared company (location) scope
+ * (`X-Altegio-Company-Id`); when present every operation is confined to it.
  */
 export interface RequestContext {
   identity: RequestIdentity | null;
   userToken?: string;
+  partnerToken?: string;
+  companyIds?: ReadonlySet<number>;
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();
@@ -159,6 +268,60 @@ export function getRequestIdentity(): RequestIdentity | null | undefined {
  */
 export function getRequestUserToken(): string | undefined {
   return storage.getStore()?.userToken;
+}
+
+/**
+ * The per-request Altegio partner token (`X-Altegio-Partner-Token`, UC2), if
+ * any. `undefined` outside a request context or when the header was absent —
+ * in which case the server signs upstream calls with its own partner token
+ * (UC1).
+ */
+export function getRequestPartnerToken(): string | undefined {
+  return storage.getStore()?.partnerToken;
+}
+
+/**
+ * The declared company (location) scope for this request, if any. `undefined`
+ * outside a request context or when no `X-Altegio-Company-Id` header was sent —
+ * in which case no company confinement is applied (today's behaviour for every
+ * other caller).
+ */
+export function getRequestCompanyIds(): ReadonlySet<number> | undefined {
+  return storage.getStore()?.companyIds;
+}
+
+/**
+ * Whether `companyId` is reachable under the current request's declared scope.
+ *
+ * `true` when no scope is declared (stdio, or a request without the header), so
+ * every existing caller is unaffected; otherwise `true` only for a company in
+ * the declared set. Used to filter `list_locations` down to the allowed set.
+ */
+export function isCompanyAllowed(companyId: number): boolean {
+  const scope = getRequestCompanyIds();
+  return scope === undefined || scope.has(companyId);
+}
+
+/**
+ * Enforce the current request's declared company (location) scope.
+ *
+ * When a request declares a scope via `X-Altegio-Company-Id`, acting on any
+ * company OUTSIDE that set is rejected with a 403 — and only that company:
+ * every ID in the set is allowed. Unscoped requests (no header, or stdio) are a
+ * no-op, so every existing caller is unaffected. This is the single guard every
+ * upstream request passes through (`AltegioClient.apiRequest`), so a new tool is
+ * confined without having to remember to add a check.
+ */
+export function assertCompanyAllowed(companyId: number): void {
+  const scope = getRequestCompanyIds();
+  if (scope !== undefined && !scope.has(companyId)) {
+    const allowed = [...scope].sort((a, b) => a - b).join(', ');
+    throw new AltegioApiError(
+      `This request is scoped to compan${scope.size === 1 ? 'y' : 'ies'} ` +
+        `${allowed}; company ${companyId} is not in scope.`,
+      403
+    );
+  }
 }
 
 /**
