@@ -4,10 +4,11 @@
  * appointments — the chain behind PRIORITY 1–3 of the schedules/appointments fix.
  *
  * Skipped unless `ALTEGIO_E2E=1`. Needs a partner token in
- * `ALTEGIO_PARTNER_TOKEN` (or `ALTEGIO_LIVE_API_TOKEN`) and demo credentials in
- * `ALTEGIO_TEST_LOGIN` / `ALTEGIO_TEST_PASSWORD` — from the environment, never a
- * file in this public repo. Runs against the Demo Location (4564), where content
- * writes are permitted, and cleans up everything it creates.
+ * `ALTEGIO_API_TOKEN` (or one of its live-test aliases) plus either an existing
+ * `ALTEGIO_USER_TOKEN` or demo credentials in `ALTEGIO_TEST_LOGIN` /
+ * `ALTEGIO_TEST_PASSWORD` — from the environment, never a file in this public
+ * repo. Runs against the Demo Location (4564), where content writes are
+ * permitted, and cleans up everything it creates.
  *
  *   ALTEGIO_E2E=1 CREDENTIALS_DIR=/tmp/altegio-mcp-live \
  *     ALTEGIO_PARTNER_TOKEN=… ALTEGIO_TEST_LOGIN=… ALTEGIO_TEST_PASSWORD=… \
@@ -34,16 +35,19 @@ describeLive('appointments end-to-end against the demo location', () => {
   beforeAll(async () => {
     const login = process.env.ALTEGIO_TEST_LOGIN;
     const password = process.env.ALTEGIO_TEST_PASSWORD;
+    const userToken = process.env.ALTEGIO_USER_TOKEN;
     const partnerToken =
-      process.env.ALTEGIO_PARTNER_TOKEN ?? process.env.ALTEGIO_LIVE_API_TOKEN;
-    if (!login || !password || !partnerToken) {
+      process.env.ALTEGIO_API_TOKEN ??
+      process.env.ALTEGIO_PARTNER_TOKEN ??
+      process.env.ALTEGIO_LIVE_API_TOKEN;
+    if (!partnerToken || (!userToken && (!login || !password))) {
       throw new Error(
-        'The live suite needs ALTEGIO_PARTNER_TOKEN (or ALTEGIO_LIVE_API_TOKEN), ALTEGIO_TEST_LOGIN and ALTEGIO_TEST_PASSWORD in the environment.'
+        'The live suite needs ALTEGIO_API_TOKEN (or a live-test alias) plus ALTEGIO_USER_TOKEN or ALTEGIO_TEST_LOGIN and ALTEGIO_TEST_PASSWORD.'
       );
     }
-    client = new AltegioClient({ partnerToken }, CREDENTIALS_DIR);
+    client = new AltegioClient({ partnerToken, userToken }, CREDENTIALS_DIR);
     if (!client.isAuthenticated()) {
-      const result = await client.login(login, password);
+      const result = await client.login(login!, password!);
       expect(result.success).toBe(true);
     }
   }, 60_000);

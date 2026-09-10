@@ -193,6 +193,8 @@ export interface AltegioScheduleEntry {
   seance_length?: number;
   datetime?: string;
   slots?: Array<{ from: string; to: string }>;
+  /** Legacy reads may encode this boolean as 0/1. */
+  is_working?: boolean | 0 | 1;
   [key: string]: unknown;
 }
 

@@ -2,8 +2,21 @@ import { describe, it, expect } from '@jest/globals';
 import { createServer } from '../server.js';
 import { AltegioClient } from '../providers/altegio-client.js';
 import { ToolHandlers } from '../tools/handlers.js';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 describe('Tool Integration', () => {
+  let credentialsDir: string;
+
+  beforeEach(() => {
+    credentialsDir = mkdtempSync(join(tmpdir(), 'altegio-integration-'));
+  });
+
+  afterEach(() => {
+    rmSync(credentialsDir, { recursive: true, force: true });
+  });
+
   it('should create server with tools registered', () => {
     const server = createServer();
     expect(server).toBeDefined();
@@ -11,9 +24,10 @@ describe('Tool Integration', () => {
   });
 
   it('should create ToolHandlers with AltegioClient', () => {
-    const client = new AltegioClient({
-      partnerToken: 'test-token',
-    });
+    const client = new AltegioClient(
+      { partnerToken: 'test-token' },
+      credentialsDir
+    );
     const handlers = new ToolHandlers(client);
 
     expect(handlers).toBeDefined();
@@ -36,9 +50,10 @@ describe('Tool Integration', () => {
       } as Response)
     ) as any;
 
-    const client = new AltegioClient({
-      partnerToken: 'test-token',
-    });
+    const client = new AltegioClient(
+      { partnerToken: 'test-token' },
+      credentialsDir
+    );
     const handlers = new ToolHandlers(client);
 
     const result = await handlers.login({
@@ -53,9 +68,10 @@ describe('Tool Integration', () => {
   });
 
   it('should handle logout', async () => {
-    const client = new AltegioClient({
-      partnerToken: 'test-token',
-    });
+    const client = new AltegioClient(
+      { partnerToken: 'test-token' },
+      credentialsDir
+    );
     const handlers = new ToolHandlers(client);
 
     const result = await handlers.logout();
@@ -67,9 +83,10 @@ describe('Tool Integration', () => {
   });
 
   it('should validate email format with zod schema', async () => {
-    const client = new AltegioClient({
-      partnerToken: 'test-token',
-    });
+    const client = new AltegioClient(
+      { partnerToken: 'test-token' },
+      credentialsDir
+    );
     const handlers = new ToolHandlers(client);
 
     const result = await handlers.login({
@@ -82,10 +99,13 @@ describe('Tool Integration', () => {
   });
 
   it('should validate location_id is a number', async () => {
-    const client = new AltegioClient({
-      partnerToken: 'test-token',
-      userToken: 'user-token',
-    });
+    const client = new AltegioClient(
+      {
+        partnerToken: 'test-token',
+        userToken: 'user-token',
+      },
+      credentialsDir
+    );
     const handlers = new ToolHandlers(client);
 
     const result = await handlers.getAppointments({

@@ -172,7 +172,7 @@ credential and is not a product boundary ([ADR-001](docs/architecture/2026-09-07
 
 | Endpoint | Serves |
 |---|---|
-| `/mcp` | **Every tool except the analytics pack**, plus its two entry points `analytics_get_overview` and `analytics_run_report` (57 tools) — the default view, unchanged for current clients |
+| `/mcp` | **Every tool except the analytics pack**, plus its two entry points `analytics_get_overview` and `analytics_run_report` (57 tools) — the default view |
 | `/mcp/ops` | Appointments (the daily work; clients and journal tools join as they land) |
 | `/mcp/catalog` | Services, service categories, team members, positions, work schedules, resources, location settings |
 | `/mcp/finance` | Analytics (visits, payments and payroll join as they land) |

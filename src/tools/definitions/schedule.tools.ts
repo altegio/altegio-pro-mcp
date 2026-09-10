@@ -45,7 +45,8 @@ export const getScheduleTool = defineTool({
       time: s.time,
       session_length: s.seance_length,
       slots: s.slots,
-      is_working: s.is_working as boolean | undefined,
+      is_working:
+        s.is_working === undefined ? undefined : Boolean(s.is_working),
     }));
 
     // The schedule endpoint returns working intervals as `slots`; fall back to

@@ -3,18 +3,28 @@ import { createServer } from '../server.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { AltegioClient } from '../providers/altegio-client.js';
 import { ToolHandlers } from '../tools/handlers.js';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 describe('End-to-End Tests', () => {
   let server: Server;
   let client: AltegioClient;
   let handlers: ToolHandlers;
+  let credentialsDir: string;
 
   beforeAll(() => {
+    credentialsDir = mkdtempSync(join(tmpdir(), 'altegio-e2e-'));
     server = createServer();
-    client = new AltegioClient({
-      partnerToken: 'test-partner-token',
-    });
+    client = new AltegioClient(
+      { partnerToken: 'test-partner-token' },
+      credentialsDir
+    );
     handlers = new ToolHandlers(client);
+  });
+
+  afterAll(() => {
+    rmSync(credentialsDir, { recursive: true, force: true });
   });
 
   it('should create server with correct metadata', () => {
