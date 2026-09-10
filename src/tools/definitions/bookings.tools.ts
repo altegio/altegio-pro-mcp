@@ -97,7 +97,9 @@ export const createAppointmentTool = defineTool({
   name: 'create_appointment',
   category: 'Appointments',
   description:
-    '[Appointments] Create a new client appointment. AUTHENTICATION REQUIRED. Required fields: team_member_id, services, datetime, client info.',
+    '[Appointments] Create a new client appointment. AUTHENTICATION REQUIRED. Required fields: team_member_id, services, datetime, session_length, client info. ' +
+    'PREREQUISITES: the team member must be LINKED to each service (use link_service_team_member, else HTTP 400 "team member does not provide the selected services") AND scheduled/available at the datetime (use create_schedule, else HTTP 409 "time not available"). ' +
+    'To back-date a completed visit or force a booking onto a busy/off slot, pass save_if_busy=true. Set attendance=1 to mark a past visit as attended.',
   annotations: {
     title: 'Create Appointment',
     openWorldHint: true,
@@ -106,15 +108,19 @@ export const createAppointmentTool = defineTool({
   input: z.object({
     location_id: z.number().int().positive().describe('Location ID'),
     team_member_id: z.number().int().positive().describe('Team member ID'),
-    services: z.array(serviceItemSchema).describe('Array of service objects'),
+    services: z
+      .array(serviceItemSchema)
+      .min(1)
+      .describe('Array of service objects'),
     datetime: z
       .string()
       .describe('Appointment datetime (ISO format: YYYY-MM-DDTHH:MM:SS)'),
     session_length: z
       .number()
       .positive()
-      .optional()
-      .describe('Session length in seconds'),
+      .describe(
+        'Session length in seconds (REQUIRED by the API for a standard appointment; a missing value is rejected with HTTP 422)'
+      ),
     client: z
       .object({
         name: z.string().min(1).describe('Client name'),
@@ -130,7 +136,19 @@ export const createAppointmentTool = defineTool({
       .max(1)
       .optional()
       .describe('Send SMS reminder (0 or 1)'),
-    attendance: z.number().int().optional().describe('Attendance status'),
+    attendance: z
+      .number()
+      .int()
+      .optional()
+      .describe(
+        'Attendance status: 2 confirmed, 1 arrived/attended, 0 waiting, -1 no-show'
+      ),
+    save_if_busy: z
+      .boolean()
+      .optional()
+      .describe(
+        'Keep the appointment even if the slot is busy or the team member is not scheduled (avoids HTTP 409). Useful for back-dated visits and test/demo data.'
+      ),
   }),
   outputSchema: bookingEntityOutput,
   handler: async ({ input, client }) => {
@@ -138,9 +156,7 @@ export const createAppointmentTool = defineTool({
       input;
     const appointment = await client.createBooking(location_id, {
       staff_id: team_member_id,
-      ...(session_length !== undefined
-        ? { seance_length: session_length }
-        : {}),
+      seance_length: session_length,
       ...appointmentData,
     });
     return {

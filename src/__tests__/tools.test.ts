@@ -80,6 +80,16 @@ describe('Tool Registration', () => {
     // Resources tool (1)
     expect(toolNames).toContain('get_resources');
 
+    // Service delete + service ↔ team member links
+    expect(toolNames).toContain('delete_service');
+    expect(toolNames).toContain('link_service_team_member');
+    expect(toolNames).toContain('update_service_team_member');
+    expect(toolNames).toContain('unlink_service_team_member');
+    expect(toolNames).toContain('link_team_member_services');
+
+    // Location update
+    expect(toolNames).toContain('update_location');
+
     // Universal executor over the generated API catalog (3, ADR-001 D2)
     expect(toolNames).toContain('altegio_search_operations');
     expect(toolNames).toContain('altegio_describe_operation');
@@ -101,8 +111,8 @@ describe('Tool Registration', () => {
     expect(toolNames).toContain('analytics_list_saved_reports');
     expect(toolNames).toContain('analytics_run_saved_report');
 
-    // Total: 30 CRUD + 3 executor + 14 analytics + 4 clients + 12 onboarding = 63 tools
-    expect(toolNames.length).toBe(63);
+    // Total: 36 CRUD + 3 executor + 14 analytics + 4 clients + 12 onboarding = 69 tools
+    expect(toolNames.length).toBe(69);
   });
 
   it('should create server with tools', () => {

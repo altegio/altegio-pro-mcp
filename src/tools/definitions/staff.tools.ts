@@ -76,7 +76,7 @@ export const createStaffTool = defineTool({
   name: 'create_staff',
   category: 'Staff',
   description:
-    '[Staff] Create a new staff member. AUTHENTICATION REQUIRED. Required fields: name, specialization, position_id, phone_number, user_email, user_phone, is_user_invite.',
+    '[Staff] Create a new staff member. AUTHENTICATION REQUIRED. Required fields: name, specialization, position_id, phone_number, user_email, user_phone, is_user_invite. Set is_paid_staff=false to create test/demo staff without consuming a paid-staff license seat.',
   annotations: {
     title: 'Create Staff Member',
     openWorldHint: true,
@@ -94,6 +94,12 @@ export const createStaffTool = defineTool({
     user_email: z.string().email().describe('User email address'),
     user_phone: z.string().min(1).describe('User phone number'),
     is_user_invite: z.boolean().describe('User invitation flag'),
+    is_paid_staff: z
+      .boolean()
+      .optional()
+      .describe(
+        'Whether this team member counts against the paid-staff license cap. Omit or set false to create test/demo staff without consuming a seat.'
+      ),
   }),
   outputSchema: staffEntityOutput,
   handler: async ({ input, client }) => {

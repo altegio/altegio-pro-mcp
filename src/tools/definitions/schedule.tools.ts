@@ -44,14 +44,25 @@ export const getScheduleTool = defineTool({
       date: s.date,
       time: s.time,
       session_length: s.seance_length,
+      slots: s.slots,
+      is_working: s.is_working as boolean | undefined,
     }));
+
+    // The schedule endpoint returns working intervals as `slots`; fall back to
+    // the legacy time/session_length shape for older payloads.
+    const describe = (s: (typeof items)[number]): string => {
+      if (s.slots && s.slots.length > 0) {
+        return s.slots.map((sl) => `${sl.from}-${sl.to}`).join(', ');
+      }
+      if (s.time !== undefined) {
+        return `at ${s.time}${s.session_length !== undefined ? ` (${s.session_length} min)` : ''}`;
+      }
+      return s.is_working === false ? 'day off' : 'no slots';
+    };
 
     const summary = `Found ${items.length} schedule ${items.length === 1 ? 'entry' : 'entries'} for team member ${input.team_member_id}:\n\n`;
     const scheduleList = items
-      .map(
-        (s, idx) =>
-          `${idx + 1}. ${s.date} at ${s.time} (${s.session_length} min)`
-      )
+      .map((s, idx) => `${idx + 1}. ${s.date} ${describe(s)}`)
       .join('\n');
 
     return {
@@ -99,8 +110,8 @@ export const createScheduleTool = defineTool({
 
     const items = schedule.map((s) => ({
       date: s.date,
-      time: s.time,
-      session_length: s.seance_length,
+      slots: s.slots ?? [],
+      is_working: true,
     }));
     const slotsStr = input.slots.map((s) => `${s.from}-${s.to}`).join(', ');
     return {
@@ -146,8 +157,8 @@ export const updateScheduleTool = defineTool({
 
     const items = schedule.map((s) => ({
       date: s.date,
-      time: s.time,
-      session_length: s.seance_length,
+      slots: s.slots ?? [],
+      is_working: true,
     }));
     return {
       text: `Successfully updated schedule for team member ${input.team_member_id} on ${input.dates.join(', ')}\nEntries returned: ${items.length}`,

@@ -51,6 +51,11 @@ export const companiesOutput = listSchema(
   ['id']
 );
 
+export const companyEntityOutput = entitySchema(
+  { id: idProp, title: strProp, city: strProp, address: strProp },
+  ['id']
+);
+
 export const bookingsOutput = listSchema(
   {
     id: idProp,
@@ -103,8 +108,22 @@ export const positionsOutput = listSchema(
   ['id', 'title']
 );
 
+const slotsProp = {
+  type: 'array' as const,
+  items: {
+    type: 'object' as const,
+    properties: { from: strProp, to: strProp },
+  },
+};
+
 export const scheduleOutput = listSchema(
-  { date: strProp, time: strProp, session_length: numProp },
+  {
+    date: strProp,
+    time: strProp,
+    session_length: numProp,
+    slots: slotsProp,
+    is_working: boolProp,
+  },
   ['date']
 );
 
@@ -126,7 +145,13 @@ export const positionEntityOutput = entitySchema(
 );
 
 export const scheduleEntityOutput = listSchema(
-  { date: strProp, time: strProp, session_length: numProp },
+  {
+    date: strProp,
+    time: strProp,
+    session_length: numProp,
+    slots: slotsProp,
+    is_working: boolProp,
+  },
   ['date']
 );
 

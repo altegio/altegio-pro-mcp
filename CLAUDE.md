@@ -87,15 +87,15 @@ Always check BUILD.md / never add it to Git
 
 MCP server for **B2B business management only** (Altegio.Pro, not public booking /b2c). Local service business business owners, admins and team members manage their operations through authenticated tools
 
-### Tools Available (63 total)
+### Tools Available (69 total)
 
 **Category-organized with [Prefix] tags for LLM navigation:**
 
 **[Auth] Authentication (2):** login, logout
-**[Location] Location (1):** list_locations
-**[Staff] Staff CRUD (4):** get, create, update, delete
+**[Location] Location (2):** list_locations, update_location
+**[Staff] Staff CRUD (4):** get, create, update, delete (create supports `is_paid_staff`)
 **[Positions] Positions CRUD (4):** get, create, update, delete
-**[Services] Services (3):** get, create, update
+**[Services] Services (8):** get, create, update, delete, plus service↔team-member links: link_service_team_member, update_service_team_member, unlink_service_team_member, link_team_member_services (bulk)
 **[Categories] Service Categories (1):** get
 **[Schedule] Schedule CRUD (4):** get, create, update, delete
 **[Appointments] Appointments CRUD (4):** get, create, update, delete
@@ -135,6 +135,16 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 - `src/utils/` - logging, errors, config, credential manager
 
 ### Change history
+
+**Schedule 422 fix + service↔team-member links + write/ergonomics gaps (2026-09-09)**
+- **Fixed schedules (PRIORITY 1):** `create_schedule`, `update_schedule`, `delete_schedule` and `onboarding_set_schedules` returned HTTP 422 for spec-correct input. `AltegioClient.setSchedule` sent the modern `PUT /company/{id}/staff/schedule` (`{schedules_to_set}`) which 422s; it now translates the canonical `SetScheduleRequest` into the deprecated per-team-member endpoint `PUT /schedule/{location_id}/{team_member_id}` with body `[{date, is_working, slots}]` — the shape the API accepts and the one `docs/api-monitoring.arazzo.yaml` exercises. One PUT per team member; a set+delete for the same member merge into one call. Returns synthesized entries with the slots that were set (the endpoint responds 201 with an empty body). Regression test sets a schedule and reads it back with slots.
+- **Added 6 tools (63 → 69):**
+  - `[Services]` service↔team-member links (PRIORITY 2, unblocks appointments — the API rejects a booking whose team member is not linked to the service with HTTP 400): `link_service_team_member` (POST `/company/{id}/services/{service_id}/staff`), `update_service_team_member` (PUT `.../staff/{team_member_id}`), `unlink_service_team_member` (DELETE), `link_team_member_services` (bulk: one team member → many services).
+  - `delete_service` (DELETE `/services/{id}/{service_id}`) — previously only `update_service active=0` existed.
+  - `update_location` (PUT `/company/{id}`) — rename / address / city / contacts / coordinates / business type.
+- **Appointments (PRIORITY 3):** `create_appointment` now REQUIRES `session_length` (the API requires `seance_length`; a missing value showed as a bare 422) and exposes `save_if_busy` (back-date visits / force onto busy or unscheduled slots). Description spells out the link + schedule prerequisites and the 400/409 they prevent. Onboarding test bookings now pass `seance_length` + `save_if_busy`.
+- **Ergonomics (PRIORITY 4):** `create_staff` exposes `is_paid_staff` (create demo staff without consuming a paid-staff seat). Error surfacing rewritten: `throwApiError` flattens the API's `meta.errors` into the message and passes the real message through on 403, instead of collapsing everything to "Access denied. Check location permissions."
+- **Files:** `src/providers/altegio-client.ts` (setSchedule rewrite, service-link + delete_service + update_location methods, error surfacing), `src/tools/definitions/{services,company,staff,bookings,schedule}.tools.ts`, `src/tools/api-mapping.ts` (schedule → deprecated op, new mappings), `src/tools/facets.ts` (catalog), `src/tools/output-schemas.ts`, `src/types/altegio.types.ts`, `src/tools/onboarding-handlers.ts`. Opt-in live E2E `src/__tests__/appointments-e2e-live.test.ts` (`ALTEGIO_E2E=1`, location 4564) sets a schedule, links a service, creates a past + future appointment, and cleans up.
 
 **Two-fork, per-request authentication (2026-09-09)**
 - **The Pro MCP now serves two B2B use cases, chosen per request by the presence of `X-Altegio-*` headers:**

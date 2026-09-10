@@ -57,6 +57,37 @@ function companyIdFromPath(endpoint: string): number | undefined {
   return undefined;
 }
 
+/**
+ * Flatten an Altegio `meta.errors` payload into a short, human-readable string.
+ *
+ * The API returns validation problems as `meta.errors`, either an object keyed
+ * by field (`{seance_length: ["is required"]}`) or a plain array/string. The
+ * curated tools used to drop this entirely and surface only a bare status code,
+ * which made a missing `seance_length` (422) indistinguishable from a
+ * permission problem. Passing it through gives the caller the real cause.
+ */
+function formatApiErrorDetails(errors: unknown): string | undefined {
+  if (!errors) return undefined;
+  if (typeof errors === 'string') return errors;
+  if (Array.isArray(errors)) {
+    const flat = errors.map((e) => String(e)).filter(Boolean);
+    return flat.length > 0 ? flat.join('; ') : undefined;
+  }
+  if (typeof errors === 'object') {
+    const parts: string[] = [];
+    for (const [field, value] of Object.entries(
+      errors as Record<string, unknown>
+    )) {
+      const messages = Array.isArray(value)
+        ? value.map((v) => String(v)).join(', ')
+        : String(value);
+      parts.push(field ? `${field}: ${messages}` : messages);
+    }
+    return parts.length > 0 ? parts.join('; ') : undefined;
+  }
+  return undefined;
+}
+
 export interface AltegioClientOptions {
   /**
    * When true (set in the HTTP deployment), anonymous requests — HTTP requests
@@ -206,8 +237,12 @@ export class AltegioClient {
       body = { meta: { message: text } };
     }
     const meta = body?.meta as Record<string, unknown> | undefined;
-    const message =
+    const rawMessage =
       (meta?.message as string) || response.statusText || 'Unknown error';
+    // Surface the API's own validation details (meta.errors) alongside the
+    // message so the caller sees the real cause, not just an HTTP status.
+    const details = formatApiErrorDetails(meta?.errors);
+    const message = details ? `${rawMessage} (${details})` : rawMessage;
 
     switch (response.status) {
       case 401:
@@ -215,14 +250,17 @@ export class AltegioClient {
           `Session expired while trying to ${context}. Call altegio_login to re-authenticate.`
         );
       case 403:
+        // Pass the API message through: a permission problem and a plain
+        // validation refusal both arrive as 4xx and were previously collapsed
+        // into one opaque "Access denied" string.
         throw new AltegioApiError(
-          `Access denied for ${context}. Check location permissions.`,
+          `Access denied while trying to ${context}: ${message} (HTTP 403). Check location permissions or the user's role.`,
           403,
           body
         );
       case 404:
         throw new AltegioApiError(
-          `Not found: ${context}. Verify the ID is correct.`,
+          `Not found while trying to ${context}: ${message} (HTTP 404). Verify the ID is correct.`,
           404,
           body
         );
@@ -392,6 +430,27 @@ export class AltegioClient {
     return locations.filter((location) => isCompanyAllowed(location.id));
   }
 
+  /**
+   * Update a location's data (B2B API, requires user auth).
+   * PUT /company/{location_id}
+   */
+  async updateLocation(
+    companyId: number,
+    data: import('../types/altegio.types.js').UpdateLocationRequest
+  ): Promise<AltegioCompany> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(`/company/${companyId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    return this.handleResponse<AltegioCompany>(response, 'update location');
+  }
+
   async getBookings(
     companyId: number,
     params?: AltegioListParams
@@ -503,10 +562,19 @@ export class AltegioClient {
   // ========== Schedule CRUD Operations ==========
 
   /**
-   * Set team member schedules (B2B API, requires user auth)
-   * PUT /company/{location_id}/staff/schedule
+   * Set team member schedules (B2B API, requires user auth).
    *
-   * Supports both setting and deleting schedules in a single request.
+   * Uses the deprecated per-team-member endpoint
+   * `PUT /schedule/{location_id}/{team_member_id}` with a body of
+   * `[{date, is_working, slots}]`. The modern `PUT /company/{id}/staff/schedule`
+   * ({schedules_to_set}) returns HTTP 422 for otherwise spec-correct input, so
+   * this method translates the canonical {@link SetScheduleRequest} into the
+   * shape the API actually accepts (verified by `docs/api-monitoring.arazzo.yaml`).
+   *
+   * Supports both setting (is_working: true) and clearing (is_working: false)
+   * schedules; a set and a delete for the same team member are merged into one
+   * request per team member. Returns synthesized entries with the slots that
+   * were set (the deprecated endpoint responds 201 with an empty body).
    */
   async setSchedule(
     companyId: number,
@@ -514,21 +582,64 @@ export class AltegioClient {
   ): Promise<AltegioScheduleEntry[]> {
     this.requireAuth();
 
-    const response = await this.apiRequest(
-      `/company/${companyId}/staff/schedule`,
-      {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      }
-    );
+    type Slot = import('../types/altegio.types.js').ScheduleSlot;
+    type Day = import('../types/altegio.types.js').StaffScheduleDay;
 
-    return this.handleResponse<AltegioScheduleEntry[]>(
-      response,
-      'set schedule'
-    );
+    // Collapse the canonical request into one ordered day-list per team member.
+    // Deletes are applied first so a same-day set wins.
+    const perStaff = new Map<number, Map<string, Day>>();
+    const dayMap = (staffId: number): Map<string, Day> => {
+      let m = perStaff.get(staffId);
+      if (!m) {
+        m = new Map<string, Day>();
+        perStaff.set(staffId, m);
+      }
+      return m;
+    };
+
+    for (const del of data.schedules_to_delete ?? []) {
+      const m = dayMap(del.team_member_id);
+      for (const date of del.dates) {
+        m.set(date, { date, is_working: false, slots: [] });
+      }
+    }
+    for (const set of data.schedules_to_set ?? []) {
+      const m = dayMap(set.team_member_id);
+      const slots: Slot[] = set.slots.map((s) => ({ from: s.from, to: s.to }));
+      for (const date of set.dates) {
+        m.set(date, { date, is_working: true, slots });
+      }
+    }
+
+    const results: AltegioScheduleEntry[] = [];
+    for (const [staffId, byDate] of perStaff) {
+      const days: Day[] = [...byDate.values()];
+      const response = await this.apiRequest(
+        `/schedule/${companyId}/${staffId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(days),
+        }
+      );
+
+      // Deprecated endpoint returns 201 with an empty body — no envelope to unwrap.
+      await this.handleVoidResponse(response, 'set schedule');
+
+      for (const day of days) {
+        if (day.is_working) {
+          results.push({
+            staff_id: staffId,
+            date: day.date,
+            slots: day.slots,
+          });
+        }
+      }
+    }
+
+    return results;
   }
 
   // ========== Staff CRUD Operations ==========
@@ -619,6 +730,110 @@ export class AltegioClient {
     );
 
     return this.handleResponse<AltegioService>(response, 'update service');
+  }
+
+  /**
+   * Delete a service (B2B API, requires user auth).
+   * DELETE /services/{location_id}/{service_id} — 204 No Content.
+   */
+  async deleteService(companyId: number, serviceId: number): Promise<void> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      `/services/${companyId}/${serviceId}`,
+      {
+        method: 'DELETE',
+      }
+    );
+
+    await this.handleVoidResponse(response, 'delete service');
+  }
+
+  // ========== Service ↔ Team Member Links ==========
+
+  /**
+   * Link a team member to a service (B2B API, requires user auth).
+   * POST /company/{location_id}/services/{service_id}/staff
+   *
+   * Without this link, creating an appointment fails with HTTP 400
+   * "team member does not provide the selected services".
+   */
+  async assignServiceToStaff(
+    companyId: number,
+    serviceId: number,
+    data: import('../types/altegio.types.js').AssignServiceStaffRequest
+  ): Promise<import('../types/altegio.types.js').MasterServiceLink> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      `/company/${companyId}/services/${serviceId}/staff`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          technological_card_id: null,
+          ...data,
+        }),
+      }
+    );
+
+    return this.handleResponse<
+      import('../types/altegio.types.js').MasterServiceLink
+    >(response, 'link team member to service');
+  }
+
+  /**
+   * Update an existing team member ↔ service link (duration, tech card).
+   * PUT /company/{location_id}/services/{service_id}/staff/{team_member_id}
+   */
+  async updateServiceStaffAssignment(
+    companyId: number,
+    serviceId: number,
+    teamMemberId: number,
+    data: import('../types/altegio.types.js').UpdateServiceStaffRequest
+  ): Promise<import('../types/altegio.types.js').MasterServiceLink> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      `/company/${companyId}/services/${serviceId}/staff/${teamMemberId}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          technological_card_id: null,
+          ...data,
+        }),
+      }
+    );
+
+    return this.handleResponse<
+      import('../types/altegio.types.js').MasterServiceLink
+    >(response, 'update team member service link');
+  }
+
+  /**
+   * Remove a team member ↔ service link (B2B API, requires user auth).
+   * DELETE /company/{location_id}/services/{service_id}/staff/{team_member_id}
+   */
+  async removeServiceFromStaff(
+    companyId: number,
+    serviceId: number,
+    teamMemberId: number
+  ): Promise<void> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      `/company/${companyId}/services/${serviceId}/staff/${teamMemberId}`,
+      {
+        method: 'DELETE',
+      }
+    );
+
+    await this.handleVoidResponse(response, 'unlink team member from service');
   }
 
   // ========== Positions CRUD Operations ==========

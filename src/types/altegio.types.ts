@@ -220,6 +220,21 @@ export interface SetScheduleRequest {
   schedules_to_delete?: ScheduleToDelete[];
 }
 
+/**
+ * One day in the body of the deprecated per-team-member schedule endpoint
+ * `PUT /schedule/{location_id}/{team_member_id}` — an array of these.
+ *
+ * This is the shape the API actually accepts (verified by the monitoring flow
+ * `docs/api-monitoring.arazzo.yaml`). The modern `PUT /company/{id}/staff/schedule`
+ * with `{schedules_to_set}` returns 422 for otherwise spec-correct input, so
+ * `setSchedule` translates the canonical `SetScheduleRequest` into this shape.
+ */
+export interface StaffScheduleDay {
+  date: string; // YYYY-MM-DD
+  is_working: boolean;
+  slots: ScheduleSlot[];
+}
+
 /** @deprecated Use SetScheduleRequest instead */
 export interface CreateScheduleRequest {
   staff_id: number;
@@ -247,6 +262,11 @@ export interface CreateStaffRequest {
   user_email: string;
   user_phone: string;
   is_user_invite: boolean;
+  /**
+   * Whether the team member counts against the paid-staff license cap.
+   * Omit or set false to create test/demo staff without consuming a seat.
+   */
+  is_paid_staff?: boolean;
 }
 
 export interface UpdateStaffRequest {
@@ -283,6 +303,31 @@ export interface UpdateServiceRequest {
   active?: number;
 }
 
+// Service ↔ team member links (which team members provide a service)
+export interface AssignServiceStaffRequest {
+  /** Team member ID that will provide the service. */
+  master_id: number;
+  /** Duration of provision in seconds (min 300, max 86100). */
+  seance_length: number;
+  /** Bill-of-materials (tech card) ID, or null. */
+  technological_card_id?: number | null;
+}
+
+export interface UpdateServiceStaffRequest {
+  seance_length: number;
+  technological_card_id?: number | null;
+}
+
+/** A team-member ↔ service link as returned by the assign/update endpoints. */
+export interface MasterServiceLink {
+  id?: number;
+  staff_id?: number;
+  service_id?: number;
+  seance_length?: number;
+  technological_card_id?: number | null;
+  [key: string]: unknown;
+}
+
 // Bookings
 export interface CreateBookingRequest {
   staff_id: number;
@@ -297,6 +342,12 @@ export interface CreateBookingRequest {
   comment?: string;
   send_sms?: number;
   attendance?: number;
+  /**
+   * Keep the appointment even when the slot is busy or the team member is not
+   * scheduled, instead of failing with HTTP 409. Useful for back-dated visits
+   * and test/demo data.
+   */
+  save_if_busy?: boolean;
 }
 
 export interface UpdateBookingRequest {
@@ -311,6 +362,7 @@ export interface UpdateBookingRequest {
   };
   comment?: string;
   attendance?: number;
+  save_if_busy?: boolean;
 }
 
 // Clients
@@ -336,6 +388,24 @@ export interface CreateCategoryRequest {
   title: string;
   api_id?: string;
   weight?: number;
+}
+
+// Locations
+export interface UpdateLocationRequest {
+  title?: string;
+  country_id?: number;
+  country?: string;
+  city_id?: number;
+  city?: string;
+  address?: string;
+  zip?: string;
+  phones?: string[];
+  site?: string;
+  coordinate_lat?: number;
+  coordinate_lon?: number;
+  description?: string;
+  business_type_id?: number;
+  short_descr?: string;
 }
 
 // Positions

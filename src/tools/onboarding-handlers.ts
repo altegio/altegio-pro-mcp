@@ -557,6 +557,10 @@ export class OnboardingHandlers {
               staff_id: staffId,
               services: [{ id: serviceId }],
               datetime,
+              // seance_length is required by the API; save_if_busy lets the
+              // sample bookings land even if the test staff has no schedule.
+              seance_length: 3600,
+              save_if_busy: true,
               client: {
                 name: `Test Client ${i + 1}`,
                 phone: `+100000000${i}`,
