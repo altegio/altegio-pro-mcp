@@ -296,27 +296,30 @@ export const apiMapping: Record<string, ApiMapping> = {
     pathParams: ['location_id', 'team_member_id', 'start_date', 'end_date'],
   },
   // create/update/delete_schedule all funnel through client.setSchedule, which
-  // uses the deprecated per-team-member endpoint. The modern
-  // PUT /company/{id}/staff/schedule ({schedules_to_set}) returns 422 for
-  // spec-correct input; the deprecated endpoint (body: [{date,is_working,slots}])
-  // is the shape the API accepts and the one the monitoring flow exercises.
+  // PUTs the modern /company/{id}/staff/schedule endpoint. NOTE: the backend
+  // expects the per-entry key `staff_id`, not the `team_member_id` the spec
+  // documents — the client maps it (see AltegioClient.setSchedule). The body
+  // params below name the top-level keys the spec does document.
   create_schedule: {
-    path: '/schedule/{location_id}/{team_member_id}',
+    path: '/company/{location_id}/staff/schedule',
     method: 'put',
-    operationId: 'schedule_team_member_update_deprecated',
-    pathParams: ['location_id', 'team_member_id'],
+    operationId: 'set_team_member_schedule',
+    pathParams: ['location_id'],
+    bodyParams: ['schedules_to_set'],
   },
   update_schedule: {
-    path: '/schedule/{location_id}/{team_member_id}',
+    path: '/company/{location_id}/staff/schedule',
     method: 'put',
-    operationId: 'schedule_team_member_update_deprecated',
-    pathParams: ['location_id', 'team_member_id'],
+    operationId: 'set_team_member_schedule',
+    pathParams: ['location_id'],
+    bodyParams: ['schedules_to_set'],
   },
   delete_schedule: {
-    path: '/schedule/{location_id}/{team_member_id}',
+    path: '/company/{location_id}/staff/schedule',
     method: 'put',
-    operationId: 'schedule_team_member_update_deprecated',
-    pathParams: ['location_id', 'team_member_id'],
+    operationId: 'set_team_member_schedule',
+    pathParams: ['location_id'],
+    bodyParams: ['schedules_to_delete'],
   },
 
   // ==========================================

@@ -78,15 +78,28 @@ describe('AltegioClient Schedule Operations', () => {
       ).rejects.toThrow('Not authenticated');
     });
 
-    // The modern PUT /company/{id}/staff/schedule ({schedules_to_set}) returns
-    // 422 for spec-correct input; setSchedule instead calls the deprecated
-    // per-team-member endpoint with a [{date,is_working,slots}] body — the shape
-    // the API accepts (docs/api-monitoring.arazzo.yaml). These assert that shape.
-    it('should PUT /schedule/{loc}/{staff} with an is_working day array (set)', async () => {
+    // Root cause of the 422: the backend expects the per-entry key `staff_id`,
+    // but the public OpenAPI documents `team_member_id`, and the controller
+    // validates with a strict Symfony Collection (no missing/extra keys). The
+    // MCP keeps the canonical `team_member_id` and maps it to `staff_id` on the
+    // wire. These tests pin that mapping.
+    it('should PUT /company/{id}/staff/schedule mapping team_member_id → staff_id (set)', async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
-        status: 201,
-        json: async () => ({}),
+        status: 200,
+        json: async () => ({
+          success: true,
+          data: [
+            {
+              staff_id: 456,
+              date: '2025-10-30',
+              slots: [
+                { from: '09:00', to: '13:00' },
+                { from: '14:00', to: '18:00' },
+              ],
+            },
+          ],
+        }),
       });
 
       const testDir = join(tmpdir(), `altegio-test-${Date.now()}`);
@@ -99,7 +112,7 @@ describe('AltegioClient Schedule Operations', () => {
         testDir
       );
 
-      const result = await client.setSchedule(123, {
+      await client.setSchedule(123, {
         schedules_to_set: [
           {
             team_member_id: 456,
@@ -113,51 +126,41 @@ describe('AltegioClient Schedule Operations', () => {
       });
 
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/schedule/123/456',
+        'https://api.alteg.io/api/v1/company/123/staff/schedule',
         expect.objectContaining({
           method: 'PUT',
           headers: expect.objectContaining({
             'Content-Type': 'application/json',
             Authorization: 'Bearer partner123, User user456',
           }),
-          body: JSON.stringify([
-            {
-              date: '2025-10-30',
-              is_working: true,
-              slots: [
-                { from: '09:00', to: '13:00' },
-                { from: '14:00', to: '18:00' },
-              ],
-            },
-            {
-              date: '2025-10-31',
-              is_working: true,
-              slots: [
-                { from: '09:00', to: '13:00' },
-                { from: '14:00', to: '18:00' },
-              ],
-            },
-          ]),
+          body: JSON.stringify({
+            schedules_to_set: [
+              {
+                staff_id: 456,
+                dates: ['2025-10-30', '2025-10-31'],
+                slots: [
+                  { from: '09:00', to: '13:00' },
+                  { from: '14:00', to: '18:00' },
+                ],
+              },
+            ],
+          }),
         })
       );
 
-      // Returns synthesized entries carrying the slots that were set.
-      expect(result).toHaveLength(2);
-      expect(result[0]).toMatchObject({
-        staff_id: 456,
-        date: '2025-10-30',
-        slots: [
-          { from: '09:00', to: '13:00' },
-          { from: '14:00', to: '18:00' },
-        ],
-      });
+      // No `team_member_id` key must reach the wire (it would fail validation).
+      const sentBody = JSON.parse(
+        (global.fetch as jest.Mock).mock.calls[0][1].body as string
+      );
+      expect(sentBody.schedules_to_set[0]).toHaveProperty('staff_id', 456);
+      expect(sentBody.schedules_to_set[0]).not.toHaveProperty('team_member_id');
     });
 
-    it('should PUT is_working:false days for schedules_to_delete', async () => {
+    it('should PUT schedules_to_delete mapping team_member_id → staff_id (no slots)', async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
-        status: 201,
-        json: async () => ({}),
+        status: 200,
+        json: async () => ({ success: true, data: [] }),
       });
 
       const testDir = join(tmpdir(), `altegio-test-${Date.now()}`);
@@ -180,21 +183,21 @@ describe('AltegioClient Schedule Operations', () => {
       });
 
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/schedule/123/456',
+        'https://api.alteg.io/api/v1/company/123/staff/schedule',
         expect.objectContaining({
           method: 'PUT',
-          body: JSON.stringify([
-            { date: '2025-10-30', is_working: false, slots: [] },
-          ]),
+          body: JSON.stringify({
+            schedules_to_delete: [{ staff_id: 456, dates: ['2025-10-30'] }],
+          }),
         })
       );
     });
 
-    it('should issue one PUT per team member for a multi-staff request', async () => {
+    it('should batch multiple team members in ONE request', async () => {
       const fetchMock = jest.fn().mockResolvedValue({
         ok: true,
-        status: 201,
-        json: async () => ({}),
+        status: 200,
+        json: async () => ({ success: true, data: [] }),
       });
       global.fetch = fetchMock;
 
@@ -223,10 +226,12 @@ describe('AltegioClient Schedule Operations', () => {
         ],
       });
 
-      expect(fetchMock).toHaveBeenCalledTimes(2);
-      const urls = fetchMock.mock.calls.map((c) => c[0]);
-      expect(urls).toContain('https://api.alteg.io/api/v1/schedule/123/456');
-      expect(urls).toContain('https://api.alteg.io/api/v1/schedule/123/789');
+      // Modern endpoint accepts all team members in a single call.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const sentBody = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+      expect(
+        sentBody.schedules_to_set.map((s: { staff_id: number }) => s.staff_id)
+      ).toEqual([456, 789]);
     });
 
     // Regression for the schedule-422 bug: setting a schedule then reading it
@@ -234,11 +239,20 @@ describe('AltegioClient Schedule Operations', () => {
     it('sets a schedule and reads it back with slots', async () => {
       const fetchMock = jest
         .fn()
-        // 1) PUT set — deprecated endpoint responds 201 with an empty body.
+        // 1) PUT set — modern endpoint returns the resulting schedules.
         .mockResolvedValueOnce({
           ok: true,
-          status: 201,
-          json: async () => ({}),
+          status: 200,
+          json: async () => ({
+            success: true,
+            data: [
+              {
+                staff_id: 447367,
+                date: '2026-09-14',
+                slots: [{ from: '10:00', to: '18:00' }],
+              },
+            ],
+          }),
         })
         // 2) GET read-back — returns the working days with their slots.
         .mockResolvedValueOnce({
@@ -267,7 +281,7 @@ describe('AltegioClient Schedule Operations', () => {
         testDir
       );
 
-      await client.setSchedule(4564, {
+      const setResult = await client.setSchedule(4564, {
         schedules_to_set: [
           {
             team_member_id: 447367,
@@ -276,6 +290,7 @@ describe('AltegioClient Schedule Operations', () => {
           },
         ],
       });
+      expect(setResult[0]?.slots).toEqual([{ from: '10:00', to: '18:00' }]);
 
       const readBack = await client.getSchedule(
         4564,

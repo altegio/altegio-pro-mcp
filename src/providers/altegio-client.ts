@@ -563,18 +563,19 @@ export class AltegioClient {
 
   /**
    * Set team member schedules (B2B API, requires user auth).
+   * PUT /company/{location_id}/staff/schedule
    *
-   * Uses the deprecated per-team-member endpoint
-   * `PUT /schedule/{location_id}/{team_member_id}` with a body of
-   * `[{date, is_working, slots}]`. The modern `PUT /company/{id}/staff/schedule`
-   * ({schedules_to_set}) returns HTTP 422 for otherwise spec-correct input, so
-   * this method translates the canonical {@link SetScheduleRequest} into the
-   * shape the API actually accepts (verified by `docs/api-monitoring.arazzo.yaml`).
+   * Supports setting and clearing schedules for multiple team members in one
+   * request.
    *
-   * Supports both setting (is_working: true) and clearing (is_working: false)
-   * schedules; a set and a delete for the same team member are merged into one
-   * request per team member. Returns synthesized entries with the slots that
-   * were set (the deprecated endpoint responds 201 with an empty body).
+   * IMPORTANT — the backend expects the per-entry key `staff_id`, NOT the
+   * `team_member_id` the public OpenAPI documents. The controller validates the
+   * body with a strict Symfony `Collection` (no missing, no extra keys), so a
+   * `team_member_id` key is rejected as unknown AND `staff_id` is reported
+   * missing — the request fails with HTTP 422 even though it matches the spec.
+   * The MCP keeps the canonical `team_member_id` at its own boundary and maps it
+   * to `staff_id` here, confining the wire-dialect mismatch to this one place.
+   * (Backend: More\Master\Validation\SingleStaffScheduleDto.)
    */
   async setSchedule(
     companyId: number,
@@ -582,64 +583,36 @@ export class AltegioClient {
   ): Promise<AltegioScheduleEntry[]> {
     this.requireAuth();
 
-    type Slot = import('../types/altegio.types.js').ScheduleSlot;
-    type Day = import('../types/altegio.types.js').StaffScheduleDay;
-
-    // Collapse the canonical request into one ordered day-list per team member.
-    // Deletes are applied first so a same-day set wins.
-    const perStaff = new Map<number, Map<string, Day>>();
-    const dayMap = (staffId: number): Map<string, Day> => {
-      let m = perStaff.get(staffId);
-      if (!m) {
-        m = new Map<string, Day>();
-        perStaff.set(staffId, m);
-      }
-      return m;
-    };
-
-    for (const del of data.schedules_to_delete ?? []) {
-      const m = dayMap(del.team_member_id);
-      for (const date of del.dates) {
-        m.set(date, { date, is_working: false, slots: [] });
-      }
+    const body: Record<string, unknown> = {};
+    if (data.schedules_to_set) {
+      body.schedules_to_set = data.schedules_to_set.map((s) => ({
+        staff_id: s.team_member_id,
+        dates: s.dates,
+        slots: s.slots.map((slot) => ({ from: slot.from, to: slot.to })),
+      }));
     }
-    for (const set of data.schedules_to_set ?? []) {
-      const m = dayMap(set.team_member_id);
-      const slots: Slot[] = set.slots.map((s) => ({ from: s.from, to: s.to }));
-      for (const date of set.dates) {
-        m.set(date, { date, is_working: true, slots });
-      }
+    if (data.schedules_to_delete) {
+      body.schedules_to_delete = data.schedules_to_delete.map((d) => ({
+        staff_id: d.team_member_id,
+        dates: d.dates,
+      }));
     }
 
-    const results: AltegioScheduleEntry[] = [];
-    for (const [staffId, byDate] of perStaff) {
-      const days: Day[] = [...byDate.values()];
-      const response = await this.apiRequest(
-        `/schedule/${companyId}/${staffId}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(days),
-        }
-      );
-
-      // Deprecated endpoint returns 201 with an empty body — no envelope to unwrap.
-      await this.handleVoidResponse(response, 'set schedule');
-
-      for (const day of days) {
-        if (day.is_working) {
-          results.push({
-            staff_id: staffId,
-            date: day.date,
-            slots: day.slots,
-          });
-        }
+    const response = await this.apiRequest(
+      `/company/${companyId}/staff/schedule`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
       }
-    }
+    );
 
-    return results;
+    return this.handleResponse<AltegioScheduleEntry[]>(
+      response,
+      'set schedule'
+    );
   }
 
   // ========== Staff CRUD Operations ==========

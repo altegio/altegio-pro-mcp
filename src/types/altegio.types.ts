@@ -220,21 +220,6 @@ export interface SetScheduleRequest {
   schedules_to_delete?: ScheduleToDelete[];
 }
 
-/**
- * One day in the body of the deprecated per-team-member schedule endpoint
- * `PUT /schedule/{location_id}/{team_member_id}` — an array of these.
- *
- * This is the shape the API actually accepts (verified by the monitoring flow
- * `docs/api-monitoring.arazzo.yaml`). The modern `PUT /company/{id}/staff/schedule`
- * with `{schedules_to_set}` returns 422 for otherwise spec-correct input, so
- * `setSchedule` translates the canonical `SetScheduleRequest` into this shape.
- */
-export interface StaffScheduleDay {
-  date: string; // YYYY-MM-DD
-  is_working: boolean;
-  slots: ScheduleSlot[];
-}
-
 /** @deprecated Use SetScheduleRequest instead */
 export interface CreateScheduleRequest {
   staff_id: number;
