@@ -230,6 +230,16 @@ export interface RequestContext {
   companyIds?: ReadonlySet<number>;
 }
 
+/** Build the complete request context from HTTP headers in one place. */
+export function requestContextFromHeaders(headers: HeaderBag): RequestContext {
+  return {
+    identity: parseIdentityHeaders(headers),
+    userToken: parseUserToken(headers),
+    partnerToken: parsePartnerToken(headers),
+    companyIds: parseCompanyIds(headers),
+  };
+}
+
 const storage = new AsyncLocalStorage<RequestContext>();
 
 /**

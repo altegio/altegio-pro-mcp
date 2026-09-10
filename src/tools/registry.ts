@@ -18,6 +18,10 @@ import {
 } from './facets.js';
 import type { DefinedTool, McpToolSpec } from './factory.js';
 import type { ToolResult } from './tool-result.js';
+import {
+  requestContextFromHeaders,
+  runWithContext,
+} from '../request-context.js';
 
 type CallHandler = (args: unknown) => Promise<ToolResult>;
 
@@ -142,18 +146,31 @@ export function registerTools(
   }));
 
   // call handler
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params;
+  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+    const execute = async (): Promise<ToolResult> => {
+      const { name, arguments: args } = request.params;
 
-    const handler = handlers.get(name) ?? onboardingDispatch[name];
-    if (!handler) {
-      throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
-    }
-    if (!visible.has(name)) {
-      throw outOfFacetError(name, facet, facetIndex);
-    }
+      const handler = handlers.get(name) ?? onboardingDispatch[name];
+      if (!handler) {
+        throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
+      }
+      if (!visible.has(name)) {
+        throw outOfFacetError(name, facet, facetIndex);
+      }
 
-    return handler(args);
+      return handler(args);
+    };
+
+    // The SDK deliberately schedules protocol handlers on a later promise turn.
+    // In the compiled ESM server that turn is outside the AsyncLocalStorage
+    // scope surrounding transport.handleRequest(), even though the source-level
+    // Jest transform happens to retain it. Re-bind from the SDK's immutable copy
+    // of the original HTTP headers at the actual tool-handler boundary. Stdio
+    // has no requestInfo and keeps its existing single-user context.
+    const headers = extra.requestInfo?.headers;
+    return headers
+      ? runWithContext(requestContextFromHeaders(headers), execute)
+      : execute();
   });
 
   return visibleToolDefs.map((tool) => tool.name);
