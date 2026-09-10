@@ -7,9 +7,9 @@ const tools = (Object.values(defs) as unknown[]).filter(
 );
 
 describe('factory tool definitions', () => {
-  // 30 CRUD tools + 3 universal executor tools + 14 analytics tools.
-  it('exposes all 47 factory-defined tools', () => {
-    expect(tools.length).toBe(51);
+  // 36 CRUD tools + 3 universal executor tools + 14 analytics tools + 4 clients.
+  it('exposes all factory-defined tools', () => {
+    expect(tools.length).toBe(57);
   });
 
   it('every tool produces a valid MCP spec', () => {

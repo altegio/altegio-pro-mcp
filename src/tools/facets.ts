@@ -90,9 +90,15 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
    */
   catalog: {
     tools: [
+      'update_location',
       'get_services',
       'create_service',
       'update_service',
+      'delete_service',
+      'link_service_team_member',
+      'update_service_team_member',
+      'unlink_service_team_member',
+      'link_team_member_services',
       'get_service_categories',
       'get_staff',
       'create_staff',

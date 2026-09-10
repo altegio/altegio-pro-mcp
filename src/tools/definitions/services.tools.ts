@@ -2,6 +2,15 @@ import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import { servicesOutput, serviceEntityOutput } from '../output-schemas.js';
 
+const seanceLengthSchema = z
+  .number()
+  .int()
+  .min(300)
+  .max(86100)
+  .describe(
+    'Duration this team member needs for the service, in seconds (min 300, max 86100)'
+  );
+
 export const getServicesTool = defineTool({
   name: 'get_services',
   category: 'Services',
@@ -155,6 +164,200 @@ export const updateServiceTool = defineTool({
         id: service.id,
         title: service.title,
         category_id: service.category_id,
+      },
+    };
+  },
+});
+
+export const deleteServiceTool = defineTool({
+  name: 'delete_service',
+  category: 'Services',
+  description:
+    '[Services] Permanently delete a service. AUTHENTICATION REQUIRED. This removes the service entirely; to merely hide it from booking, use update_service with active=0 instead.',
+  annotations: {
+    title: 'Delete Service',
+    destructiveHint: true,
+    openWorldHint: true,
+  },
+  input: z.object({
+    location_id: z.number().int().positive().describe('Location ID'),
+    service_id: z.number().int().positive().describe('Service ID to delete'),
+  }),
+  handler: async ({ input, client }) => {
+    await client.deleteService(input.location_id, input.service_id);
+    return {
+      text: `Successfully deleted service ${input.service_id} from location ${input.location_id}`,
+    };
+  },
+});
+
+// ========== Service ↔ Team Member Links ==========
+
+export const linkServiceTeamMemberTool = defineTool({
+  name: 'link_service_team_member',
+  category: 'Services',
+  description:
+    '[Services] Link a team member to a service so they can perform it. AUTHENTICATION REQUIRED. Required to create appointments: without the link, create_appointment fails with HTTP 400 "team member does not provide the selected services". If the link already exists, use update_service_team_member to change its duration.',
+  annotations: {
+    title: 'Link Team Member to Service',
+    openWorldHint: true,
+    idempotentHint: false,
+  },
+  input: z.object({
+    location_id: z.number().int().positive().describe('Location ID'),
+    service_id: z.number().int().positive().describe('Service ID'),
+    team_member_id: z.number().int().positive().describe('Team member ID'),
+    session_length: seanceLengthSchema,
+    technological_card_id: z
+      .number()
+      .int()
+      .positive()
+      .nullable()
+      .optional()
+      .describe('Bill-of-materials (tech card) ID, or null'),
+  }),
+  handler: async ({ input, client }) => {
+    await client.assignServiceToStaff(input.location_id, input.service_id, {
+      master_id: input.team_member_id,
+      seance_length: input.session_length,
+      technological_card_id: input.technological_card_id ?? null,
+    });
+    return {
+      text: `Linked team member ${input.team_member_id} to service ${input.service_id} (${input.session_length}s per session)`,
+      structuredContent: {
+        service_id: input.service_id,
+        team_member_id: input.team_member_id,
+        session_length: input.session_length,
+      },
+    };
+  },
+});
+
+export const updateServiceTeamMemberTool = defineTool({
+  name: 'update_service_team_member',
+  category: 'Services',
+  description:
+    '[Services] Update an existing team member ↔ service link (session duration or tech card). AUTHENTICATION REQUIRED. Use link_service_team_member to create the link first.',
+  annotations: {
+    title: 'Update Team Member Service Link',
+    openWorldHint: true,
+    idempotentHint: true,
+  },
+  input: z.object({
+    location_id: z.number().int().positive().describe('Location ID'),
+    service_id: z.number().int().positive().describe('Service ID'),
+    team_member_id: z.number().int().positive().describe('Team member ID'),
+    session_length: seanceLengthSchema,
+    technological_card_id: z
+      .number()
+      .int()
+      .positive()
+      .nullable()
+      .optional()
+      .describe('Bill-of-materials (tech card) ID, or null'),
+  }),
+  handler: async ({ input, client }) => {
+    await client.updateServiceStaffAssignment(
+      input.location_id,
+      input.service_id,
+      input.team_member_id,
+      {
+        seance_length: input.session_length,
+        technological_card_id: input.technological_card_id ?? null,
+      }
+    );
+    return {
+      text: `Updated link of team member ${input.team_member_id} to service ${input.service_id} (${input.session_length}s per session)`,
+      structuredContent: {
+        service_id: input.service_id,
+        team_member_id: input.team_member_id,
+        session_length: input.session_length,
+      },
+    };
+  },
+});
+
+export const unlinkServiceTeamMemberTool = defineTool({
+  name: 'unlink_service_team_member',
+  category: 'Services',
+  description:
+    '[Services] Remove the link between a team member and a service (they stop offering it). AUTHENTICATION REQUIRED.',
+  annotations: {
+    title: 'Unlink Team Member from Service',
+    destructiveHint: true,
+    openWorldHint: true,
+  },
+  input: z.object({
+    location_id: z.number().int().positive().describe('Location ID'),
+    service_id: z.number().int().positive().describe('Service ID'),
+    team_member_id: z.number().int().positive().describe('Team member ID'),
+  }),
+  handler: async ({ input, client }) => {
+    await client.removeServiceFromStaff(
+      input.location_id,
+      input.service_id,
+      input.team_member_id
+    );
+    return {
+      text: `Unlinked team member ${input.team_member_id} from service ${input.service_id}`,
+    };
+  },
+});
+
+export const linkTeamMemberServicesTool = defineTool({
+  name: 'link_team_member_services',
+  category: 'Services',
+  description:
+    '[Services] Bulk-link ONE team member to MANY services in a single call. AUTHENTICATION REQUIRED. Applies the same session_length to every service. Reports per-service success/failure (already-linked services fail individually without stopping the rest).',
+  annotations: {
+    title: 'Link Team Member to Multiple Services',
+    openWorldHint: true,
+    idempotentHint: false,
+  },
+  input: z.object({
+    location_id: z.number().int().positive().describe('Location ID'),
+    team_member_id: z.number().int().positive().describe('Team member ID'),
+    service_ids: z
+      .array(z.number().int().positive())
+      .min(1)
+      .describe('Service IDs to link this team member to'),
+    session_length: seanceLengthSchema,
+    technological_card_id: z
+      .number()
+      .int()
+      .positive()
+      .nullable()
+      .optional()
+      .describe('Bill-of-materials (tech card) ID, or null'),
+  }),
+  handler: async ({ input, client }) => {
+    const linked: number[] = [];
+    const errors: string[] = [];
+    for (const serviceId of input.service_ids) {
+      try {
+        await client.assignServiceToStaff(input.location_id, serviceId, {
+          master_id: input.team_member_id,
+          seance_length: input.session_length,
+          technological_card_id: input.technological_card_id ?? null,
+        });
+        linked.push(serviceId);
+      } catch (error) {
+        errors.push(
+          `service ${serviceId}: ${error instanceof Error ? error.message : 'unknown error'}`
+        );
+      }
+    }
+    const summary = `Linked team member ${input.team_member_id} to ${linked.length}/${input.service_ids.length} service(s).`;
+    return {
+      text:
+        summary +
+        (linked.length > 0 ? `\nLinked: ${linked.join(', ')}` : '') +
+        (errors.length > 0 ? `\nFailed:\n  ${errors.join('\n  ')}` : ''),
+      structuredContent: {
+        team_member_id: input.team_member_id,
+        linked,
+        failed: errors.length,
+        errors,
       },
     };
   },

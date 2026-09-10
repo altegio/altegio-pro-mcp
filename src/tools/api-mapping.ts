@@ -72,6 +72,28 @@ export const apiMapping: Record<string, ApiMapping> = {
     pathParams: [],
     queryParams: ['my', 'page', 'count'],
   },
+  update_location: {
+    path: '/company/{location_id}',
+    method: 'put',
+    operationId: 'update_location',
+    pathParams: ['location_id'],
+    bodyParams: [
+      'title',
+      'country',
+      'country_id',
+      'city',
+      'city_id',
+      'address',
+      'zip',
+      'phones',
+      'site',
+      'coordinate_lat',
+      'coordinate_lon',
+      'description',
+      'business_type_id',
+      'short_descr',
+    ],
+  },
 
   // ==========================================
   // Appointments
@@ -127,6 +149,7 @@ export const apiMapping: Record<string, ApiMapping> = {
       'user_email',
       'user_phone',
       'is_user_invite',
+      'is_paid_staff',
     ],
   },
   update_staff: {
@@ -194,6 +217,44 @@ export const apiMapping: Record<string, ApiMapping> = {
       'active',
     ],
   },
+  delete_service: {
+    path: '/services/{location_id}/{service_id}',
+    method: 'delete',
+    operationId: 'delete_service',
+    pathParams: ['location_id', 'service_id'],
+  },
+
+  // ==========================================
+  // Service ↔ Team Member links
+  // ==========================================
+  link_service_team_member: {
+    path: '/company/{location_id}/services/{service_id}/staff',
+    method: 'post',
+    operationId: 'assign_service_to_team_member',
+    pathParams: ['location_id', 'service_id'],
+    bodyParams: ['master_id', 'seance_length', 'technological_card_id'],
+  },
+  // Bulk variant loops the single-assign operation, so it maps to the same op.
+  link_team_member_services: {
+    path: '/company/{location_id}/services/{service_id}/staff',
+    method: 'post',
+    operationId: 'assign_service_to_team_member',
+    pathParams: ['location_id', 'service_id'],
+    bodyParams: ['master_id', 'seance_length', 'technological_card_id'],
+  },
+  update_service_team_member: {
+    path: '/company/{location_id}/services/{service_id}/staff/{team_member_id}',
+    method: 'put',
+    operationId: 'update_service_team_member_assignment',
+    pathParams: ['location_id', 'service_id', 'team_member_id'],
+    bodyParams: ['seance_length', 'technological_card_id'],
+  },
+  unlink_service_team_member: {
+    path: '/company/{location_id}/services/{service_id}/staff/{team_member_id}',
+    method: 'delete',
+    operationId: 'remove_service_from_team_member',
+    pathParams: ['location_id', 'service_id', 'team_member_id'],
+  },
 
   // ==========================================
   // Service Categories
@@ -234,6 +295,11 @@ export const apiMapping: Record<string, ApiMapping> = {
     operationId: 'get_team_member_schedule',
     pathParams: ['location_id', 'team_member_id', 'start_date', 'end_date'],
   },
+  // create/update/delete_schedule all funnel through client.setSchedule, which
+  // PUTs the modern /company/{id}/staff/schedule endpoint. NOTE: the backend
+  // expects the per-entry key `staff_id`, not the `team_member_id` the spec
+  // documents — the client maps it (see AltegioClient.setSchedule). The body
+  // params below name the top-level keys the spec does document.
   create_schedule: {
     path: '/company/{location_id}/staff/schedule',
     method: 'put',

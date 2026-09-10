@@ -31,6 +31,7 @@ describe('ToolHandlers - Appointments CRUD', () => {
         team_member_id: 123,
         services: [{ id: 789 }],
         datetime: '2025-11-01T10:00:00',
+        session_length: 3600,
         client: { name: 'Jane', phone: '9876543210' },
       });
 
@@ -40,6 +41,7 @@ describe('ToolHandlers - Appointments CRUD', () => {
       expect(result.content[0]?.text).toContain('999');
       expect(mockClient.createBooking).toHaveBeenCalledWith(456, {
         staff_id: 123,
+        seance_length: 3600,
         services: [{ id: 789 }],
         datetime: '2025-11-01T10:00:00',
         client: { name: 'Jane', phone: '9876543210' },
@@ -56,6 +58,7 @@ describe('ToolHandlers - Appointments CRUD', () => {
         team_member_id: 123,
         services: [{ id: 789 }],
         datetime: '2025-11-01T10:00:00',
+        session_length: 3600,
         client: { name: 'Jane', phone: '123' },
       });
 

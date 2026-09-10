@@ -45,6 +45,29 @@ describe('AltegioClient - Bookings CRUD', () => {
       );
     });
 
+    it('should forward seance_length and save_if_busy in the body', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => ({ success: true, data: { id: 1 }, meta: {} }),
+      });
+
+      await client.createBooking(456, {
+        staff_id: 123,
+        services: [{ id: 789 }],
+        datetime: '2025-11-01T10:00:00',
+        seance_length: 3600,
+        save_if_busy: true,
+        client: { name: 'Jane', phone: '9876543210' },
+      });
+
+      const body = JSON.parse(
+        (global.fetch as jest.Mock).mock.calls[0][1].body as string
+      );
+      expect(body.seance_length).toBe(3600);
+      expect(body.save_if_busy).toBe(true);
+    });
+
     it('should throw error when not authenticated', async () => {
       const unauthClient = new AltegioClient(
         { partnerToken: 'test' },

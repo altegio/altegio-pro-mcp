@@ -11856,6 +11856,13 @@
                 "description": "Online sales group ID",
                 "type": "number"
               },
+              "personal_subdomain_url": {
+                "description": "Personal subdomain URL for the booking form; `null` when not configured",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "record_type_id": {
                 "description": "Appointment type ID",
                 "type": [
@@ -12204,6 +12211,13 @@
               "description": "Online sales group ID",
               "type": "number"
             },
+            "personal_subdomain_url": {
+              "description": "Personal subdomain URL for the booking form; `null` when not configured",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "record_type_id": {
               "description": "Appointment type ID",
               "type": [
@@ -12461,6 +12475,13 @@
             "online_sales_group_id": {
               "description": "Online sales group ID",
               "type": "number"
+            },
+            "personal_subdomain_url": {
+              "description": "Personal subdomain URL for the booking form; `null` when not configured",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "record_type_id": {
               "description": "Appointment type ID",
@@ -12811,6 +12832,13 @@
             "online_sales_group_id": {
               "description": "Online sales group ID",
               "type": "number"
+            },
+            "personal_subdomain_url": {
+              "description": "Personal subdomain URL for the booking form; `null` when not configured",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "record_type_id": {
               "description": "Appointment type ID",
@@ -22344,8 +22372,8 @@
         "statusCode": "201",
         "envelope": "v1",
         "schema": {
-          "description": "Is null",
-          "type": "string"
+          "description": "Always null for this endpoint",
+          "type": "null"
         }
       }
     },
@@ -22414,8 +22442,8 @@
         "statusCode": "201",
         "envelope": "v1",
         "schema": {
-          "description": "Is null",
-          "type": "string"
+          "description": "Always null for this endpoint",
+          "type": "null"
         }
       }
     },
@@ -25827,8 +25855,11 @@
                 "type": "string"
               },
               "slug": {
-                "description": "Tag slug",
-                "type": "string"
+                "description": "Tag slug; `null` when not set",
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "title": {
                 "description": "Tag name",
@@ -31904,8 +31935,8 @@
         "statusCode": "201",
         "envelope": "v1",
         "schema": {
-          "description": "Is null",
-          "type": "string"
+          "description": "Always null for this endpoint",
+          "type": "null"
         }
       }
     },
@@ -31965,8 +31996,8 @@
         "statusCode": "201",
         "envelope": "v1",
         "schema": {
-          "description": "Is null",
-          "type": "string"
+          "description": "Always null for this endpoint",
+          "type": "null"
         }
       }
     },
@@ -33940,6 +33971,10 @@
               "description": "Item ID",
               "type": "number"
             },
+            "good_special_number": {
+              "description": "Membership/subscription number. Required when selling a loyalty membership product to a specified client; must be unique.",
+              "type": "string"
+            },
             "master_id": {
               "description": "ID of the team member who sold the product",
               "type": "number"
@@ -34927,6 +34962,10 @@
             "good_id": {
               "description": "Item ID",
               "type": "number"
+            },
+            "good_special_number": {
+              "description": "Membership/subscription number. Required when selling a loyalty membership product to a specified client; must be unique.",
+              "type": "string"
             },
             "master_id": {
               "description": "ID of the team member who sold the product",

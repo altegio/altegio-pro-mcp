@@ -28,7 +28,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Available Tools
 
-**59 tools organized by category** for complete business management:
+**69 tools organized by category** for complete business management:
 
 ### 🔐 Authentication
 - `altegio_login` - Authenticate with email/password
@@ -36,6 +36,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ### 🏢 Location Management
 - `list_locations` - Get managed locations (requires auth)
+- `update_location` - Rename or change a location's address, city, contacts, coordinates, or business type
 
 ### 👥 Staff Management
 - `get_staff` - View staff members with admin details
@@ -54,6 +55,11 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 - `get_service_categories` - View service categories
 - `create_service` - Add new service
 - `update_service` - Modify service details
+- `delete_service` - Permanently delete a service
+- `link_service_team_member` - Link a team member to a service so they can perform it (required before booking that service)
+- `update_service_team_member` - Change a team member's session length / tech card for a service
+- `unlink_service_team_member` - Remove a team member ↔ service link
+- `link_team_member_services` - Bulk-link one team member to many services at once
 
 ### 📅 Schedule Management
 - `get_schedule` - View staff member work schedules
@@ -166,7 +172,7 @@ credential and is not a product boundary ([ADR-001](docs/architecture/2026-09-07
 
 | Endpoint | Serves |
 |---|---|
-| `/mcp` | **Every tool except the analytics pack**, plus its two entry points `analytics_get_overview` and `analytics_run_report` (47 tools) — the default view, unchanged for current clients |
+| `/mcp` | **Every tool except the analytics pack**, plus its two entry points `analytics_get_overview` and `analytics_run_report` (57 tools) — the default view |
 | `/mcp/ops` | Appointments (the daily work; clients and journal tools join as they land) |
 | `/mcp/catalog` | Services, service categories, team members, positions, work schedules, resources, location settings |
 | `/mcp/finance` | Analytics (visits, payments and payroll join as they land) |

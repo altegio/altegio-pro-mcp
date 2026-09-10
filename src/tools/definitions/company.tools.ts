@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
-import { companiesOutput } from '../output-schemas.js';
+import { companiesOutput, companyEntityOutput } from '../output-schemas.js';
 
 export const listLocationsTool = defineTool({
   name: 'list_locations',
@@ -61,6 +61,67 @@ export const listLocationsTool = defineTool({
           phone: c.phone,
         })),
         count: locations.length,
+      },
+    };
+  },
+});
+
+export const updateLocationTool = defineTool({
+  name: 'update_location',
+  category: 'Location',
+  description:
+    '[Location] Update a location (salon) — rename it, change address/city/country, phones, website, coordinates, description, or business type. AUTHENTICATION REQUIRED (admin access to the location). Provide only the fields to change.',
+  annotations: {
+    title: 'Update Location',
+    openWorldHint: true,
+    idempotentHint: true,
+  },
+  input: z.object({
+    location_id: z.number().int().positive().describe('Location ID'),
+    title: z.string().min(1).optional().describe('Location name'),
+    country: z.string().optional().describe('Country name'),
+    country_id: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Country ID (takes priority over country)'),
+    city: z.string().optional().describe('City name'),
+    city_id: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('City ID (takes priority over city)'),
+    address: z.string().optional().describe('Street address'),
+    zip: z.string().optional().describe('ZIP / postal code'),
+    phones: z
+      .array(z.string())
+      .optional()
+      .describe('Location phone numbers (without +)'),
+    site: z.string().optional().describe('Website URL'),
+    coordinate_lat: z.number().optional().describe('Latitude'),
+    coordinate_lon: z.number().optional().describe('Longitude'),
+    description: z.string().optional().describe('Description (HTML allowed)'),
+    business_type_id: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Business type ID'),
+    short_descr: z.string().optional().describe('Business category / tagline'),
+  }),
+  outputSchema: companyEntityOutput,
+  handler: async ({ input, client }) => {
+    const { location_id, ...updateData } = input;
+    const location = await client.updateLocation(location_id, updateData);
+    return {
+      text: `Successfully updated location ${location_id}:\nTitle: ${location.title ?? location.public_title ?? '(unchanged)'}`,
+      structuredContent: {
+        id: location.id,
+        title: location.title,
+        city: location.city,
+        address: location.address,
       },
     };
   },
