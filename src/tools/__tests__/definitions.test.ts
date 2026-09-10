@@ -7,9 +7,10 @@ const tools = (Object.values(defs) as unknown[]).filter(
 );
 
 describe('factory tool definitions', () => {
-  // 36 CRUD tools + 3 universal executor tools + 14 analytics tools + 4 clients.
+  // 38 curated tools + 3 universal executor tools + 14 analytics tools +
+  // 4 client reads (clients_delete is counted in curated tools).
   it('exposes all factory-defined tools', () => {
-    expect(tools.length).toBe(57);
+    expect(tools.length).toBe(59);
   });
 
   it('every tool produces a valid MCP spec', () => {
@@ -31,6 +32,18 @@ describe('factory tool definitions', () => {
     );
     expect(
       defs.deleteAppointmentTool.toMcpTool().annotations?.destructiveHint
+    ).toBe(true);
+    expect(
+      defs.deleteServiceCategoryTool.toMcpTool().annotations?.destructiveHint
+    ).toBe(true);
+    expect(
+      defs.clientsDeleteTool.toMcpTool().annotations?.destructiveHint
+    ).toBe(true);
+    expect(
+      defs.deleteBookingFormTool.toMcpTool().annotations?.destructiveHint
+    ).toBe(true);
+    expect(
+      defs.removeLocationUserTool.toMcpTool().annotations?.destructiveHint
     ).toBe(true);
   });
 

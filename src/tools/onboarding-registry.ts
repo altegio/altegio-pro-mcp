@@ -60,7 +60,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_add_positions',
     description:
-      '[Onboarding] Bulk create staff positions/roles (e.g. Manager, Stylist, Receptionist) from a JSON array or CSV string. Create positions BEFORE staff so staff can reference position_id. Accepts title (required) and api_id. Creates checkpoint for rollback.',
+      '[Onboarding] Bulk create staff positions/roles (e.g. Manager, Stylist, Receptionist) from a JSON array or CSV string. Create positions BEFORE staff so staff can reference position_id. The documented public V1 operation accepts title only. Created IDs are checkpointed for audit, but public V1 has no position delete operation, so this phase cannot be automatically rolled back.',
     annotations: {
       title: 'Batch Add Positions',
       openWorldHint: true,
@@ -72,7 +72,7 @@ export const onboardingTools: McpToolSpec[] = [
         location_id: { type: 'number', description: 'Location ID' },
         positions: {
           description:
-            'JSON array of position objects or CSV string with headers: title,api_id',
+            'JSON array of position objects or CSV string with header: title',
           oneOf: [
             {
               type: 'array',
@@ -80,7 +80,6 @@ export const onboardingTools: McpToolSpec[] = [
                 type: 'object',
                 properties: {
                   title: { type: 'string' },
-                  api_id: { type: 'string' },
                 },
                 required: ['title'],
               },
@@ -335,7 +334,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_rollback_phase',
     description:
-      'Delete all entities from specific phase and reset checkpoint. Supports: positions, staff, categories, services, schedules, clients, test_appointments. WARNING: Destructive operation.',
+      'Delete all entities from a supported onboarding phase and reset its checkpoint. Supports staff, categories, services, schedules, clients, and test_appointments. Position rollback is refused because public V1 has no position delete operation. Failed IDs remain checkpointed. WARNING: Destructive operation.',
     annotations: {
       title: 'Rollback Onboarding Phase',
       destructiveHint: true,
@@ -348,7 +347,7 @@ export const onboardingTools: McpToolSpec[] = [
         phase_name: {
           type: 'string',
           description:
-            'Phase to rollback (positions, staff, categories, services, schedules, clients, test_appointments)',
+            'Phase to rollback (staff, categories, services, schedules, clients, test_appointments; positions is accepted only to return the public-API limitation)',
         },
       },
       required: ['location_id', 'phase_name'],

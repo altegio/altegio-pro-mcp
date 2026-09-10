@@ -411,3 +411,32 @@ export const clientsLookupTool = defineTool({
   }),
   handler: async ({ input, client }) => clients.lookupClients(client, input),
 });
+
+// ========== clients_delete ==========
+
+export const clientsDeleteTool = defineTool({
+  name: 'clients_delete',
+  category: 'Clients',
+  description:
+    '[Clients] Permanently delete one specifically identified client from one location. AUTHENTICATION REQUIRED. Resolve and verify the exact client ID with clients_lookup or clients_get_card first; this is not a bulk cleanup operation.',
+  annotations: {
+    title: 'Clients: Delete One Client',
+    destructiveHint: true,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
+  input: z.object({
+    location_id: locationId,
+    client_id: z
+      .number()
+      .int()
+      .positive()
+      .describe('Exact client ID to delete'),
+  }),
+  handler: async ({ input, client }) => {
+    await client.deleteClient(input.location_id, input.client_id);
+    return {
+      text: `Deleted client ${input.client_id} from location ${input.location_id}`,
+    };
+  },
+});

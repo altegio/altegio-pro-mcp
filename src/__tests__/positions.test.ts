@@ -24,7 +24,7 @@ describe('AltegioClient Position Operations', () => {
       );
     });
 
-    it('should call positions endpoint with correct parameters', async () => {
+    it('should call the documented public V1 list endpoint', async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
         json: async () => ({
@@ -46,7 +46,7 @@ describe('AltegioClient Position Operations', () => {
       await client.getPositions(123);
 
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/positions/123',
+        'https://api.alteg.io/api/v1/company/123/staff/positions',
         expect.objectContaining({
           headers: expect.objectContaining({
             Authorization: 'Bearer partner123, User user456',
@@ -73,7 +73,7 @@ describe('AltegioClient Position Operations', () => {
       ).rejects.toThrow('Not authenticated');
     });
 
-    it('should call POST /positions endpoint', async () => {
+    it('should call the documented public V1 quick-create endpoint', async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
         json: async () => ({
@@ -95,71 +95,13 @@ describe('AltegioClient Position Operations', () => {
       await client.createPosition(123, { title: 'Manager' });
 
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/positions/123',
+        'https://api.alteg.io/api/v1/company/123/positions/quick',
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
             'Content-Type': 'application/json',
           }),
           body: JSON.stringify({ title: 'Manager' }),
-        })
-      );
-    });
-  });
-
-  describe('updatePosition', () => {
-    it('should call PUT endpoint', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          success: true,
-          data: { id: 1, title: 'Senior Manager' },
-        }),
-      });
-
-      const testDir = join(tmpdir(), `altegio-test-${Date.now()}`);
-      const client = new AltegioClient(
-        {
-          apiBase: 'https://api.alteg.io/api/v1',
-          partnerToken: 'partner123',
-          userToken: 'user456',
-        },
-        testDir
-      );
-
-      await client.updatePosition(123, 1, { title: 'Senior Manager' });
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/positions/123/1',
-        expect.objectContaining({
-          method: 'PUT',
-        })
-      );
-    });
-  });
-
-  describe('deletePosition', () => {
-    it('should call DELETE endpoint', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-      });
-
-      const testDir = join(tmpdir(), `altegio-test-${Date.now()}`);
-      const client = new AltegioClient(
-        {
-          apiBase: 'https://api.alteg.io/api/v1',
-          partnerToken: 'partner123',
-          userToken: 'user456',
-        },
-        testDir
-      );
-
-      await client.deletePosition(123, 1);
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/positions/123/1',
-        expect.objectContaining({
-          method: 'DELETE',
         })
       );
     });

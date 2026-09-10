@@ -112,9 +112,8 @@ operations:
     tool_name: create_position
     write_allowed: false
     notes: >
-      update_position and delete_position call /positions/{location_id}/{id},
-      which the V1 spec does not document — they stay in `unmappedTools` until
-      the spec team documents the pair.
+      Deprecated but still the only public V1 position create operation. Public
+      V1 has no supported position update or delete; do not use internal V2.
 
   # --- services ------------------------------------------------------------
   get_service_list:
@@ -130,12 +129,40 @@ operations:
     facets: [catalog, onboarding]
     tool_name: create_service
     write_allowed: false
-  patch_service:
+  deprecated_update_service_by_id:
     domain: services
     tier: core
     facets: [catalog]
     tool_name: update_service
     write_allowed: false
+    notes: >
+      PUT is replacement-shaped. The curated client reads and merges the
+      current service so unchanged fields and team-member links survive.
+  delete_service_category:
+    domain: services
+    tier: core
+    facets: [catalog, onboarding]
+    tool_name: delete_service_category
+    write_allowed: false
+  delete_client:
+    domain: clients
+    tier: pack
+    facets: [ops, onboarding]
+    tool_name: clients_delete
+    write_allowed: false
+  delete_booking_widget:
+    domain: online_booking
+    tier: core
+    facets: [catalog, onboarding]
+    tool_name: delete_booking_form
+    write_allowed: false
+  remove_user_from_location:
+    domain: users
+    tier: pack
+    facets: [catalog]
+    tool_name: remove_location_user
+    write_allowed: false
+    notes: Exact user ID is required twice as a destructive safeguard.
   deprecated_get_service_category_list:
     domain: services
     tier: core

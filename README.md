@@ -14,21 +14,21 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Features
 
-- **59 MCP tools** including a 14-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
-- **CRUD operations** for staff, services, appointments, schedules, and positions management
+- **71 MCP tools** including a 14-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
+- **Administrative writes** for staff, services, appointments, schedules, clients, categories, booking forms, and location users
 - **Analytics**: key metrics with period comparison, daily series, breakdowns, day-end report, report builder
 - **Location settings**: appointment calendar, online booking, booking forms, resources
 - **Universal API executor**: search, describe and call any of the 317 documented API operations, even the ones without a dedicated tool
 - **Conversational onboarding** with bulk CSV/JSON import and checkpoint/resume
 - **Dual transport:** stdio for Claude Desktop, HTTP for cloud deployments
-- **TypeScript** with full type safety and comprehensive tests (466 passing)
+- **TypeScript** with full type safety and comprehensive automated tests
 - **Auto-deploy CI/CD** via VM cron (git pull + docker compose rebuild every 2 min)
 - **Rate limiting** and **retry logic** with exponential backoff
 - **Secure credential storage** in `~/.altegio-mcp/`
 
 ## Available Tools
 
-**69 tools organized by category** for complete business management:
+**71 tools organized by category** for complete business management:
 
 ### 🔐 Authentication
 - `altegio_login` - Authenticate with email/password
@@ -47,8 +47,9 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 ### 📋 Positions Management
 - `get_positions` - List location positions/roles
 - `create_position` - Create new position (Manager, Stylist, etc.)
-- `update_position` - Modify position details
-- `delete_position` - Remove position
+
+The documented public V1 API only supports listing and quick creation. Position
+update/delete are intentionally not exposed; internal V2 routes are out of scope.
 
 ### 🛎️ Services Management
 - `get_services` - View all services with configuration
@@ -60,6 +61,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 - `update_service_team_member` - Change a team member's session length / tech card for a service
 - `unlink_service_team_member` - Remove a team member ↔ service link
 - `link_team_member_services` - Bulk-link one team member to many services at once
+- `delete_service_category` - Permanently delete a service category
 
 ### 📅 Schedule Management
 - `get_schedule` - View staff member work schedules
@@ -76,7 +78,12 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 ### ⚙️ Location Settings
 - `get_appointment_settings` / `update_appointment_settings` - Appointment calendar defaults (record type, group capacity)
 - `get_online_booking_settings` / `update_online_booking_settings` - Online booking behavior
-- `get_booking_forms` / `create_booking_form` - Online booking widgets
+- `get_booking_forms` / `create_booking_form` / `delete_booking_form` - Online booking widgets
+
+### 👤 Clients and Location Access
+- `clients_search`, `clients_get_card`, `clients_get_visit_history`, `clients_lookup` - Search and inspect the client base
+- `clients_delete` - Permanently delete a client
+- `remove_location_user` - Revoke a user's access to one location; requires the user ID twice as an explicit safeguard
 
 ### 🪑 Resources
 - `get_resources` - List cabinets/equipment (read-only; API has no create)
@@ -161,7 +168,10 @@ alternative for each.
 - `onboarding_preview_data` - Validate before import
 - `onboarding_rollback_phase` - Undo specific phase
 
-**Note:** Services DELETE operation is not available in Altegio API. All write operations require user authentication via `altegio_login`. See [Onboarding Guide](docs/ONBOARDING_GUIDE.md) for first-time setup workflows.
+All write operations require user authentication via `altegio_login`. See the
+[Onboarding Guide](docs/ONBOARDING_GUIDE.md) for first-time setup workflows and
+[Demo-management API contract notes](docs/DEMO_MANAGEMENT_CONTRACTS.md) for
+documented limitations and live-API discrepancies.
 
 ## Facets
 
@@ -172,7 +182,7 @@ credential and is not a product boundary ([ADR-001](docs/architecture/2026-09-07
 
 | Endpoint | Serves |
 |---|---|
-| `/mcp` | **Every tool except the analytics pack**, plus its two entry points `analytics_get_overview` and `analytics_run_report` (57 tools) — the default view |
+| `/mcp` | **Every tool except the analytics pack**, plus its two entry points `analytics_get_overview` and `analytics_run_report` (59 tools) — the default view |
 | `/mcp/ops` | Appointments (the daily work; clients and journal tools join as they land) |
 | `/mcp/catalog` | Services, service categories, team members, positions, work schedules, resources, location settings |
 | `/mcp/finance` | Analytics (visits, payments and payroll join as they land) |

@@ -35,13 +35,19 @@ export class ToolHandlers {
   deleteSchedule = (args: unknown) => this.run(defs.deleteScheduleTool, args);
   getPositions = (args: unknown) => this.run(defs.getPositionsTool, args);
   createPosition = (args: unknown) => this.run(defs.createPositionTool, args);
-  updatePosition = (args: unknown) => this.run(defs.updatePositionTool, args);
-  deletePosition = (args: unknown) => this.run(defs.deletePositionTool, args);
   createStaff = (args: unknown) => this.run(defs.createStaffTool, args);
   updateStaff = (args: unknown) => this.run(defs.updateStaffTool, args);
   deleteStaff = (args: unknown) => this.run(defs.deleteStaffTool, args);
   createService = (args: unknown) => this.run(defs.createServiceTool, args);
   updateService = (args: unknown) => this.run(defs.updateServiceTool, args);
+  deleteService = (args: unknown) => this.run(defs.deleteServiceTool, args);
+  deleteServiceCategory = (args: unknown) =>
+    this.run(defs.deleteServiceCategoryTool, args);
+  deleteClient = (args: unknown) => this.run(defs.clientsDeleteTool, args);
+  deleteBookingForm = (args: unknown) =>
+    this.run(defs.deleteBookingFormTool, args);
+  removeLocationUser = (args: unknown) =>
+    this.run(defs.removeLocationUserTool, args);
   createAppointment = (args: unknown) =>
     this.run(defs.createAppointmentTool, args);
   updateAppointment = (args: unknown) =>

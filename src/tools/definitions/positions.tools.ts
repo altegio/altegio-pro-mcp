@@ -6,7 +6,7 @@ export const getPositionsTool = defineTool({
   name: 'get_positions',
   category: 'Positions',
   description:
-    '[Positions] Get list of positions in a location. AUTHENTICATION REQUIRED. Returns all available positions that can be assigned to staff members.',
+    '[Positions] Get the positions that can be assigned to team members in a location. AUTHENTICATION REQUIRED. This uses the deprecated but still documented public V1 read; public V1 does not provide position update or delete operations.',
   annotations: {
     title: 'Get Positions',
     readOnlyHint: true,
@@ -36,7 +36,6 @@ export const getPositionsTool = defineTool({
         items: positions.map((p) => ({
           id: p.id,
           title: p.title,
-          api_id: p.api_id,
         })),
         count: positions.length,
       },
@@ -48,7 +47,7 @@ export const createPositionTool = defineTool({
   name: 'create_position',
   category: 'Positions',
   description:
-    '[Positions] Create a new position. AUTHENTICATION REQUIRED. Positions are used to categorize staff roles (e.g., "Manager", "Stylist", "Receptionist").',
+    '[Positions] Create a new position through the deprecated but still documented public V1 quick-create operation. AUTHENTICATION REQUIRED. Positions categorize team-member roles (for example Manager, Stylist, Receptionist). Public V1 accepts only the title and does not provide position update or delete operations.',
   annotations: {
     title: 'Create Position',
     openWorldHint: true,
@@ -57,7 +56,6 @@ export const createPositionTool = defineTool({
   input: z.object({
     location_id: z.number().int().positive().describe('Location ID'),
     title: z.string().min(1).describe('Position title'),
-    api_id: z.string().optional().describe('External API ID (optional)'),
   }),
   outputSchema: positionEntityOutput,
   handler: async ({ input, client }) => {
@@ -66,59 +64,6 @@ export const createPositionTool = defineTool({
     return {
       text: `Successfully created position:\nID: ${position.id}\nTitle: ${position.title}`,
       structuredContent: { id: position.id, title: position.title },
-    };
-  },
-});
-
-export const updatePositionTool = defineTool({
-  name: 'update_position',
-  category: 'Positions',
-  description:
-    '[Positions] Update existing position. AUTHENTICATION REQUIRED. Modify position title or external ID.',
-  annotations: {
-    title: 'Update Position',
-    openWorldHint: true,
-    idempotentHint: true,
-  },
-  input: z.object({
-    location_id: z.number().int().positive().describe('Location ID'),
-    position_id: z.number().int().positive().describe('Position ID'),
-    title: z.string().min(1).optional().describe('New position title'),
-    api_id: z.string().optional().describe('External API ID (optional)'),
-  }),
-  outputSchema: positionEntityOutput,
-  handler: async ({ input, client }) => {
-    const { location_id, position_id, ...updateData } = input;
-    const position = await client.updatePosition(
-      location_id,
-      position_id,
-      updateData
-    );
-    return {
-      text: `Successfully updated position ${position_id}:\nTitle: ${position.title}`,
-      structuredContent: { id: position.id, title: position.title },
-    };
-  },
-});
-
-export const deletePositionTool = defineTool({
-  name: 'delete_position',
-  category: 'Positions',
-  description:
-    '[Positions] Delete position. AUTHENTICATION REQUIRED. Note: Cannot delete positions that are assigned to staff members.',
-  annotations: {
-    title: 'Delete Position',
-    destructiveHint: true,
-    openWorldHint: true,
-  },
-  input: z.object({
-    location_id: z.number().int().positive().describe('Location ID'),
-    position_id: z.number().int().positive().describe('Position ID to delete'),
-  }),
-  handler: async ({ input, client }) => {
-    await client.deletePosition(input.location_id, input.position_id);
-    return {
-      text: `Successfully deleted position ${input.position_id}`,
     };
   },
 });

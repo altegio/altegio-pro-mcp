@@ -70,7 +70,7 @@ export interface AltegioBooking {
   id: number;
   company_id: number;
   staff_id: number;
-  staff: {
+  staff?: {
     id: number;
     name: string;
     specialization?: string;
@@ -80,9 +80,12 @@ export interface AltegioBooking {
     id: number;
     title: string;
     cost: number;
+    amount?: number;
+    discount?: number;
+    manual_cost?: number;
     currency?: string;
   }>;
-  client: {
+  client?: {
     id: number;
     name: string;
     phone?: string;
@@ -91,8 +94,22 @@ export interface AltegioBooking {
   };
   date: string;
   datetime: string;
-  duration: number;
-  status: string;
+  duration?: number;
+  /** Canonical status is derived from these V1 attendance codes. */
+  attendance?: number;
+  visit_attendance?: number;
+  confirmed?: number;
+  seance_length?: number;
+  length?: number;
+  visit_id?: number;
+  created_user_id?: number;
+  deleted?: boolean;
+  online?: boolean;
+  paid_full?: number;
+  create_date?: string;
+  last_change_date?: string;
+  /** Some deployments return a pre-normalized status string. */
+  status?: string;
   paid_status?: string;
   payment_status?: string;
   prepaid?: boolean;
@@ -160,13 +177,24 @@ export interface AltegioStaff {
 export interface AltegioService {
   id: number;
   title: string;
-  cost: number;
+  /** Some legacy list variants expose one price as `cost`. */
+  cost?: number;
   discount?: number;
   category_id?: number;
   duration?: number;
+  technical_break_duration?: number | null;
   api_id?: string | null;
   price_min?: number;
   price_max?: number;
+  comment?: string;
+  weight?: number;
+  active?: number | boolean;
+  prepaid?: string;
+  staff?: Array<{
+    id: number;
+    seance_length: number;
+    technological_card_id?: number | null;
+  }>;
   [key: string]: unknown;
 }
 
@@ -277,6 +305,8 @@ export interface CreateServiceRequest {
   comment?: string;
   duration?: number;
   prepaid?: string;
+  /** Defaults to 1 in the client so a newly created service is usable. */
+  active?: number;
 }
 
 export interface UpdateServiceRequest {
@@ -287,6 +317,10 @@ export interface UpdateServiceRequest {
   discount?: number;
   comment?: string;
   duration?: number;
+  technical_break_duration?: number | null;
+  weight?: number;
+  api_id?: string;
+  prepaid?: string;
   active?: number;
 }
 
@@ -398,12 +432,6 @@ export interface UpdateLocationRequest {
 // Positions
 export interface CreatePositionRequest {
   title: string;
-  api_id?: string;
-}
-
-export interface UpdatePositionRequest {
-  title?: string;
-  api_id?: string;
 }
 
 // ========== Location Settings & Resources ==========

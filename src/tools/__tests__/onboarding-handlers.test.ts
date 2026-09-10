@@ -295,9 +295,10 @@ describe('Onboarding Handlers', () => {
       );
     });
 
-    it('should handle services (no delete API)', async () => {
+    it('should delete services through the documented API', async () => {
       await handlers.start({ location_id: 123 });
       await stateManager.checkpoint(123, 'services', [20, 21]);
+      mockClient.deleteService = jest.fn().mockResolvedValue(undefined);
 
       const result = await handlers.rollbackPhase({
         location_id: 123,
@@ -305,24 +306,66 @@ describe('Onboarding Handlers', () => {
       });
 
       expect(result.content[0]?.text).toContain('Rolled back services');
-      expect(result.content[0]?.text).toContain(
-        'Note: Services cannot be deleted via API'
-      );
+      expect(mockClient.deleteService).toHaveBeenCalledTimes(2);
     });
 
-    it('should delete positions', async () => {
+    it('refuses unsupported position rollback and keeps the checkpoint', async () => {
       await handlers.start({ location_id: 123 });
       await stateManager.checkpoint(123, 'positions', [5, 6]);
-
-      mockClient.deletePosition = jest.fn().mockResolvedValue(undefined);
 
       const result = await handlers.rollbackPhase({
         location_id: 123,
         phase_name: 'positions',
       });
 
-      expect(mockClient.deletePosition).toHaveBeenCalledTimes(2);
-      expect(result.content[0]?.text).toContain('Rolled back positions');
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toContain(
+        'public V1 API has list and quick-create operations but no position delete'
+      );
+      expect(
+        (await stateManager.load(123))?.checkpoints.positions
+      ).toBeDefined();
+    });
+
+    it('deletes categories and clients through their documented APIs', async () => {
+      await handlers.start({ location_id: 123 });
+      await stateManager.checkpoint(123, 'categories', [10]);
+      await stateManager.checkpoint(123, 'clients', [30]);
+      mockClient.deleteServiceCategory = jest.fn().mockResolvedValue(undefined);
+      mockClient.deleteClient = jest.fn().mockResolvedValue(undefined);
+
+      await handlers.rollbackPhase({
+        location_id: 123,
+        phase_name: 'categories',
+      });
+      await handlers.rollbackPhase({
+        location_id: 123,
+        phase_name: 'clients',
+      });
+
+      expect(mockClient.deleteServiceCategory).toHaveBeenCalledWith(123, 10);
+      expect(mockClient.deleteClient).toHaveBeenCalledWith(123, 30);
+    });
+
+    it('keeps failed destructive IDs in the checkpoint', async () => {
+      await handlers.start({ location_id: 123 });
+      await stateManager.checkpoint(123, 'categories', [10, 11]);
+      mockClient.deleteServiceCategory = jest
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('chain-owned'));
+
+      const result = await handlers.rollbackPhase({
+        location_id: 123,
+        phase_name: 'categories',
+      });
+
+      expect(result.content[0]?.text).toContain(
+        'checkpoint retained for IDs [11]'
+      );
+      expect(
+        (await stateManager.load(123))?.checkpoints.categories?.entity_ids
+      ).toEqual([11]);
     });
 
     it('should delete schedules using metadata dates', async () => {

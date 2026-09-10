@@ -10,11 +10,79 @@ describe('ToolHandlers - Appointments CRUD', () => {
 
   beforeEach(() => {
     mockClient = {
+      getBookings: jest.fn(),
       createBooking: jest.fn(),
       updateBooking: jest.fn(),
       deleteBooking: jest.fn(),
     } as any;
     handlers = new ToolHandlers(mockClient);
+  });
+
+  describe('getAppointments', () => {
+    it('derives a canonical visit status and useful fields without undefined text', async () => {
+      mockClient.getBookings.mockResolvedValue([
+        {
+          id: 999,
+          company_id: 456,
+          staff_id: 123,
+          staff: { id: 123, name: 'Alex' },
+          client: { id: 321, name: 'Jane', phone: '555' },
+          services: [{ id: 789, title: 'Haircut', cost: 100, amount: 2 }],
+          datetime: '2026-09-10T10:00:00+02:00',
+          date: '2026-09-10T10:00:00+02:00',
+          attendance: 0,
+          confirmed: 1,
+          seance_length: 3600,
+          visit_id: 42,
+          paid_full: 1,
+          online: true,
+          deleted: false,
+        },
+      ] as any);
+
+      const result = await handlers.getAppointments({
+        location_id: 456,
+        page: 1,
+      });
+
+      expect(result.content[0]?.text).toContain('Visit status: confirmed');
+      expect(result.content[0]?.text).toContain('Total cost: 200');
+      expect(result.content[0]?.text).not.toContain('undefined');
+      expect(result.structuredContent).toMatchObject({
+        items: [
+          {
+            id: 999,
+            location_id: 456,
+            status: 'confirmed',
+            client_id: 321,
+            total_cost: 200,
+            duration_seconds: 3600,
+            visit_id: 42,
+            paid_in_full: true,
+            online: true,
+            deleted: false,
+          },
+        ],
+      });
+      expect(mockClient.getBookings).toHaveBeenCalledWith(456, { page: 1 });
+    });
+
+    it('reports an unknown status explicitly when V1 omits it', async () => {
+      mockClient.getBookings.mockResolvedValue([
+        {
+          id: 1000,
+          company_id: 456,
+          staff_id: 123,
+          services: [],
+          datetime: '2026-09-10T10:00:00+02:00',
+          date: '2026-09-10T10:00:00+02:00',
+        },
+      ] as any);
+
+      const result = await handlers.getAppointments({ location_id: 456 });
+      expect(result.content[0]?.text).toContain('Visit status: unknown');
+      expect(result.content[0]?.text).not.toContain('undefined');
+    });
   });
 
   describe('createAppointment', () => {

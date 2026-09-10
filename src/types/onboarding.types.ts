@@ -76,7 +76,6 @@ export const CategoryBatchItemSchema = z.object({
 
 export const PositionBatchItemSchema = z.object({
   title: z.string().min(1),
-  api_id: z.string().optional(),
 });
 
 export const ScheduleSlotInputSchema = z.object({

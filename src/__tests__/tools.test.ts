@@ -68,8 +68,8 @@ describe('Tool Registration', () => {
     // Position management tools
     expect(toolNames).toContain('get_positions');
     expect(toolNames).toContain('create_position');
-    expect(toolNames).toContain('update_position');
-    expect(toolNames).toContain('delete_position');
+    expect(toolNames).not.toContain('update_position');
+    expect(toolNames).not.toContain('delete_position');
 
     // Location settings tools (6)
     expect(toolNames).toContain('get_appointment_settings');
@@ -78,12 +78,14 @@ describe('Tool Registration', () => {
     expect(toolNames).toContain('update_online_booking_settings');
     expect(toolNames).toContain('get_booking_forms');
     expect(toolNames).toContain('create_booking_form');
+    expect(toolNames).toContain('delete_booking_form');
 
     // Resources tool (1)
     expect(toolNames).toContain('get_resources');
 
     // Service delete + service ↔ team member links
     expect(toolNames).toContain('delete_service');
+    expect(toolNames).toContain('delete_service_category');
     expect(toolNames).toContain('link_service_team_member');
     expect(toolNames).toContain('update_service_team_member');
     expect(toolNames).toContain('unlink_service_team_member');
@@ -91,6 +93,10 @@ describe('Tool Registration', () => {
 
     // Location update
     expect(toolNames).toContain('update_location');
+
+    // Exact-ID demo cleanup tools
+    expect(toolNames).toContain('clients_delete');
+    expect(toolNames).toContain('remove_location_user');
 
     // Universal executor over the generated API catalog (3, ADR-001 D2)
     expect(toolNames).toContain('altegio_search_operations');
@@ -113,8 +119,8 @@ describe('Tool Registration', () => {
     expect(toolNames).toContain('analytics_list_saved_reports');
     expect(toolNames).toContain('analytics_run_saved_report');
 
-    // Total: 36 CRUD + 3 executor + 14 analytics + 4 clients + 12 onboarding = 69 tools
-    expect(toolNames.length).toBe(69);
+    // Total: 59 factory-defined + 12 onboarding = 71 tools
+    expect(toolNames.length).toBe(71);
   });
 
   it('should create server with tools', () => {

@@ -1,11 +1,82 @@
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import { bookingsOutput, bookingEntityOutput } from '../output-schemas.js';
+import { visitStatusFromLegacyCode } from '../../capabilities/analytics/vocabulary.js';
+import type { AltegioBooking } from '../../types/altegio.types.js';
 
 const serviceItemSchema = z.object({
   id: z.number().int().positive().describe('Service ID'),
   amount: z.number().positive().optional().describe('Amount/quantity'),
 });
+
+function appointmentStatus(appointment: AltegioBooking): string {
+  if (appointment.deleted) return 'cancelled';
+  const code = appointment.attendance ?? appointment.visit_attendance;
+  // Some V1 responses keep attendance=0 but set the separate confirmation
+  // flag. Prefer the more specific state in that combination.
+  if (code === 0 && appointment.confirmed === 1) return 'confirmed';
+  if (typeof code === 'number') {
+    const mapped = visitStatusFromLegacyCode(code);
+    if (mapped) return mapped;
+  }
+  const reported = appointment.status?.trim().toLowerCase();
+  if (
+    reported &&
+    ['waiting', 'confirmed', 'arrived', 'no_show', 'cancelled'].includes(
+      reported
+    )
+  ) {
+    return reported;
+  }
+  return 'unknown';
+}
+
+function appointmentTotalCost(appointment: AltegioBooking): number | null {
+  const priced = (appointment.services ?? []).filter(
+    (service) => typeof service.cost === 'number'
+  );
+  if (priced.length === 0) return null;
+  return priced.reduce(
+    (total, service) => total + service.cost * (service.amount ?? 1),
+    0
+  );
+}
+
+function projectAppointment(appointment: AltegioBooking) {
+  return {
+    id: appointment.id,
+    location_id: appointment.company_id,
+    datetime: appointment.datetime ?? null,
+    date: appointment.date ?? null,
+    status: appointmentStatus(appointment),
+    team_member_id: appointment.staff_id ?? appointment.staff?.id ?? null,
+    team_member_name: appointment.staff?.name ?? null,
+    client_id: appointment.client?.id ?? null,
+    client_name: appointment.client?.name ?? null,
+    client_phone: appointment.client?.phone ?? null,
+    services: (appointment.services ?? []).map((service) => ({
+      id: service.id,
+      title: service.title,
+      cost: service.cost ?? null,
+      amount: service.amount ?? null,
+    })),
+    total_cost: appointmentTotalCost(appointment),
+    duration_seconds:
+      appointment.seance_length ??
+      appointment.length ??
+      appointment.duration ??
+      null,
+    visit_id: appointment.visit_id ?? null,
+    paid_in_full:
+      appointment.paid_full === undefined
+        ? null
+        : Boolean(appointment.paid_full),
+    prepaid: appointment.prepaid ?? null,
+    online: appointment.online ?? null,
+    comment: appointment.comment ?? null,
+    deleted: Boolean(appointment.deleted),
+  };
+}
 
 export const getAppointmentsTool = defineTool({
   name: 'get_appointments',
@@ -29,12 +100,13 @@ export const getAppointmentsTool = defineTool({
       .positive()
       .optional()
       .describe(
-        'Page number for pagination (starts at 0). Use to fetch subsequent pages when user needs more results.'
+        '1-based page number for pagination (default 1). Use 2 for the next page.'
       ),
     count: z
       .number()
       .int()
       .positive()
+      .max(300)
       .optional()
       .describe(
         'Results per page. Default may be large. RECOMMENDED: Use 20-50 for initial requests. Only increase if user explicitly requests more. Max 300.'
@@ -62,31 +134,24 @@ export const getAppointmentsTool = defineTool({
 
     const summary = `Found ${appointments.length} ${appointments.length === 1 ? 'appointment' : 'appointments'} for location ${location_id}:\n\n`;
     const appointmentsList = appointments
-      .map(
-        (b, idx) =>
+      .map((b, idx) => {
+        const projected = projectAppointment(b);
+        return (
           `${idx + 1}. Appointment ID: ${b.id}\n` +
-          `   Date: ${b.datetime || b.date}\n` +
-          `   Client: ${b.client?.name || 'N/A'} (${b.client?.phone || 'no phone'})\n` +
-          `   Team member: ${b.staff?.name || 'N/A'}\n` +
-          `   Services: ${b.services?.map((s) => s.title).join(', ') || 'N/A'}\n` +
-          `   Status: ${b.status}`
-      )
+          `   Date: ${projected.datetime ?? projected.date ?? 'not reported'}\n` +
+          `   Client: ${projected.client_name ?? 'not reported'} (${projected.client_phone ?? 'no phone'})\n` +
+          `   Team member: ${projected.team_member_name ?? 'not reported'}\n` +
+          `   Services: ${projected.services.map((s) => s.title).join(', ') || 'none'}\n` +
+          `   Visit status: ${projected.status}\n` +
+          `   Total cost: ${projected.total_cost ?? 'not reported'}`
+        );
+      })
       .join('\n\n');
 
     return {
       text: summary + appointmentsList,
       structuredContent: {
-        items: appointments.map((b) => ({
-          id: b.id,
-          datetime: b.datetime,
-          date: b.date,
-          status: b.status,
-          team_member_id: b.staff_id,
-          team_member_name: b.staff?.name,
-          client_name: b.client?.name,
-          client_phone: b.client?.phone,
-          services: b.services,
-        })),
+        items: appointments.map(projectAppointment),
         count: appointments.length,
       },
     };

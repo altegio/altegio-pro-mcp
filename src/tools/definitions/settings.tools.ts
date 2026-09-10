@@ -292,3 +292,30 @@ export const createBookingFormTool = defineTool({
     };
   },
 });
+
+export const deleteBookingFormTool = defineTool({
+  name: 'delete_booking_form',
+  category: 'Settings',
+  description:
+    '[Settings] Permanently delete one specifically identified online booking form/widget. AUTHENTICATION REQUIRED. Read the forms first with get_booking_forms and take extra care before deleting the default form.',
+  annotations: {
+    title: 'Delete Booking Form',
+    destructiveHint: true,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
+  input: z.object({
+    location_id: z.number().int().positive().describe('Location ID'),
+    form_id: z
+      .number()
+      .int()
+      .positive()
+      .describe('Exact booking form ID to delete'),
+  }),
+  handler: async ({ input, client }) => {
+    await client.deleteBookingForm(input.location_id, input.form_id);
+    return {
+      text: `Deleted booking form ${input.form_id} from location ${input.location_id}`,
+    };
+  },
+});

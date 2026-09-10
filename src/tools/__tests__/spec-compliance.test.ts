@@ -491,10 +491,7 @@ describe('Spec Compliance', () => {
       for (const tool of unmappedTools) {
         if (executor.has(tool)) continue;
         expect(
-          tool === 'altegio_logout' ||
-            tool.startsWith('onboarding_') ||
-            tool === 'update_position' ||
-            tool === 'delete_position'
+          tool === 'altegio_logout' || tool.startsWith('onboarding_')
         ).toBe(true);
       }
     });

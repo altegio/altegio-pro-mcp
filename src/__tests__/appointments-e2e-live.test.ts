@@ -97,6 +97,11 @@ describeLive('appointments end-to-end against the demo location', () => {
       });
       expect(service.id).toBeGreaterThan(0);
       cleanup.push(() => client.deleteService(DEMO_LOCATION_ID, service.id));
+      const createdService = await client.getService(
+        DEMO_LOCATION_ID,
+        service.id
+      );
+      expect(Number(createdService.active)).toBe(1);
 
       // --- PRIORITY 2: link the team member to the service --------------------
       await client.assignServiceToStaff(DEMO_LOCATION_ID, service.id, {
@@ -105,6 +110,19 @@ describeLive('appointments end-to-end against the demo location', () => {
       });
       cleanup.push(() =>
         client.removeServiceFromStaff(DEMO_LOCATION_ID, service.id, staff.id)
+      );
+
+      // A service update is a replacement-shaped V1 PUT. The client must read
+      // and merge the staff array so this link remains bookable.
+      await client.updateService(DEMO_LOCATION_ID, service.id, {
+        comment: `E2E link-preservation ${stamp}`,
+      });
+      const updatedService = await client.getService(
+        DEMO_LOCATION_ID,
+        service.id
+      );
+      expect(updatedService.staff?.some((link) => link.id === staff.id)).toBe(
+        true
       );
 
       // --- PRIORITY 1: set a schedule and read it back with slots -------------
