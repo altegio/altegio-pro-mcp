@@ -5,6 +5,8 @@ import { ALL_TOOLS_FACET } from '../tools/facets.js';
 import { AltegioClient } from '../providers/altegio-client.js';
 import { ToolHandlers } from '../tools/handlers.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { getRequestUserToken } from '../request-context.js';
 
 describe('Tool Registration', () => {
   it('should register all tools and return tool names', () => {
@@ -121,6 +123,51 @@ describe('Tool Registration', () => {
     expect(server).toBeDefined();
     expect(server.name).toBe('@altegio/mcp-server-pro');
     expect(server.version).toBe('1.0.0');
+  });
+
+  it('rebinds direct-token headers at the SDK tool-handler boundary', async () => {
+    type RegisteredHandler = (
+      request: {
+        params: { name: string; arguments: Record<string, unknown> };
+      },
+      extra: {
+        requestInfo?: { headers: Record<string, string>; url: URL };
+      }
+    ) => Promise<unknown>;
+
+    let callHandler: RegisteredHandler | undefined;
+    const server = {
+      setRequestHandler: (schema: unknown, handler: RegisteredHandler) => {
+        if (schema === CallToolRequestSchema) callHandler = handler;
+      },
+    } as unknown as Server;
+    let tokenSeenByClient: string | undefined;
+    const client = {
+      getCompanies: async () => {
+        tokenSeenByClient = getRequestUserToken();
+        return [];
+      },
+    } as unknown as AltegioClient;
+
+    registerTools(server, client);
+    expect(callHandler).toBeDefined();
+    await callHandler!(
+      {
+        params: {
+          name: 'list_locations',
+          arguments: { my: 1, count: 1 },
+        },
+      },
+      {
+        requestInfo: {
+          headers: { 'x-altegio-user-token': 'direct-user-token' },
+          url: new URL('https://mcp.alteg.io/public/pro/mcp'),
+        },
+      }
+    );
+
+    expect(tokenSeenByClient).toBe('direct-user-token');
+    expect(getRequestUserToken()).toBeUndefined();
   });
 });
 
