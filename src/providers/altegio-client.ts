@@ -22,6 +22,7 @@ import { CredentialManager } from './credential-manager.js';
 import { AuthenticationError, AltegioApiError } from '../utils/errors.js';
 import {
   assertCompanyAllowed,
+  getRequestCompanyIds,
   getRequestIdentity,
   getRequestPartnerToken,
   getRequestUserToken,
@@ -414,6 +415,20 @@ export class AltegioClient {
   ): Promise<AltegioCompany[]> {
     this.requireAuth();
 
+    const declaredCompanyIds = getRequestCompanyIds();
+    if (params?.my === 1 && declaredCompanyIds) {
+      // A UC2 application's technical user can successfully access a declared
+      // location directly while `/companies?my=1` still returns an empty list.
+      // The declaration is already the authoritative isolation boundary, so
+      // resolve only those exact IDs through the documented single-location
+      // read instead of trusting an unrelated account-enumeration result.
+      const ids = [...declaredCompanyIds];
+      const page = params.page ?? 1;
+      const count = params.count ?? ids.length;
+      const pageIds = ids.slice((page - 1) * count, page * count);
+      return Promise.all(pageIds.map((id) => this.getLocation(id, { my: 1 })));
+    }
+
     const queryParams = params
       ? `?${new URLSearchParams(params as Record<string, string>).toString()}`
       : '';
@@ -428,6 +443,23 @@ export class AltegioClient {
     // user token cannot enumerate the other salons it happens to reach. Unscoped
     // requests see everything (no-op).
     return locations.filter((location) => isCompanyAllowed(location.id));
+  }
+
+  /** Get one location through the documented V1 location endpoint. */
+  async getLocation(
+    companyId: number,
+    params?: { my?: number }
+  ): Promise<AltegioCompany> {
+    this.requireAuth();
+
+    const queryParams = params
+      ? `?${new URLSearchParams(params as Record<string, string>).toString()}`
+      : '';
+    const response = await this.apiRequest(
+      `/company/${companyId}${queryParams}`
+    );
+
+    return this.handleResponse<AltegioCompany>(response, 'fetch location');
   }
 
   /**
@@ -506,6 +538,33 @@ export class AltegioClient {
     return this.handleResponse<AltegioService[]>(response, 'fetch services');
   }
 
+  /** Get one service, including its current team-member links. */
+  async getService(
+    companyId: number,
+    serviceId: number
+  ): Promise<AltegioService> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      `/services/${companyId}/${serviceId}`
+    );
+    const result = await this.handleResponse<AltegioService | AltegioService[]>(
+      response,
+      'fetch service'
+    );
+    const service = Array.isArray(result)
+      ? (result.find((item) => item.id === serviceId) ?? result[0])
+      : result;
+    if (!service) {
+      throw new AltegioApiError(
+        `Service ${serviceId} was not present in the fetch service response`,
+        404,
+        result
+      );
+    }
+    return service;
+  }
+
   /**
    * Get service categories (public API, no user auth required)
    */
@@ -533,7 +592,9 @@ export class AltegioClient {
   async getPositions(companyId: number): Promise<AltegioPosition[]> {
     this.requireAuth();
 
-    const response = await this.apiRequest(`/positions/${companyId}`);
+    const response = await this.apiRequest(
+      `/company/${companyId}/staff/positions`
+    );
 
     return this.handleResponse<AltegioPosition[]>(response, 'fetch positions');
   }
@@ -678,7 +739,10 @@ export class AltegioClient {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(data),
+      // The upstream default creates an inactive row. Default to active while
+      // retaining an explicit `active: 0` for callers intentionally creating a
+      // draft or hidden service.
+      body: JSON.stringify({ ...data, active: data.active ?? 1 }),
     });
 
     return this.handleResponse<AltegioService>(response, 'create service');
@@ -691,14 +755,54 @@ export class AltegioClient {
   ): Promise<AltegioService> {
     this.requireAuth();
 
+    // V1 PUT is replacement-shaped. Read the current service first and carry
+    // every documented writable field — especially `staff` — into the update.
+    // A partial PUT without the staff array silently removes the service links
+    // and makes existing appointment creation fail.
+    const current = await this.getService(companyId, serviceId);
+    if (!Array.isArray(current.staff)) {
+      throw new AltegioApiError(
+        `Cannot safely update service ${serviceId}: the service read did not include its team-member links`,
+        502,
+        current
+      );
+    }
+
+    const merged: Record<string, unknown> = {};
+    const writableFields = [
+      'title',
+      'category_id',
+      'price_min',
+      'price_max',
+      'duration',
+      'technical_break_duration',
+      'discount',
+      'comment',
+      'weight',
+      'active',
+      'api_id',
+    ] as const;
+    for (const field of writableFields) {
+      const value = current[field];
+      if (value !== undefined) merged[field] = value;
+    }
+    Object.assign(merged, data);
+    merged.staff = current.staff.map((link) => ({
+      id: link.id,
+      seance_length: link.seance_length,
+      ...(link.technological_card_id !== undefined
+        ? { technological_card_id: link.technological_card_id }
+        : {}),
+    }));
+
     const response = await this.apiRequest(
       `/services/${companyId}/${serviceId}`,
       {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(merged),
       }
     );
 
@@ -809,7 +913,7 @@ export class AltegioClient {
     await this.handleVoidResponse(response, 'unlink team member from service');
   }
 
-  // ========== Positions CRUD Operations ==========
+  // ========== Supported public V1 Position Operations ==========
 
   async createPosition(
     companyId: number,
@@ -817,49 +921,18 @@ export class AltegioClient {
   ): Promise<AltegioPosition> {
     this.requireAuth();
 
-    const response = await this.apiRequest(`/positions/${companyId}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    return this.handleResponse<AltegioPosition>(response, 'create position');
-  }
-
-  async updatePosition(
-    companyId: number,
-    positionId: number,
-    data: import('../types/altegio.types.js').UpdatePositionRequest
-  ): Promise<AltegioPosition> {
-    this.requireAuth();
-
     const response = await this.apiRequest(
-      `/positions/${companyId}/${positionId}`,
+      `/company/${companyId}/positions/quick`,
       {
-        method: 'PUT',
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ title: data.title }),
       }
     );
 
-    return this.handleResponse<AltegioPosition>(response, 'update position');
-  }
-
-  async deletePosition(companyId: number, positionId: number): Promise<void> {
-    this.requireAuth();
-
-    const response = await this.apiRequest(
-      `/positions/${companyId}/${positionId}`,
-      {
-        method: 'DELETE',
-      }
-    );
-
-    await this.handleVoidResponse(response, 'delete position');
+    return this.handleResponse<AltegioPosition>(response, 'create position');
   }
 
   // ========== Location Settings & Resources ==========
@@ -994,6 +1067,17 @@ export class AltegioClient {
     return this.handleResponse<BookingForm>(response, 'create booking form');
   }
 
+  /** Delete one specifically identified booking form. */
+  async deleteBookingForm(companyId: number, formId: number): Promise<void> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      `/company/${companyId}/booking_forms/${formId}`,
+      { method: 'DELETE' }
+    );
+    await this.handleVoidResponse(response, 'delete booking form');
+  }
+
   /**
    * Get resources at a location (B2B API, requires user auth).
    * Read-only: the API does not expose resource creation.
@@ -1075,6 +1159,16 @@ export class AltegioClient {
     >(response, 'create client');
   }
 
+  /** Delete one specifically identified client. */
+  async deleteClient(companyId: number, clientId: number): Promise<void> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(`/client/${companyId}/${clientId}`, {
+      method: 'DELETE',
+    });
+    await this.handleVoidResponse(response, 'delete client');
+  }
+
   // ========== Service Categories CRUD Operations ==========
 
   async createServiceCategory(
@@ -1095,6 +1189,31 @@ export class AltegioClient {
       response,
       'create category'
     );
+  }
+
+  /** Delete one specifically identified location-owned service category. */
+  async deleteServiceCategory(
+    companyId: number,
+    categoryId: number
+  ): Promise<void> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      `/service_category/${companyId}/${categoryId}`,
+      { method: 'DELETE' }
+    );
+    await this.handleVoidResponse(response, 'delete service category');
+  }
+
+  /** Remove one specifically identified user from one location. */
+  async removeLocationUser(companyId: number, userId: number): Promise<void> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      `/company/${companyId}/users/${userId}`,
+      { method: 'DELETE' }
+    );
+    await this.handleVoidResponse(response, 'remove location user');
   }
 
   /**

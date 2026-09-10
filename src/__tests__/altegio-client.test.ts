@@ -1158,11 +1158,11 @@ describe('AltegioClient', () => {
       it('list_locations returns only IDs in the declared set (multi)', async () => {
         mockOnce({
           success: true,
-          data: [
-            { id: 4564, title: 'Demo Location' },
-            { id: 720441, title: 'Altegio CIS' },
-            { id: 999, title: 'Someone Else' },
-          ],
+          data: { id: 4564, title: 'Demo Location' },
+        });
+        mockOnce({
+          success: true,
+          data: { id: 720441, title: 'Altegio CIS' },
         });
         const companies = await runWithContext(
           {
@@ -1172,11 +1172,18 @@ describe('AltegioClient', () => {
           },
           () => client.getCompanies({ my: 1 })
         );
-        // 999 is reachable by the shared token but not in scope — dropped.
+        // Only exact declared IDs are resolved; `/companies` is not used for
+        // scoped my=1 calls because it can return an empty list for UC2.
         expect(companies).toEqual([
           { id: 4564, title: 'Demo Location' },
           { id: 720441, title: 'Altegio CIS' },
         ]);
+        expect(fetch).toHaveBeenCalledTimes(2);
+        expect(
+          (fetch as jest.MockedFunction<typeof fetch>).mock.calls.some(
+            ([url]) => String(url).includes('/companies')
+          )
+        ).toBe(false);
       });
 
       it('list_locations returns all locations when no set is declared', async () => {

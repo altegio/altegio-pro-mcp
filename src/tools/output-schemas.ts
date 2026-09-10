@@ -8,6 +8,9 @@ const idProp = { type: 'number' as const };
 const strProp = { type: 'string' as const };
 const numProp = { type: 'number' as const };
 const boolProp = { type: 'boolean' as const };
+const nullableStrProp = { type: ['string', 'null'] as const };
+const nullableNumProp = { type: ['number', 'null'] as const };
+const nullableBoolProp = { type: ['boolean', 'null'] as const };
 
 function listSchema(
   itemProps: Record<string, object>,
@@ -56,19 +59,75 @@ export const companyEntityOutput = entitySchema(
   ['id']
 );
 
+export const locationUpdateOutput = entitySchema(
+  {
+    id: idProp,
+    title: nullableStrProp,
+    city: nullableStrProp,
+    address: nullableStrProp,
+    phones: {
+      type: ['array', 'null'] as const,
+      items: strProp,
+    },
+    verification_source: strProp,
+    requested_fields: {
+      type: 'array' as const,
+      items: strProp,
+    },
+    verified_fields: {
+      type: 'array' as const,
+      items: strProp,
+    },
+    unconfirmed_fields: {
+      type: 'array' as const,
+      items: strProp,
+    },
+    verification_error: nullableStrProp,
+  },
+  [
+    'id',
+    'verification_source',
+    'requested_fields',
+    'verified_fields',
+    'unconfirmed_fields',
+  ]
+);
+
 export const bookingsOutput = listSchema(
   {
     id: idProp,
-    datetime: strProp,
-    date: strProp,
+    location_id: idProp,
+    datetime: nullableStrProp,
+    date: nullableStrProp,
     status: strProp,
-    team_member_id: idProp,
-    team_member_name: strProp,
-    client_name: strProp,
-    client_phone: strProp,
-    services: { type: 'array' as const, items: { type: 'object' as const } },
+    team_member_id: nullableNumProp,
+    team_member_name: nullableStrProp,
+    client_id: nullableNumProp,
+    client_name: nullableStrProp,
+    client_phone: nullableStrProp,
+    services: {
+      type: 'array' as const,
+      items: {
+        type: 'object' as const,
+        properties: {
+          id: idProp,
+          title: strProp,
+          cost: nullableNumProp,
+          amount: nullableNumProp,
+        },
+        required: ['id', 'title'],
+      },
+    },
+    total_cost: nullableNumProp,
+    duration_seconds: nullableNumProp,
+    visit_id: nullableNumProp,
+    paid_in_full: nullableBoolProp,
+    prepaid: nullableBoolProp,
+    online: nullableBoolProp,
+    comment: nullableStrProp,
+    deleted: boolProp,
   },
-  ['id']
+  ['id', 'status', 'services', 'deleted']
 );
 
 export const staffListOutput = listSchema(
@@ -89,13 +148,27 @@ export const servicesOutput = listSchema(
   {
     id: idProp,
     title: strProp,
-    cost: strProp,
-    duration: numProp,
-    category_id: numProp,
-    active: numProp,
-    discount: numProp,
+    price_min: nullableNumProp,
+    price_max: nullableNumProp,
+    duration_seconds: nullableNumProp,
+    category_id: nullableNumProp,
+    active: nullableBoolProp,
+    discount: nullableNumProp,
+    comment: nullableStrProp,
+    team_members: {
+      type: 'array' as const,
+      items: {
+        type: 'object' as const,
+        properties: {
+          team_member_id: idProp,
+          session_length_seconds: numProp,
+          technological_card_id: nullableNumProp,
+        },
+        required: ['team_member_id', 'session_length_seconds'],
+      },
+    },
   },
-  ['id', 'title']
+  ['id', 'title', 'team_members']
 );
 
 export const categoriesOutput = listSchema({ id: idProp, title: strProp }, [
@@ -103,10 +176,10 @@ export const categoriesOutput = listSchema({ id: idProp, title: strProp }, [
   'title',
 ]);
 
-export const positionsOutput = listSchema(
-  { id: idProp, title: strProp, api_id: strProp },
-  ['id', 'title']
-);
+export const positionsOutput = listSchema({ id: idProp, title: strProp }, [
+  'id',
+  'title',
+]);
 
 const slotsProp = {
   type: 'array' as const,
@@ -135,7 +208,27 @@ export const staffEntityOutput = entitySchema(
 );
 
 export const serviceEntityOutput = entitySchema(
-  { id: idProp, title: strProp, category_id: numProp },
+  {
+    id: idProp,
+    title: strProp,
+    category_id: nullableNumProp,
+    price_min: nullableNumProp,
+    price_max: nullableNumProp,
+    duration_seconds: nullableNumProp,
+    active: nullableBoolProp,
+    team_members: {
+      type: 'array' as const,
+      items: {
+        type: 'object' as const,
+        properties: {
+          team_member_id: idProp,
+          session_length_seconds: numProp,
+          technological_card_id: nullableNumProp,
+        },
+        required: ['team_member_id', 'session_length_seconds'],
+      },
+    },
+  },
   ['id', 'title']
 );
 

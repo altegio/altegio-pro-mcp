@@ -212,7 +212,6 @@ export class OnboardingHandlers {
         try {
           const positionRequest: CreatePositionRequest = {
             title: position.title,
-            api_id: position.api_id,
           };
           const result = await this.client.createPosition(
             location_id,
@@ -674,16 +673,19 @@ export class OnboardingHandlers {
       const checkpoint = state.checkpoints[phase_name];
       const entityIds = checkpoint.entity_ids;
       const deletedCount = { success: 0, failed: 0 };
-      let servicesNote = '';
+      const failedIds: number[] = [];
+
+      if (phase_name === 'positions') {
+        throw new Error(
+          'Positions cannot be rolled back: the supported public V1 API has list and quick-create operations but no position delete operation. The checkpoint was kept so the created IDs remain auditable.'
+        );
+      }
 
       // Delete entities based on phase type
       for (const id of entityIds) {
         try {
           if (phase_name === 'staff') {
             await this.client.deleteStaff(location_id, id);
-            deletedCount.success++;
-          } else if (phase_name === 'positions') {
-            await this.client.deletePosition(location_id, id);
             deletedCount.success++;
           } else if (phase_name === 'schedules') {
             // entity_ids are staff IDs; dates come from checkpoint metadata
@@ -704,31 +706,14 @@ export class OnboardingHandlers {
             await this.client.deleteBooking(location_id, id);
             deletedCount.success++;
           } else if (phase_name === 'services') {
-            servicesNote =
-              '\nNote: Services cannot be deleted via API. Checkpoint removed but entities remain.';
+            await this.client.deleteService(location_id, id);
             deletedCount.success++;
           } else if (phase_name === 'categories') {
-            servicesNote =
-              '\nNote: Categories cannot be deleted via API. Checkpoint removed but entities remain.';
+            await this.client.deleteServiceCategory(location_id, id);
             deletedCount.success++;
           } else if (phase_name === 'clients') {
-            try {
-              if (
-                'deleteClient' in this.client &&
-                typeof this.client.deleteClient === 'function'
-              ) {
-                await (this.client as any).deleteClient(location_id, id);
-                deletedCount.success++;
-              } else {
-                servicesNote =
-                  '\nNote: Client deletion is not implemented in API.';
-                deletedCount.success++;
-              }
-            } catch {
-              servicesNote =
-                '\nNote: Client deletion may not be supported via API.';
-              deletedCount.success++;
-            }
+            await this.client.deleteClient(location_id, id);
+            deletedCount.success++;
           } else {
             deletedCount.success++;
           }
@@ -738,11 +723,17 @@ export class OnboardingHandlers {
             `Failed to delete ${phase_name} entity`
           );
           deletedCount.failed++;
+          failedIds.push(id);
         }
       }
 
-      // Remove checkpoint from state
-      delete state.checkpoints[phase_name];
+      // Do not discard the only audit trail for entities that the API refused
+      // to delete (for example a chain-owned category returning 403).
+      if (failedIds.length === 0) {
+        delete state.checkpoints[phase_name];
+      } else {
+        checkpoint.entity_ids = failedIds;
+      }
       state.updated_at = new Date().toISOString();
       await this.stateManager.save(state);
 
@@ -754,9 +745,8 @@ export class OnboardingHandlers {
               `Rolled back ${toAgentPhase(requestedPhase)}: processed ${entityIds.length} entities\n` +
               `✓ Successfully handled: ${deletedCount.success}\n` +
               (deletedCount.failed > 0
-                ? `✗ Failed: ${deletedCount.failed}\n`
-                : '') +
-              servicesNote,
+                ? `✗ Failed: ${deletedCount.failed}; checkpoint retained for IDs [${failedIds.join(', ')}]\n`
+                : ''),
           },
         ],
       };

@@ -25,13 +25,13 @@ Positions come first so staff can reference `position_id`. Work schedules come a
 onboarding_add_positions({
   location_id: 123456,
   positions: [
-    { title: "Senior Stylist", api_id: "pos-senior" },
+    { title: "Senior Stylist" },
     { title: "Manicurist" },
     { title: "Receptionist" }
   ]
 })
 // Response lists created position IDs — use them as position_id when adding staff.
-// CSV form: "title,api_id\nSenior Stylist,pos-senior\nManicurist,"
+// CSV form: "title\nSenior Stylist\nManicurist"
 ```
 
 **Set work schedules (after staff):**
@@ -354,12 +354,15 @@ onboarding_rollback_phase({
 
 **Rollback order (reverse dependency):**
 1. `test_appointments` (depends on staff, services, clients) — deleted via API
-2. `clients` (standalone)
+2. `clients` (standalone) — deleted via API
 3. `schedules` (depends on staff) — deleted via API
-4. `services` (depends on categories) — checkpoint cleared, entities remain (no delete API)
-5. `categories` (standalone) — checkpoint cleared, entities remain (no delete API)
+4. `services` (depends on categories) — deleted via API
+5. `categories` (standalone) — deleted via API
 6. `staff` (depends on positions) — deleted via API
-7. `positions` (standalone) — deleted via API
+7. `positions` (standalone) — retained and reported because public V1 has no delete operation
+
+If an API deletion fails, the failed entity ID remains in the checkpoint so a
+later rollback can retry it and the audit trail is not lost.
 
 Supported `phase_name` values for `onboarding_rollback_phase`: `positions`, `staff`, `services`, `categories`, `schedules`, `clients`, `test_appointments`.
 
@@ -585,7 +588,6 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 **`onboarding_add_positions(location_id, positions)`**
 - Bulk create staff positions/roles from JSON array or CSV string
 - Required: `title`
-- Optional: `api_id`
 - Run before staff so staff can reference `position_id`
 
 **`onboarding_add_staff_batch(location_id, staff_data)`**
@@ -654,7 +656,9 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 
 6. **Save CSV templates** for future use or additional locations
 
-7. **Use rollback for corrections** rather than manual deletion:
+7. **Use rollback for corrections** rather than manual deletion. Positions are
+   the exception: public V1 cannot delete them, so the rollback reports and
+   retains their IDs:
    ```typescript
    onboarding_rollback_phase({ location_id: 123456, phase_name: "staff" })
    ```

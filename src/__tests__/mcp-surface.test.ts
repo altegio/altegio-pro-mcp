@@ -79,6 +79,7 @@ describe('tools/list per facet', () => {
     expect(tools.map((tool) => tool.name).sort()).toEqual([
       'altegio_login',
       'altegio_logout',
+      'clients_delete',
       'clients_get_card',
       'clients_get_visit_history',
       'clients_lookup',

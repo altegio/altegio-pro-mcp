@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import { servicesOutput, serviceEntityOutput } from '../output-schemas.js';
+import type { AltegioService } from '../../types/altegio.types.js';
 
 const seanceLengthSchema = z
   .number()
@@ -10,6 +11,42 @@ const seanceLengthSchema = z
   .describe(
     'Duration this team member needs for the service, in seconds (min 300, max 86100)'
   );
+
+function servicePrice(service: AltegioService): {
+  min: number | null;
+  max: number | null;
+} {
+  const min = service.price_min ?? service.cost ?? null;
+  const max = service.price_max ?? min;
+  return { min, max };
+}
+
+function servicePriceText(service: AltegioService): string {
+  const { min, max } = servicePrice(service);
+  if (min === null) return 'not reported';
+  return max !== null && max !== min ? `${min}–${max}` : String(min);
+}
+
+function projectService(service: AltegioService) {
+  const { min, max } = servicePrice(service);
+  return {
+    id: service.id,
+    title: service.title,
+    category_id: service.category_id ?? null,
+    price_min: min,
+    price_max: max,
+    duration_seconds: service.duration ?? null,
+    active:
+      service.active === undefined ? null : Boolean(Number(service.active)),
+    discount: service.discount ?? null,
+    comment: service.comment ?? null,
+    team_members: (service.staff ?? []).map((link) => ({
+      team_member_id: link.id,
+      session_length_seconds: link.seance_length,
+      technological_card_id: link.technological_card_id ?? null,
+    })),
+  };
+}
 
 export const getServicesTool = defineTool({
   name: 'get_services',
@@ -33,12 +70,13 @@ export const getServicesTool = defineTool({
       .positive()
       .optional()
       .describe(
-        'Page number for pagination (starts at 0). Use to fetch subsequent pages when user needs more results.'
+        '1-based page number for pagination (default 1). Use 2 for the next page.'
       ),
     count: z
       .number()
       .int()
       .positive()
+      .max(300)
       .optional()
       .describe(
         'Results per page. Default may be large. RECOMMENDED: Use 30-50 for initial display. Max 300.'
@@ -57,22 +95,18 @@ export const getServicesTool = defineTool({
       .map(
         (s, idx) =>
           `${idx + 1}. ID: ${s.id} - "${s.title}"\n` +
-          `   Price: ${s.cost}${s.duration ? `\n   Duration: ${s.duration} min` : ''}${s.category_id ? `\n   Category ID: ${s.category_id}` : ''}`
+          `   Price: ${servicePriceText(s)}\n` +
+          `   Active: ${s.active === undefined ? 'not reported' : Boolean(Number(s.active))}\n` +
+          `   Duration: ${s.duration === undefined ? 'not reported' : `${s.duration} seconds`}` +
+          `${s.category_id ? `\n   Category ID: ${s.category_id}` : ''}\n` +
+          `   Team members: ${s.staff?.length ?? 0}`
       )
       .join('\n\n');
 
     return {
       text: summary + servicesList,
       structuredContent: {
-        items: services.map((s) => ({
-          id: s.id,
-          title: s.title,
-          cost: s.cost,
-          duration: s.duration,
-          category_id: s.category_id,
-          active: s.active,
-          discount: s.discount,
-        })),
+        items: services.map(projectService),
         count: services.length,
       },
     };
@@ -83,7 +117,7 @@ export const createServiceTool = defineTool({
   name: 'create_service',
   category: 'Services',
   description:
-    '[Services] Create a new service. AUTHENTICATION REQUIRED. Required fields: title, category_id.',
+    '[Services] Create a new service. AUTHENTICATION REQUIRED. Required fields: title, category_id. Services are active and usable by default; pass active=0 only to create a hidden draft. Link at least one team member before booking it.',
   annotations: {
     title: 'Create Service',
     openWorldHint: true,
@@ -103,18 +137,25 @@ export const createServiceTool = defineTool({
     comment: z.string().optional().describe('Service description'),
     duration: z.number().positive().optional().describe('Duration in seconds'),
     prepaid: z.string().optional().describe('Prepaid option'),
+    active: z
+      .number()
+      .int()
+      .min(0)
+      .max(1)
+      .optional()
+      .default(1)
+      .describe('1 (default) creates an active service; 0 creates a draft'),
   }),
   outputSchema: serviceEntityOutput,
   handler: async ({ input, client }) => {
     const { location_id, ...serviceData } = input;
     const service = await client.createService(location_id, serviceData);
     return {
-      text: `Successfully created service:\nID: ${service.id}\nTitle: ${service.title}\nCategory: ${service.category_id}`,
-      structuredContent: {
-        id: service.id,
-        title: service.title,
-        category_id: service.category_id,
-      },
+      text:
+        `Successfully created service:\nID: ${service.id}\nTitle: ${service.title}\n` +
+        `Category: ${service.category_id ?? 'not reported'}\n` +
+        `Active: ${service.active === undefined ? 'not reported by create response' : Boolean(Number(service.active))}`,
+      structuredContent: projectService(service),
     };
   },
 });
@@ -123,7 +164,7 @@ export const updateServiceTool = defineTool({
   name: 'update_service',
   category: 'Services',
   description:
-    '[Services] Update existing service. AUTHENTICATION REQUIRED. Provide only fields to update.',
+    '[Services] Safely update an existing service. AUTHENTICATION REQUIRED. Provide only fields to change; the tool reads the current service and preserves all unchanged writable fields and team-member links before sending the documented V1 PUT.',
   annotations: {
     title: 'Update Service',
     openWorldHint: true,
@@ -159,12 +200,11 @@ export const updateServiceTool = defineTool({
       updateData
     );
     return {
-      text: `Successfully updated service ${service_id}:\nTitle: ${service.title}`,
-      structuredContent: {
-        id: service.id,
-        title: service.title,
-        category_id: service.category_id,
-      },
+      text:
+        `Successfully updated service ${service_id}:\nTitle: ${service.title}\n` +
+        `Active: ${service.active === undefined ? 'not reported' : Boolean(Number(service.active))}\n` +
+        `Team-member links preserved: ${service.staff?.length ?? 'not reported by update response'}`,
+      structuredContent: projectService(service),
     };
   },
 });

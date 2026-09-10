@@ -24,12 +24,13 @@ export const getStaffTool = defineTool({
       .positive()
       .optional()
       .describe(
-        'Page number for pagination (starts at 0). Use to fetch subsequent pages when user needs more results.'
+        '1-based page number for pagination (default 1). Use 2 for the next page.'
       ),
     count: z
       .number()
       .int()
       .positive()
+      .max(300)
       .optional()
       .describe(
         'Results per page. Default may be large. RECOMMENDED: Use 30-50 for initial display. Max 300.'

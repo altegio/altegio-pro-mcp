@@ -1,6 +1,14 @@
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
-import { companiesOutput, companyEntityOutput } from '../output-schemas.js';
+import { companiesOutput, locationUpdateOutput } from '../output-schemas.js';
+import type { AltegioCompany } from '../../types/altegio.types.js';
+
+function sameValue(requested: unknown, observed: unknown): boolean {
+  if (Array.isArray(requested) && Array.isArray(observed)) {
+    return JSON.stringify(requested) === JSON.stringify(observed);
+  }
+  return requested === observed;
+}
 
 export const listLocationsTool = defineTool({
   name: 'list_locations',
@@ -28,12 +36,13 @@ export const listLocationsTool = defineTool({
       .positive()
       .optional()
       .describe(
-        'Page number for pagination (starts at 0). Use to fetch subsequent pages when user needs more results.'
+        '1-based page number for pagination (default 1). Use 2 for the next page.'
       ),
     count: z
       .number()
       .int()
       .positive()
+      .max(300)
       .optional()
       .describe(
         'Results per page. Default 200 (overwhelming). RECOMMENDED: Use 20-50 for user locations (my=1), 50-100 for public searches. Only use 200+ if user explicitly requests complete list. Max 300.'
@@ -70,7 +79,7 @@ export const updateLocationTool = defineTool({
   name: 'update_location',
   category: 'Location',
   description:
-    '[Location] Update a location (salon) — rename it, change address/city/country, phones, website, coordinates, description, or business type. AUTHENTICATION REQUIRED (admin access to the location). Provide only the fields to change.',
+    '[Location] Update a location — rename it or change documented address, city/country, website, coordinates, description, business type, or phone fields. AUTHENTICATION REQUIRED (admin access to the location). The result verifies requested fields against a documented location read. In particular, the API may accept phones without persisting them; such fields are reported as unconfirmed, never as successfully updated.',
   annotations: {
     title: 'Update Location',
     openWorldHint: true,
@@ -98,7 +107,9 @@ export const updateLocationTool = defineTool({
     phones: z
       .array(z.string())
       .optional()
-      .describe('Location phone numbers (without +)'),
+      .describe(
+        'Location phone numbers (without +). Documented by V1, but some locations accept this field without persisting it; the tool reports the read-back mismatch.'
+      ),
     site: z.string().optional().describe('Website URL'),
     coordinate_lat: z.number().optional().describe('Latitude'),
     coordinate_lon: z.number().optional().describe('Longitude'),
@@ -111,17 +122,57 @@ export const updateLocationTool = defineTool({
       .describe('Business type ID'),
     short_descr: z.string().optional().describe('Business category / tagline'),
   }),
-  outputSchema: companyEntityOutput,
+  outputSchema: locationUpdateOutput,
   handler: async ({ input, client }) => {
     const { location_id, ...updateData } = input;
-    const location = await client.updateLocation(location_id, updateData);
+    const updateResponse = await client.updateLocation(location_id, updateData);
+    let location: AltegioCompany = updateResponse;
+    let verificationSource = 'update_response';
+    let verificationError: string | null = null;
+    try {
+      location = await client.getLocation(location_id, { my: 1 });
+      verificationSource = 'read_back';
+    } catch (error) {
+      verificationError =
+        error instanceof Error ? error.message : 'Location read-back failed';
+    }
+
+    const requestedFields = Object.keys(updateData);
+    const verifiedFields: string[] = [];
+    const unconfirmedFields: string[] = [];
+    for (const field of requestedFields) {
+      const requested = updateData[field as keyof typeof updateData];
+      const observed = location[field];
+      if (observed !== undefined && sameValue(requested, observed)) {
+        verifiedFields.push(field);
+      } else {
+        unconfirmedFields.push(field);
+      }
+    }
+
+    const verificationText =
+      unconfirmedFields.length === 0
+        ? `Verified by ${verificationSource.replace('_', ' ')}: ${verifiedFields.join(', ') || 'no fields requested'}.`
+        : `Not confirmed by ${verificationSource.replace('_', ' ')}: ${unconfirmedFields.join(', ')}. The API accepted the request, but these values were absent or different in the result; do not claim they persisted.`;
     return {
-      text: `Successfully updated location ${location_id}:\nTitle: ${location.title ?? location.public_title ?? '(unchanged)'}`,
+      text:
+        `Location ${location_id} update request completed.\n` +
+        `Title: ${location.title ?? location.public_title ?? 'not reported'}\n` +
+        `${verificationText}` +
+        (verificationError
+          ? `\nRead-back unavailable: ${verificationError}`
+          : ''),
       structuredContent: {
         id: location.id,
-        title: location.title,
-        city: location.city,
-        address: location.address,
+        title: location.title ?? location.public_title ?? null,
+        city: location.city ?? null,
+        address: location.address ?? null,
+        phones: Array.isArray(location.phones) ? location.phones : null,
+        verification_source: verificationSource,
+        requested_fields: requestedFields,
+        verified_fields: verifiedFields,
+        unconfirmed_fields: unconfirmedFields,
+        verification_error: verificationError,
       },
     };
   },

@@ -199,12 +199,13 @@ export const apiMapping: Record<string, ApiMapping> = {
       'comment',
       'duration',
       'prepaid',
+      'active',
     ],
   },
   update_service: {
     path: '/services/{location_id}/{service_id}',
-    method: 'patch',
-    operationId: 'patch_service',
+    method: 'put',
+    operationId: 'deprecated_update_service_by_id',
     pathParams: ['location_id', 'service_id'],
     bodyParams: [
       'title',
@@ -266,6 +267,12 @@ export const apiMapping: Record<string, ApiMapping> = {
     pathParams: ['location_id', 'id'],
     queryParams: ['page', 'count'],
   },
+  delete_service_category: {
+    path: '/service_category/{location_id}/{id}',
+    method: 'delete',
+    operationId: 'delete_service_category',
+    pathParams: ['location_id', 'id'],
+  },
 
   // ==========================================
   // Positions (deprecated V1, pending V2 migration)
@@ -283,9 +290,6 @@ export const apiMapping: Record<string, ApiMapping> = {
     pathParams: ['location_id'],
     bodyParams: ['title'],
   },
-  // update_position and delete_position use V1 endpoints not in current spec
-  // They call /positions/{company_id}/{position_id} which aren't documented in V1 openapi.yaml
-
   // ==========================================
   // Schedule
   // ==========================================
@@ -369,6 +373,12 @@ export const apiMapping: Record<string, ApiMapping> = {
     pathParams: ['location_id'],
     bodyParams: ['title'],
   },
+  delete_booking_form: {
+    path: '/company/{location_id}/booking_forms/{form_id}',
+    method: 'delete',
+    operationId: 'delete_booking_widget',
+    pathParams: ['location_id', 'form_id'],
+  },
 
   // ==========================================
   // Resources (read-only)
@@ -417,6 +427,22 @@ export const apiMapping: Record<string, ApiMapping> = {
     pathParams: ['location_id'],
     queryParams: ['name', 'limit'],
     source: 'extended',
+  },
+  clients_delete: {
+    path: '/client/{location_id}/{id}',
+    method: 'delete',
+    operationId: 'delete_client',
+    pathParams: ['location_id', 'id'],
+  },
+
+  // ==========================================
+  // Location users
+  // ==========================================
+  remove_location_user: {
+    path: '/company/{location_id}/users/{user_id}',
+    method: 'delete',
+    operationId: 'remove_user_from_location',
+    pathParams: ['location_id', 'user_id'],
   },
 
   // ==========================================
@@ -779,8 +805,6 @@ export const unmappedTools: string[] = [
   // Their drift check is `npm run catalog:check` plus the tests in
   // src/tools/executor/__tests__/.
   ...executorTools,
-  'update_position',
-  'delete_position',
   'onboarding_start',
   'onboarding_resume',
   'onboarding_status',

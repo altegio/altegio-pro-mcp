@@ -1,6 +1,7 @@
 import { AltegioClient } from '../altegio-client.js';
 import { AltegioApiError } from '../../utils/errors.js';
 import type { AltegioConfig } from '../../types/altegio.types.js';
+import { runWithContext } from '../../request-context.js';
 
 describe('AltegioClient - updateLocation', () => {
   let client: AltegioClient;
@@ -49,6 +50,88 @@ describe('AltegioClient - updateLocation', () => {
     await expect(unauth.updateLocation(4564, { title: 'x' })).rejects.toThrow(
       'Not authenticated'
     );
+  });
+});
+
+describe('AltegioClient - company-scoped location listing', () => {
+  beforeEach(() => {
+    global.fetch = jest.fn();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('resolves declared companies directly when my=1', async () => {
+    const client = new AltegioClient(
+      { partnerToken: 'partner', userToken: 'user' },
+      '/tmp/test-credentials'
+    );
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          data: { id: 4564, title: 'Praha' },
+          meta: {},
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          data: { id: 720441, title: 'Kraków' },
+          meta: {},
+        }),
+      });
+
+    const locations = await runWithContext(
+      { identity: null, companyIds: new Set([4564, 720441]) },
+      () => client.getCompanies({ my: 1, page: 1, count: 20 })
+    );
+
+    expect(locations.map((location) => location.id)).toEqual([4564, 720441]);
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('/company/4564?my=1'),
+      expect.any(Object)
+    );
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('/company/720441?my=1'),
+      expect.any(Object)
+    );
+    expect(
+      (global.fetch as jest.Mock).mock.calls.some(([url]) =>
+        String(url).includes('/companies')
+      )
+    ).toBe(false);
+  });
+
+  it('applies 1-based pagination to the declared scope', async () => {
+    const client = new AltegioClient(
+      { partnerToken: 'partner', userToken: 'user' },
+      '/tmp/test-credentials'
+    );
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: { id: 720441, title: 'Kraków' },
+        meta: {},
+      }),
+    });
+
+    const locations = await runWithContext(
+      { identity: null, companyIds: new Set([4564, 720441]) },
+      () => client.getCompanies({ my: 1, page: 2, count: 1 })
+    );
+
+    expect(locations.map((location) => location.id)).toEqual([720441]);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -33,12 +33,13 @@ export const getServiceCategoriesTool = defineTool({
       .positive()
       .optional()
       .describe(
-        'Page number for pagination (starts at 0). Use to fetch subsequent pages when user needs more results.'
+        '1-based page number for pagination (default 1). Use 2 for the next page.'
       ),
     count: z
       .number()
       .int()
       .positive()
+      .max(300)
       .optional()
       .describe(
         'Results per page. Default may be large. RECOMMENDED: Use 20-30 for initial display. Max 300.'
@@ -67,6 +68,33 @@ export const getServiceCategoriesTool = defineTool({
         items: categories.map((c) => ({ id: c.id, title: c.title })),
         count: categories.length,
       },
+    };
+  },
+});
+
+export const deleteServiceCategoryTool = defineTool({
+  name: 'delete_service_category',
+  category: 'Categories',
+  description:
+    '[Categories] Permanently delete one specifically identified service category. AUTHENTICATION REQUIRED. Delete or move its location-owned services first. A 403 for a chain-owned category is an ownership boundary; do not retry it at chain scope.',
+  annotations: {
+    title: 'Delete Service Category',
+    destructiveHint: true,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
+  input: z.object({
+    location_id: z.number().int().positive().describe('Location ID'),
+    category_id: z
+      .number()
+      .int()
+      .positive()
+      .describe('Exact service category ID to delete'),
+  }),
+  handler: async ({ input, client }) => {
+    await client.deleteServiceCategory(input.location_id, input.category_id);
+    return {
+      text: `Deleted service category ${input.category_id} from location ${input.location_id}`,
     };
   },
 });
