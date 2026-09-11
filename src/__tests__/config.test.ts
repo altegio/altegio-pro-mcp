@@ -60,7 +60,7 @@ describe('Configuration Schema', () => {
       const result = ServerConfigSchema.parse({});
 
       expect(result.name).toBe('@altegio/mcp-server-pro');
-      expect(result.version).toBe('0.2.0-alpha.0');
+      expect(result.version).toBe('0.2.0-alpha.1');
       expect(result.protocolVersion).toBe('2025-11-25');
       expect(result.capabilities.tools?.listChanged).toBe(true);
     });

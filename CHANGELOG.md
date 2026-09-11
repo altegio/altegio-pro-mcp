@@ -4,6 +4,12 @@ All notable server releases are recorded here. Versions follow Semantic
 Versioning and use an `alpha.N` prerelease suffix until the public MCP contract
 is declared stable.
 
+## [0.2.0-alpha.1] - 2026-09-11
+
+- Fixed the deletion ownership check to use the least-privileged report list;
+  the detailed report endpoint can return `403` for users who can still list
+  and delete assistant-created reports.
+
 ## [0.2.0-alpha.0] - 2026-09-11
 
 - Added guarded deletion for assistant-created analytics reports through the

@@ -129,7 +129,7 @@ describe('Tool Registration', () => {
 
     expect(server).toBeDefined();
     expect(server.name).toBe('@altegio/mcp-server-pro');
-    expect(server.version).toBe('0.2.0-alpha.0');
+    expect(server.version).toBe('0.2.0-alpha.1');
   });
 
   it('rebinds direct-token headers at the SDK tool-handler boundary', async () => {
