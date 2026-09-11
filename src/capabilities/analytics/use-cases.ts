@@ -660,6 +660,39 @@ export async function listSavedReports(
   return { text, structuredContent: { items, count: items.length } };
 }
 
+export async function deleteAssistantReport(
+  client: AltegioClient,
+  input: { location_id: number; report_id: string }
+): Promise<AnalyticsResult> {
+  const timezone = await resolveLocationTimezone(client, input.location_id);
+  const api = plainApi(client, timezone);
+  const report = await api.getSavedReport({
+    location_id: input.location_id,
+    report_id: input.report_id,
+  });
+
+  if (!report.name.startsWith(OWNED_REPORT_PREFIX)) {
+    throw new AnalyticsInputError(
+      `Refusing to delete "${report.name}": this tool deletes only reports whose name starts with "${OWNED_REPORT_PREFIX}".`
+    );
+  }
+
+  await api.deleteReport({
+    location_id: input.location_id,
+    report_id: input.report_id,
+  });
+
+  return {
+    text: `Deleted assistant-created report "${report.name}" (${report.report_id}) from location ${input.location_id}.`,
+    structuredContent: {
+      location_id: input.location_id,
+      report_id: report.report_id,
+      report_name: report.name,
+      deleted: true,
+    },
+  };
+}
+
 // ========== report builder: running reports ==========
 
 /**
@@ -882,10 +915,10 @@ export interface RunReportInput extends PeriodInput {
 /**
  * Run a template or an ad-hoc report.
  *
- * Ownership rule: the report builder has no delete, so every report this server
- * creates would stay in the owner's builder forever. A ready report named
+ * Ownership rule: a ready report named
  * `[Altegio Assistant] …` is reused before creating anything; failed duplicates
- * never shadow it. The new data API accepts a runtime period override; the
+ * never shadow it and can be removed explicitly with
+ * `analytics_delete_assistant_report`. The new data API accepts a runtime period override; the
  * legacy API is used only when its stored period already matches.
  */
 export async function runReport(

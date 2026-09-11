@@ -30,7 +30,7 @@ describe('End-to-End Tests', () => {
   it('should create server with correct metadata', () => {
     expect(server).toBeDefined();
     expect((server as any).name).toBe('@altegio/mcp-server-pro');
-    expect((server as any).version).toBe('1.0.0');
+    expect((server as any).version).toBe('0.2.0-alpha.0');
   });
 
   it('should have all required tools registered', async () => {

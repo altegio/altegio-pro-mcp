@@ -1,6 +1,6 @@
 {
   "name": "@altegio/mcp-server-pro",
-  "version": "1.0.0",
+  "version": "0.2.0-alpha.0",
   "description": "Professional B2B MCP (Model Context Protocol) server for Altegio.Pro business management and admin operations",
   "keywords": [
     "mcp",

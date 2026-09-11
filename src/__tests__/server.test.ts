@@ -5,6 +5,6 @@ describe('MCP Server', () => {
   it('should create server with correct metadata', () => {
     const server = createServer();
     expect(server.name).toBe('@altegio/mcp-server-pro');
-    expect(server.version).toBe('1.0.0');
+    expect(server.version).toBe('0.2.0-alpha.0');
   });
 });

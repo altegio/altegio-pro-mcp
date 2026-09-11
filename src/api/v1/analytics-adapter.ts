@@ -13,7 +13,11 @@
  */
 import type { AltegioHttp } from '../altegio-http.js';
 import { queryString, v2Path } from '../altegio-http.js';
-import { callEnveloped, callRawArray } from './analytics-http.js';
+import {
+  callAnalytics,
+  callEnveloped,
+  callRawArray,
+} from './analytics-http.js';
 import type {
   AnalyticsApi,
   AnalyticsFilterQuery,
@@ -986,6 +990,21 @@ export class V1AnalyticsAdapter implements AnalyticsApi {
       }
     );
     return toSavedReport(data);
+  }
+
+  async deleteReport(query: {
+    location_id: number;
+    report_id: string;
+  }): Promise<void> {
+    await callAnalytics(
+      this.http,
+      `/company/${query.location_id}/ac/${encodeURIComponent(query.report_id)}`,
+      {
+        kind: 'report_builder',
+        context: 'delete the assistant-created report',
+        method: 'DELETE',
+      }
+    );
   }
 
   async runReport(query: {

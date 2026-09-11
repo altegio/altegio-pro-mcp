@@ -650,6 +650,22 @@ paths:
                           used_column_name: { type: string }
                           value: {}
 
+  /company/{location_id}/ac/{report_id}:
+    delete:
+      operationId: delete_report_builder_report_legacy
+      summary: Delete one saved report through the compatible report-builder route
+      x-altegio-permission: reports_access, plus an active subscription
+      x-altegio-caveat: >-
+        The newer analytics_constructor route has no DELETE mapping, but both
+        generations address the same saved-report records. The MCP exposes this
+        route only for reports whose name starts with "[Altegio Assistant]".
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: report_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204':
+          description: Report deleted.
+
 components:
   schemas:
     ReportBuilderReport:

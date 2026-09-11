@@ -623,12 +623,12 @@ const reportTableOutput = objectSchema({
 export const analyticsRunReportTool = defineTool({
   name: 'analytics_run_report',
   category: 'Analytics',
-  description: `[Analytics] Run a report and get a table back: either a built-in template by template_id, or an ad-hoc report built from a dataset, the fields you want and what to group them by. This is how you answer "revenue by team member last month", "top services by revenue", "sales per client", "income and expenses by month", "P&L for the quarter", "occupancy hours per stylist". Get template_id from analytics_list_report_templates and field keys from analytics_list_report_fields. At most ${REPORT_ROW_CAP} rows come back inline; a longer table is attached as a CSV resource link that stays readable for 30 minutes. The tool reuses a ready "[Altegio Assistant] …" report when one exists and never lets a failed duplicate shadow it. The first ad-hoc shape may create one report because the builder has no delete. Period overrides require the location's new report-data API; on the legacy API an existing report can be read only for its stored period. Needs the Analytics access right and an active subscription.`,
+  description: `[Analytics] Run a report and get a table back: either a built-in template by template_id, or an ad-hoc report built from a dataset, the fields you want and what to group them by. This is how you answer "revenue by team member last month", "top services by revenue", "sales per client", "income and expenses by month", "P&L for the quarter", "occupancy hours per stylist". Get template_id from analytics_list_report_templates and field keys from analytics_list_report_fields. At most ${REPORT_ROW_CAP} rows come back inline; a longer table is attached as a CSV resource link that stays readable for 30 minutes. The tool reuses a ready "[Altegio Assistant] …" report when one exists and never lets a failed duplicate shadow it. Failed or obsolete assistant reports can be removed with analytics_delete_assistant_report. Period overrides require the location's new report-data API; on the legacy API an existing report can be read only for its stored period. Needs the Analytics access right and an active subscription.`,
   annotations: {
     title: 'Analytics: run a report',
     // Not marked read-only on purpose: running a template requires a stored
     // report in the location's report builder, so the first run of each shape
-    // creates one (idempotently reused afterwards, never deleted, never
+    // creates one (idempotently reused afterwards, never
     // overwriting anything the user made).
     readOnlyHint: false,
     destructiveHint: false,
@@ -707,6 +707,37 @@ export const analyticsListSavedReportsTool = defineTool({
   }),
   handler: async ({ input, client }) =>
     analytics.listSavedReports(client, input),
+});
+
+export const analyticsDeleteAssistantReportTool = defineTool({
+  name: 'analytics_delete_assistant_report',
+  category: 'Analytics',
+  description:
+    '[Analytics] Permanently delete one report created by this assistant. The report must have a name beginning with "[Altegio Assistant]"; reports created or named by the owner are refused. Get the exact report_id from analytics_list_saved_reports. Use this to remove failed, obsolete or duplicate assistant artifacts without touching customer-created reports.',
+  annotations: {
+    title: 'Analytics: delete an assistant report',
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
+  input: z.object({
+    location_id: locationId,
+    report_id: z
+      .string()
+      .min(1)
+      .describe(
+        'Exact assistant-created report ID from analytics_list_saved_reports.'
+      ),
+  }),
+  outputSchema: objectSchema({
+    location_id: { type: 'integer' as const },
+    report_id: { type: 'string' as const },
+    report_name: { type: 'string' as const },
+    deleted: { type: 'boolean' as const },
+  }),
+  handler: async ({ input, client }) =>
+    analytics.deleteAssistantReport(client, input),
 });
 
 export const analyticsRunSavedReportTool = defineTool({

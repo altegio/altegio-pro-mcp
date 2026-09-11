@@ -103,7 +103,7 @@ describe('Tool Registration', () => {
     expect(toolNames).toContain('altegio_describe_operation');
     expect(toolNames).toContain('altegio_call_operation');
 
-    // Analytics pack (14)
+    // Analytics pack (15)
     expect(toolNames).toContain('analytics_get_overview');
     expect(toolNames).toContain('analytics_get_daily_series');
     expect(toolNames).toContain('analytics_get_appointments_breakdown');
@@ -118,9 +118,10 @@ describe('Tool Registration', () => {
     expect(toolNames).toContain('analytics_run_report');
     expect(toolNames).toContain('analytics_list_saved_reports');
     expect(toolNames).toContain('analytics_run_saved_report');
+    expect(toolNames).toContain('analytics_delete_assistant_report');
 
-    // Total: 59 factory-defined + 12 onboarding = 71 tools
-    expect(toolNames.length).toBe(71);
+    // Total: 60 factory-defined + 12 onboarding = 72 tools
+    expect(toolNames.length).toBe(72);
   });
 
   it('should create server with tools', () => {
@@ -128,7 +129,7 @@ describe('Tool Registration', () => {
 
     expect(server).toBeDefined();
     expect(server.name).toBe('@altegio/mcp-server-pro');
-    expect(server.version).toBe('1.0.0');
+    expect(server.version).toBe('0.2.0-alpha.0');
   });
 
   it('rebinds direct-token headers at the SDK tool-handler boundary', async () => {

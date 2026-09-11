@@ -178,6 +178,7 @@ export const DEFAULT_FACET_EXCLUDED_PREFIXES: readonly string[] = [
 export const DEFAULT_FACET_EXTRA_TOOLS: readonly string[] = [
   'analytics_get_overview',
   'analytics_run_report',
+  'analytics_delete_assistant_report',
 ];
 
 /** Prefix removed from the default view by the onboarding config switch. */
