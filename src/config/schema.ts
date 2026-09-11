@@ -8,8 +8,9 @@ import { ConfigurationError } from '../utils/errors.js';
 /**
  * Server `instructions` returned in the MCP `initialize` result (ADR-001 §5.6).
  * One paragraph: what the product is, which domains exist today, where the
- * static facets live, and what is still being added — so a host with tool
- * search knows what to look for. Override with `MCP_SERVER_INSTRUCTIONS`.
+ * static facets live, and where the knowledge resources and workflows are — so
+ * a host with tool search knows what to look for. Override with
+ * `MCP_SERVER_INSTRUCTIONS`.
  */
 export const DEFAULT_SERVER_INSTRUCTIONS = [
   'Altegio Pro is the management surface for a local service business — its',
@@ -17,13 +18,21 @@ export const DEFAULT_SERVER_INSTRUCTIONS = [
   'team members and positions, services and categories, work schedules,',
   'appointments, the client base (segment, cards, visit history, lookup), analytics',
   'with a report builder, location settings, resources, and a guided onboarding',
-  'walkthrough. Call altegio_login first, then list_locations for a location_id.',
-  'The default /mcp endpoint serves the whole surface; narrower static views live',
+  'walkthrough. Use the delegated Altegio identity or direct user token already',
+  'provided by the host; in local stdio mode call altegio_login if needed. Then',
+  'call list_locations for a location_id. The default /mcp endpoint serves the',
+  'general surface plus analytics entry points; the complete analytics pack and',
+  'other narrower static views live',
   'on /mcp/ops, /mcp/catalog, /mcp/finance, /mcp/marketing, /mcp/analytics and',
-  '/mcp/onboarding for hosts that cap active tools. A universal operation executor',
-  'and more packs are being added. Resources under altegio://docs/ carry the',
-  'product model, the canonical vocabulary and the client-segmentation reference;',
-  'the onboarding_walkthrough prompt drives a first-time setup.',
+  '/mcp/onboarding for hosts that cap active tools. The universal operation',
+  'executor searches, describes and calls documented read operations. Read',
+  'altegio://docs/product-logic, altegio://docs/glossary and',
+  'altegio://docs/clients-segmentation for the product model, vocabulary and client',
+  'segments; read altegio://analytics/glossary, altegio://analytics/coverage,',
+  'altegio://analytics/playbook and altegio://analytics/data-model before',
+  'substantial analysis. Available workflows are onboarding_walkthrough,',
+  'analytics_location_health_check, analytics_monthly_review,',
+  'analytics_team_member_review and analytics_compare_periods.',
 ].join(' ');
 
 /**

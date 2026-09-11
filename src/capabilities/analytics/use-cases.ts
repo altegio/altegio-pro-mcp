@@ -749,10 +749,11 @@ export async function awaitReportReady(
         `The report "${current.name}" was deleted in the report builder. Run analytics_run_report again to create it.`
       );
     }
-    // `error` right after create/update is the builder's first attempt failing;
-    // it re-queues every report on its hourly refresh, so treat it as "not
-    // ready yet" and let the caller answer with a retry hint instead of failing.
-    if (current.status === 'error') return null;
+    if (current.status === 'error') {
+      throw new AnalyticsUnavailableError(
+        `The report builder failed to prepare "${current.name}". This is an upstream builder failure, not a pending report; use analytics_get_overview, analytics_get_daily_series or analytics_get_day_end_report instead.`
+      );
+    }
     if (Date.now() - startedAt >= timeoutMs) return null;
     await sleep(pollMs);
     current = await api.getSavedReport({
@@ -807,10 +808,19 @@ async function renderTable(
   period: Period,
   rowCap: number
 ): Promise<{ table: RenamedTable; stored?: StoredReport }> {
+  const storedPeriod = (report.filters ?? [])
+    .map((filter) => filter.value)
+    .find(
+      (value) =>
+        typeof value === 'string' &&
+        /^\d{4}-\d{2}-\d{2},\d{4}-\d{2}-\d{2}$/.test(value)
+    );
   const raw = await api.runReport({
     location_id: locationId,
     report_id: report.report_id,
     filters: periodOverride(report, fields, period),
+    allow_stored_period_fallback:
+      storedPeriod === `${period.date_from},${period.date_to}`,
   });
   const table = projectReportTable(raw, fields, rowCap);
   if (!table.truncated) return { table };
@@ -873,10 +883,10 @@ export interface RunReportInput extends PeriodInput {
  * Run a template or an ad-hoc report.
  *
  * Ownership rule: the report builder has no delete, so every report this server
- * creates would stay in the owner's builder forever. Exactly one report per
- * (location, template or ad-hoc signature) is therefore kept, named
- * `[Altegio Assistant] …`, created on first use and reused afterwards; the
- * period travels as a runtime filter override, never as a new report.
+ * creates would stay in the owner's builder forever. A ready report named
+ * `[Altegio Assistant] …` is reused before creating anything; failed duplicates
+ * never shadow it. The new data API accepts a runtime period override; the
+ * legacy API is used only when its stored period already matches.
  */
 export async function runReport(
   client: AltegioClient,
@@ -906,7 +916,22 @@ export async function runReport(
     ? await templateDefinition(ctx.api, input, fields)
     : adHocDefinition(input, fields);
 
-  const owned = saved.find((report) => report.name === definition.name);
+  const ownedCandidates = saved.filter(
+    (report) => report.name === definition.name
+  );
+  // The list response omits build status. Read every same-name candidate so a
+  // newer failed duplicate can never shadow an older working report.
+  const detailedOwned = await Promise.all(
+    ownedCandidates.map((candidate) =>
+      ctx.api.getSavedReport({
+        location_id: input.location_id,
+        report_id: candidate.report_id,
+      })
+    )
+  );
+  const owned =
+    detailedOwned.find((report) => report.status === 'success') ??
+    detailedOwned[0];
   let report: SavedReport;
   if (!owned) {
     report = await ctx.api.createReport({
@@ -914,14 +939,11 @@ export async function runReport(
       definition,
     });
   } else {
-    report = await ctx.api.getSavedReport({
-      location_id: input.location_id,
-      report_id: owned.report_id,
-    });
+    report = owned;
     // The template or the requested shape may have changed since the report was
     // created; update the one we own in place rather than leaving a second,
     // undeletable report behind.
-    if (!definitionMatches(report, definition)) {
+    if (report.status !== 'success' && !definitionMatches(report, definition)) {
       await ctx.api.updateReport({
         location_id: input.location_id,
         report_id: report.report_id,
@@ -971,12 +993,8 @@ function pendingResult(
   report: SavedReport,
   ctx: { period: Period }
 ): AnalyticsResult {
-  const status = report.status === 'error' ? 'error' : 'pending';
-  const when =
-    status === 'error'
-      ? 'The builder failed its first attempt and retries every report on its hourly refresh, so try again within the hour'
-      : 'It is still being prepared; try again in about a minute';
-  const text = `The report "${report.name}" has no data yet (builder status: ${status}). ${when}: call analytics_run_saved_report with report_id="${report.report_id}" and the same period (${ctx.period.date_from} – ${ctx.period.date_to}).`;
+  const status = 'pending';
+  const text = `The report "${report.name}" is still being prepared. Try again in about a minute: call analytics_run_saved_report with report_id="${report.report_id}" and the same period (${ctx.period.date_from} – ${ctx.period.date_to}).`;
   return {
     text,
     structuredContent: {
@@ -1012,8 +1030,8 @@ async function templateDefinition(
     );
   }
 
-  // Ensure the report can be re-run for any period: it needs a filter on a date
-  // column that the run-time override can target.
+  // Ensure the new data API can re-run the report for another period: it needs
+  // a filter on a date column that the run-time override can target.
   const filters = [...(template.filters ?? [])];
   const dataset = template.dataset ?? 'sales';
   const dateField = fieldsByKey(fields, dataset).get(

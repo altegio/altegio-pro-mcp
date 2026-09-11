@@ -2,12 +2,7 @@
  * Every prompt module the server serves.
  *
  * A pack plugs in with two lines: import its module here and add it to the
- * array. For example, once the analytics pack lands:
- *
- * ```ts
- * import { analyticsPrompts } from './analytics.prompts.js';
- * export const promptModules: PromptModule[] = [onboardingPrompts, analyticsPrompts];
- * ```
+ * array. The onboarding and analytics workflow packs are registered below.
  */
 import { onboardingPrompts } from './onboarding.prompts.js';
 export { analyticsPrompts } from './analytics.module.js';

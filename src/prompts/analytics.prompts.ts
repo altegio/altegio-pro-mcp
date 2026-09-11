@@ -1,9 +1,8 @@
 /**
  * MCP prompts of the analytics pack — definitions and renderers, no transport.
  *
- * Like the resources module this exports plain data plus a pure renderer, so the
- * transport change in flight can wire `prompts/list` and `prompts/get` without
- * touching this file:
+ * Like the resources module this exports plain data plus a pure renderer; the
+ * shared server wires it into `prompts/list` and `prompts/get` on every facet:
  *
  *   listAnalyticsPrompts()          → prompts/list entries
  *   getAnalyticsPrompt(name, args)  → prompts/get result, or null

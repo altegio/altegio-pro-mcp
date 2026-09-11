@@ -1,9 +1,8 @@
 /**
  * Resource module tests.
  *
- * The server does not register resource handlers yet, so these tests exercise
- * the exported list/read functions directly — the same functions the transport
- * change will wire into `resources/list` and `resources/read`.
+ * These tests exercise the exported list/read functions directly; the shared
+ * server also registers them on every facet.
  */
 import {
   COVERAGE_URI,

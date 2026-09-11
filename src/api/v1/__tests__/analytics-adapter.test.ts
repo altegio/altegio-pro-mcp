@@ -595,7 +595,12 @@ describe('V1AnalyticsAdapter — report builder', () => {
     expect(reports).toHaveLength(2);
     expect(reports[0]!.name).toBe('[Altegio Assistant] Revenue by team member');
     expect(reports[0]!.filters).toEqual([
-      { filter_id: 'rf-1', column_id: 'c-sales-date', operator: 'BETWEEN' },
+      {
+        filter_id: 'rf-1',
+        column_id: 'c-sales-date',
+        operator: 'BETWEEN',
+        value: '2026-08-01,2026-08-31',
+      },
     ]);
   });
 
@@ -687,6 +692,54 @@ describe('V1AnalyticsAdapter — report builder', () => {
       c_1: 'c-sales-revenue',
       c_2: 'c-sales-visits',
     });
+  });
+
+  it('falls back to legacy rows only when the caller verified the stored period', async () => {
+    const { api, calls } = adapter([
+      [
+        /analytics_constructor\/reports\/.+\/data/,
+        { status: 400, body: { success: false } },
+      ],
+      [/\/ac\/.+\/data/, 'constructor-report-data-legacy'],
+    ]);
+    const table = await api.runReport({
+      location_id: 4564,
+      report_id: 'r-owned',
+      filters: [],
+      allow_stored_period_fallback: true,
+    });
+
+    expect(calls.map((call) => call.path)).toEqual([
+      '/company/4564/analytics_constructor/reports/r-owned/data',
+      '/company/4564/ac/r-owned/data',
+    ]);
+    expect(table.row_count).toBe(2);
+    expect(table.rows[0]).toEqual({
+      sales_revenue: 6120.5,
+      team_member_name: 'Team member A',
+    });
+    expect(table.column_ids).toEqual({
+      sales_revenue: 'c-sales-revenue',
+      team_member_name: 'c-sales-master',
+    });
+  });
+
+  it('does not use legacy rows when the requested period differs', async () => {
+    const { api, calls } = adapter([
+      [
+        /analytics_constructor\/reports\/.+\/data/,
+        { status: 400, body: { success: false } },
+      ],
+    ]);
+
+    await expect(
+      api.runReport({
+        location_id: 4564,
+        report_id: 'r-owned',
+        filters: [],
+      })
+    ).rejects.toBeInstanceOf(AnalyticsInputError);
+    expect(calls).toHaveLength(1);
   });
 
   it('reads the builder 404 as a missing access right, not a missing report', async () => {

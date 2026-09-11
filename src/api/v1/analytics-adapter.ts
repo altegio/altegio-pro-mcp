@@ -992,27 +992,47 @@ export class V1AnalyticsAdapter implements AnalyticsApi {
     location_id: number;
     report_id: string;
     filters: ReportDataFilterOverride[];
+    allow_stored_period_fallback?: boolean;
   }): Promise<ReportTable> {
-    const data = await callEnveloped<Record<string, unknown>>(
-      this.http,
-      this.builderPath(
-        query.location_id,
-        `/reports/${encodeURIComponent(query.report_id)}/data`
-      ),
-      {
-        kind: 'report_builder',
-        context: 'run the report',
-        method: 'POST',
-        body: {
-          filters: query.filters.map((filter) => ({
-            id: filter.filter_id,
-            operator: filter.operator,
-            value: filter.value,
-          })),
-        },
-      }
-    );
-    return toReportTable(data);
+    try {
+      const data = await callEnveloped<Record<string, unknown>>(
+        this.http,
+        this.builderPath(
+          query.location_id,
+          `/reports/${encodeURIComponent(query.report_id)}/data`
+        ),
+        {
+          kind: 'report_builder',
+          context: 'run the report',
+          method: 'POST',
+          body: {
+            filters: query.filters.map((filter) => ({
+              id: filter.filter_id,
+              operator: filter.operator,
+              value: filter.value,
+            })),
+          },
+        }
+      );
+      return toReportTable(data);
+    } catch (error) {
+      if (!query.allow_stored_period_fallback) throw error;
+
+      // Some locations do not have the new report-data feature flag. Their
+      // legacy rows endpoint can safely be used only for the period already
+      // stored in the report; the capability layer verifies that condition.
+      const rows = await callEnveloped<unknown[][]>(
+        this.http,
+        `/company/${query.location_id}/ac/${encodeURIComponent(query.report_id)}/data`,
+        {
+          kind: 'report_builder',
+          context: 'run the saved report for its stored period',
+          method: 'POST',
+          body: { report_columns: [] },
+        }
+      );
+      return toLegacyReportTable(rows);
+    }
   }
 }
 
@@ -1067,6 +1087,7 @@ function toSavedReport(value: unknown): SavedReport {
         filter_id: String(f.id ?? ''),
         column_id: String(f.column_id ?? ''),
         operator: String(f.operator ?? '='),
+        value: typeof f.value === 'string' ? f.value : null,
       };
     }),
     columns: list(r.report_columns).map((column) => {
@@ -1174,5 +1195,46 @@ function toReportTable(data: Record<string, unknown>): ReportTable {
     totals,
     row_count: rows.length,
     column_ids: Object.fromEntries(columnIdByKey),
+  };
+}
+
+/** Flatten the row/cell response returned by the legacy report-data API. */
+function toLegacyReportTable(data: unknown[][]): ReportTable {
+  const columns: ReportTable['columns'] = [];
+  const columnIds: Record<string, string> = {};
+  const seen = new Set<string>();
+  const rows = list(data).map((rawRow) => {
+    const row: Record<string, string | number | null> = {};
+    for (const rawCell of list(rawRow)) {
+      const cell = record(rawCell);
+      const baseKey = String(
+        cell.used_column_name ?? cell.column_id ?? cell.report_column_id ?? ''
+      );
+      if (!baseKey) continue;
+      let key = baseKey;
+      let suffix = 2;
+      while (key in row) key = `${baseKey}_${suffix++}`;
+      const value = cell.value;
+      row[key] =
+        value === null || value === undefined
+          ? null
+          : typeof value === 'number'
+            ? value
+            : String(value);
+      if (!seen.has(key)) {
+        seen.add(key);
+        columns.push({ key, title: key });
+        columnIds[key] = String(cell.column_id ?? '');
+      }
+    }
+    return row;
+  });
+
+  return {
+    columns,
+    rows,
+    totals: {},
+    row_count: rows.length,
+    column_ids: columnIds,
   };
 }

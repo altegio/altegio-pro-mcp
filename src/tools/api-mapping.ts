@@ -751,6 +751,14 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       bodyParams: ['filters'],
       source: 'extended',
     },
+    {
+      path: '/company/{location_id}/ac/{report_id}/data',
+      method: 'post',
+      operationId: 'run_report_builder_report_legacy',
+      pathParams: ['location_id', 'report_id'],
+      bodyParams: ['report_columns'],
+      source: 'extended',
+    },
   ],
   analytics_run_saved_report: [
     {
@@ -774,6 +782,14 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       operationId: 'run_report_builder_report',
       pathParams: ['location_id', 'report_id'],
       bodyParams: ['filters'],
+      source: 'extended',
+    },
+    {
+      path: '/company/{location_id}/ac/{report_id}/data',
+      method: 'post',
+      operationId: 'run_report_builder_report_legacy',
+      pathParams: ['location_id', 'report_id'],
+      bodyParams: ['report_columns'],
       source: 'extended',
     },
   ],
