@@ -3,12 +3,8 @@
  *
  * A pack plugs in with two lines: import its module here and add it to the
  * array. Nothing else changes — the handlers, the ordering and the capability
- * declaration are shared. For example, once the analytics pack lands:
- *
- * ```ts
- * import { analyticsResources } from './analytics.resources.js';
- * export const resourceModules: ResourceModule[] = [docsResources, analyticsResources];
- * ```
+ * declaration are shared. Analytics and client-segmentation resources are
+ * registered below alongside the core product documents.
  */
 import { docsResources } from './docs.resources.js';
 export { analyticsResources } from './analytics.module.js';

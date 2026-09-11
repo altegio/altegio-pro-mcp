@@ -14,6 +14,7 @@ Proxy: mcp-proxy (Cloud Run) → mcp.alteg.io
 |---------|---------|------------|
 | altegio-pro-mcp | 3000 | `https://mcp.alteg.io/pro/mcp` |
 | altegio-pro-mcp (facets) | 3000 | `https://mcp.alteg.io/pro/mcp/<facet>` |
+| altegio-pro-mcp (public OAuth) | 3000 | `https://mcp.alteg.io/public/pro/mcp` |
 | bi-data | 8080 | `https://mcp.alteg.io/bi-data/mcp` |
 
 ## Quick Start
@@ -64,6 +65,7 @@ gh pr merge --merge
 
 Routes external traffic to VM internal IP:
 - `/pro/*` → `10.132.0.3:3000`
+- `/public/pro/*` → Altegio OAuth/token gateway → the same Pro backend
 - `/bi-data/*` → `10.132.0.3:8080`
 
 **Facets need no proxy change.** The proxy forwards everything under `/pro/*`
@@ -98,6 +100,7 @@ gcloud compute ssh mcp-servers --project=altegio-mcp --zone=europe-west1-b --tun
 ```bash
 # Via proxy (public)
 curl https://mcp.alteg.io/pro/health
+curl https://mcp.alteg.io/public/pro/health
 curl https://mcp.alteg.io/bi-data/health
 
 # Direct (from internal network)

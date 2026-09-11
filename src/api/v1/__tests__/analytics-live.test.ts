@@ -4,15 +4,16 @@
  *
  * Skipped unless `ALTEGIO_E2E=1`. It needs a partner token in
  * `ALTEGIO_PARTNER_TOKEN` (or `ALTEGIO_LIVE_API_TOKEN`) and the demo
- * credentials in `ALTEGIO_TEST_LOGIN` / `ALTEGIO_TEST_PASSWORD` — from the
+ * credentials in `ALTEGIO_TEST_LOGIN` / `ALTEGIO_TEST_PASSWORD`, or an
+ * existing technical-user token in `ALTEGIO_USER_TOKEN` — from the
  * environment, never from a file in this repository, which is public. The
  * partner token is read from its own variable because the shared Jest setup
  * pins `ALTEGIO_API_TOKEN` to a dummy value for every other suite.
  *
  *   ALTEGIO_E2E=1 CREDENTIALS_DIR=/tmp/altegio-mcp-live npx jest analytics-live
  *
- * It is read-only apart from the assistant-owned report the report builder
- * needs, which is only touched when `ALTEGIO_E2E_WRITE=1` is also set.
+ * It is read-only. The report-builder check reuses a ready assistant-owned
+ * report left by the maintained demo fixture and never creates or updates one.
  *
  * Every recorded payload passes through `sanitize` first: personal fields
  * (names, phone numbers, e-mail addresses) are replaced with neutral
@@ -24,14 +25,13 @@ import { AltegioClient } from '../../../providers/altegio-client.js';
 import { httpFromClient } from '../../altegio-http.js';
 import { V1AnalyticsAdapter } from '../analytics-adapter.js';
 import {
-  awaitReportReady,
-  DATASET_DATE_FIELD,
+  runReport,
+  runSavedReport,
 } from '../../../capabilities/analytics/use-cases.js';
 import { callAnalytics } from '../analytics-http.js';
 import { resolveLocationTimezone } from '../../../capabilities/analytics/location-timezone.js';
 
 const LIVE = process.env.ALTEGIO_E2E === '1';
-const ALLOW_WRITE = process.env.ALTEGIO_E2E_WRITE === '1';
 const DEMO_LOCATION_ID = 4564;
 const FIXTURES = path.join(__dirname, 'fixtures', 'live');
 const CREDENTIALS_DIR = process.env.CREDENTIALS_DIR ?? '/tmp/altegio-mcp-live';
@@ -205,19 +205,20 @@ describeLive('analytics endpoints against the demo location', () => {
   beforeAll(async () => {
     const login = process.env.ALTEGIO_TEST_LOGIN;
     const password = process.env.ALTEGIO_TEST_PASSWORD;
+    const userToken = process.env.ALTEGIO_USER_TOKEN;
     const partnerToken =
       process.env.ALTEGIO_PARTNER_TOKEN ?? process.env.ALTEGIO_LIVE_API_TOKEN;
-    if (!login || !password || !partnerToken) {
+    if (!partnerToken || (!userToken && (!login || !password))) {
       throw new Error(
-        'The live suite needs ALTEGIO_PARTNER_TOKEN (or ALTEGIO_LIVE_API_TOKEN), ALTEGIO_TEST_LOGIN and ALTEGIO_TEST_PASSWORD in the environment.'
+        'The live suite needs ALTEGIO_PARTNER_TOKEN (or ALTEGIO_LIVE_API_TOKEN) and either ALTEGIO_USER_TOKEN or ALTEGIO_TEST_LOGIN plus ALTEGIO_TEST_PASSWORD.'
       );
     }
-    client = new AltegioClient({ partnerToken }, CREDENTIALS_DIR);
+    client = new AltegioClient({ partnerToken, userToken }, CREDENTIALS_DIR);
     // The ERP rate-limits logins per IP and login (403 after a handful of
     // attempts), so reuse the token cached in CREDENTIALS_DIR between runs and
     // log in only when there is none.
     if (!client.isAuthenticated()) {
-      const result = await client.login(login, password);
+      const result = await client.login(login!, password!);
       expect(result.success).toBe(true);
     }
     timezone = await resolveLocationTimezone(client, DEMO_LOCATION_ID);
@@ -364,131 +365,75 @@ describeLive('analytics endpoints against the demo location', () => {
     ]);
   }, 60_000);
 
-  (ALLOW_WRITE ? it : it.skip)(
-    'creates or reuses exactly one assistant-owned report',
-    async () => {
-      const api = new V1AnalyticsAdapter(httpFromClient(client), { timezone });
-      const fields = await api.listReportFields({
-        location_id: DEMO_LOCATION_ID,
-      });
-      const templates = await api.listReportTemplates({
-        location_id: DEMO_LOCATION_ID,
-        with_definition: true,
-      });
-      const template = templates.find((one) => one.columns?.length);
-      expect(template).toBeDefined();
-
-      const before = await api.listSavedReports({
-        location_id: DEMO_LOCATION_ID,
-      });
-      const ownedBefore = before.filter((one) =>
-        one.name.startsWith('[Altegio Assistant]')
-      ).length;
-
-      // Mirror the use case: the stored date filter is the template's `!= NULL`
-      // placeholder on the dataset's mandatory date column; the period is a
-      // run-time BETWEEN override addressed to that filter.
-      const dateField = fields.find(
-        (field) =>
-          field.dataset === template!.dataset &&
-          field.field_key === DATASET_DATE_FIELD[template!.dataset ?? 'sales']
-      );
-      expect(dateField).toBeDefined();
-      const templateFilters = (template!.filters ?? []).map((filter) => ({
-        column_id: filter.column_id,
-        operator: filter.operator,
-        value: filter.value,
-      }));
-      const filters = templateFilters.some(
-        (filter) => filter.column_id === dateField!.column_id
-      )
-        ? templateFilters
-        : [
-            ...templateFilters,
-            { column_id: dateField!.column_id, operator: '!=', value: 'NULL' },
-          ];
-      const definition = {
-        name: `[Altegio Assistant] ${template!.name}`,
-        template_id: template!.template_id,
-        kind: template!.kind,
-        columns: template!.columns!.map((column) => ({
-          column_id: column.column_id,
-        })),
-        filters,
-        groupings: template!.groupings!,
-      };
-
-      // Reuse the owned report when it exists (updating it in place), so a
-      // re-run never leaves a second, undeletable report behind.
-      const existing = before.find((one) => one.name === definition.name);
-      let created = existing
-        ? await api.updateReport({
-            location_id: DEMO_LOCATION_ID,
-            report_id: existing.report_id,
-            definition,
-          })
-        : await api.createReport({
-            location_id: DEMO_LOCATION_ID,
-            definition,
-          });
-
-      // The builder prepares the data mart asynchronously; wait for `success`.
-      let full = await api.getSavedReport({
-        location_id: DEMO_LOCATION_ID,
-        report_id: created.report_id,
-      });
-      const ready = await awaitReportReady(api, DEMO_LOCATION_ID, full, {
-        timeoutMs: 150_000,
-        pollMs: 5_000,
-      });
-      full =
-        ready ??
-        (await api.getSavedReport({
+  it('runs a ready assistant-owned report without mutating the builder', async () => {
+    const api = new V1AnalyticsAdapter(httpFromClient(client), { timezone });
+    const saved = await api.listSavedReports({
+      location_id: DEMO_LOCATION_ID,
+    });
+    const owned = saved.filter((report) =>
+      report.name.startsWith('[Altegio Assistant]')
+    );
+    const detailed = await Promise.all(
+      owned.map((report) =>
+        api.getSavedReport({
           location_id: DEMO_LOCATION_ID,
-          report_id: created.report_id,
-        }));
-      record('constructor-report', { success: true, data: full });
-      if (!ready) {
-        // The builder's first attempt on an API-created report fails; the hourly
-        // refresh rebuilds it. Record the definition, skip the data assertions.
-        console.warn(
-          `report ${full.report_id} not ready (status: ${full.status}); data not recorded`
-        );
-        return;
-      }
-
-      const periodFilter = (full.filters ?? []).find(
-        (filter) => filter.column_id === dateField!.column_id
+          report_id: report.report_id,
+        })
+      )
+    );
+    const ready = detailed.find((report) => report.status === 'success');
+    expect(ready).toBeDefined();
+    const full = await api.getSavedReport({
+      location_id: DEMO_LOCATION_ID,
+      report_id: ready!.report_id,
+    });
+    const storedPeriod = (full.filters ?? [])
+      .map((filter) => filter.value)
+      .find((value) =>
+        typeof value === 'string'
+          ? /^\d{4}-\d{2}-\d{2},\d{4}-\d{2}-\d{2}$/.test(value)
+          : false
       );
-      expect(periodFilter).toBeDefined();
-      const table = await api.runReport({
-        location_id: DEMO_LOCATION_ID,
-        report_id: created.report_id,
-        filters: [
-          {
-            filter_id: periodFilter!.filter_id,
-            operator: 'BETWEEN',
-            value: { from: PERIOD.date_from, to: PERIOD.date_to },
-          },
-        ],
-      });
-      record('constructor-report-data-live', {
-        success: true,
-        data: { columns: table.columns.length, rows: table.rows.length },
-      });
-      expect(table.columns.length).toBeGreaterThan(0);
+    expect(storedPeriod).toBeDefined();
+    const [dateFrom, dateTo] = storedPeriod!.split(',');
+    const result = await runSavedReport(client, {
+      location_id: DEMO_LOCATION_ID,
+      report_id: full.report_id,
+      date_from: dateFrom!,
+      date_to: dateTo!,
+    });
+    const table = result.structuredContent as {
+      row_count: number;
+      columns: unknown[];
+    };
+    expect(table.row_count).toBeGreaterThan(0);
+    expect(table.columns).not.toHaveLength(0);
+  }, 120_000);
 
-      const after = await api.listSavedReports({
-        location_id: DEMO_LOCATION_ID,
-      });
-      const ownedAfter = after.filter((one) =>
-        one.name.startsWith('[Altegio Assistant]')
-      ).length;
-      // One report per template at most: a second run must not add another.
-      expect(ownedAfter).toBeLessThanOrEqual(ownedBefore + 1);
-    },
-    180_000
-  );
+  it('runs a template through the complete use case', async () => {
+    const api = new V1AnalyticsAdapter(httpFromClient(client), { timezone });
+    const templates = await api.listReportTemplates({
+      location_id: DEMO_LOCATION_ID,
+    });
+    const template = templates.find(
+      (candidate) => candidate.name === 'Revenue by team member'
+    );
+    expect(template).toBeDefined();
+
+    const result = await runReport(client, {
+      location_id: DEMO_LOCATION_ID,
+      template_id: template!.template_id,
+      ...PERIOD,
+    });
+    const table = result.structuredContent as {
+      row_count: number;
+      columns: unknown[];
+      reused_existing_report: boolean;
+    };
+    expect(table.row_count).toBeGreaterThan(0);
+    expect(table.columns).not.toHaveLength(0);
+    expect(table.reused_existing_report).toBe(true);
+  }, 120_000);
 });
 
 describe('sanitize', () => {

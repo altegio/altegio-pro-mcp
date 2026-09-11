@@ -1,10 +1,9 @@
 /**
  * MCP resources of the analytics pack — data and handlers, no transport.
  *
- * The server does not register resource handlers yet (the transport work is in
- * flight in a parallel change), so this module deliberately exports plain data
- * and pure-ish handlers that any `resources/list`, `resources/templates/list`
- * and `resources/read` implementation can call:
+ * The shared server registers this module on every facet. It exports plain data
+ * and pure-ish handlers used by `resources/list`, `resources/templates/list`
+ * and `resources/read`:
  *
  *   listAnalyticsResources()          → resources/list entries
  *   listAnalyticsResourceTemplates()  → resources/templates/list entries
@@ -293,6 +292,8 @@ export function renderCoverage(): string {
     '',
     '- At most 365 days per call.',
     '- Report tables are capped in the tool result; the full table arrives as a CSV resource link that lives for 30 minutes in the server process.',
+    "- The report builder has two data APIs. Locations with the new API can override a saved report's period per run. The legacy fallback is used only when the requested period exactly matches the report's stored period; a different range is rejected rather than mislabeled.",
+    '- A report-builder status of `error` is a real upstream build failure, not a pending report. Use the overview, daily series or day-end report while the builder is unavailable.',
     '- Everything is scoped to one location; there is no chain-wide roll-up.',
     '',
   ].join('\n');

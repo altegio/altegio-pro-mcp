@@ -18,7 +18,7 @@
 openapi: 3.1.0
 info:
   title: Altegio analytics — undocumented operations used by the MCP analytics pack
-  version: '2026-09-07'
+  version: '2026-09-11'
   description: >-
     Hand-written stubs for the undocumented analytics endpoints the
     `analytics_*` tool pack depends on. Candidates for publication in the
@@ -605,6 +605,50 @@ paths:
                         type: object
                         properties:
                           columns: { type: array, items: { type: object } }
+
+  /company/{location_id}/ac/{report_id}/data:
+    post:
+      operationId: run_report_builder_report_legacy
+      summary: Run a saved report through the legacy row data API
+      x-altegio-permission: reports_access, plus an active subscription
+      x-altegio-caveat: >-
+        Compatibility fallback for locations without the new report-data
+        feature flag. Runtime date overrides are not reliable on this route,
+        so the MCP calls it only when the requested period exactly matches the
+        period already stored in the report. Returns arrays of cells rather
+        than the new header/rows/summary pivot.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: report_id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                report_columns: { type: array, items: { type: object } }
+      responses:
+        '200':
+          description: Rows represented as arrays of report cells.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: array
+                    items:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          report_column_id: { type: [string, 'null'] }
+                          report_grouping_id: { type: [string, 'null'] }
+                          column_id: { type: string }
+                          used_column_name: { type: string }
+                          value: {}
 
 components:
   schemas:

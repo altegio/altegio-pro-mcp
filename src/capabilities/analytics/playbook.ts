@@ -334,6 +334,6 @@ export const ANALYSIS_NOTES: readonly AnalysisNote[] = [
   },
   {
     title: 'Running a report leaves a footprint',
-    text: 'analytics_run_report keeps exactly one assistant-owned report per shape in the location’s report builder (named "[Altegio Assistant] …"), reused across runs; the period travels per run. It never touches a report the owner made.',
+    text: 'analytics_run_report reuses a ready assistant-owned report per shape in the location’s report builder (named "[Altegio Assistant] …") and never edits a report the owner made. Period overrides work on the new report-data API; the legacy API is used only for a report’s stored period.',
   },
 ] as const;

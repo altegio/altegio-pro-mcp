@@ -634,6 +634,12 @@ export class OnboardingHandlers {
         .join('\n');
 
       const fieldCount = Object.keys(parsed[0]).length;
+      const importTool = {
+        staff: 'onboarding_add_staff_batch',
+        services: 'onboarding_add_services_batch',
+        clients: 'onboarding_import_clients',
+        categories: 'onboarding_add_categories',
+      }[data_type];
 
       return {
         content: [
@@ -644,7 +650,7 @@ export class OnboardingHandlers {
               `Total rows: ${parsed.length}\n` +
               `Fields: ${fieldCount} (${Object.keys(parsed[0]).join(', ')})\n\n` +
               `First ${Math.min(5, parsed.length)} rows:\n${preview}\n\n` +
-              `Proceed with onboarding_add_${data_type}_batch to create entities.`,
+              `Proceed with ${importTool} to create entities.`,
           },
         ],
       };

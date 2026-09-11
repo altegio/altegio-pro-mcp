@@ -9,7 +9,7 @@
 MCP server for Altegio.Pro business management API - B2B integration for salon/spa owners and administrators.
 
 **Target users:** Business owners managing their Altegio locations
-**Authentication:** All operations require user login (obtained via `altegio_login`)
+**Authentication:** public HTTP uses Altegio OAuth; local stdio can use `altegio_login` or a pre-seeded user token
 **Focus:** Administrative B2B operations only (no public booking features)
 
 ## Features
@@ -19,7 +19,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 - **Analytics**: key metrics with period comparison, daily series, breakdowns, day-end report, report builder
 - **Location settings**: appointment calendar, online booking, booking forms, resources
 - **Universal API executor**: search, describe and call any of the 317 documented API operations, even the ones without a dedicated tool
-- **Conversational onboarding** with bulk CSV/JSON import and checkpoint/resume
+- **Conversational onboarding** with bulk CSV/JSON import and automatic checkpoint/resume
 - **Dual transport:** stdio for Claude Desktop, HTTP for cloud deployments
 - **TypeScript** with full type safety and comprehensive automated tests
 - **Auto-deploy CI/CD** via VM cron (git pull + docker compose rebuild every 2 min)
@@ -115,7 +115,8 @@ corporate OpenAPI specs, so they make no spec or network lookups of their own.
 pointer to the curated tool: writes go through the curated surface, and executor
 writes require the allowlist from [ADR-001](docs/architecture/2026-09-07-mcp-platform-architecture.md)
 D2. V3 preview operations are described but not callable — the live API does not
-serve them yet. Authentication via `altegio_login` is required.
+serve them yet. A delegated Altegio identity, direct user token or local
+`altegio_login` session is required.
 ### 📊 Analytics
 **Read-only reporting for one location.** Every tool takes `location_id` first and
 either a `period` preset (`today`, `yesterday`, `this_week`, `last_week`,
@@ -136,13 +137,16 @@ the call, and amounts come back in major units with an ISO currency code.
 - `analytics_list_report_templates` - The built-in report templates of the location, each with the question it answers
 - `analytics_list_report_fields` - Canonical field keys of one report-builder dataset (`sales`, `financial_transactions`, `loyalty`, `team_member_schedules`)
 - `analytics_run_report` - Run a template by id, or an ad-hoc report from a dataset, fields, `group_by` and an optional `day`/`week`/`month`/`year` granularity. Returns a table capped at 200 rows; a longer table is attached as a CSV resource link that lives for 30 minutes
-- `analytics_list_saved_reports` / `analytics_run_saved_report` - Re-run a report the owner already has, for any period
+- `analytics_list_saved_reports` / `analytics_run_saved_report` - Re-run a report the owner already has. Locations on the legacy report-data API can run its stored period; locations with the new data API can override the period per run
 
-**Report ownership.** The report builder has no delete, so `analytics_run_report`
-keeps exactly one report per template or ad-hoc shape, named
-`[Altegio Assistant] <name>`, created on first use and updated in place. The
-period always travels as a per-run filter override, never as a new report. This
-is the one analytics tool that is not marked read-only.
+**Report ownership.** The report builder has no supported delete, so
+`analytics_run_report` first reuses a ready report named
+`[Altegio Assistant] <name>` and creates one only when none exists. It never
+updates a ready report merely because a newer duplicate failed. The period
+travels as a per-run filter override where the location's report-data API
+supports it. This is the one analytics tool that is not marked read-only. A
+builder status of `error` is surfaced as an upstream failure and is never
+reported as merely pending.
 
 **Access rights.** Analytics needs the Analytics access right in the location;
 the day-end report needs the finance reporting right, occupancy needs access to
@@ -168,7 +172,7 @@ alternative for each.
 - `onboarding_preview_data` - Validate before import
 - `onboarding_rollback_phase` - Undo specific phase
 
-All write operations require user authentication via `altegio_login`. See the
+All write operations require an authenticated Altegio user. See the
 [Onboarding Guide](docs/ONBOARDING_GUIDE.md) for first-time setup workflows and
 [Demo-management API contract notes](docs/DEMO_MANAGEMENT_CONTRACTS.md) for
 documented limitations and live-API discrepancies.
@@ -193,7 +197,8 @@ credential and is not a product boundary ([ADR-001](docs/architecture/2026-09-07
 Rules:
 
 - Every facet always serves `altegio_login`, `altegio_logout` and
-  `list_locations` — no tool works before authentication, and nearly every tool
+  `list_locations`. Public OAuth and direct-token callers are already
+  authenticated; local stdio callers can use `altegio_login`. Nearly every tool
   needs a `location_id`.
 - Membership is declared once in [`src/tools/facets.ts`](src/tools/facets.ts) as
   explicit tool names plus tool-name prefixes (`analytics_*`, `onboarding_*`),
@@ -206,9 +211,9 @@ Rules:
   available facets.
 - **stdio exposes everything** — `src/index.ts` uses the unfiltered `all` view,
   which has no HTTP route. Facets are an HTTP concern only.
-- Publicly the paths are `https://mcp.alteg.io/pro/mcp` and
-  `https://mcp.alteg.io/pro/mcp/<facet>` — the platform proxy strips the `/pro`
-  prefix, so facets need no proxy change.
+- Public client-facing paths are `https://mcp.alteg.io/public/pro/mcp` and
+  `https://mcp.alteg.io/public/pro/mcp/<facet>`. The internal delegated route
+  remains under `/pro/mcp`.
 
 Set `MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING=true` to drop the onboarding
 walkthrough from `/mcp` and serve it only on `/mcp/onboarding`. It is off by
@@ -225,10 +230,21 @@ Both are available on every facet and on stdio.
 | `altegio://docs/product-logic` | The product model: chains and locations, team members and clients, the service catalog, scheduling and booking, the visit and payment lifecycle, loyalty, finance and inventory |
 | `altegio://docs/glossary` | The canonical vocabulary — the approved term for every concept and the synonyms never to use |
 | `altegio://docs/onboarding-guide` | The onboarding walkthrough guide: phase order, accepted CSV and JSON shapes, resuming and rolling back |
+| `altegio://docs/clients-segmentation` | Client-base filters, outcome codes and worked segment recipes |
+| `altegio://analytics/glossary` | Exact definitions and invariants for every analytics metric |
+| `altegio://analytics/coverage` | Supported questions, known API gaps and the closest safe alternatives |
+| `altegio://analytics/playbook` | Diagnostic order, decompositions, question-to-tool routing and benchmarks |
+| `altegio://analytics/data-model` | Sources and relationships behind appointments, visits, clients and financial ledgers |
+| `altegio://analytics/report-fields/{dataset}` | Resource template pointing to the live field catalogue for one report-builder dataset |
+| `altegio://reports/{location_id}/{run_id}.csv` | Temporary full CSV for a truncated report result |
 
 | Prompt | What it does |
 |---|---|
 | `onboarding_walkthrough` | Guides a first-time location setup through the onboarding tools in the order that leaves the digital schedule working. Optional `location_id`; without it the walkthrough lists the locations and asks |
+| `analytics_location_health_check` | End-to-end location diagnosis from headline metrics to the largest actionable leak |
+| `analytics_monthly_review` | Monthly operating review with trends, sources, visit outcomes and drivers |
+| `analytics_team_member_review` | Team-member revenue and occupancy review |
+| `analytics_compare_periods` | Explicit period-versus-period comparison and driver analysis |
 
 Both are driven by small registries — [`src/resources/registry.ts`](src/resources/registry.ts)
 and [`src/prompts/registry.ts`](src/prompts/registry.ts) — so a tool pack adds
@@ -236,7 +252,7 @@ its own resources or prompts by exporting one module and adding a single import
 line to `src/resources/index.ts` or `src/prompts/index.ts`. `resources/list` is
 ordered by URI and `prompts/list` by name.
 
-The two markdown documents are read from `docs/` at runtime; set
+The core markdown documents are read from `docs/` at runtime; set
 `ALTEGIO_DOCS_DIR` if a deployment keeps them elsewhere.
 
 The `initialize` result also carries a server `instructions` paragraph naming
@@ -379,7 +395,11 @@ The MCP endpoint is available at `http://localhost:8080/mcp` (Streamable HTTP tr
 
 Automatic deployment to `mcp-servers` VM on PR merge to `main`. A cron job pulls latest `main` every 2 minutes and rebuilds if changed.
 
-Public endpoint: `https://mcp.alteg.io/pro/mcp`
+Public endpoint: `https://mcp.alteg.io/public/pro/mcp`
+
+Users authorize with their own Altegio account during connection. For richer
+product answers, add the public Knowledge MCP alongside it:
+`https://mcp.alteg.io/public/knowledge/mcp`.
 
 See [CI-CD.md](CI-CD.md) for details.
 
@@ -406,7 +426,11 @@ How the user token behind `altegio_login` is stored depends on the transport:
 - **stdio (Claude Desktop, `npm start`) — single user.** `altegio_login` writes
   one token to `<CREDENTIALS_DIR>/credentials.json` and every tool call uses it.
   This is unchanged from previous releases.
-- **HTTP (`mcp.alteg.io/pro`) — per delegated identity.** The deployment sits
+- **Public HTTP (`mcp.alteg.io/public/pro`) — Altegio OAuth.** The platform
+  authorizes the user with their own Altegio account and forwards only that
+  user's delegated token and allowed location scope. No `altegio_login` call or
+  server-side password storage is involved.
+- **Internal HTTP (`mcp.alteg.io/pro`) — per delegated identity.** The deployment sits
   behind the platform's OAuth 2.1 proxy, which forwards the verified caller as
   `x-mcp-auth-*` headers. Each request acts strictly as *its own* identity: the
   token from `altegio_login` is stored per identity
@@ -420,8 +444,8 @@ identity gets no user token — every authenticated tool returns
 `Not authenticated. Call altegio_login first.` and `altegio_login` is refused
 for that request.
 
-> **After a deploy, HTTP callers must run `altegio_login` once more.** Tokens are
-> stored on the container's ephemeral filesystem, so a redeploy clears them.
+The legacy internal login store is ephemeral; public OAuth and direct-token
+connections do not depend on it and survive MCP server redeploys.
 
 - **HTTP with a direct token — many clients, no login.** A caller that already
   holds a client's Altegio user token (e.g. a marketplace app's technical-user
@@ -488,7 +512,7 @@ pipeline and the overlay format.
 
 ### Testing
 
-- **865 tests** (47 suites, 6 skipped live) covering authentication, all tools, facets and `tools/list` ordering, resources and prompts, the API catalog and executor, analytics golden fixtures and the terminology guard, error handling, pagination
+- **More than 1,100 tests** covering authentication, all tools, facets and `tools/list` ordering, resources and prompts, the API catalog and executor, analytics golden fixtures and the terminology guard, error handling and pagination
 - **Opt-in live suite** for analytics — records real API payloads from the demo location (4564) into `src/api/v1/__tests__/fixtures/live/`; the hand-built fixtures next to it drive the unit tests and are not overwritten:
 
 ```bash
@@ -499,9 +523,8 @@ npx jest analytics-live
 ```
 
   The partner token has its own variable here because the shared Jest setup pins
-  `ALTEGIO_API_TOKEN` to a dummy value for every other suite. Add
-  `ALTEGIO_E2E_WRITE=1` to also exercise the assistant-owned report in the
-  report builder.
+  `ALTEGIO_API_TOKEN` to a dummy value for every other suite. The suite is
+  read-only and reuses a maintained assistant-owned report for builder checks.
 - **Jest** for unit tests with mocked API responses
 - **Test isolation** with temporary credentials directory
 - Run: `npm test` or `npm run test:coverage`
@@ -520,7 +543,8 @@ Generated catalog of every documented operation: [docs/architecture/catalog.md](
 
 **Authentication:**
 - Partner token: `Authorization: Bearer {token}`
-- User token: `User-Token: {token}` (obtained via `altegio_login`)
+- User token: append `, User {token}` to the `Authorization` header (resolved
+  automatically from OAuth, a direct request token or `altegio_login`)
 
 ## Contributing
 

@@ -9,8 +9,7 @@
  *
  * The bridge reaches the client's internal request method structurally. That
  * method is `private` in TypeScript only — a compile-time marker, not a runtime
- * barrier — and promoting it to a public port belongs to the transport work in
- * flight, so this module keeps the coupling in one documented place and fails
+ * barrier — so this module keeps the coupling in one documented place and fails
  * loudly if the plumbing ever moves. `src/api/__tests__/altegio-http.test.ts`
  * guards the assumption.
  */

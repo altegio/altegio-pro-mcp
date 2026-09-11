@@ -134,7 +134,7 @@ describe('tools/call outside the facet', () => {
 });
 
 describe('server instructions', () => {
-  it('names the domains, the facets and what is being added', async () => {
+  it('names the live domains, authentication paths and knowledge entry points', async () => {
     const client = await connect();
     const instructions = client.getInstructions() ?? '';
 
@@ -144,7 +144,28 @@ describe('server instructions', () => {
     expect(instructions).toContain('/mcp/onboarding');
     expect(instructions).toContain('report builder');
     expect(instructions).toContain('executor');
-    expect(instructions.split(/\s+/).filter(Boolean).length).toBeLessThan(120);
+    expect(instructions).toContain('delegated Altegio identity');
+    for (const uri of [
+      PRODUCT_LOGIC_URI,
+      GLOSSARY_URI,
+      CLIENTS_SEGMENTATION_URI,
+      ANALYTICS_GLOSSARY_URI,
+      ANALYTICS_COVERAGE_URI,
+      ANALYTICS_PLAYBOOK_URI,
+      ANALYTICS_DATA_MODEL_URI,
+    ]) {
+      expect(instructions).toContain(uri);
+    }
+    for (const prompt of [
+      ONBOARDING_WALKTHROUGH_PROMPT,
+      'analytics_location_health_check',
+      'analytics_monthly_review',
+      'analytics_team_member_review',
+      'analytics_compare_periods',
+    ]) {
+      expect(instructions).toContain(prompt);
+    }
+    expect(instructions.split(/\s+/).filter(Boolean).length).toBeLessThan(180);
     await client.close();
   });
 

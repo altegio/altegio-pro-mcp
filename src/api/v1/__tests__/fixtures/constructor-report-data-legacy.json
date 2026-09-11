@@ -1,0 +1,37 @@
+{
+  "success": true,
+  "data": [
+    [
+      {
+        "report_column_id": "rc-1",
+        "report_grouping_id": null,
+        "column_id": "c-sales-revenue",
+        "used_column_name": "sales_revenue",
+        "value": 6120.5
+      },
+      {
+        "report_column_id": null,
+        "report_grouping_id": "rg-1",
+        "column_id": "c-sales-master",
+        "used_column_name": "team_member_name",
+        "value": "Team member A"
+      }
+    ],
+    [
+      {
+        "report_column_id": "rc-1",
+        "report_grouping_id": null,
+        "column_id": "c-sales-revenue",
+        "used_column_name": "sales_revenue",
+        "value": 4310
+      },
+      {
+        "report_column_id": null,
+        "report_grouping_id": "rg-1",
+        "column_id": "c-sales-master",
+        "used_column_name": "team_member_name",
+        "value": "Team member B"
+      }
+    ]
+  ]
+}

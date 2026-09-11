@@ -53,7 +53,8 @@ onboarding_set_schedules({
 ### 1. Login and Start
 
 ```typescript
-// First, authenticate
+// Public HTTP is already authorized with Altegio OAuth.
+// In local stdio mode only, authenticate if needed:
 altegio_login({
   email: "your-email@example.com",
   password: "your-password"
@@ -297,8 +298,8 @@ Bob Smith,Nail Technician,invalid-phone`
 If an error interrupts the onboarding process:
 
 ```typescript
-// Later, in a new session
-altegio_login({ email: "...", password: "..." })
+// Later, in a new session (public HTTP reconnects with Altegio OAuth;
+// local stdio calls altegio_login first only when its session is absent)
 
 onboarding_resume({
   location_id: 123456
@@ -313,20 +314,6 @@ onboarding_resume({
 //
 //           Next steps: Continue with onboarding_add_services_batch()
 //           or onboarding_status() for full progress"
-```
-
-### Manual Checkpoint
-
-Save progress manually at any point:
-
-```typescript
-onboarding_checkpoint({
-  location_id: 123456
-})
-
-// Response: "Checkpoint saved for location 123456
-//           Phase: services
-//           Timestamp: 2025-01-29T10:45:30.000Z"
 ```
 
 ### Rollback Specific Phase
@@ -475,7 +462,8 @@ onboarding_add_staff_batch({ location_id: 222222, ... })
 Full onboarding from scratch to operational platform:
 
 ```typescript
-// 1. Login
+// 1. Public HTTP: connect with Altegio OAuth.
+//    Local stdio only: log in if needed.
 altegio_login({ email: "owner@salon.com", password: "secure123" })
 
 // 2. Start onboarding
@@ -540,7 +528,7 @@ onboarding_status({ location_id: 123456 })
 ## Troubleshooting
 
 ### Error: "Authentication required"
-**Solution:** Run `altegio_login()` first
+**Solution:** reconnect public HTTP with Altegio OAuth, or run `altegio_login()` in local stdio mode
 
 ### Error: "Category ID not found"
 **Solution:** Run `onboarding_add_categories()` before `onboarding_add_services_batch()`
@@ -621,12 +609,8 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 
 **`onboarding_preview_data(data_type, raw_input)`**
 - Parse and validate without creating entities
-- Types: 'staff', 'services', 'clients'
+- Types: 'staff', 'services', 'clients', 'categories'
 - Shows structured preview with validation errors
-
-**`onboarding_checkpoint(location_id)`**
-- Manual save point (auto-checkpoints also happen)
-- Returns: checkpoint ID and timestamp
 
 **`onboarding_rollback_phase(location_id, phase_name)`**
 - Delete entities from specified phase

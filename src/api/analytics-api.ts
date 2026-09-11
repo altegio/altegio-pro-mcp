@@ -362,7 +362,12 @@ export interface SavedReport {
    */
   status?: 'pending' | 'success' | 'error' | 'deleted' | null;
   /** Filters of the stored report, needed to override the period at run time. */
-  filters?: Array<{ filter_id: string; column_id: string; operator: string }>;
+  filters?: Array<{
+    filter_id: string;
+    column_id: string;
+    operator: string;
+    value?: string | null;
+  }>;
   columns?: Array<{
     report_column_id: string;
     column_id: string;
@@ -449,5 +454,7 @@ export interface AnalyticsApi {
     location_id: number;
     report_id: string;
     filters: ReportDataFilterOverride[];
+    /** Use the legacy rows endpoint only for the report's stored period. */
+    allow_stored_period_fallback?: boolean;
   }): Promise<ReportTable>;
 }

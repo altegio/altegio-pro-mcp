@@ -230,7 +230,23 @@ describe('Onboarding Handlers', () => {
       expect(textContent).toContain('+1234567890');
       expect(textContent).toContain('Fields: 2');
       expect(textContent).toContain('Total rows: 2');
+      expect(textContent).toContain('onboarding_add_staff_batch');
     });
+
+    it.each([
+      ['clients', 'onboarding_import_clients'],
+      ['categories', 'onboarding_add_categories'],
+      ['services', 'onboarding_add_services_batch'],
+    ] as const)(
+      'points %s previews to the real import tool',
+      async (data_type, tool) => {
+        const result = await handlers.previewData({
+          data_type,
+          raw_input: 'name\nExample',
+        });
+        expect(result.content[0]?.text).toContain(tool);
+      }
+    );
 
     it('should show JSON preview', async () => {
       const json = JSON.stringify([

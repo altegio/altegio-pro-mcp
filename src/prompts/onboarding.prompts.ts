@@ -23,7 +23,7 @@ function walkthrough(locationId?: string): string {
     '',
     target,
     '',
-    'Start by calling altegio_login if I am not authenticated yet, then',
+    'Use the host-provided Altegio identity if present; otherwise, in local stdio mode, call altegio_login if I am not authenticated yet. Then',
     'onboarding_start for the location (onboarding_resume instead if a session',
     'already exists — onboarding_status tells you which).',
     '',
