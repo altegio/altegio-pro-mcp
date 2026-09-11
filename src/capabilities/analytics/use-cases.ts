@@ -666,10 +666,18 @@ export async function deleteAssistantReport(
 ): Promise<AnalyticsResult> {
   const timezone = await resolveLocationTimezone(client, input.location_id);
   const api = plainApi(client, timezone);
-  const report = await api.getSavedReport({
-    location_id: input.location_id,
-    report_id: input.report_id,
-  });
+  // The detailed report endpoint can require a stronger permission than the
+  // list and delete endpoints. Ownership needs only the immutable ID + name,
+  // so use the least-privileged working read before the destructive call.
+  const report = (
+    await api.listSavedReports({ location_id: input.location_id })
+  ).find(({ report_id }) => report_id === input.report_id);
+
+  if (!report) {
+    throw new AnalyticsInputError(
+      `Saved report ${input.report_id} was not found in location ${input.location_id}.`
+    );
+  }
 
   if (!report.name.startsWith(OWNED_REPORT_PREFIX)) {
     throw new AnalyticsInputError(

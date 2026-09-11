@@ -795,11 +795,10 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
   ],
   analytics_delete_assistant_report: [
     {
-      path: '/company/{location_id}/analytics_constructor/reports/{report_id}',
+      path: '/company/{location_id}/analytics_constructor/reports',
       method: 'get',
-      operationId: 'get_report_builder_report',
-      pathParams: ['location_id', 'report_id'],
-      queryParams: ['include'],
+      operationId: 'list_report_builder_reports',
+      pathParams: ['location_id'],
       source: 'extended',
     },
     {

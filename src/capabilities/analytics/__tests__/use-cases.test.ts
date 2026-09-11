@@ -807,10 +807,8 @@ describe('analytics_delete_assistant_report', () => {
       'analytics_delete_assistant_report',
       { location_id: 4564, report_id: 'r-owned' },
       [
-        [
-          /analytics_constructor\/reports\/r-owned|\/ac\/r-owned/,
-          'constructor-report',
-        ],
+        [/analytics_constructor\/reports$/, 'constructor-reports'],
+        [/\/ac\/r-owned$/, { success: true, data: null }],
       ]
     );
 
@@ -818,7 +816,7 @@ describe('analytics_delete_assistant_report', () => {
     expect(calls.map(({ method, path }) => ({ method, path }))).toEqual([
       {
         method: 'GET',
-        path: '/company/4564/analytics_constructor/reports/r-owned?include[]=report_columns&include[]=report_filters&include[]=report_groupings&include[]=report_status',
+        path: '/company/4564/analytics_constructor/reports',
       },
       { method: 'DELETE', path: '/company/4564/ac/r-owned' },
     ]);
@@ -829,23 +827,26 @@ describe('analytics_delete_assistant_report', () => {
   });
 
   it('refuses to delete an owner-created report', async () => {
-    const ownerReport = {
-      success: true,
-      data: {
-        id: 'r-user',
-        name: 'Weekly sales',
-        description: '',
-        type: 'static',
-      },
-    };
     const { result, calls } = await call(
       'analytics_delete_assistant_report',
       { location_id: 4564, report_id: 'r-user' },
-      [[/analytics_constructor\/reports\/r-user/, ownerReport]]
+      [[/analytics_constructor\/reports$/, 'constructor-reports']]
     );
 
     expect(result.isError).toBe(true);
     expect(result.content[0]!.text).toContain('deletes only reports');
+    expect(calls).toHaveLength(1);
+  });
+
+  it('does not delete an unknown report id', async () => {
+    const { result, calls } = await call(
+      'analytics_delete_assistant_report',
+      { location_id: 4564, report_id: 'missing' },
+      [[/analytics_constructor\/reports$/, 'constructor-reports']]
+    );
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]!.text).toContain('was not found');
     expect(calls).toHaveLength(1);
   });
 });
