@@ -806,7 +806,12 @@ describe('analytics_delete_assistant_report', () => {
     const { result, calls } = await call(
       'analytics_delete_assistant_report',
       { location_id: 4564, report_id: 'r-owned' },
-      [[/analytics_constructor\/reports\/r-owned|\/ac\/r-owned/, 'constructor-report']]
+      [
+        [
+          /analytics_constructor\/reports\/r-owned|\/ac\/r-owned/,
+          'constructor-report',
+        ],
+      ]
     );
 
     expect(result.isError).toBeUndefined();
