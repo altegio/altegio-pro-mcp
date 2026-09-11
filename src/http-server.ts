@@ -11,6 +11,7 @@ import {
   requestContextFromHeaders,
   runWithContext,
 } from './request-context.js';
+import { PACKAGE_VERSION } from './package-metadata.js';
 
 const logger = createLogger('http-server');
 
@@ -50,7 +51,11 @@ export function createApp(): {
 
   // Health check endpoint
   app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({
+      status: 'ok',
+      version: PACKAGE_VERSION,
+      timestamp: new Date().toISOString(),
+    });
   });
 
   const transportsByFacet = Object.fromEntries(

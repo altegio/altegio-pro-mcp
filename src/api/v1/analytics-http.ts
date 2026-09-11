@@ -25,7 +25,7 @@ export interface CallOptions {
   kind: AnalyticsEndpointKind;
   /** Verb phrase for error messages, e.g. `read key metrics`. */
   context: string;
-  method?: 'GET' | 'POST';
+  method?: 'GET' | 'POST' | 'DELETE';
   /** JSON request body, for the report builder's POST endpoints. */
   body?: unknown;
 }

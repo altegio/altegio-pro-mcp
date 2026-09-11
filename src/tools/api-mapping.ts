@@ -793,6 +793,23 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       source: 'extended',
     },
   ],
+  analytics_delete_assistant_report: [
+    {
+      path: '/company/{location_id}/analytics_constructor/reports/{report_id}',
+      method: 'get',
+      operationId: 'get_report_builder_report',
+      pathParams: ['location_id', 'report_id'],
+      queryParams: ['include'],
+      source: 'extended',
+    },
+    {
+      path: '/company/{location_id}/ac/{report_id}',
+      method: 'delete',
+      operationId: 'delete_report_builder_report_legacy',
+      pathParams: ['location_id', 'report_id'],
+      source: 'extended',
+    },
+  ],
 };
 
 /** Every tool → operation pair, from both maps, for the compliance test. */

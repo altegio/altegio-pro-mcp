@@ -4,6 +4,11 @@
 
 import { z } from 'zod';
 import { ConfigurationError } from '../utils/errors.js';
+import {
+  PACKAGE_DESCRIPTION,
+  PACKAGE_NAME,
+  PACKAGE_VERSION,
+} from '../package-metadata.js';
 
 /**
  * Server `instructions` returned in the MCP `initialize` result (ADR-001 §5.6).
@@ -96,8 +101,8 @@ export type EnvConfig = z.infer<typeof EnvSchema>;
 
 // MCP Server configuration
 export const ServerConfigSchema = z.object({
-  name: z.string().default('altegio-mcp-server'),
-  version: z.string().default('1.0.0'),
+  name: z.string().default(PACKAGE_NAME),
+  version: z.string().default(PACKAGE_VERSION),
   description: z.string().optional(),
   instructions: z.string().min(1).default(DEFAULT_SERVER_INSTRUCTIONS),
   protocolVersion: z.string().default('2025-11-25'),
@@ -209,9 +214,9 @@ export class ConfigLoader {
 
       // Build server config
       const serverConfig = ServerConfigSchema.parse({
-        name: env.npm_package_name || 'altegio-mcp-server',
-        version: env.npm_package_version || '1.0.0',
-        description: env.npm_package_description,
+        name: env.npm_package_name || PACKAGE_NAME,
+        version: env.npm_package_version || PACKAGE_VERSION,
+        description: env.npm_package_description || PACKAGE_DESCRIPTION,
         instructions: envConfig.MCP_SERVER_INSTRUCTIONS,
       });
 

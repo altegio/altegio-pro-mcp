@@ -28,7 +28,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Available Tools
 
-**71 tools organized by category** for complete business management:
+**72 tools organized by category** for complete business management:
 
 ### 🔐 Authentication
 - `altegio_login` - Authenticate with email/password
@@ -138,13 +138,16 @@ the call, and amounts come back in major units with an ISO currency code.
 - `analytics_list_report_fields` - Canonical field keys of one report-builder dataset (`sales`, `financial_transactions`, `loyalty`, `team_member_schedules`)
 - `analytics_run_report` - Run a template by id, or an ad-hoc report from a dataset, fields, `group_by` and an optional `day`/`week`/`month`/`year` granularity. Returns a table capped at 200 rows; a longer table is attached as a CSV resource link that lives for 30 minutes
 - `analytics_list_saved_reports` / `analytics_run_saved_report` - Re-run a report the owner already has. Locations on the legacy report-data API can run its stored period; locations with the new data API can override the period per run
+- `analytics_delete_assistant_report` - Permanently remove one failed, obsolete or duplicate report whose name starts with `[Altegio Assistant]`; owner-created reports are refused
 
-**Report ownership.** The report builder has no supported delete, so
-`analytics_run_report` first reuses a ready report named
+**Report ownership.** `analytics_run_report` first reuses a ready report named
 `[Altegio Assistant] <name>` and creates one only when none exists. It never
 updates a ready report merely because a newer duplicate failed. The period
 travels as a per-run filter override where the location's report-data API
-supports it. This is the one analytics tool that is not marked read-only. A
+supports it. Failed or obsolete assistant-created artifacts can be removed with
+`analytics_delete_assistant_report`, which checks the name before using the
+compatible report-builder delete route. Owner-created reports cannot be deleted
+by that tool. A
 builder status of `error` is surfaced as an upstream failure and is never
 reported as merely pending.
 

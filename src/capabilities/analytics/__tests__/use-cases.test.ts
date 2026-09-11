@@ -801,6 +801,55 @@ describe('analytics_list_saved_reports', () => {
   });
 });
 
+describe('analytics_delete_assistant_report', () => {
+  it('reads ownership before deleting the exact report', async () => {
+    const { result, calls } = await call(
+      'analytics_delete_assistant_report',
+      { location_id: 4564, report_id: 'r-owned' },
+      [
+        [
+          /analytics_constructor\/reports\/r-owned|\/ac\/r-owned/,
+          'constructor-report',
+        ],
+      ]
+    );
+
+    expect(result.isError).toBeUndefined();
+    expect(calls.map(({ method, path }) => ({ method, path }))).toEqual([
+      {
+        method: 'GET',
+        path: '/company/4564/analytics_constructor/reports/r-owned?include[]=report_columns&include[]=report_filters&include[]=report_groupings&include[]=report_status',
+      },
+      { method: 'DELETE', path: '/company/4564/ac/r-owned' },
+    ]);
+    expect(result.structuredContent).toMatchObject({
+      report_id: 'r-owned',
+      deleted: true,
+    });
+  });
+
+  it('refuses to delete an owner-created report', async () => {
+    const ownerReport = {
+      success: true,
+      data: {
+        id: 'r-user',
+        name: 'Weekly sales',
+        description: '',
+        type: 'static',
+      },
+    };
+    const { result, calls } = await call(
+      'analytics_delete_assistant_report',
+      { location_id: 4564, report_id: 'r-user' },
+      [[/analytics_constructor\/reports\/r-user/, ownerReport]]
+    );
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]!.text).toContain('deletes only reports');
+    expect(calls).toHaveLength(1);
+  });
+});
+
 describe('helpers', () => {
   it('hashes an ad-hoc signature stably', () => {
     expect(shortHash('sales|revenue_total|by|team_member_name')).toBe(

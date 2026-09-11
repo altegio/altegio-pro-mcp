@@ -166,7 +166,7 @@ describe('static facets', () => {
     ).length;
 
     it('has the whole pack registered', () => {
-      expect(analyticsCount).toBe(14);
+      expect(analyticsCount).toBe(15);
     });
 
     it('admits only the named entry points to the default view', () => {
@@ -175,6 +175,9 @@ describe('static facets', () => {
         true
       );
       expect(index.includes(DEFAULT_FACET, 'analytics_run_report')).toBe(true);
+      expect(
+        index.includes(DEFAULT_FACET, 'analytics_delete_assistant_report')
+      ).toBe(true);
       expect(index.includes(DEFAULT_FACET, 'analytics_get_daily_series')).toBe(
         false
       );

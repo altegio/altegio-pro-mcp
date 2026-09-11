@@ -58,9 +58,10 @@ function http(
               status: 200,
             });
           }
-          return new Response(JSON.stringify(target.body ?? {}), {
-            status: target.status,
-          });
+          return new Response(
+            target.status === 204 ? null : JSON.stringify(target.body ?? {}),
+            { status: target.status }
+          );
         }
         throw new Error(`no fixture routed for ${requestPath}`);
       },
@@ -634,6 +635,17 @@ describe('V1AnalyticsAdapter — report builder', () => {
       report_groupings: [{ column_id: 'c-sales-master' }],
     });
     expect(body.report_filters).toHaveLength(1);
+  });
+
+  it('deletes a saved report through the compatible builder route', async () => {
+    const { api, calls } = adapter([[/\/ac\/r-owned$/, { status: 204 }]]);
+
+    await api.deleteReport({ location_id: 4564, report_id: 'r-owned' });
+
+    expect(calls[0]).toMatchObject({
+      path: '/company/4564/ac/r-owned',
+      method: 'DELETE',
+    });
   });
 
   it('refuses a definition with no field or no grouping', async () => {

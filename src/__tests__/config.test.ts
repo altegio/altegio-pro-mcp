@@ -59,8 +59,8 @@ describe('Configuration Schema', () => {
     it('should provide default values', () => {
       const result = ServerConfigSchema.parse({});
 
-      expect(result.name).toBe('altegio-mcp-server');
-      expect(result.version).toBe('1.0.0');
+      expect(result.name).toBe('@altegio/mcp-server-pro');
+      expect(result.version).toBe('0.2.0-alpha.0');
       expect(result.protocolVersion).toBe('2025-11-25');
       expect(result.capabilities.tools?.listChanged).toBe(true);
     });
@@ -111,7 +111,7 @@ describe('Configuration Schema', () => {
       expect(config.env.ALTEGIO_API_TOKEN).toBe('test-token-123');
       expect(config.env.NODE_ENV).toBe('test');
       expect(config.env.LOG_LEVEL).toBe('debug');
-      expect(config.server.name).toBe('altegio-mcp-server');
+      expect(config.server.name).toBe('@altegio/mcp-server-pro');
       expect(config.altegio.partnerToken).toBe('test-token-123');
     });
 

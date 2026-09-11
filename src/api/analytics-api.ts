@@ -450,6 +450,10 @@ export interface AnalyticsApi {
     report_id: string;
     definition: ReportDefinition;
   }): Promise<SavedReport>;
+  deleteReport(query: {
+    location_id: number;
+    report_id: string;
+  }): Promise<void>;
   runReport(query: {
     location_id: number;
     report_id: string;
