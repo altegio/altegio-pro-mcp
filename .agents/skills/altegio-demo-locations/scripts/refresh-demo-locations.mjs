@@ -19,6 +19,8 @@ const profiles = [
   {
     id: 4564,
     title: 'Ateliér Vltava | Praha [TEST]',
+    timeZone: 'Europe/Prague',
+    closedWeekdays: [0],
     dailyMinimum: {
       scheduledStaff: 4,
       pastAppointments: 10,
@@ -294,6 +296,8 @@ const profiles = [
   {
     id: 720441,
     title: 'Brzytwa | Kraków [TEST]',
+    timeZone: 'Europe/Warsaw',
+    closedWeekdays: [0],
     dailyMinimum: {
       scheduledStaff: 3,
       pastAppointments: 6,
@@ -509,6 +513,8 @@ const profiles = [
   {
     id: 703092,
     title: 'VONA beauty space | Львів [TEST]',
+    timeZone: 'Europe/Kyiv',
+    closedWeekdays: [],
     dailyMinimum: {
       scheduledStaff: 2,
       pastAppointments: 5,
@@ -552,7 +558,7 @@ const profiles = [
         name: 'Марія Коваль',
         specialization: 'Стилістка-колористка',
         weight: 100,
-        daysOff: [0],
+        daysOff: [],
         slots: [
           ['10:00', '14:00'],
           ['15:00', '19:00'],
@@ -564,7 +570,7 @@ const profiles = [
         name: 'Олена Бойко',
         specialization: 'Майстриня нігтьового сервісу та естетистка',
         weight: 70,
-        daysOff: [0],
+        daysOff: [],
         slots: [
           ['11:00', '15:00'],
           ['16:00', '20:00'],
@@ -770,6 +776,83 @@ async function getAllAppointments(session, locationId, startDate, endDate) {
   return items;
 }
 
+function apiBase() {
+  return (
+    process.env.ALTEGIO_API_BASE || 'https://api.alteg.io/api/v1'
+  ).replace(/\/$/, '');
+}
+
+async function documentedApiRequest(
+  path,
+  { method = 'GET', query, body, requiresUser = false } = {}
+) {
+  const partnerToken = process.env.ALTEGIO_API_TOKEN;
+  const userToken = process.env.ALTEGIO_USER_TOKEN;
+  if (!partnerToken || (requiresUser && !userToken)) {
+    throw new Error(
+      `Documented API request requires ALTEGIO_API_TOKEN${requiresUser ? ' and ALTEGIO_USER_TOKEN' : ''}`
+    );
+  }
+  const url = new URL(`${apiBase()}${path}`);
+  for (const [key, value] of Object.entries(query || {})) {
+    for (const item of Array.isArray(value) ? value : [value]) {
+      url.searchParams.append(key, String(item));
+    }
+  }
+  const authorization = requiresUser
+    ? `Bearer ${partnerToken}, User ${userToken}`
+    : `Bearer ${partnerToken}`;
+  const response = await fetch(url, {
+    method,
+    headers: {
+      Authorization: authorization,
+      Accept: 'application/vnd.api.v2+json',
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const responseText = await response.text();
+  const payload = responseText ? JSON.parse(responseText) : {};
+  if (!response.ok || payload.success === false) {
+    throw new Error(
+      `Documented API ${method} ${path} failed (HTTP ${response.status}): ${JSON.stringify(payload.errors || payload.meta || payload).slice(0, 500)}`
+    );
+  }
+  return { status: response.status, payload };
+}
+
+async function directGetBookingTimes(
+  locationId,
+  teamMemberId,
+  date,
+  serviceId
+) {
+  const { payload } = await documentedApiRequest(
+    `/book_times/${locationId}/${teamMemberId}/${date}`,
+    { query: { 'service_ids[]': serviceId } }
+  );
+  return Array.isArray(payload.data) ? payload.data : [];
+}
+
+async function directValidateBooking(locationId, appointment, datetime) {
+  const { status } = await documentedApiRequest(`/book_check/${locationId}`, {
+    method: 'POST',
+    body: {
+      appointments: [
+        {
+          id: 1,
+          services: [appointment.service_id],
+          staff_id: appointment.team_member_id,
+          datetime,
+        },
+      ],
+    },
+  });
+  if (status !== 201) {
+    throw new Error(`Booking pre-check returned HTTP ${status}, expected 201`);
+  }
+}
+
 async function directPayVisit(locationId, appointment) {
   const partnerToken = process.env.ALTEGIO_API_TOKEN;
   const userToken = process.env.ALTEGIO_USER_TOKEN;
@@ -942,6 +1025,56 @@ function formatMinutes(value) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
+function localDateTimeKey(timeZone) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(new Date())
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, part.value])
+  );
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}
+
+function scheduleContains(scheduleDay, datetime, durationSeconds) {
+  if (!scheduleDay?.is_working) return false;
+  const start = parseMinutes(datetime.slice(11, 16));
+  const end = start + Math.ceil(Number(durationSeconds || 3600) / 60);
+  return (scheduleDay.slots || []).some(
+    (slot) => start >= parseMinutes(slot.from) && end <= parseMinutes(slot.to)
+  );
+}
+
+async function readScheduleIndex(session, profile, staffByKey) {
+  const index = new Map();
+  for (const staff of profile.staff.filter(
+    (teamMember) => teamMember.provider !== false
+  )) {
+    const teamMemberId = staffByKey.get(staff.key).id;
+    const result = await session.callTool('get_schedule', {
+      location_id: profile.id,
+      team_member_id: teamMemberId,
+      start_date: isoDate(addDays(ANCHOR, -SCHEDULE_PAST_DAYS)),
+      end_date: isoDate(addDays(ANCHOR, SCHEDULE_FUTURE_DAYS)),
+    });
+    for (const day of getItems(result)) {
+      const date = (day.date || day.datetime || '').slice(0, 10);
+      index.set(`${teamMemberId}|${date}`, {
+        is_working: Boolean(day.is_working),
+        slots: day.slots || [],
+      });
+    }
+  }
+  return index;
+}
+
 function dailyDemand(staff, maxTarget, direction) {
   const relative = staff.target / maxTarget;
   if (direction === 'past') {
@@ -989,7 +1122,7 @@ function buildAppointmentPlan(profile, staffByKey, servicesByKey) {
             { length: HISTORY_DAYS },
             (_, index) => -HISTORY_DAYS + index
           )
-        : Array.from({ length: FUTURE_DAYS }, (_, index) => index + 1);
+        : Array.from({ length: FUTURE_DAYS + 1 }, (_, index) => index);
     for (const [dayIndex, offset] of offsets.entries()) {
       const date = addDays(ANCHOR, offset);
       for (const [staffIndex, staff] of providers.entries()) {
@@ -1370,6 +1503,136 @@ async function ensureSchedules(session, profile, staffByKey) {
   });
 }
 
+function mergedSlots(slots, requiredIntervals) {
+  const intervals = [
+    ...(slots || []).map((slot) => [
+      parseMinutes(slot.from),
+      parseMinutes(slot.to),
+    ]),
+    ...requiredIntervals,
+  ].sort((a, b) => a[0] - b[0]);
+  const merged = [];
+  for (const interval of intervals) {
+    const previous = merged.at(-1);
+    if (previous && interval[0] <= previous[1]) {
+      previous[1] = Math.max(previous[1], interval[1]);
+    } else {
+      merged.push([...interval]);
+    }
+  }
+  return merged.map(([from, to]) => ({
+    from: formatMinutes(from),
+    to: formatMinutes(to),
+  }));
+}
+
+async function repairAppointmentScheduleVisibility(
+  session,
+  profile,
+  staffByKey,
+  servicesByKey
+) {
+  const start = isoDate(addDays(ANCHOR, -HISTORY_DAYS - 1));
+  const end = isoDate(addDays(ANCHOR, FUTURE_DAYS + 1));
+  const appointments = await getAllAppointments(
+    session,
+    profile.id,
+    start,
+    end
+  );
+  const providers = profile.staff.filter((staff) => staff.provider !== false);
+  const providerById = new Map(
+    providers.map((staff) => [staffByKey.get(staff.key).id, staff])
+  );
+  const durationByServiceId = new Map(
+    profile.services.map((definition) => [
+      servicesByKey.get(definition[0]).id,
+      definition[5],
+    ])
+  );
+  const curatedServiceIds = new Set(durationByServiceId.keys());
+  const scheduleIndex = await readScheduleIndex(session, profile, staffByKey);
+  const requiredByStaffDay = new Map();
+  for (const appointment of appointments) {
+    if (!providerById.has(appointment.team_member_id)) continue;
+    if (
+      !appointment.services?.some((service) =>
+        curatedServiceIds.has(service.id)
+      )
+    )
+      continue;
+    const datetime = (appointment.datetime || appointment.date).replace(
+      ' ',
+      'T'
+    );
+    const duration =
+      appointment.services.reduce(
+        (total, service) => total + (durationByServiceId.get(service.id) || 0),
+        0
+      ) || 3600;
+    const key = `${appointment.team_member_id}|${datetime.slice(0, 10)}`;
+    const scheduleDay = scheduleIndex.get(key);
+    if (scheduleContains(scheduleDay, datetime, duration)) continue;
+    const intervals = requiredByStaffDay.get(key) || [];
+    const appointmentStart = parseMinutes(datetime.slice(11, 16));
+    intervals.push([
+      appointmentStart,
+      appointmentStart + Math.ceil(duration / 60),
+    ]);
+    requiredByStaffDay.set(key, intervals);
+  }
+
+  let repaired = 0;
+  if (APPLY) {
+    for (const [key, requiredIntervals] of requiredByStaffDay) {
+      const [teamMemberIdRaw, date] = key.split('|');
+      const teamMemberId = Number(teamMemberIdRaw);
+      const staff = providerById.get(teamMemberId);
+      const current = scheduleIndex.get(key);
+      const slots = mergedSlots(
+        current?.is_working
+          ? current.slots
+          : staff.slots.map(([from, to]) => ({ from, to })),
+        requiredIntervals
+      );
+      await session.callTool('create_schedule', {
+        location_id: profile.id,
+        team_member_id: teamMemberId,
+        dates: [date],
+        slots,
+      });
+      const readback = getItems(
+        await session.callTool('get_schedule', {
+          location_id: profile.id,
+          team_member_id: teamMemberId,
+          start_date: date,
+          end_date: date,
+        })
+      )[0];
+      if (
+        !requiredIntervals.every(([from, to]) =>
+          scheduleContains(
+            readback,
+            `${date}T${formatMinutes(from)}:00`,
+            (to - from) * 60
+          )
+        )
+      ) {
+        throw new Error(
+          `${profile.id}: schedule repair did not persist for ${key}`
+        );
+      }
+      repaired += 1;
+    }
+  }
+  log('schedule_visibility_repairs', {
+    location_id: profile.id,
+    affected_employee_days: requiredByStaffDay.size,
+    repaired,
+  });
+  return { affected_employee_days: requiredByStaffDay.size, repaired };
+}
+
 async function ensureBookingForm(session, profile) {
   const forms = getItems(
     await session.callTool('get_booking_forms', { location_id: profile.id })
@@ -1394,12 +1657,26 @@ async function ensureAppointments(session, profile, staffByKey, servicesByKey) {
   const plan = buildAppointmentPlan(profile, staffByKey, servicesByKey);
   const windowStart = isoDate(addDays(ANCHOR, -HISTORY_DAYS - 1));
   const windowEnd = isoDate(addDays(ANCHOR, FUTURE_DAYS + 1));
+  const scheduleIndex = await readScheduleIndex(session, profile, staffByKey);
   const existing = await getAllAppointments(
     session,
     profile.id,
     windowStart,
     windowEnd
   );
+  const durationByServiceId = new Map(
+    profile.services.map((definition) => [
+      servicesByKey.get(definition[0]).id,
+      definition[5],
+    ])
+  );
+  const appointmentDuration = (item) =>
+    Number(item.duration_seconds) ||
+    (item.services || []).reduce(
+      (total, service) => total + (durationByServiceId.get(service.id) || 0),
+      0
+    ) ||
+    3600;
   const occupied = new Map();
   const addOccupied = (teamMemberId, datetime, durationSeconds) => {
     const normalized = datetime.replace(' ', 'T');
@@ -1422,12 +1699,21 @@ async function ensureAppointments(session, profile, staffByKey, servicesByKey) {
     addOccupied(
       item.team_member_id,
       item.datetime || item.date,
-      item.duration_seconds
+      appointmentDuration(item)
     );
   }
   let created = 0;
   let skipped = 0;
   const failures = [];
+  const validation = {
+    schedule_checks: 0,
+    live_occupancy_checks: 0,
+    online_session_checks: 0,
+    booking_prechecks: 0,
+    online_unavailable_fallbacks: 0,
+    historical_admin_checks: 0,
+    readback_checks: 0,
+  };
 
   if (APPLY) {
     for (let index = 0; index < plan.length; index += 1) {
@@ -1437,7 +1723,89 @@ async function ensureAppointments(session, profile, staffByKey, servicesByKey) {
         continue;
       }
       try {
-        await session.callTool('create_appointment', {
+        const date = appointment.datetime.slice(0, 10);
+        const scheduleDay = scheduleIndex.get(
+          `${appointment.team_member_id}|${date}`
+        );
+        validation.schedule_checks += 1;
+        if (
+          !scheduleContains(
+            scheduleDay,
+            appointment.datetime,
+            appointment.session_length
+          )
+        ) {
+          throw new Error(
+            `Appointment is outside a working schedule: ${appointment.datetime}`
+          );
+        }
+
+        // Re-read the day immediately before every write. The initial window read
+        // is only a planning cache and must not be treated as an availability lock.
+        const liveDay = await getAllAppointments(
+          session,
+          profile.id,
+          date,
+          date
+        );
+        validation.live_occupancy_checks += 1;
+        const candidateStart = parseMinutes(appointment.datetime.slice(11, 16));
+        const candidateEnd =
+          candidateStart + Math.ceil(appointment.session_length / 60);
+        const liveConflict = liveDay.some((item) => {
+          if (item.team_member_id !== appointment.team_member_id) return false;
+          const itemDateTime = (item.datetime || item.date).replace(' ', 'T');
+          const itemStart = parseMinutes(itemDateTime.slice(11, 16));
+          const itemEnd = itemStart + Math.ceil(appointmentDuration(item) / 60);
+          return candidateStart < itemEnd && candidateEnd > itemStart;
+        });
+        if (liveConflict) {
+          throw new Error(
+            `Live appointment read found a conflict: ${appointment.datetime}`
+          );
+        }
+
+        const isOnlineFuture =
+          appointment.datetime.slice(0, 16) >
+          localDateTimeKey(profile.timeZone);
+        if (isOnlineFuture) {
+          const sessions = await directGetBookingTimes(
+            profile.id,
+            appointment.team_member_id,
+            date,
+            appointment.service_id
+          );
+          validation.online_session_checks += 1;
+          if (sessions.length === 0) {
+            // Some demo locations expose a working B2B calendar but no public
+            // online-booking sessions. Keep that limitation explicit and rely
+            // on the just-in-time B2B checks plus the create endpoint's default
+            // save_if_busy=false enforcement.
+            validation.online_unavailable_fallbacks += 1;
+          } else {
+            const available = sessions.find(
+              (slot) => slot.time === appointment.datetime.slice(11, 16)
+            );
+            if (!available) {
+              throw new Error(
+                `Backend did not return ${appointment.datetime.slice(11, 16)} as a bookable session`
+              );
+            }
+            await directValidateBooking(
+              profile.id,
+              appointment,
+              available.datetime || appointment.datetime
+            );
+            validation.booking_prechecks += 1;
+          }
+        } else {
+          // Public online-booking availability intentionally excludes elapsed
+          // time. Historical demo rows therefore use the authoritative B2B
+          // schedule plus a live occupancy read, never a synthetic slot model.
+          validation.historical_admin_checks += 1;
+        }
+
+        const createdResult = await session.callTool('create_appointment', {
           location_id: profile.id,
           team_member_id: appointment.team_member_id,
           services: [{ id: appointment.service_id, amount: 1 }],
@@ -1447,8 +1815,20 @@ async function ensureAppointments(session, profile, staffByKey, servicesByKey) {
           comment: `Demo ${isoDate(ANCHOR).slice(0, 7)} · ${appointment.peak ? 'peak' : 'off-peak'} · ${appointment.priceBand}`,
           send_sms: 0,
           attendance: appointment.attendance,
-          save_if_busy: true,
         });
+        const createdId = createdResult.structuredContent?.id;
+        const readback = await getAllAppointments(
+          session,
+          profile.id,
+          date,
+          date
+        );
+        validation.readback_checks += 1;
+        if (!createdId || !readback.some((item) => item.id === createdId)) {
+          throw new Error(
+            `Appointment ${createdId || '(missing id)'} was not visible in day read-back`
+          );
+        }
         addOccupied(
           appointment.team_member_id,
           appointment.datetime,
@@ -1480,13 +1860,14 @@ async function ensureAppointments(session, profile, staffByKey, servicesByKey) {
     created,
     skipped,
     failed: failures.length,
+    validation,
   });
   if (failures.length)
     log('appointment_failures', {
       location_id: profile.id,
       failures: failures.slice(0, 10),
     });
-  return { plan, failures };
+  return { plan, failures, validation };
 }
 
 async function ensurePaidSales(session, profile, staffByKey, servicesByKey) {
@@ -1557,7 +1938,14 @@ async function ensurePaidSales(session, profile, staffByKey, servicesByKey) {
   return failures;
 }
 
-async function audit(session, profile, staffByKey, servicesByKey, plan) {
+async function audit(
+  session,
+  profile,
+  staffByKey,
+  servicesByKey,
+  plan,
+  writeValidation
+) {
   const start = isoDate(addDays(ANCHOR, -HISTORY_DAYS - 1));
   const end = isoDate(addDays(ANCHOR, FUTURE_DAYS + 1));
   const nowKey = isoDate(ANCHOR);
@@ -1588,6 +1976,9 @@ async function audit(session, profile, staffByKey, servicesByKey, plan) {
   }
   const past = curated.filter(
     (item) => (item.datetime || item.date).slice(0, 10) < nowKey
+  ).length;
+  const today = curated.filter(
+    (item) => (item.datetime || item.date).slice(0, 10) === nowKey
   ).length;
   const future = curated.filter(
     (item) => (item.datetime || item.date).slice(0, 10) > nowKey
@@ -1635,6 +2026,7 @@ async function audit(session, profile, staffByKey, servicesByKey, plan) {
   }
   const scheduleChecks = [];
   const scheduledByDay = new Map();
+  const scheduleByStaffDay = new Map();
   const providerChecks = [];
   for (const staff of providers) {
     const result = await session.callTool('get_schedule', {
@@ -1645,8 +2037,13 @@ async function audit(session, profile, staffByKey, servicesByKey, plan) {
     });
     const days = getItems(result);
     const months = {};
-    for (const day of days.filter((item) => item.is_working)) {
+    for (const day of days) {
       const date = (day.date || day.datetime || '').slice(0, 10);
+      scheduleByStaffDay.set(`${staffByKey.get(staff.key).id}|${date}`, {
+        is_working: Boolean(day.is_working),
+        slots: day.slots || [],
+      });
+      if (!day.is_working) continue;
       const month = date.slice(0, 7);
       months[month] = (months[month] || 0) + 1;
       const scheduled = scheduledByDay.get(date) || new Set();
@@ -1673,11 +2070,42 @@ async function audit(session, profile, staffByKey, servicesByKey, plan) {
       service_links: data.services_links?.length || 0,
     });
   }
+  const durationByServiceId = new Map(
+    profile.services.map((definition) => [
+      servicesByKey.get(definition[0]).id,
+      definition[5],
+    ])
+  );
+  const scheduleViolations = [];
+  for (const appointment of curated) {
+    const datetime = (appointment.datetime || appointment.date).replace(
+      ' ',
+      'T'
+    );
+    const duration =
+      (appointment.services || []).reduce(
+        (total, service) => total + (durationByServiceId.get(service.id) || 0),
+        0
+      ) || 3600;
+    const day = scheduleByStaffDay.get(
+      `${appointment.team_member_id}|${datetime.slice(0, 10)}`
+    );
+    if (!scheduleContains(day, datetime, duration)) {
+      scheduleViolations.push({
+        appointment_id: appointment.id,
+        team_member_id: appointment.team_member_id,
+        datetime,
+        duration_seconds: duration,
+        reason: day?.is_working
+          ? 'outside_working_slots'
+          : 'nonworking_or_missing_day',
+      });
+    }
+  }
   const dailyCoverage = [];
   for (let offset = -HISTORY_DAYS; offset <= FUTURE_DAYS; offset += 1) {
-    if (offset === 0) continue;
     const date = addDays(ANCHOR, offset);
-    if (date.getUTCDay() === 0) continue;
+    if (profile.closedWeekdays.includes(date.getUTCDay())) continue;
     const key = isoDate(date);
     const operational = operationalByDay.get(key) || {
       appointments: 0,
@@ -1766,6 +2194,7 @@ async function audit(session, profile, staffByKey, servicesByKey, plan) {
     clients: clientResult.structuredContent?.total_count,
     curated_appointments: curated.length,
     past,
+    today,
     future,
     projected_statuses: statusCounts,
     analytics_outcomes: analyticsOutcomes,
@@ -1802,6 +2231,12 @@ async function audit(session, profile, staffByKey, servicesByKey, plan) {
       ).toFixed(2)
     ),
     schedule_checks: scheduleChecks,
+    appointment_schedule_visibility: {
+      checked: curated.length,
+      violations: scheduleViolations.slice(0, 12),
+      violation_count: scheduleViolations.length,
+    },
+    write_validation: writeValidation,
     provider_checks: providerChecks,
     service_link_failures: linkFailures,
     booking_form: forms.some(
@@ -1826,7 +2261,13 @@ async function audit(session, profile, staffByKey, servicesByKey, plan) {
         ) ||
       future <
         Math.floor(
-          plan.filter((item) => item.direction === 'future').length * 0.85
+          plan.filter((item) => item.datetime.slice(0, 10) > nowKey).length *
+            0.85
+        ) ||
+      today <
+        Math.floor(
+          plan.filter((item) => item.datetime.slice(0, 10) === nowKey).length *
+            0.85
         ) ||
       paidSales <
         Math.floor(
@@ -1835,6 +2276,7 @@ async function audit(session, profile, staffByKey, servicesByKey, plan) {
           ).length * 0.85
         ) ||
       scheduleChecks.some((check) => check.working_days < 40) ||
+      scheduleViolations.length > 0 ||
       sparseDays.length > 0 ||
       providers.some(
         (staff) =>
@@ -1869,7 +2311,7 @@ async function curate(profile) {
     const services = await ensureServices(session, profile, categories, staff);
     await ensureSchedules(session, profile, staff);
     await ensureBookingForm(session, profile);
-    const { plan, failures } = await ensureAppointments(
+    const { plan, failures, validation } = await ensureAppointments(
       session,
       profile,
       staff,
@@ -1879,6 +2321,12 @@ async function curate(profile) {
       throw new Error(
         `${profile.id}: too many appointment failures (${failures.length})`
       );
+    const visibilityRepairs = await repairAppointmentScheduleVisibility(
+      session,
+      profile,
+      staff,
+      services
+    );
     const salesFailures = await ensurePaidSales(
       session,
       profile,
@@ -1894,7 +2342,10 @@ async function curate(profile) {
       companyId: profile.id,
     }).initialize();
     try {
-      await audit(auditSession, profile, staff, services, plan);
+      await audit(auditSession, profile, staff, services, plan, {
+        ...validation,
+        visibility_repairs: visibilityRepairs,
+      });
     } finally {
       await auditSession.close();
     }
