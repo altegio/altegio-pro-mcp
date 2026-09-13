@@ -10,15 +10,20 @@ const APPLY = process.argv.includes('--apply');
 const requestedId = Number(
   process.argv.find((arg) => arg.startsWith('--location='))?.split('=')[1] || 0
 );
-const HISTORY_DAYS = 180;
-const FUTURE_DAYS = 75;
-const SCHEDULE_PAST_DAYS = 210;
-const SCHEDULE_FUTURE_DAYS = 180;
+const HISTORY_DAYS = 45;
+const FUTURE_DAYS = 45;
+const SCHEDULE_PAST_DAYS = 60;
+const SCHEDULE_FUTURE_DAYS = 60;
 
 const profiles = [
   {
     id: 4564,
-    title: 'Ateliér Vltava | Praha',
+    title: 'Ateliér Vltava | Praha [TEST]',
+    dailyMinimum: {
+      scheduledStaff: 4,
+      pastAppointments: 10,
+      futureAppointments: 6,
+    },
     location: {
       country_id: 13,
       city_id: 589,
@@ -288,7 +293,12 @@ const profiles = [
   },
   {
     id: 720441,
-    title: 'Brzytwa i Bród | Kraków',
+    title: 'Brzytwa | Kraków [TEST]',
+    dailyMinimum: {
+      scheduledStaff: 3,
+      pastAppointments: 6,
+      futureAppointments: 5,
+    },
     location: {
       country_id: 12,
       city_id: 1446,
@@ -498,7 +508,12 @@ const profiles = [
   },
   {
     id: 703092,
-    title: 'VONA beauty space | Львів',
+    title: 'VONA beauty space | Львів [TEST]',
+    dailyMinimum: {
+      scheduledStaff: 2,
+      pastAppointments: 5,
+      futureAppointments: 4,
+    },
     location: {
       country_id: 4,
       city_id: 100,
@@ -537,7 +552,7 @@ const profiles = [
         name: 'Марія Коваль',
         specialization: 'Стилістка-колористка',
         weight: 100,
-        daysOff: [0, 1],
+        daysOff: [0],
         slots: [
           ['10:00', '14:00'],
           ['15:00', '19:00'],
@@ -549,7 +564,7 @@ const profiles = [
         name: 'Олена Бойко',
         specialization: 'Майстриня нігтьового сервісу та естетистка',
         weight: 70,
-        daysOff: [0, 3],
+        daysOff: [0],
         slots: [
           ['11:00', '15:00'],
           ['16:00', '20:00'],
@@ -927,107 +942,127 @@ function formatMinutes(value) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
-function appointmentCandidates(staff, direction) {
-  const offsets =
-    direction === 'past'
-      ? Array.from({ length: HISTORY_DAYS }, (_, i) => -HISTORY_DAYS + i)
-      : Array.from({ length: FUTURE_DAYS }, (_, i) => i + 1);
-  const candidates = [];
-  for (const offset of offsets) {
-    const date = addDays(ANCHOR, offset);
-    if (staff.daysOff.includes(date.getUTCDay())) continue;
-    staff.slots.forEach((slot, slotIndex) => {
-      candidates.push({
-        date,
-        slot,
-        slotIndex,
-        peak:
-          [4, 5, 6].includes(date.getUTCDay()) ||
-          slotIndex === staff.slots.length - 1,
-      });
-    });
+function dailyDemand(staff, maxTarget, direction) {
+  const relative = staff.target / maxTarget;
+  if (direction === 'past') {
+    if (relative >= 0.9) return 4;
+    if (relative >= 0.55) return 3;
+    return 2;
   }
-  return {
-    peak: candidates.filter((candidate) => candidate.peak),
-    regular: candidates.filter((candidate) => !candidate.peak),
-  };
+  if (relative >= 0.9) return 3;
+  if (relative >= 0.55) return 2;
+  return 1;
 }
 
-function appointmentTime(candidate, durationSeconds) {
-  const [from, to] = candidate.slot;
-  if (!candidate.peak || candidate.slotIndex === 0) return from;
-  const latest = parseMinutes(to) - Math.ceil(durationSeconds / 60);
-  const start = Math.max(parseMinutes(from), Math.floor(latest / 30) * 30);
-  return formatMinutes(start);
+function chooseService(priced, desiredBand, maxDurationSeconds, seed) {
+  const value = priced[0];
+  const premium = priced.at(-1);
+  const core = priced.slice(1, -1);
+  const preferred =
+    desiredBand === 'value'
+      ? [value]
+      : desiredBand === 'premium'
+        ? [premium]
+        : core.length
+          ? core
+          : priced;
+  const rotated = preferred.length
+    ? preferred.map((_, index) => preferred[(index + seed) % preferred.length])
+    : [];
+  const candidates = [...rotated, ...priced].filter(
+    (service, index, all) => all.indexOf(service) === index
+  );
+  return candidates.find((service) => service[5] <= maxDurationSeconds);
 }
 
 function buildAppointmentPlan(profile, staffByKey, servicesByKey) {
   const clients = clientsFor(profile);
   const plan = [];
   const providers = profile.staff.filter((staff) => staff.provider !== false);
+  const maxTarget = Math.max(...providers.map((staff) => staff.target));
+  let appointmentIndex = 0;
 
-  providers.forEach((staff, staffIndex) => {
-    const staffServices = profile.services.filter((service) =>
-      service[6].includes(staff.key)
-    );
-    const priced = [...staffServices].sort((a, b) => a[3] - b[3]);
-    const pastTarget = Math.max(4, Math.round(staff.target * 0.82));
-    const futureTarget = staff.target - pastTarget;
+  for (const direction of ['past', 'future']) {
+    const offsets =
+      direction === 'past'
+        ? Array.from(
+            { length: HISTORY_DAYS },
+            (_, index) => -HISTORY_DAYS + index
+          )
+        : Array.from({ length: FUTURE_DAYS }, (_, index) => index + 1);
+    for (const [dayIndex, offset] of offsets.entries()) {
+      const date = addDays(ANCHOR, offset);
+      for (const [staffIndex, staff] of providers.entries()) {
+        if (staff.daysOff.includes(date.getUTCDay())) continue;
+        const staffServices = profile.services.filter((service) =>
+          service[6].includes(staff.key)
+        );
+        const priced = [...staffServices].sort((a, b) => a[3] - b[3]);
+        const target = dailyDemand(staff, maxTarget, direction);
+        const slotCounts = staff.slots.map((_, index) =>
+          index === staff.slots.length - 1
+            ? Math.ceil(target / staff.slots.length)
+            : Math.floor(target / staff.slots.length)
+        );
 
-    for (const [direction, target] of [
-      ['past', pastTarget],
-      ['future', futureTarget],
-    ]) {
-      const pools = appointmentCandidates(staff, direction);
-      const poolIndexes = { peak: 0, regular: 0 };
-      for (let i = 0; i < target; i += 1) {
-        const wanted = i % 4 < 3 ? 'peak' : 'regular';
-        const pool = pools[wanted].length
-          ? pools[wanted]
-          : pools[wanted === 'peak' ? 'regular' : 'peak'];
-        const selectedIndex =
-          (poolIndexes[wanted] + staffIndex * 5) % pool.length;
-        const candidate = pool[selectedIndex];
-        poolIndexes[wanted] += 1;
-        const service =
-          i % 4 === 0
-            ? priced[0]
-            : i % 4 === 1
-              ? priced.at(-1)
-              : priced[(i + staffIndex) % priced.length];
-        const time = appointmentTime(candidate, service[5]);
-        const attendance =
-          direction === 'past'
-            ? [1, 1, 1, 1, 1, 1, 1, 1, -1, 1, 1, 2, 1, 1, 0][
-                (i + staffIndex) % 15
-              ]
-            : [2, 2, 0, 2, 0, 2, 2, 0][(i + staffIndex) % 8];
-        const client =
-          clients[
-            (i * 5 + staffIndex * 3 + (direction === 'future' ? 7 : 0)) %
-              clients.length
-          ];
-        plan.push({
-          staffKey: staff.key,
-          team_member_id: staffByKey.get(staff.key).id,
-          serviceKey: service[0],
-          service_id: servicesByKey.get(service[0]).id,
-          datetime: `${isoDate(candidate.date)}T${time}:00`,
-          session_length: service[5],
-          client,
-          attendance,
-          direction,
-          peak: candidate.peak,
-          priceBand:
-            service === priced[0]
-              ? 'value'
-              : service === priced.at(-1)
-                ? 'premium'
-                : 'core',
-        });
+        for (const [slotIndex, slot] of staff.slots.entries()) {
+          let cursor = parseMinutes(slot[0]);
+          const end = parseMinutes(slot[1]);
+          const count = slotCounts[slotIndex];
+          for (let inSlot = 0; inSlot < count; inSlot += 1) {
+            const remaining = count - inSlot - 1;
+            const maxDurationSeconds =
+              Math.max(0, end - cursor - remaining * 30) * 60;
+            const desiredBand = ['value', 'premium', 'core', 'core'][
+              appointmentIndex % 4
+            ];
+            const service = chooseService(
+              priced,
+              desiredBand,
+              maxDurationSeconds,
+              appointmentIndex + staffIndex + dayIndex
+            );
+            if (!service) break;
+            const time = formatMinutes(cursor);
+            const peak =
+              [4, 5, 6].includes(date.getUTCDay()) || cursor >= 16 * 60;
+            const priceBand =
+              service === priced[0]
+                ? 'value'
+                : service === priced.at(-1)
+                  ? 'premium'
+                  : 'core';
+            const attendance =
+              direction === 'past'
+                ? [1, 1, 1, 1, 1, 1, 1, 1, -1, 1, 1, 2, 1, 1, 0][
+                    (appointmentIndex + staffIndex) % 15
+                  ]
+                : [2, 2, 0, 2, 0, 2, 2, 0][(appointmentIndex + staffIndex) % 8];
+            const client =
+              clients[
+                (appointmentIndex * 5 + staffIndex * 3 + dayIndex * 7) %
+                  clients.length
+              ];
+            plan.push({
+              staffKey: staff.key,
+              team_member_id: staffByKey.get(staff.key).id,
+              serviceKey: service[0],
+              service_id: servicesByKey.get(service[0]).id,
+              datetime: `${isoDate(date)}T${time}:00`,
+              session_length: service[5],
+              client,
+              attendance,
+              direction,
+              peak,
+              priceBand,
+            });
+            cursor += Math.ceil(service[5] / 60);
+            appointmentIndex += 1;
+          }
+        }
       }
     }
-  });
+  }
   return plan;
 }
 
@@ -1365,12 +1400,31 @@ async function ensureAppointments(session, profile, staffByKey, servicesByKey) {
     windowStart,
     windowEnd
   );
-  const occupied = new Set(
-    existing.map(
-      (item) =>
-        `${item.team_member_id}|${(item.datetime || item.date).replace(' ', 'T').slice(0, 16)}`
-    )
-  );
+  const occupied = new Map();
+  const addOccupied = (teamMemberId, datetime, durationSeconds) => {
+    const normalized = datetime.replace(' ', 'T');
+    const dayKey = `${teamMemberId}|${normalized.slice(0, 10)}`;
+    const start = parseMinutes(normalized.slice(11, 16));
+    const end = start + Math.ceil(Number(durationSeconds || 3600) / 60);
+    const intervals = occupied.get(dayKey) || [];
+    intervals.push([start, end]);
+    occupied.set(dayKey, intervals);
+  };
+  const isOccupied = (appointment) => {
+    const dayKey = `${appointment.team_member_id}|${appointment.datetime.slice(0, 10)}`;
+    const start = parseMinutes(appointment.datetime.slice(11, 16));
+    const end = start + Math.ceil(appointment.session_length / 60);
+    return (occupied.get(dayKey) || []).some(
+      ([busyStart, busyEnd]) => start < busyEnd && end > busyStart
+    );
+  };
+  for (const item of existing) {
+    addOccupied(
+      item.team_member_id,
+      item.datetime || item.date,
+      item.duration_seconds
+    );
+  }
   let created = 0;
   let skipped = 0;
   const failures = [];
@@ -1378,8 +1432,7 @@ async function ensureAppointments(session, profile, staffByKey, servicesByKey) {
   if (APPLY) {
     for (let index = 0; index < plan.length; index += 1) {
       const appointment = plan[index];
-      const slotKey = `${appointment.team_member_id}|${appointment.datetime.slice(0, 16)}`;
-      if (occupied.has(slotKey)) {
+      if (isOccupied(appointment)) {
         skipped += 1;
         continue;
       }
@@ -1396,7 +1449,11 @@ async function ensureAppointments(session, profile, staffByKey, servicesByKey) {
           attendance: appointment.attendance,
           save_if_busy: true,
         });
-        occupied.add(slotKey);
+        addOccupied(
+          appointment.team_member_id,
+          appointment.datetime,
+          appointment.session_length
+        );
         created += 1;
       } catch (error) {
         failures.push({
@@ -1541,6 +1598,19 @@ async function audit(session, profile, staffByKey, servicesByKey, plan) {
       item.status === 'arrived' &&
       item.paid_in_full
   ).length;
+  const operationalByDay = new Map();
+  for (const item of appointments.filter((entry) =>
+    providerIds.has(entry.team_member_id)
+  )) {
+    const date = (item.datetime || item.date).slice(0, 10);
+    const coverage = operationalByDay.get(date) || {
+      appointments: 0,
+      staff: new Set(),
+    };
+    coverage.appointments += 1;
+    coverage.staff.add(item.team_member_id);
+    operationalByDay.set(date, coverage);
+  }
   const clientResult = await session.callTool('clients_search', {
     location_id: profile.id,
     page: 1,
@@ -1564,19 +1634,24 @@ async function audit(session, profile, staffByKey, servicesByKey, plan) {
     }
   }
   const scheduleChecks = [];
+  const scheduledByDay = new Map();
   const providerChecks = [];
   for (const staff of providers) {
     const result = await session.callTool('get_schedule', {
       location_id: profile.id,
       team_member_id: staffByKey.get(staff.key).id,
-      start_date: isoDate(ANCHOR),
+      start_date: isoDate(addDays(ANCHOR, -SCHEDULE_PAST_DAYS)),
       end_date: isoDate(addDays(ANCHOR, SCHEDULE_FUTURE_DAYS)),
     });
     const days = getItems(result);
     const months = {};
     for (const day of days.filter((item) => item.is_working)) {
-      const month = (day.date || day.datetime || '').slice(0, 7);
+      const date = (day.date || day.datetime || '').slice(0, 10);
+      const month = date.slice(0, 7);
       months[month] = (months[month] || 0) + 1;
+      const scheduled = scheduledByDay.get(date) || new Set();
+      scheduled.add(staffByKey.get(staff.key).id);
+      scheduledByDay.set(date, scheduled);
     }
     scheduleChecks.push({
       staff: staff.name,
@@ -1598,6 +1673,35 @@ async function audit(session, profile, staffByKey, servicesByKey, plan) {
       service_links: data.services_links?.length || 0,
     });
   }
+  const dailyCoverage = [];
+  for (let offset = -HISTORY_DAYS; offset <= FUTURE_DAYS; offset += 1) {
+    if (offset === 0) continue;
+    const date = addDays(ANCHOR, offset);
+    if (date.getUTCDay() === 0) continue;
+    const key = isoDate(date);
+    const operational = operationalByDay.get(key) || {
+      appointments: 0,
+      staff: new Set(),
+    };
+    dailyCoverage.push({
+      date: key,
+      direction: offset < 0 ? 'past' : 'future',
+      scheduled_staff: scheduledByDay.get(key)?.size || 0,
+      appointment_staff: operational.staff.size,
+      appointments: operational.appointments,
+    });
+  }
+  const sparseDays = dailyCoverage.filter((day) => {
+    const requiredAppointments =
+      day.direction === 'past'
+        ? profile.dailyMinimum.pastAppointments
+        : profile.dailyMinimum.futureAppointments;
+    return (
+      day.scheduled_staff < profile.dailyMinimum.scheduledStaff ||
+      day.appointment_staff < profile.dailyMinimum.scheduledStaff ||
+      day.appointments < requiredAppointments
+    );
+  });
   const forms = getItems(
     await session.callTool('get_booking_forms', { location_id: profile.id })
   );
@@ -1670,6 +1774,20 @@ async function audit(session, profile, staffByKey, servicesByKey, plan) {
     services_revenue: overview.structuredContent?.revenue?.services?.current,
     by_staff: staffCounts,
     paid_sales: paidSales,
+    daily_coverage: {
+      open_days: dailyCoverage.length,
+      minimum_scheduled_staff: Math.min(
+        ...dailyCoverage.map((day) => day.scheduled_staff)
+      ),
+      minimum_appointment_staff: Math.min(
+        ...dailyCoverage.map((day) => day.appointment_staff)
+      ),
+      minimum_appointments: Math.min(
+        ...dailyCoverage.map((day) => day.appointments)
+      ),
+      sparse_days: sparseDays.slice(0, 12),
+      sparse_days_count: sparseDays.length,
+    },
     planned_peak_share: Number(
       (plan.filter((item) => item.peak).length / plan.length).toFixed(2)
     ),
@@ -1700,7 +1818,8 @@ async function audit(session, profile, staffByKey, servicesByKey, plan) {
   });
   if (
     APPLY &&
-    (linkFailures.length ||
+    (locationData.title !== profile.title ||
+      linkFailures.length ||
       past <
         Math.floor(
           plan.filter((item) => item.direction === 'past').length * 0.9
@@ -1715,7 +1834,8 @@ async function audit(session, profile, staffByKey, servicesByKey, plan) {
             (item) => item.direction === 'past' && item.attendance === 1
           ).length * 0.85
         ) ||
-      scheduleChecks.some((check) => check.working_days < 110) ||
+      scheduleChecks.some((check) => check.working_days < 40) ||
+      sparseDays.length > 0 ||
       providers.some(
         (staff) =>
           (staffCounts[staff.name] || 0) < Math.floor(staff.target * 0.8)
@@ -1769,7 +1889,15 @@ async function curate(profile) {
       throw new Error(
         `${profile.id}: too many sales failures (${salesFailures.length})`
       );
-    await audit(session, profile, staff, services, plan);
+    const auditSession = await new HostedMcpSession({
+      token: process.env.ALTEGIO_USER_TOKEN,
+      companyId: profile.id,
+    }).initialize();
+    try {
+      await audit(auditSession, profile, staff, services, plan);
+    } finally {
+      await auditSession.close();
+    }
     log('location_complete', { location_id: profile.id });
   } finally {
     await session.close();
