@@ -4,7 +4,7 @@
  *
  * MCP tool schemas are validated by strict clients — the mcp Python SDK's
  * `_validate_tool_result`, MCP Inspector, and by extension Cursor / Claude.ai —
- * against the draft 2020-12 meta-schema *before any data is handed back*. A
+ * before any data is handed back. A
  * schema that is only valid under an older draft (for example the draft-2019
  * tuple form `items: [ … ]`, where `items` is an array of schemas) fails that
  * meta-schema check, and the client rejects the whole tool call with
@@ -14,6 +14,7 @@
  * bug that hit `analytics_get_daily_series` (and every series built on the
  * shared `dailyPoints` schema) can never ship again.
  */
+import Ajv from 'ajv';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import { orderedToolEntries } from '../registry.js';
 
@@ -93,7 +94,7 @@ describe('analytics_get_daily_series output schema (the dailyPoints regression)'
     expect(validate(result)).toBe(true);
   });
 
-  it('keeps each point a strict [string, number] 2-tuple', () => {
+  it('keeps each point a two-element date/value scalar pair', () => {
     const ajv = new Ajv2020({ strict: false });
     const validate = ajv.compile(spec!.outputSchema!);
 
@@ -103,10 +104,39 @@ describe('analytics_get_daily_series output schema (the dailyPoints regression)'
       ],
     };
     const withWrongTypes = {
-      series: [{ key: 'total', label: 'Total', points: [[1, 'oops']] }],
+      series: [{ key: 'total', label: 'Total', points: [['date', {}]] }],
     };
 
     expect(validate(withThreeElementPoint)).toBe(false);
     expect(validate(withWrongTypes)).toBe(false);
+  });
+
+  it('does not use draft-specific tuple keywords that draft-7 misreads', () => {
+    const point = (spec!.outputSchema as any).properties.series.items.properties
+      .points.items;
+    expect(point.prefixItems).toBeUndefined();
+    expect(point.items).not.toBe(false);
+  });
+
+  it('also validates real points with draft-7 clients', () => {
+    const occupancy = entries.find(
+      (e) => e.spec.name === 'analytics_get_team_member_occupancy'
+    )?.spec;
+    const validate = new Ajv({ strict: false }).compile(
+      occupancy!.outputSchema!
+    );
+    expect(
+      validate({
+        team_members: [
+          {
+            team_member_id: 7,
+            points: [
+              ['2026-09-01', 42.5],
+              ['2026-09-02', 0],
+            ],
+          },
+        ],
+      })
+    ).toBe(true);
   });
 });
