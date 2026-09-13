@@ -29,11 +29,11 @@ Use a direct fallback only when the operation is documented and the MCP write is
 
 These are the maintained demo identities as of 2026-09-13. Verify them before assuming the state is unchanged.
 
-|     ID | Identity                   | Intended model                                                  | Curated providers | Curated services |
-| -----: | -------------------------- | --------------------------------------------------------------- | ----------------: | ---------------: |
-|   4564 | Ateliér Vltava \| Praha    | Czech beauty studio: hair, color, nails, and skincare           |                 6 |               13 |
-| 720441 | Brzytwa i Bród \| Kraków   | Polish barbershop: haircuts, beard care, packages, and coloring |                 4 |               10 |
-| 703092 | VONA beauty space \| Львів | Compact Ukrainian beauty studio: hair/color plus nails/skincare |                 2 |               12 |
+|     ID | Identity                          | Intended model                                                  | Curated providers | Curated services |
+| -----: | --------------------------------- | --------------------------------------------------------------- | ----------------: | ---------------: |
+|   4564 | Ateliér Vltava \| Praha [TEST]    | Czech beauty studio: hair, color, nails, and skincare           |                 6 |               13 |
+| 720441 | Brzytwa \| Kraków [TEST]          | Polish barbershop: haircuts, beard care, packages, and coloring |                 4 |               10 |
+| 703092 | VONA beauty space \| Львів [TEST] | Compact Ukrainian beauty studio: hair/color plus nails/skincare |                 2 |               12 |
 
 Location `703092` has a three-seat timetable subscription limit. One seat belongs to the hidden user-linked `Test MCP` profile and must be preserved. The curated business therefore uses two bookable providers plus a non-bookable administrator. Do not turn the hidden user-linked profile into a demo provider or remove its access merely to reach a preferred roster size.
 
@@ -59,14 +59,16 @@ Receptionists do not need a bookable schedule. Every service provider does.
 Sparse examples are not enough. Unless the user asks for a smaller fixture, maintain these read-back targets per location:
 
 - at least 60 localized clients, with realistic repeat visits rather than one synthetic client per row;
-- at least 300 curated past appointments across roughly 180 days and at least 60 future appointments across roughly 75 days; larger teams should scale above this floor;
-- at least 45 past and 10 future appointments for every curated provider;
+- a deliberately dense operational window of roughly 45 days before and 45 days after the anchor; a longer six-month fixture is unnecessary unless the user asks for it;
+- every open day in that window must contain appointments from several working providers, not merely satisfy a location-wide total;
+- for a two-provider location, schedule both providers and keep at least 4 appointments per open day; for four providers, schedule at least 3 and keep at least 5; for six providers, schedule at least 4 and keep at least 6;
+- every scheduled provider should normally have at least one appointment on that day, with popular providers receiving 3–4 and lower-demand providers 1–2;
 - intentionally unequal provider demand: a clear lead provider, a middle group, and a lower-demand provider where team size permits; for a two-provider studio, approximately 60/40 is sufficient;
 - 65–80% of appointments on locally plausible peak days/times (Thursday–Saturday, late afternoon/evening, plus Saturday late morning), with the remainder off-peak;
 - both value and premium services represented by at least 25% of the generated plan, with core-priced services making up the rest;
 - past outcomes containing arrived and no-show plus unresolved/confirmed examples, and future appointments split between confirmed and waiting.
 - at least 70% of historical appointments must be completed **and paid**, with a real service-payment transaction and `paid_in_full=true`; `attendance=1` alone is not a sale.
-- every provider's schedule should cover the appointment history and at least the next six months, with monthly read-back checks so a partially filled horizon cannot pass.
+- every provider's schedule should cover the dense appointment window plus a small buffer, with daily read-back checks so a day with only one scheduled provider cannot pass.
 
 Do not infer the distribution from row creation success. Re-read appointments and analytics, group by provider, period, outcome, peak/off-peak, and service price band, and report the observed counts. Count a payment only after `paid_in_full` or the corresponding transaction is visible; some legacy payment modes return HTTP 200 without creating a transaction.
 
@@ -81,7 +83,7 @@ node .agents/skills/altegio-demo-locations/scripts/refresh-demo-locations.mjs --
 node .agents/skills/altegio-demo-locations/scripts/refresh-demo-locations.mjs --apply --location=703092
 ```
 
-The first command is an audit-only pass. `--apply` updates identities, curated staff/services/links, schedules from 210 days before the anchor through 180 days after it, booking settings/forms, clients, a dense 180-day history plus 75-day future plan, and payments for arrived demo visits. Exact names and staff+datetime keys make reruns idempotent within the same anchor date. Set `DEMO_ANCHOR_DATE=YYYY-MM-DD` for a reproducible historical run. The helper opens a separate scoped hosted-MCP session per location, paginates reads beyond 300 appointments, paces writes, retries bounded `429` responses, and never prints tokens.
+The first command is an audit-only pass. `--apply` updates identities, curated staff/services/links, schedules from 60 days before the anchor through 60 days after it, booking settings/forms, clients, a dense ±45-day appointment plan, and payments for arrived demo visits. The plan is built day by day, packs non-overlapping services inside each work shift, and enforces location-specific minimum staff and appointment counts for every open day. Exact names and staff+datetime intervals make reruns idempotent within the same anchor date. Set `DEMO_ANCHOR_DATE=YYYY-MM-DD` for a reproducible historical run. The helper opens a separate scoped hosted-MCP session per location, opens a fresh session for the final audit, paginates reads beyond 300 appointments, paces writes, retries bounded `429` responses, and never prints tokens.
 
 ## Safe cleanup classification
 
@@ -107,7 +109,7 @@ Use this order because later writes can invalidate earlier work:
 4. Create services.
 5. Apply the final service update, including `active=1`, price, duration, comment, and category.
 6. Link services to team members **after the last service update**. A legacy full service `PUT` can replace the service's staff array and silently remove earlier links.
-7. Create schedules for every service provider across the historical appointment window and at least six future months. Write in bounded chunks and verify every month, not only the next two weeks.
+7. Create schedules for every service provider across the ±45-day appointment window plus a buffer. Write in bounded chunks and verify every open day; two-provider locations should avoid staggered days off that leave only one provider working.
 8. Import or create clients.
 9. Create past and future appointments, set varied outcomes, and create the localized default booking form.
 10. Close each arrived historical demo visit through documented `PUT /visits/{visit_id}/{record_id}` with the complete services array and a working `fast_payment` mode. Omitting services can silently remove the visit line items. Fast cash payment can return HTTP 200 without a transaction when the legacy location has no default cash account; the bundled helper uses the consistently configured cashless mode and verifies `paid_in_full`.
@@ -123,7 +125,7 @@ Verify through the same public MCP surface another agent will use:
 - `get_staff` for the visible roster;
 - `altegio_call_operation(get_team_member)` for every provider, asserting `is_bookable=true`, `has_schedule=true`, and the expected `services_links` count;
 - `get_services` plus `altegio_call_operation(get_service)` for active state, price, duration, category, staff, and online visibility;
-- `get_schedule` over at least the next six months for each provider, grouped by month;
+- `get_schedule` over the complete dense window for each provider, grouped by day;
 - `clients_search` for total count and localized names;
 - `get_appointments` for the selected past/future window;
 - `altegio_call_operation(get_transactions)` or `get_transactions_by_visit_or_appointment_id` plus appointment `paid_in_full` for completed service sales;
@@ -140,6 +142,7 @@ An acceptable demo invariant is:
 - every provider is bookable, linked to at least one service, and scheduled;
 - receptionist-only staff are not presented as providers;
 - there are both past and future appointments;
+- every open day meets the location's minimum scheduled-provider, appointment-provider, and appointment-count thresholds;
 - outcomes include arrived, confirmed, waiting, and no-show;
 - at least 70% of historical appointments are paid service sales and analytics reports non-zero service revenue;
 - booking form, timezone, and currency match the location;
