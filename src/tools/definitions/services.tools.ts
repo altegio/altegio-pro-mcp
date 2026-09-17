@@ -225,6 +225,23 @@ export const deleteServiceTool = defineTool({
     location_id: z.number().int().positive().describe('Location ID'),
     service_id: z.number().int().positive().describe('Service ID to delete'),
   }),
+  confirm: {
+    action: 'Delete service',
+    target: (input) =>
+      `service ${input.service_id} at location ${input.location_id}`,
+    resolve: async (input, client) => {
+      const service = await client.getService(
+        input.location_id,
+        input.service_id
+      );
+      const links = service.staff?.length;
+      const linked =
+        links === undefined ? '' : `, linked to ${links} team member(s)`;
+      return `service "${service.title}", id ${service.id}${linked}, at location ${input.location_id}`;
+    },
+    consequence:
+      'The service is removed from the location together with every team-member link and its place in the online-booking menu. Appointments already booked keep the service name they were booked with. To merely take it off sale instead, cancel here and call update_service with active=0.',
+  },
   handler: async ({ input, client }) => {
     await client.deleteService(input.location_id, input.service_id);
     return {
@@ -336,6 +353,24 @@ export const unlinkServiceTeamMemberTool = defineTool({
     service_id: z.number().int().positive().describe('Service ID'),
     team_member_id: z.number().int().positive().describe('Team member ID'),
   }),
+  confirm: {
+    action: 'Unlink team member from service',
+    target: (input) =>
+      `team member ${input.team_member_id} from service ${input.service_id} at location ${input.location_id}`,
+    resolve: async (input, client) => {
+      const [service, staff] = await Promise.all([
+        client.getService(input.location_id, input.service_id),
+        client.getStaff(input.location_id),
+      ]);
+      const member = staff.find(
+        (candidate) => candidate.id === input.team_member_id
+      );
+      if (!member) return undefined;
+      return `${member.name} (id ${member.id}) from service "${service.title}" (id ${service.id}) at location ${input.location_id}`;
+    },
+    consequence:
+      'They stop offering this service: the pair disappears from online booking and create_appointment rejects it with HTTP 400 "team member does not provide the selected services". Appointments already booked for the pair are kept.',
+  },
   handler: async ({ input, client }) => {
     await client.removeServiceFromStaff(
       input.location_id,

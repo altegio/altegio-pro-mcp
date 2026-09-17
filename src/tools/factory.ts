@@ -15,6 +15,13 @@
 import { z, type ZodType } from 'zod';
 import type { AltegioClient } from '../providers/altegio-client.js';
 import {
+  prepareConfirmation,
+  CONFIRMATION_TOKEN_ARG,
+  CONFIRMATION_TOKEN_SCHEMA,
+  type ConfirmationSpec,
+  type PreparedConfirmation,
+} from './confirmation.js';
+import {
   withErrorHandling,
   type ToolContent,
   type ToolResult,
@@ -51,6 +58,14 @@ export interface ToolDefinition<T extends ZodType> {
   annotations?: ToolAnnotations;
   input: T;
   outputSchema?: Record<string, unknown>;
+  /**
+   * Require a human to confirm this call before it runs (see
+   * `./confirmation.ts`). Declaring it here adds the always-present
+   * `confirmation_token` argument to `inputSchema` and registers the tool with
+   * the gate in `./registry.ts`; the handler itself stays unchanged and never
+   * sees the token.
+   */
+  confirm?: ConfirmationSpec<z.infer<T>>;
   handler: (ctx: ToolContext<z.infer<T>>) => Promise<HandlerOutput>;
 }
 
@@ -67,17 +82,44 @@ export interface DefinedTool<T extends ZodType = ZodType> {
   createHandler: (
     client: AltegioClient
   ) => (args: unknown) => Promise<ToolResult>;
+  /**
+   * Present only when the definition declares `confirm`. Binds the declared
+   * spec to one set of raw arguments with the input generic erased, so the
+   * registry can hold the gates for every tool in one map. Returns `undefined`
+   * for arguments the tool would reject anyway.
+   */
+  prepareConfirmation?: (args: unknown) => PreparedConfirmation | undefined;
   meta: ToolDefinition<T>;
 }
 
-/** Generate a plain JSON Schema for the MCP `inputSchema` (drops the `$schema` key). */
-function inputJsonSchema(schema: ZodType): Record<string, unknown> {
+/**
+ * Generate a plain JSON Schema for the MCP `inputSchema` (drops the `$schema`
+ * key).
+ *
+ * `withConfirmationToken` adds the optional `confirmation_token` argument. It
+ * is added unconditionally, never from the connected client's capabilities:
+ * `tools/list` must be identical for every connection to one path (ADR-001 D7),
+ * so the argument exists even on hosts that will never need it.
+ */
+function inputJsonSchema(
+  schema: ZodType,
+  withConfirmationToken: boolean
+): Record<string, unknown> {
   const json = z.toJSONSchema(schema, { io: 'input' }) as Record<
     string,
     unknown
   >;
   delete json.$schema;
-  return json;
+  if (!withConfirmationToken) return json;
+
+  const properties = (json.properties ?? {}) as Record<string, unknown>;
+  return {
+    ...json,
+    properties: {
+      ...properties,
+      [CONFIRMATION_TOKEN_ARG]: { ...CONFIRMATION_TOKEN_SCHEMA },
+    },
+  };
 }
 
 export function defineTool<T extends ZodType>(
@@ -88,9 +130,18 @@ export function defineTool<T extends ZodType>(
       name: def.name,
       description: def.description,
       ...(def.annotations ? { annotations: def.annotations } : {}),
-      inputSchema: inputJsonSchema(def.input),
+      inputSchema: inputJsonSchema(def.input, def.confirm !== undefined),
       ...(def.outputSchema ? { outputSchema: def.outputSchema } : {}),
     }),
+
+    ...(def.confirm
+      ? {
+          prepareConfirmation: prepareConfirmation(def.confirm, (args) => {
+            const parsed = def.input.safeParse(args ?? {});
+            return parsed.success ? (parsed.data as z.infer<T>) : undefined;
+          }),
+        }
+      : {}),
 
     createHandler: (client: AltegioClient) => (args: unknown) =>
       withErrorHandling(def.name, async () => {

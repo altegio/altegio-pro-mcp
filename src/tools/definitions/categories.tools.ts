@@ -91,6 +91,23 @@ export const deleteServiceCategoryTool = defineTool({
       .positive()
       .describe('Exact service category ID to delete'),
   }),
+  confirm: {
+    action: 'Delete service category',
+    target: (input) =>
+      `service category ${input.category_id} at location ${input.location_id}`,
+    resolve: async (input, client) => {
+      const category = (
+        await client.getServiceCategories(input.location_id)
+      ).find((candidate) => candidate.id === input.category_id);
+      if (!category) return undefined;
+      const services = category.services?.length;
+      const holding =
+        services === undefined ? '' : ` holding ${services} service(s)`;
+      return `service category "${category.title}", id ${category.id}${holding}, at location ${input.location_id}`;
+    },
+    consequence:
+      'The category itself is removed. Services still assigned to it are left without a category and drop out of the online-booking menu until they are reassigned, so move or delete them first.',
+  },
   handler: async ({ input, client }) => {
     await client.deleteServiceCategory(input.location_id, input.category_id);
     return {
