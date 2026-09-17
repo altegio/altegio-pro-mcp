@@ -2,9 +2,11 @@ import { describe, it, expect, beforeEach } from '@jest/globals';
 import {
   loadConfig,
   ConfigLoader,
+  DEFAULT_PUBLIC_BASE_URL,
   EnvSchema,
   ServerConfigSchema,
   AltegioConfigSchema,
+  readOnlyViewInstructions,
 } from '../config/schema.js';
 import { ConfigurationError } from '../utils/errors.js';
 
@@ -85,6 +87,39 @@ describe('Configuration Schema', () => {
         ALTEGIO_EXPOSE_PASSWORD_LOGIN: 'true',
       } as NodeJS.ProcessEnv);
       expect(config.env.ALTEGIO_EXPOSE_PASSWORD_LOGIN).toBe(true);
+    });
+  });
+
+  describe('MCP_PUBLIC_BASE_URL', () => {
+    // It only ever appears in text a model reads — the read-only view's
+    // refusal and its instructions — so a wrong value misdirects a user.
+    it('defaults to the published public endpoint', () => {
+      const result = EnvSchema.parse({ ALTEGIO_API_TOKEN: 'test-token' });
+      expect(result.MCP_PUBLIC_BASE_URL).toBe(DEFAULT_PUBLIC_BASE_URL);
+      expect(DEFAULT_PUBLIC_BASE_URL).toBe('https://mcp.alteg.io/public/pro');
+    });
+
+    it('accepts an override and strips a trailing slash', () => {
+      const result = EnvSchema.parse({
+        ALTEGIO_API_TOKEN: 'test-token',
+        MCP_PUBLIC_BASE_URL: 'https://mcp.alteg.io/pro/',
+      });
+      expect(result.MCP_PUBLIC_BASE_URL).toBe('https://mcp.alteg.io/pro');
+    });
+
+    it('rejects a value that is not a URL', () => {
+      expect(
+        EnvSchema.safeParse({
+          ALTEGIO_API_TOKEN: 'test-token',
+          MCP_PUBLIC_BASE_URL: 'mcp.alteg.io/pro',
+        }).success
+      ).toBe(false);
+    });
+
+    it('is what the read-only instructions name', () => {
+      const text = readOnlyViewInstructions('https://mcp.alteg.io/pro');
+      expect(text).toContain('https://mcp.alteg.io/pro/mcp/readonly');
+      expect(text).toContain('https://mcp.alteg.io/pro/mcp,');
     });
   });
 

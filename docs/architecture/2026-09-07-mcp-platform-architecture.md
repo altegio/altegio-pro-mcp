@@ -89,6 +89,8 @@ Executor policy: any **documented read** is callable; **writes** only for operat
 
 The platform proxy forwards everything under `/pro/*` to the service, so facets need no new routes, audiences or scopes. Facets are a compatibility shim for hosts without tool search; they are not product boundaries and share one credential.
 
+**Addendum (2026-09-17) — `/mcp/readonly` is a view, not a facet.** A facet answers *how many tools fit in this host's context*; the read-only address answers *what may this agent do at all*. Same sub-path mechanism, different question and different membership rule: a facet is a hand-curated domain slice in the overlay, the read-only view is computed from each tool's own `readOnlyHint`. It therefore lives alongside `default` and `all` rather than inside `FACET_NAMES`, and is not offered as an alternative destination when a facet refuses a tool. The restriction is expressed as a separate URL because a separate URL is a separate OAuth resource — the industry pattern (GitHub, Linear, Sentry, Stripe, Notion, Atlassian, Slack) and the only form both the protocol and current hosts respect; a caller-set header (`X-MCP-Readonly`) would enforce nothing and would vary `tools/list` on one resource, which D7 forbids. While V1 issues a single full user token this is a guardrail rather than a boundary: its purpose is to let the consent screen stay all-or-nothing (D6), and it is where read-scoped V3 tokens plug in when they exist.
+
 ### D4 — The catalog is the source of truth; generation happens at build time
 
 ```

@@ -1,10 +1,17 @@
 /**
- * Static facets — ADR-001 D3.
+ * Static views of the tool surface — ADR-001 D3.
  *
  * A facet is a fixed, filtered view of the one tool surface, served on its own
  * HTTP sub-path (`/mcp/<facet>`). Facets exist for hosts that cap the number of
  * active tools and cannot defer them; they are not product boundaries, carry no
  * separate audience or credential, and never change the behavior of a tool.
+ *
+ * The read-only view (`READONLY_VIEW`) is deliberately NOT a facet. A facet
+ * answers "how many tools fit in this host's context"; the read-only view
+ * answers "what may this agent do at all". They are different questions with
+ * different membership rules — a facet is a hand-curated domain slice, the
+ * read-only view is computed from each tool's own `readOnlyHint` — so they are
+ * separate kinds of view, alongside `DEFAULT_FACET` and `ALL_TOOLS_FACET`.
  *
  * Membership is declarative: explicit tool names plus tool-name prefixes, so a
  * whole pack joins a facet with one entry. The index is computed once at
@@ -40,11 +47,70 @@ export const DEFAULT_FACET = 'default';
  */
 export const ALL_TOOLS_FACET = 'all';
 
+/**
+ * Key of the read-only view served on `/mcp/readonly`.
+ *
+ * Its own HTTP address, because that is the only place a restriction can live
+ * that both the protocol and the hosts respect. A separate URL is a separate
+ * OAuth resource, which every host already understands; the alternative
+ * considered — a request header such as `X-MCP-Readonly` — was rejected, since
+ * nothing enforces a header the caller sets for itself, Claude Desktop does not
+ * send one, and honoring it would make `tools/list` differ between connections
+ * to the *same* resource, which ADR-001 D7 forbids. GitHub, Linear, Sentry,
+ * Stripe, Notion, Atlassian and Slack all restrict an agent the same way.
+ *
+ * The audience is not the business owner — they take the full surface. It is
+ * the caller with no human watching: an autonomous agent, a shared team agent,
+ * a third-party agent nobody has audited, chain-wide analytics, and our own
+ * internal builds. So it is documented for developers and not offered during
+ * onboarding or in the marketplace.
+ */
+export const READONLY_VIEW = 'readonly';
+
 export type FacetKey =
-  FacetName | typeof DEFAULT_FACET | typeof ALL_TOOLS_FACET;
+  | FacetName
+  | typeof DEFAULT_FACET
+  | typeof ALL_TOOLS_FACET
+  | typeof READONLY_VIEW;
 
 export function isFacetName(value: string): value is FacetName {
   return (FACET_NAMES as readonly string[]).includes(value);
+}
+
+/**
+ * A tool as the view builder sees it: its name, and whether it only reads.
+ *
+ * `readOnly` is the tool's own `readOnlyHint` annotation and nothing else, so
+ * the read-only view can never drift from the tool surface: a pack that lands
+ * next month is classified by the annotation its own author wrote, with no list
+ * here to update. The test in `__tests__/facets.test.ts` fails if the view ever
+ * disagrees with the annotations, and `__tests__/tool-annotations.test.ts`
+ * already forbids a tool from shipping without an annotations block at all.
+ */
+export interface FacetTool {
+  readonly name: string;
+  readonly readOnly: boolean;
+}
+
+/** The one rule for "this tool only reads". */
+export function isReadOnlyTool(annotations?: {
+  readOnlyHint?: boolean;
+}): boolean {
+  return annotations?.readOnlyHint === true;
+}
+
+/**
+ * Project tool specs onto what the view builder needs. Fail-closed: a missing,
+ * false or non-boolean `readOnlyHint` makes the tool a write, so a new tool is
+ * kept off the read-only view until someone states that it only reads.
+ */
+export function facetToolsFromSpecs(
+  specs: readonly { name: string; annotations?: { readOnlyHint?: boolean } }[]
+): FacetTool[] {
+  return specs.map((spec) => ({
+    name: spec.name,
+    readOnly: isReadOnlyTool(spec.annotations),
+  }));
 }
 
 /**
@@ -253,14 +319,18 @@ function matchesPrefix(name: string, prefixes: readonly string[]): boolean {
 }
 
 /**
- * Compute the facet index once, from the registered tool names in their final
- * `tools/list` order. Each facet preserves that order, so every facet's list is
+ * Compute the view index once, from the registered tools in their final
+ * `tools/list` order. Each view preserves that order, so every view's list is
  * deterministic without sorting again.
  */
 export function buildFacetIndex(
-  toolNames: readonly string[],
+  tools: readonly FacetTool[],
   options: FacetIndexOptions = {}
 ): FacetIndex {
+  const toolNames = tools.map((tool) => tool.name);
+  const readOnlyNames = new Set(
+    tools.filter((tool) => tool.readOnly).map((tool) => tool.name)
+  );
   const exposePasswordLogin = options.exposePasswordLogin ?? false;
   const base = new Set([
     ...FACET_BASE_TOOLS,
@@ -293,11 +363,25 @@ export function buildFacetIndex(
     );
   };
 
+  // The read-only view: every tool that declares it only reads, minus the
+  // tools this deployment withholds from the HTTP surface by name. Note what is
+  // deliberately absent — `FACET_BASE_TOOLS` is NOT force-admitted here the way
+  // it is to a facet, so a base tool that ever stopped being read-only would
+  // drop out of this view instead of quietly widening it. The default view's
+  // prefix exclusions do not apply either: the whole analytics pack only reads,
+  // and chain-wide analytics is exactly who this address is for.
+  const inReadOnly = (name: string): boolean =>
+    readOnlyNames.has(name) && !excludedNames.has(name);
+
   const members = new Map<FacetKey, readonly string[]>();
   members.set(ALL_TOOLS_FACET, [...toolNames]);
   members.set(
     DEFAULT_FACET,
     toolNames.filter((name) => inDefault(name))
+  );
+  members.set(
+    READONLY_VIEW,
+    toolNames.filter((name) => inReadOnly(name))
   );
   for (const facet of FACET_NAMES) {
     members.set(
@@ -312,10 +396,50 @@ export function buildFacetIndex(
   }
 
   return {
-    keys: [ALL_TOOLS_FACET, DEFAULT_FACET, ...FACET_NAMES],
+    keys: [ALL_TOOLS_FACET, DEFAULT_FACET, READONLY_VIEW, ...FACET_NAMES],
     members: (facet) => members.get(facet) ?? [],
     includes: (facet, toolName) => sets.get(facet)?.has(toolName) ?? false,
     facetsProviding: (toolName) =>
       FACET_NAMES.filter((facet) => sets.get(facet)?.has(toolName)),
   };
+}
+
+/** MCP sub-path of a view, appended to a deployment's public base URL. */
+function viewPath(view: typeof DEFAULT_FACET | typeof READONLY_VIEW): string {
+  return view === DEFAULT_FACET ? '/mcp' : `/mcp/${view}`;
+}
+
+/** Absolute address of a view, from the deployment's public base URL. */
+export function viewUrl(
+  publicBaseUrl: string,
+  view: typeof DEFAULT_FACET | typeof READONLY_VIEW
+): string {
+  return `${publicBaseUrl.replace(/\/+$/, '')}${viewPath(view)}`;
+}
+
+/**
+ * What a caller gets when it invokes a writing tool on the read-only address.
+ *
+ * Hiding the tool from `tools/list` is not enough on its own: a model that has
+ * the name from anywhere else — a cached list, documentation, a guess — will
+ * still call it, so the call is refused as well (the same posture as password
+ * login on the public surface).
+ *
+ * The text names the full address of the complete surface because a host cannot
+ * act on anything subtler. Re-authorizing after a 403 to widen a token is not a
+ * thing MCP hosts do — Claude Code closed that request as "not planned" in
+ * April 2026 — so there is no step-up to hint at. The only real next step is a
+ * person changing which server their client connects to, and the message has to
+ * say so in words the model can act on: report, do not retry.
+ */
+export function readOnlyRefusalMessage(
+  toolName: string,
+  publicBaseUrl: string
+): string {
+  return [
+    `Tool "${toolName}" changes data, and this endpoint (${viewUrl(publicBaseUrl, READONLY_VIEW)}) serves read operations only.`,
+    'Nothing unlocks it from here: no confirmation, no wider scope and no retry turns this address into a writing one.',
+    `The complete surface is a separate MCP server at ${viewUrl(publicBaseUrl, DEFAULT_FACET)}, which a person adds in their own client configuration — this session cannot move there by itself.`,
+    'So: finish the reading part of the task, then tell the user precisely what change you would have made and where, and let them decide whether they want an agent that can make it.',
+  ].join(' ');
 }

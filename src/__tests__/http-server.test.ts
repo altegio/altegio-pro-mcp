@@ -6,7 +6,9 @@ import {
   ALL_TOOLS_FACET,
   DEFAULT_FACET,
   FACET_NAMES,
+  READONLY_VIEW,
 } from '../tools/facets.js';
+import { orderedToolEntries } from '../tools/registry.js';
 import {
   getRequestIdentity,
   identityKey,
@@ -151,9 +153,10 @@ describe('HTTP server facet routes', () => {
       body: jsonRpcBody,
     });
 
-  it('serves a route for the default view and for every facet', () => {
+  it('serves a route for the default view, the read-only view and every facet', () => {
     expect(FACET_ROUTES.map((route) => route.path)).toEqual([
       '/mcp',
+      `/mcp/${READONLY_VIEW}`,
       ...FACET_NAMES.map((facet) => `/mcp/${facet}`),
     ]);
     // The unfiltered view is stdio-only; it gets no HTTP route.
@@ -162,7 +165,17 @@ describe('HTTP server facet routes', () => {
     );
     const { transportsByFacet } = createApp();
     expect(Object.keys(transportsByFacet).sort()).toEqual(
-      [DEFAULT_FACET, ...FACET_NAMES].sort()
+      [DEFAULT_FACET, READONLY_VIEW, ...FACET_NAMES].sort()
+    );
+  });
+
+  it('routes /mcp/readonly to its own handler, not the unknown-facet catch-all', () => {
+    // The catch-all is registered after every known view; a path missing from
+    // FACET_ROUTES would silently become a 404 instead of a served view.
+    const { transportsByFacet } = createApp();
+    expect(transportsByFacet[READONLY_VIEW]).toBeDefined();
+    expect(transportsByFacet[READONLY_VIEW]).not.toBe(
+      transportsByFacet[DEFAULT_FACET]
     );
   });
 
@@ -227,7 +240,8 @@ describe('HTTP server facet routes', () => {
       expect(body.jsonrpc).toBe('2.0');
       expect(body.error.code).toBe(-32601);
       expect(body.error.message).toContain('Unknown facet: nope');
-      expect(body.error.message).toContain('ops');
+      expect(body.error.message).toContain('/mcp/ops');
+      expect(body.error.message).toContain(`/mcp/${READONLY_VIEW}`);
       expect(body.id).toBeNull();
     } finally {
       server.close();
@@ -383,12 +397,99 @@ describe('HTTP server facet wiring, end to end', () => {
     }
   });
 
+  it('serves only read-only tools on /mcp/readonly, over the real transport', async () => {
+    const { app } = createApp();
+    const server = app.listen(0);
+    try {
+      const { port } = server.address() as AddressInfo;
+      const names = await toolNamesOn(port, `/mcp/${READONLY_VIEW}`);
+      const entries = orderedToolEntries();
+
+      expect(names.length).toBeGreaterThan(0);
+      for (const name of names) {
+        const spec = entries.find((entry) => entry.spec.name === name)?.spec;
+        expect(spec?.annotations?.readOnlyHint).toBe(true);
+      }
+      // The whole analytics pack is here, which /mcp holds back.
+      expect(names).toContain('analytics_get_daily_series');
+      expect(await toolNamesOn(port, '/mcp')).not.toContain(
+        'analytics_get_daily_series'
+      );
+    } finally {
+      server.close();
+    }
+  });
+
+  it('refuses a writing tool on /mcp/readonly instead of only hiding it', async () => {
+    const { app } = createApp();
+    const server = app.listen(0);
+    try {
+      const { port } = server.address() as AddressInfo;
+      const path = `/mcp/${READONLY_VIEW}`;
+
+      const init = await rpc(port, path, {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-11-25',
+          capabilities: {},
+          clientInfo: { name: 'readonly-test', version: '1.0.0' },
+        },
+      });
+      const sessionId = init.headers.get('mcp-session-id') as string;
+      const initPayload = await parseSse<{
+        result: { instructions?: string };
+      }>(init);
+      // The view states its own posture at initialize (task 3).
+      expect(initPayload.result.instructions).toContain('READ-ONLY ENDPOINT');
+
+      const session = {
+        'mcp-session-id': sessionId,
+        'mcp-protocol-version': '2025-11-25',
+      };
+      await rpc(
+        port,
+        path,
+        { jsonrpc: '2.0', method: 'notifications/initialized' },
+        session
+      );
+
+      const call = await rpc(
+        port,
+        path,
+        {
+          jsonrpc: '2.0',
+          id: 2,
+          method: 'tools/call',
+          params: {
+            name: 'delete_staff',
+            arguments: { location_id: 1, staff_id: 2 },
+          },
+        },
+        session
+      );
+      const payload = await parseSse<{
+        error?: { code: number; message: string };
+      }>(call);
+
+      expect(payload.error).toBeDefined();
+      expect(payload.error?.message).toContain('delete_staff');
+      expect(payload.error?.message).toContain('/mcp');
+      // A tool refusal is an in-band JSON-RPC error; it must not take the HTTP
+      // session down with a transport-level status.
+      expect(call.status).toBe(200);
+    } finally {
+      server.close();
+    }
+  });
+
   it('gives every connection to a path the same list (ADR-001 D7)', async () => {
     const { app } = createApp();
     const server = app.listen(0);
     try {
       const { port } = server.address() as AddressInfo;
-      for (const path of ['/mcp', '/mcp/catalog']) {
+      for (const path of ['/mcp', '/mcp/catalog', `/mcp/${READONLY_VIEW}`]) {
         const [first, second] = await Promise.all([
           toolNamesOn(port, path),
           toolNamesOn(port, path),
