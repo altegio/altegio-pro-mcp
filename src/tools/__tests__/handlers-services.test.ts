@@ -34,9 +34,15 @@ describe('ToolHandlers - Services CRUD', () => {
 
       const result = await handlers.getServices({ location_id: 456, page: 1 });
 
-      expect(result.content[0]?.text).toContain('Price: 100–150');
-      expect(result.content[0]?.text).toContain('Active: true');
-      expect(result.content[0]?.text).not.toContain('undefined');
+      const text = result.content[0]?.text ?? '';
+      expect(text).toContain('price 100–150');
+      expect(text).toContain('active true');
+      expect(text).not.toContain('undefined');
+      // The title is free input typed at the location: fenced, not in our row.
+      const [ours, theirs] = text.split('\n\n');
+      expect(ours).toContain('Service 789');
+      expect(ours).not.toContain('Haircut');
+      expect(theirs).toContain('service 789 title: Haircut');
       expect(result.structuredContent).toMatchObject({
         items: [
           {

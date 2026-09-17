@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
+import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
 import { staffListOutput, staffEntityOutput } from '../output-schemas.js';
 
 export const getStaffTool = defineTool({
@@ -44,18 +45,33 @@ export const getStaffTool = defineTool({
       Object.keys(listParams).length > 0 ? listParams : undefined
     );
 
-    const summary = `Found ${staff.length} staff ${staff.length === 1 ? 'member' : 'members'} for location ${location_id}:\n\n`;
-    const staffList = staff
-      .map(
-        (s, idx) =>
-          `${idx + 1}. ID: ${s.id} - ${s.name}\n` +
-          `   Specialization: ${s.specialization || 'N/A'}\n` +
-          `   Rating: ${s.rating !== undefined ? s.rating : 'N/A'}${s.position?.title ? `\n   Position: ${s.position.title} (ID: ${s.position.id})` : ''}`
-      )
-      .join('\n\n');
+    const lines = [
+      `Found ${staff.length} team ${staff.length === 1 ? 'member' : 'members'} for location ${location_id}:`,
+    ];
+    // Names, specializations and position titles are free input typed at the
+    // location, so they are fenced and keyed back by team-member id.
+    const untrusted: UntrustedField[] = [];
+    for (const member of staff) {
+      lines.push(
+        `- Team member ${member.id}: rating ${member.rating ?? 'not reported'}` +
+          `${member.position?.id ? ` · position id ${member.position.id}` : ''}`
+      );
+      untrusted.push({
+        label: `team member ${member.id} name`,
+        value: member.name,
+      });
+      untrusted.push({
+        label: `team member ${member.id} specialization`,
+        value: member.specialization,
+      });
+      untrusted.push({
+        label: `team member ${member.id} position`,
+        value: member.position?.title,
+      });
+    }
 
     return {
-      text: summary + staffList,
+      text: withUntrustedBlock(lines.join('\n'), untrusted, { maxChars: 200 }),
       structuredContent: {
         items: staff.map((s) => ({
           id: s.id,

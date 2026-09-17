@@ -19,6 +19,36 @@ describe('ToolHandlers - Appointments CRUD', () => {
   });
 
   describe('getAppointments', () => {
+    it('returns client phones when the call asks for them', async () => {
+      mockClient.getBookings.mockResolvedValue([
+        {
+          id: 999,
+          company_id: 456,
+          staff_id: 123,
+          staff: { id: 123, name: 'Alex' },
+          client: { id: 321, name: 'Jane', phone: '555' },
+          services: [{ id: 789, title: 'Haircut', cost: 100, amount: 2 }],
+          datetime: '2026-09-10T10:00:00+02:00',
+          attendance: 3,
+          deleted: false,
+        },
+      ] as any);
+
+      const result = await handlers.getAppointments({
+        location_id: 456,
+        include_contacts: true,
+      });
+
+      const text = result.content[0]?.text ?? '';
+      // Present, but still inside the fence: a phone is free input too.
+      expect(text).toContain('appointment 999 client phone: 555');
+      expect(text.split('\n\n')[0]).not.toContain('555');
+      expect(result.structuredContent).toMatchObject({
+        contacts_included: true,
+        items: [{ client_phone: '555' }],
+      });
+    });
+
     it('derives a canonical visit status and useful fields without undefined text', async () => {
       mockClient.getBookings.mockResolvedValue([
         {
@@ -45,9 +75,25 @@ describe('ToolHandlers - Appointments CRUD', () => {
         page: 1,
       });
 
-      expect(result.content[0]?.text).toContain('Visit status: confirmed');
-      expect(result.content[0]?.text).toContain('Total cost: 200');
-      expect(result.content[0]?.text).not.toContain('undefined');
+      const text = result.content[0]?.text ?? '';
+      expect(text).toContain('confirmed');
+      expect(text).toContain('total 200');
+      expect(text).not.toContain('undefined');
+      // Names and service titles are free input: fenced, not in our own row.
+      const [ours, theirs] = text.split('\n\n');
+      expect(ours).toContain('Appointment 999');
+      expect(ours).not.toContain('Jane');
+      expect(ours).not.toContain('Haircut');
+      expect(theirs).toContain('appointment 999 client: Jane');
+      expect(theirs).toContain('appointment 999 services: Haircut');
+      // A phone is a contact: withheld unless the call asked for it.
+      expect(text).not.toContain('555');
+      expect(result.structuredContent).toMatchObject({
+        contacts_included: false,
+      });
+      expect(
+        (result.structuredContent as { items: object[] }).items[0]
+      ).not.toHaveProperty('client_phone');
       expect(result.structuredContent).toMatchObject({
         items: [
           {
@@ -80,7 +126,7 @@ describe('ToolHandlers - Appointments CRUD', () => {
       ] as any);
 
       const result = await handlers.getAppointments({ location_id: 456 });
-      expect(result.content[0]?.text).toContain('Visit status: unknown');
+      expect(result.content[0]?.text).toContain('unknown');
       expect(result.content[0]?.text).not.toContain('undefined');
     });
   });

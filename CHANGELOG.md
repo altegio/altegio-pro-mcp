@@ -42,6 +42,18 @@ visible.
   `clients_search` drops contact fields from its advanced `fields` list without
   that flag. This is the default projection of the "read clients without
   contacts" level in the v3 authorization RFC.
+- Extended both rules to the three list tools that were still inlining other
+  people's text into our own rows: `get_appointments` (client and team-member
+  names, service titles, and the `comment` a client types at online booking),
+  `get_services` (title and comment) and `get_staff` (name, specialization,
+  position title). Each row now carries ids, dates, status and money — ours —
+  and the free text follows in the fenced block, keyed back by id.
+- `get_appointments` also puts the client phone behind `include_contacts`. A
+  date range can return hundreds of rows, so it was the largest default contact
+  leak on the surface.
+- Dropped the stale "analytics with a report builder" pointer from the server
+  `instructions`: the report builder has been withheld since 2026-09-17 and the
+  paragraph was still advertising it.
 
 ## [0.3.0-alpha.0] - 2026-09-17
 
