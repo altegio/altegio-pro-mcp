@@ -1,5 +1,12 @@
 import type { McpToolSpec } from './factory.js';
 import * as output from './output-schemas.js';
+import {
+  prepareConfirmation,
+  CONFIRMATION_TOKEN_ARG,
+  CONFIRMATION_TOKEN_SCHEMA,
+  type ConfirmationSpec,
+  type PreparedConfirmation,
+} from './confirmation.js';
 
 export const onboardingTools: McpToolSpec[] = [
   {
@@ -367,8 +374,51 @@ export const onboardingTools: McpToolSpec[] = [
           description:
             'Phase to rollback (staff, categories, services, schedules, clients, test_appointments; positions is accepted only to return the public-API limitation)',
         },
+        [CONFIRMATION_TOKEN_ARG]: { ...CONFIRMATION_TOKEN_SCHEMA },
       },
       required: ['location_id', 'phase_name'],
     },
   },
 ];
+
+// ========== destructive-operation confirmation ==========
+
+interface RollbackInput {
+  location_id: number;
+  phase_name: string;
+}
+
+/**
+ * The wizard keeps hand-written tool specs, so its one destructive tool
+ * declares the confirmation the same way a factory tool declares `confirm` —
+ * just next to the spec instead of inside it. The gate itself is enforced in
+ * `./registry.ts` for every tool alike.
+ */
+const rollbackPhaseConfirmation: ConfirmationSpec<RollbackInput> = {
+  action: 'Roll back an onboarding phase',
+  target: (input) =>
+    `the "${input.phase_name}" phase of onboarding at location ${input.location_id}`,
+  consequence:
+    'Every entity the onboarding wizard created in this phase is deleted at the location and the phase checkpoint is reset, so the wizard will ask for that data again. Entities created outside the wizard are not touched, and IDs that fail to delete stay checkpointed.',
+};
+
+/**
+ * Confirmation gates for the hand-written onboarding tools, keyed by tool name
+ * exactly as `./registry.ts` consumes them.
+ */
+export const onboardingConfirmations: Record<
+  string,
+  (args: unknown) => PreparedConfirmation | undefined
+> = {
+  onboarding_rollback_phase: prepareConfirmation(
+    rollbackPhaseConfirmation,
+    (args) => {
+      if (!args || typeof args !== 'object') return undefined;
+      const { location_id, phase_name } = args as Record<string, unknown>;
+      if (typeof location_id !== 'number' || typeof phase_name !== 'string') {
+        return undefined;
+      }
+      return { location_id, phase_name };
+    }
+  ),
+};

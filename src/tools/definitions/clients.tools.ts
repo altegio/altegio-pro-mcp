@@ -433,6 +433,23 @@ export const clientsDeleteTool = defineTool({
       .positive()
       .describe('Exact client ID to delete'),
   }),
+  confirm: {
+    action: 'Delete client',
+    target: (input) =>
+      `client ${input.client_id} at location ${input.location_id}`,
+    resolve: async (input, client) => {
+      const { data } = await client.request<{
+        id?: number;
+        name?: string;
+        phone?: string;
+      }>('GET', `/client/${input.location_id}/${input.client_id}`);
+      if (!data?.id) return undefined;
+      const phone = data.phone ? `, ${data.phone}` : '';
+      return `client ${data.name ?? 'without a name'}${phone}, id ${data.id}, at location ${input.location_id}`;
+    },
+    consequence:
+      'The whole client card leaves the base: contact details, tags, comments, consent record and loyalty balances go with it, and the visit history rows lose the client they pointed at. This cannot be undone.',
+  },
   handler: async ({ input, client }) => {
     await client.deleteClient(input.location_id, input.client_id);
     return {

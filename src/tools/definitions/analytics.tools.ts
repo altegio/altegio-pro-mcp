@@ -744,6 +744,13 @@ export const analyticsDeleteAssistantReportTool = defineTool({
     report_name: { type: 'string' as const },
     deleted: { type: 'boolean' as const },
   }),
+  confirm: {
+    action: 'Delete assistant report',
+    target: (input) =>
+      `report ${input.report_id} at location ${input.location_id}`,
+    consequence:
+      'The saved report and its stored configuration are removed from the location\u2019s report builder. Only reports this assistant created are eligible; the underlying appointment and payment data is untouched.',
+  },
   handler: async ({ input, client }) =>
     analytics.deleteAssistantReport(client, input),
 });

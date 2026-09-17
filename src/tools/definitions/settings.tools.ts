@@ -315,6 +315,21 @@ export const deleteBookingFormTool = defineTool({
       .positive()
       .describe('Exact booking form ID to delete'),
   }),
+  confirm: {
+    action: 'Delete online booking form',
+    target: (input) =>
+      `booking form ${input.form_id} at location ${input.location_id}`,
+    resolve: async (input, client) => {
+      const form = (await client.getBookingForms(input.location_id)).find(
+        (candidate) => candidate.id === input.form_id
+      );
+      if (!form) return undefined;
+      const flag = form.is_default ? ' — THE DEFAULT FORM' : '';
+      return `booking form "${form.title}", id ${form.id}${flag}, at location ${input.location_id}`;
+    },
+    consequence:
+      'The form stops working immediately: every site, link or QR code embedding this widget stops accepting bookings. Deleting the default form takes online booking off the air for the whole location. Appointments already made through it are kept.',
+  },
   handler: async ({ input, client }) => {
     await client.deleteBookingForm(input.location_id, input.form_id);
     return {

@@ -203,6 +203,23 @@ export const deleteStaffTool = defineTool({
       .positive()
       .describe('Team member ID to delete'),
   }),
+  confirm: {
+    action: 'Delete team member',
+    target: (input) =>
+      `team member ${input.team_member_id} at location ${input.location_id}`,
+    resolve: async (input, client) => {
+      const member = (await client.getStaff(input.location_id)).find(
+        (candidate) => candidate.id === input.team_member_id
+      );
+      if (!member) return undefined;
+      const position = member.position?.title
+        ? `, ${member.position.title}`
+        : '';
+      return `team member ${member.name}${position}, id ${member.id}, at location ${input.location_id}`;
+    },
+    consequence:
+      'They are removed from the location together with their work schedule and every service they were linked to, so they disappear from the booking grid and can no longer be booked. Appointments already in the calendar keep their record of who served the client. This cannot be undone through this server.',
+  },
   handler: async ({ input, client }) => {
     await client.deleteStaff(input.location_id, input.team_member_id);
     return {

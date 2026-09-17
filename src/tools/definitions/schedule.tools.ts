@@ -189,6 +189,20 @@ export const deleteScheduleTool = defineTool({
       .min(1)
       .describe('Dates to delete schedule for (YYYY-MM-DD format)'),
   }),
+  confirm: {
+    action: 'Delete work schedule',
+    target: (input) =>
+      `${input.dates.length} day(s) (${input.dates.join(', ')}) for team member ${input.team_member_id} at location ${input.location_id}`,
+    resolve: async (input, client) => {
+      const member = (await client.getStaff(input.location_id)).find(
+        (candidate) => candidate.id === input.team_member_id
+      );
+      if (!member) return undefined;
+      return `${input.dates.length} day(s) (${input.dates.join(', ')}) for ${member.name}, id ${member.id}, at location ${input.location_id}`;
+    },
+    consequence:
+      'Those dates become non-working days: the slots stop being offered for booking, online and in the calendar. Appointments already booked on them are not deleted and stay in the calendar without a matching shift.',
+  },
   handler: async ({ input, client }) => {
     await client.setSchedule(input.location_id, {
       schedules_to_delete: [

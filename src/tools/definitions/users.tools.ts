@@ -26,6 +26,23 @@ export const removeLocationUserTool = defineTool({
       path: ['confirm_user_id'],
       message: 'must exactly match user_id',
     }),
+  confirm: {
+    action: 'Remove user access',
+    target: (input) => `user ${input.user_id} at location ${input.location_id}`,
+    resolve: async (input, client) => {
+      const { data } = await client.request<
+        Array<{ id?: number; user_id?: number; name?: string; email?: string }>
+      >('GET', `/company/${input.location_id}/users`);
+      const user = (Array.isArray(data) ? data : []).find(
+        (candidate) => (candidate.user_id ?? candidate.id) === input.user_id
+      );
+      if (!user) return undefined;
+      const email = user.email ? `, ${user.email}` : '';
+      return `user ${user.name ?? 'without a name'}${email}, id ${input.user_id}, at location ${input.location_id}`;
+    },
+    consequence:
+      'They lose all access to this location, including any integration or CI identity that signs in as them, and any automation using that account stops working. Data they created is kept. Re-adding access is a separate invitation flow this server does not cover.',
+  },
   handler: async ({ input, client }) => {
     await client.removeLocationUser(input.location_id, input.user_id);
     return {

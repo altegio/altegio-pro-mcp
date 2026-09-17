@@ -238,6 +238,51 @@ login is still how a V1 user token is obtained — never on the public endpoint.
 stdio serves the unfiltered `all` view and always has both tools, whatever this
 variable says.
 
+## Destructive operations require a human
+
+Eleven tools delete something: `delete_staff`, `delete_service`,
+`delete_service_category`, `delete_schedule`, `delete_appointment`,
+`delete_booking_form`, `clients_delete`, `unlink_service_team_member`,
+`remove_location_user`, `onboarding_rollback_phase` and the withheld
+`analytics_delete_assistant_report`. They all carry `destructiveHint: true`,
+but that annotation is only a hint: MCP forbids clients from relying on
+annotations for security decisions, and on an autonomous agent with no human in
+the loop it protects nothing. The server therefore asks for confirmation
+itself, before the API call, whatever the host is configured to do.
+
+**On a host that supports elicitation** (`elicitation` declared at
+`initialize`) the server sends an `elicitation/create` form naming the concrete
+object and what happens to it — resolving the ID to a name through the API
+first, so the operator reads *"Delete team member — team member Ivan Petrov,
+Stylist, id 123, at location 4564"*, not *"are you sure?"*. The operation runs
+only on an explicit accept. A decline, a cancel, or a host that advertises
+elicitation and then fails to deliver the prompt all stop the call, and no
+token is issued on that path.
+
+**On a host that does not support it** the call would otherwise hang, so the
+first call performs nothing and returns the same consequence text plus a
+one-time `confirmation_token`; the caller repeats the identical call with that
+token to proceed. The token is an HMAC over the tool name and the exact
+arguments, keyed per process, so it cannot be guessed, expires after 10
+minutes, and cannot be replayed against another target — a token for client 5
+never authorises deleting client 7. A token that does not verify is refused
+rather than silently ignored.
+
+Every outcome that is not an approval — confirmation required, operator
+declined, prompt undeliverable, token invalid — comes back as an `isError`
+result, the same channel the executor uses to refuse a write. The tool did not
+do what it was asked, and a model must not be able to read "cancelled" as
+"deleted".
+
+`confirmation_token` is an optional argument on every one of these tools'
+published schemas, on every connection: `tools/list` must not vary with client
+capabilities (ADR-001 D7). The declaration lives on the tool definition as
+`confirm` ([`src/tools/factory.ts`](src/tools/factory.ts)); the gate itself is
+enforced in one place, the `tools/call` handler in
+[`src/tools/registry.ts`](src/tools/registry.ts), and the mechanism lives in
+[`src/tools/confirmation.ts`](src/tools/confirmation.ts). Nothing is stored
+server-side.
+
 ## Resources and prompts
 
 Besides tools, the server serves MCP **resources** (documents a session can read

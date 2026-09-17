@@ -4,11 +4,12 @@ import {
   ListToolsRequestSchema,
   McpError,
   ErrorCode,
+  type ElicitRequestFormParams,
+  type RequestId,
 } from '@modelcontextprotocol/sdk/types.js';
 import { AltegioClient } from '../providers/altegio-client.js';
 import { OnboardingHandlers } from './onboarding-handlers.js';
 import { OnboardingStateManager } from '../providers/onboarding-state-manager.js';
-import { onboardingTools } from './onboarding-registry.js';
 import * as definitions from './definitions/index.js';
 import { isToolDisabled } from './disabled-tools.js';
 import {
@@ -20,11 +21,24 @@ import {
 import type { DefinedTool, McpToolSpec } from './factory.js';
 import type { ToolResult } from './tool-result.js';
 import {
+  requireConfirmation,
+  type ConfirmationAnswer,
+  type ConfirmationRuntime,
+  type PreparedConfirmation,
+} from './confirmation.js';
+import {
+  onboardingConfirmations,
+  onboardingTools,
+} from './onboarding-registry.js';
+import {
   requestContextFromHeaders,
   runWithContext,
 } from '../request-context.js';
 
 type CallHandler = (args: unknown) => Promise<ToolResult>;
+
+/** A tool's confirmation spec bound to raw arguments (see `./confirmation.ts`). */
+type PrepareConfirmation = (args: unknown) => PreparedConfirmation | undefined;
 
 /** A tool spec plus the category that orders it in `tools/list`. */
 interface ToolEntry {
@@ -114,6 +128,62 @@ function outOfFacetError(
   );
 }
 
+/**
+ * The elicitation form the operator sees. A single required enum, with no
+ * default, so nothing can be auto-filled into an approval: the server treats
+ * only an explicit `accept` carrying `decision: "confirm"` as consent.
+ */
+function confirmationSchema(
+  title: string
+): ElicitRequestFormParams['requestedSchema'] {
+  return {
+    type: 'object',
+    properties: {
+      decision: {
+        type: 'string',
+        title,
+        description: 'Perform this destructive operation?',
+        enum: ['confirm', 'cancel'],
+        enumNames: ['Yes, perform it', 'No, cancel'],
+      },
+    },
+    required: ['decision'],
+  };
+}
+
+/**
+ * Bind the confirmation gate to one MCP request.
+ *
+ * `relatedRequestId` ties the prompt to the tool call that triggered it, which
+ * is what routes it back to the right session on Streamable HTTP.
+ *
+ * The capability check is the point of this function: `elicitInput` throws
+ * synchronously on a client that never declared elicitation, and a host that
+ * silently ignores the request would otherwise leave the tool call hanging.
+ */
+function confirmationRuntime(
+  server: Server,
+  relatedRequestId: RequestId
+): ConfirmationRuntime {
+  return {
+    supportsElicitation: () =>
+      Boolean(server.getClientCapabilities()?.elicitation?.form),
+
+    elicit: async (message, title): Promise<ConfirmationAnswer> => {
+      const result = await server.elicitInput(
+        {
+          mode: 'form',
+          message,
+          requestedSchema: confirmationSchema(title),
+        },
+        { relatedRequestId }
+      );
+      if (result.action !== 'accept') return result.action;
+      return result.content?.decision === 'confirm' ? 'accept' : 'decline';
+    },
+  };
+}
+
 export function registerTools(
   server: Server,
   client: AltegioClient,
@@ -126,6 +196,21 @@ export function registerTools(
   const handlers = new Map<string, CallHandler>(
     factoryTools.map((tool) => [tool.meta.name, tool.createHandler(client)])
   );
+
+  // Destructive tools that require a human confirmation before they run. The
+  // gate is enforced here and nowhere else: this is the only code path that
+  // has both the MCP `Server` (to send `elicitation/create`) and the id of the
+  // request the prompt has to be related to. Factory tools declare it as
+  // `confirm` on the definition; the onboarding wizard keeps hand-written
+  // specs and declares it alongside them.
+  const confirmations = new Map<string, PrepareConfirmation>(
+    Object.entries(onboardingConfirmations)
+  );
+  for (const tool of factoryTools) {
+    if (tool.prepareConfirmation) {
+      confirmations.set(tool.meta.name, tool.prepareConfirmation);
+    }
+  }
 
   // Onboarding wizard — stateful subsystem kept in its own registry/handlers.
   const stateManager = new OnboardingStateManager();
@@ -177,6 +262,21 @@ export function registerTools(
       }
       if (!visible.has(name)) {
         throw outOfFacetError(name, facet, facetIndex);
+      }
+
+      // Destructive operations stop here until a human says yes. `undefined`
+      // means "already confirmed, or nothing to confirm"; anything else is the
+      // result the caller gets instead of the operation being performed.
+      const prepared = confirmations.get(name)?.(args);
+      if (prepared) {
+        const gate = await requireConfirmation({
+          toolName: name,
+          args,
+          prepared,
+          client,
+          runtime: confirmationRuntime(server, extra.requestId),
+        });
+        if (gate) return gate;
       }
 
       return handler(args);

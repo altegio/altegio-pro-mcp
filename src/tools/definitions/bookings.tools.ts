@@ -329,6 +329,32 @@ export const deleteAppointmentTool = defineTool({
       .positive()
       .describe('Appointment ID to delete'),
   }),
+  confirm: {
+    action: 'Delete appointment',
+    target: (input) =>
+      `appointment ${input.appointment_id} at location ${input.location_id}`,
+    resolve: async (input, client) => {
+      const { data } = await client.request<AltegioBooking>(
+        'GET',
+        `/record/${input.location_id}/${input.appointment_id}`
+      );
+      if (!data?.id) return undefined;
+      const services = (data.services ?? [])
+        .map((service) => service.title)
+        .join(', ');
+      return [
+        `appointment ${data.id} on ${data.datetime ?? data.date ?? 'an unknown date'}`,
+        data.client?.name ? `for ${data.client.name}` : null,
+        data.staff?.name ? `with ${data.staff.name}` : null,
+        services ? `(${services})` : null,
+        `at location ${input.location_id}`,
+      ]
+        .filter(Boolean)
+        .join(' ');
+    },
+    consequence:
+      'The appointment is cancelled and leaves the calendar, the slot becomes bookable again, and the visit stops counting towards the client history and the revenue reports. This server sends no cancellation notice to the client.',
+  },
   handler: async ({ input, client }) => {
     await client.deleteBooking(input.location_id, input.appointment_id);
     return {
