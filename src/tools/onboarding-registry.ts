@@ -11,6 +11,9 @@ export const onboardingTools: McpToolSpec[] = [
       // Resets the local wizard checkpoint file for this location; it never
       // touches business data, so it is a write, not a destructive one.
       destructiveHint: false,
+      // A repeat rewrites started_at and wipes whatever progress the
+      // previous session had, so it is not a no-op.
+      idempotentHint: false,
       openWorldHint: true,
     },
     inputSchema: {
@@ -349,6 +352,10 @@ export const onboardingTools: McpToolSpec[] = [
     annotations: {
       title: 'Rollback Onboarding Phase',
       destructiveHint: true,
+      // Not a no-op on repeat: a fully successful rollback consumes the
+      // checkpoint (the next call errors), and a partial one keeps the IDs
+      // the API refused, so the next call retries those deletions.
+      idempotentHint: false,
       openWorldHint: true,
     },
     inputSchema: {

@@ -219,6 +219,7 @@ export const deleteServiceTool = defineTool({
   annotations: {
     title: 'Delete Service',
     destructiveHint: true,
+    idempotentHint: true,
     openWorldHint: true,
   },
   input: z.object({
@@ -329,6 +330,7 @@ export const unlinkServiceTeamMemberTool = defineTool({
   annotations: {
     title: 'Unlink Team Member from Service',
     destructiveHint: true,
+    idempotentHint: true,
     openWorldHint: true,
   },
   input: z.object({
