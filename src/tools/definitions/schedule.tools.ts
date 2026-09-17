@@ -80,6 +80,7 @@ export const createScheduleTool = defineTool({
     '[Schedule] Create staff member work schedule. AUTHENTICATION REQUIRED - administrative access to create staff working schedule. Defines when a staff member is available to work (e.g., "Monday 9:00-18:00"). Use this to set up or modify work hours.',
   annotations: {
     title: 'Create Schedule',
+    destructiveHint: false,
     openWorldHint: true,
     idempotentHint: false,
   },
@@ -129,6 +130,7 @@ export const updateScheduleTool = defineTool({
     '[Schedule] Update staff member work schedule. AUTHENTICATION REQUIRED - administrative access to modify staff working schedule. Replaces work hours for specified dates.',
   annotations: {
     title: 'Update Schedule',
+    destructiveHint: false,
     openWorldHint: true,
     idempotentHint: true,
   },

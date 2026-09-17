@@ -80,6 +80,7 @@ export const createStaffTool = defineTool({
     '[Staff] Create a new staff member. AUTHENTICATION REQUIRED. Required fields: name, specialization, position_id, phone_number, user_email, user_phone, is_user_invite. Set is_paid_staff=false to create test/demo staff without consuming a paid-staff license seat.',
   annotations: {
     title: 'Create Staff Member',
+    destructiveHint: false,
     openWorldHint: true,
     idempotentHint: false,
   },
@@ -124,6 +125,7 @@ export const updateStaffTool = defineTool({
     '[Staff] Update existing staff member. AUTHENTICATION REQUIRED. Provide only fields to update.',
   annotations: {
     title: 'Update Staff Member',
+    destructiveHint: false,
     openWorldHint: true,
     idempotentHint: true,
   },

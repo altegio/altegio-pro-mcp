@@ -50,6 +50,7 @@ export const createPositionTool = defineTool({
     '[Positions] Create a new position through the deprecated but still documented public V1 quick-create operation. AUTHENTICATION REQUIRED. Positions categorize team-member roles (for example Manager, Stylist, Receptionist). Public V1 accepts only the title and does not provide position update or delete operations.',
   annotations: {
     title: 'Create Position',
+    destructiveHint: false,
     openWorldHint: true,
     idempotentHint: false,
   },

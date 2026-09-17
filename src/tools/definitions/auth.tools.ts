@@ -9,6 +9,7 @@ export const loginTool = defineTool({
     '[Auth] Login to Altegio with email and password. REQUIRED for administrative operations: getting user locations (list_locations with my=1), viewing appointments, and other business management tasks. Ask user for credentials when they request administrative data.',
   annotations: {
     title: 'Login to Altegio',
+    destructiveHint: false,
     openWorldHint: true,
   },
   input: z.object({
@@ -36,6 +37,7 @@ export const logoutTool = defineTool({
   description: '[Auth] Logout from Altegio and clear stored credentials.',
   annotations: {
     title: 'Logout from Altegio',
+    destructiveHint: false,
     openWorldHint: true,
   },
   input: z.object({}),

@@ -120,6 +120,7 @@ export const createServiceTool = defineTool({
     '[Services] Create a new service. AUTHENTICATION REQUIRED. Required fields: title, category_id. Services are active and usable by default; pass active=0 only to create a hidden draft. Link at least one team member before booking it.',
   annotations: {
     title: 'Create Service',
+    destructiveHint: false,
     openWorldHint: true,
     idempotentHint: false,
   },
@@ -167,6 +168,7 @@ export const updateServiceTool = defineTool({
     '[Services] Safely update an existing service. AUTHENTICATION REQUIRED. Provide only fields to change; the tool reads the current service and preserves all unchanged writable fields and team-member links before sending the documented V1 PUT.',
   annotations: {
     title: 'Update Service',
+    destructiveHint: false,
     openWorldHint: true,
     idempotentHint: true,
   },
@@ -240,6 +242,7 @@ export const linkServiceTeamMemberTool = defineTool({
     '[Services] Link a team member to a service so they can perform it. AUTHENTICATION REQUIRED. Required to create appointments: without the link, create_appointment fails with HTTP 400 "team member does not provide the selected services". If the link already exists, use update_service_team_member to change its duration.',
   annotations: {
     title: 'Link Team Member to Service',
+    destructiveHint: false,
     openWorldHint: true,
     idempotentHint: false,
   },
@@ -280,6 +283,7 @@ export const updateServiceTeamMemberTool = defineTool({
     '[Services] Update an existing team member ↔ service link (session duration or tech card). AUTHENTICATION REQUIRED. Use link_service_team_member to create the link first.',
   annotations: {
     title: 'Update Team Member Service Link',
+    destructiveHint: false,
     openWorldHint: true,
     idempotentHint: true,
   },
@@ -351,6 +355,7 @@ export const linkTeamMemberServicesTool = defineTool({
     '[Services] Bulk-link ONE team member to MANY services in a single call. AUTHENTICATION REQUIRED. Applies the same session_length to every service. Reports per-service success/failure (already-linked services fail individually without stopping the rest).',
   annotations: {
     title: 'Link Team Member to Multiple Services',
+    destructiveHint: false,
     openWorldHint: true,
     idempotentHint: false,
   },
