@@ -3,10 +3,14 @@
  *
  * Every tool here reads: key metrics with period comparison, daily series,
  * breakdowns, receptionist performance, loyalty results, the day-end report,
- * occupancy, per-client visit counts, and the report builder with its templates
- * and datasets. The one exception is `analytics_run_report`, which may create a
- * single assistant-owned report in the location's report builder so a template
- * can be executed at all — its annotations say so.
+ * occupancy and per-client visit counts.
+ *
+ * The report-builder definitions below (`analytics_list_report_templates`,
+ * `analytics_list_report_fields`, `analytics_run_report`,
+ * `analytics_list_saved_reports`, `analytics_run_saved_report`,
+ * `analytics_delete_assistant_report`) are kept but **not served**: the backend
+ * report-data API fails for every report in production. The reasons and the
+ * re-enable step are in `src/tools/disabled-tools.ts`.
  *
  * All names, parameters, result fields and texts use canonical product
  * vocabulary; the legacy API dialect stops in `src/capabilities/analytics/
@@ -150,7 +154,7 @@ export const analyticsGetOverviewTool = defineTool({
   name: 'analytics_get_overview',
   category: 'Analytics',
   description:
-    '[Analytics] Key metrics of one location for a period, each next to the same metric in the previous period of equal length: total revenue and its services and products split, average check (average ticket), occupancy, appointments by outcome, and new, returning, active and lost clients. Start here for "how did we do last month", "is revenue up", "how many new clients", "what is our average check", "how busy were we". Optional filters narrow it to one team member, one position or one receptionist. For day-by-day numbers use analytics_get_daily_series; for a table by team member, service or client use analytics_run_report; for today’s till totals use analytics_get_day_end_report. Needs the Analytics access right in this location.',
+    '[Analytics] Key metrics of one location for a period, each next to the same metric in the previous period of equal length: total revenue and its services and products split, average check (average ticket), occupancy, appointments by outcome, and new, returning, active and lost clients. Start here for "how did we do last month", "is revenue up", "how many new clients", "what is our average check", "how busy were we". Optional filters narrow it to one team member, one position or one receptionist. For day-by-day numbers use analytics_get_daily_series; to split the same headline across the team call it again with position_id or team_member_id; for today’s till totals use analytics_get_day_end_report. Needs the Analytics access right in this location.',
   annotations: { title: 'Analytics: key metrics', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -513,6 +517,10 @@ export const analyticsGetClientVisitStatsTool = defineTool({
 });
 
 // ========== report builder ==========
+
+// ========== report builder — DISABLED, not served =========================
+// Kept compiling and tested, withheld from every view by
+// `src/tools/disabled-tools.ts`. Do not point guidance at these names.
 
 export const analyticsListReportTemplatesTool = defineTool({
   name: 'analytics_list_report_templates',

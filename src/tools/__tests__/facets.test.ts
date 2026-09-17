@@ -165,8 +165,9 @@ describe('static facets', () => {
       name.startsWith('analytics_')
     ).length;
 
-    it('has the whole pack registered', () => {
-      expect(analyticsCount).toBe(15);
+    it('has the whole served pack registered', () => {
+      // 15 defined, 6 withheld — see src/tools/disabled-tools.ts.
+      expect(analyticsCount).toBe(9);
     });
 
     it('admits only the named entry points to the default view', () => {
@@ -174,10 +175,11 @@ describe('static facets', () => {
       expect(index.includes(DEFAULT_FACET, 'analytics_get_overview')).toBe(
         true
       );
-      expect(index.includes(DEFAULT_FACET, 'analytics_run_report')).toBe(true);
+      // The report-builder entry points are gone from every view.
+      expect(index.includes(DEFAULT_FACET, 'analytics_run_report')).toBe(false);
       expect(
         index.includes(DEFAULT_FACET, 'analytics_delete_assistant_report')
-      ).toBe(true);
+      ).toBe(false);
       expect(index.includes(DEFAULT_FACET, 'analytics_get_daily_series')).toBe(
         false
       );

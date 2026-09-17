@@ -145,9 +145,10 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
   },
 
   /**
-   * The analytics pack and the report builder. Not in the original D3 list;
-   * added for the analytics pack, which needs a facet of its own because it
-   * alone is larger than some hosts' whole tool budget.
+   * The analytics pack. Not in the original D3 list; added for the analytics
+   * pack, which needs a facet of its own because it alone is larger than some
+   * hosts' whole tool budget. The report-builder tools are withheld from every
+   * view (report builder disabled, see `./disabled-tools.ts`).
    */
   analytics: {
     tools: [],
@@ -171,14 +172,14 @@ export const DEFAULT_FACET_EXCLUDED_PREFIXES: readonly string[] = [
 ];
 
 /**
- * Individual tools re-admitted to `/mcp` despite an excluded prefix: the two
- * entry points a session needs before it knows to switch to `/mcp/analytics`.
- * Names that no tool provides are ignored.
+ * Individual tools re-admitted to `/mcp` despite an excluded prefix: the entry
+ * point a session needs before it knows to switch to `/mcp/analytics`. Names
+ * that no tool provides are ignored — the report-builder entries that used to
+ * sit here are withheld from every view (report builder disabled, see
+ * `./disabled-tools.ts`).
  */
 export const DEFAULT_FACET_EXTRA_TOOLS: readonly string[] = [
   'analytics_get_overview',
-  'analytics_run_report',
-  'analytics_delete_assistant_report',
 ];
 
 /** Prefix removed from the default view by the onboarding config switch. */

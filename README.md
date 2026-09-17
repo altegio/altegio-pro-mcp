@@ -16,7 +16,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 - **71 MCP tools** including a 14-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
 - **Administrative writes** for staff, services, appointments, schedules, clients, categories, booking forms, and location users
-- **Analytics**: key metrics with period comparison, daily series, breakdowns, day-end report, report builder
+- **Analytics**: key metrics with period comparison, daily series, breakdowns, day-end report, occupancy (the report builder is switched off — see below)
 - **Location settings**: appointment calendar, online booking, booking forms, resources
 - **Universal API executor**: search, describe and call any of the 317 documented API operations, even the ones without a dedicated tool
 - **Conversational onboarding** with bulk CSV/JSON import and automatic checkpoint/resume
@@ -134,26 +134,27 @@ the call, and amounts come back in major units with an ISO currency code.
 - `analytics_get_day_end_report` - Day-end totals: clients, appointments, services and products sold, memberships and gift cards, takings per account (cash vs card) and write-offs. Per-client detail is off by default and never carries names or phone numbers
 - `analytics_get_team_member_occupancy` - Day-by-day occupancy for up to ten named team members
 - `analytics_get_client_visit_stats` - One client's attended and missed visits, spend and client-account balance
-- `analytics_list_report_templates` - The built-in report templates of the location, each with the question it answers
-- `analytics_list_report_fields` - Canonical field keys of one report-builder dataset (`sales`, `financial_transactions`, `loyalty`, `team_member_schedules`)
-- `analytics_run_report` - Run a template by id, or an ad-hoc report from a dataset, fields, `group_by` and an optional `day`/`week`/`month`/`year` granularity. Returns a table capped at 200 rows; a longer table is attached as a CSV resource link that lives for 30 minutes
-- `analytics_list_saved_reports` / `analytics_run_saved_report` - Re-run a report the owner already has. Locations on the legacy report-data API can run its stored period; locations with the new data API can override the period per run
-- `analytics_delete_assistant_report` - Permanently remove one failed, obsolete or duplicate report whose name starts with `[Altegio Assistant]`; owner-created reports are refused
-
-**Report ownership.** `analytics_run_report` first reuses a ready report named
-`[Altegio Assistant] <name>` and creates one only when none exists. It never
-updates a ready report merely because a newer duplicate failed. The period
-travels as a per-run filter override where the location's report-data API
-supports it. Failed or obsolete assistant-created artifacts can be removed with
-`analytics_delete_assistant_report`, which checks the name before using the
-compatible report-builder delete route. Owner-created reports cannot be deleted
-by that tool. A
-builder status of `error` is surfaced as an upstream failure and is never
-reported as merely pending.
+**The report builder is switched off.** Six tools
+(`analytics_list_report_templates`, `analytics_list_report_fields`,
+`analytics_run_report`, `analytics_list_saved_reports`,
+`analytics_run_saved_report`, `analytics_delete_assistant_report`) are defined
+and tested but served on no view, including stdio. Verified against production
+on 2026-09-17: the report-data endpoint answers `400` for every report even with
+a valid period override and a mart in `success`, because the backend flag
+`new_query_builder_analytics_constructor` is off; the legacy data route accepts
+no filters and ignores the report's stored period, so its rows are all-time data
+under the requested period's label; a new report's first mart build always fails
+and only an hourly upstream sweep repairs it; and the delete route needs the
+`analytics_constructor_access` user right, which neither an owner's OAuth token
+nor the marketplace system user carries. The reasons, the evidence and the
+one-line re-enable step live in
+[`src/tools/disabled-tools.ts`](src/tools/disabled-tools.ts). Questions that
+needed a report table (by service, by client, a P&L) are declined through
+`altegio://analytics/coverage` instead of answered with an unfiltered table.
 
 **Access rights.** Analytics needs the Analytics access right in the location;
-the day-end report needs the finance reporting right, occupancy needs access to
-the work schedule, and the report builder needs an active subscription. A user
+the day-end report needs the finance reporting right and occupancy needs access
+to the work schedule. A user
 who may only see their own numbers can still call
 `analytics_get_receptionist_performance` with their own `created_by_user_id`.
 Not everything the web interface shows is reachable through the API — the
@@ -189,12 +190,12 @@ credential and is not a product boundary ([ADR-001](docs/architecture/2026-09-07
 
 | Endpoint | Serves |
 |---|---|
-| `/mcp` | **Every tool except the analytics pack**, plus its two entry points `analytics_get_overview` and `analytics_run_report` (59 tools) — the default view |
+| `/mcp` | **Every tool except the analytics pack**, plus its entry point `analytics_get_overview` (58 tools) — the default view |
 | `/mcp/ops` | Appointments (the daily work; clients and journal tools join as they land) |
 | `/mcp/catalog` | Services, service categories, team members, positions, work schedules, resources, location settings |
 | `/mcp/finance` | Analytics (visits, payments and payroll join as they land) |
 | `/mcp/marketing` | Base tools only for now (loyalty, notifications and chain tools join as they land) |
-| `/mcp/analytics` | The analytics pack and the report builder |
+| `/mcp/analytics` | The analytics pack (the report-builder tools are served nowhere) |
 | `/mcp/onboarding` | The 12 onboarding walkthrough tools |
 
 Rules:

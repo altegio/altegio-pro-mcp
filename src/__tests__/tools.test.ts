@@ -103,7 +103,8 @@ describe('Tool Registration', () => {
     expect(toolNames).toContain('altegio_describe_operation');
     expect(toolNames).toContain('altegio_call_operation');
 
-    // Analytics pack (15)
+    // Analytics pack (9 served; the 6 report-builder tools are withheld,
+    // see src/tools/disabled-tools.ts)
     expect(toolNames).toContain('analytics_get_overview');
     expect(toolNames).toContain('analytics_get_daily_series');
     expect(toolNames).toContain('analytics_get_appointments_breakdown');
@@ -113,15 +114,19 @@ describe('Tool Registration', () => {
     expect(toolNames).toContain('analytics_get_day_end_report');
     expect(toolNames).toContain('analytics_get_team_member_occupancy');
     expect(toolNames).toContain('analytics_get_client_visit_stats');
-    expect(toolNames).toContain('analytics_list_report_templates');
-    expect(toolNames).toContain('analytics_list_report_fields');
-    expect(toolNames).toContain('analytics_run_report');
-    expect(toolNames).toContain('analytics_list_saved_reports');
-    expect(toolNames).toContain('analytics_run_saved_report');
-    expect(toolNames).toContain('analytics_delete_assistant_report');
+    for (const withheld of [
+      'analytics_list_report_templates',
+      'analytics_list_report_fields',
+      'analytics_run_report',
+      'analytics_list_saved_reports',
+      'analytics_run_saved_report',
+      'analytics_delete_assistant_report',
+    ]) {
+      expect(toolNames).not.toContain(withheld);
+    }
 
-    // Total: 60 factory-defined + 12 onboarding = 72 tools
-    expect(toolNames.length).toBe(72);
+    // Total: 54 factory-defined + 12 onboarding = 66 tools
+    expect(toolNames.length).toBe(66);
   });
 
   it('should create server with tools', () => {
@@ -129,7 +134,7 @@ describe('Tool Registration', () => {
 
     expect(server).toBeDefined();
     expect(server.name).toBe('@altegio/mcp-server-pro');
-    expect(server.version).toBe('0.2.0-alpha.1');
+    expect(server.version).toBe('0.3.0-alpha.0');
   });
 
   it('rebinds direct-token headers at the SDK tool-handler boundary', async () => {

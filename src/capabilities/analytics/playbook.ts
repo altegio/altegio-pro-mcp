@@ -96,15 +96,14 @@ export const DIAGNOSTIC_PLAYS: readonly DiagnosticPlay[] = [
       'analytics_get_overview — read revenue_total, average_check and clients_active together, each against the previous period, to split the drop into traffic versus spend.',
       'analytics_get_daily_series with metric=revenue — was it one bad week or a steady decline? Name the worst days.',
       'analytics_get_appointments_breakdown by visit_status — did the no_show or cancelled share rise and eat the revenue that was booked?',
-      'analytics_run_report on "Revenue by service" and "Revenue by team member" — which part of the business actually moved.',
+      'analytics_get_overview again with position_id, then with team_member_id for the two or three people who carry the revenue — which part of the team moved the headline. There is no per-service table through this server; say so instead of guessing one.',
     ],
     read: 'Attribute the change to one of: fewer clients (traffic), lower average check (spend), a worse attendance rate (leakage), or a shift in service mix. Report the absolute money next to the percentage — a 5% fall on the main service line matters more than a 40% fall on a tiny one.',
   },
   {
     symptom: 'The team looks busy but occupancy is low, or capacity is wasted',
     steps: [
-      'analytics_run_report on the "Occupancy" template — scheduled, booked and idle hours per team member, with occupancy_percent.',
-      'analytics_get_team_member_occupancy for the two or three people who look unusual — the day-by-day pattern.',
+      'analytics_get_team_member_occupancy for the team, up to ten ids at once — scheduled, booked and idle hours per person, day by day.',
       'analytics_get_daily_series with metric=occupancy — the location-wide booked share and the no-show share of working time.',
     ],
     read: 'Separate three causes: no schedule (occupancy is blank, fix the schedule, not the marketing), a full schedule with empty slots (demand — fill it), and time lost to no-shows (occupancy_no_show_percent — a front-desk and reminder problem). Idle hours are the size of the opportunity.',
@@ -113,7 +112,6 @@ export const DIAGNOSTIC_PLAYS: readonly DiagnosticPlay[] = [
     symptom: 'We are losing clients / retention feels weak',
     steps: [
       'analytics_get_overview — new_count, returning_count, active_count and lost_count together; is growth leaning on new clients while returning stalls?',
-      'analytics_run_report on the "Client retention" template — new versus returning and the share that comes back.',
       'analytics_get_receptionist_performance — the rebooking rate after a visit and after a no-show, the lever that turns a visit into a return.',
     ],
     read: 'Low returning numbers with healthy new numbers is a retention leak, and the cheapest fix is usually rebooking at checkout, not more acquisition. Remember lost_clients is a share of the whole base and lags by the location’s inactivity threshold (60 days by default).',
@@ -141,7 +139,7 @@ export const DIAGNOSTIC_PLAYS: readonly DiagnosticPlay[] = [
       'analytics_get_overview for the period — the headline: revenue, average check, occupancy, appointment outcomes, client mix, each versus the previous period.',
       'analytics_get_daily_series with metric=revenue — the shape of the period and its weekly rhythm.',
       'analytics_get_appointments_breakdown by source, then by visit_status — where demand comes from and how much of it leaks.',
-      'analytics_run_report on "Revenue by team member" and "Revenue by service" — the two tables that explain the headline.',
+      'analytics_get_overview once per position_id, and per team_member_id where it matters — the headline split across the team.',
     ],
     read: 'Close with three to five sentences an owner can act on: what grew, what shrank, what is leaking (no-shows, cancellations, idle time), and the single change with the largest expected effect. Say plainly when a module is off or an access right is missing rather than guessing a number.',
   },
@@ -156,6 +154,12 @@ export interface QuestionRoute {
   readonly tool: string;
 }
 
+/*
+ * A question with no route here — a table by service or by client, a P&L, a
+ * cash-flow sheet — has no answer through this server: the report builder is
+ * switched off (see `src/tools/disabled-tools.ts`). `altegio://analytics/coverage`
+ * lists those gaps; name the gap instead of improvising a number.
+ */
 export const QUESTION_ROUTES: readonly QuestionRoute[] = [
   {
     question: 'How did we do last month / is revenue up',
@@ -210,16 +214,8 @@ export const QUESTION_ROUTES: readonly QuestionRoute[] = [
     tool: 'analytics_get_client_visit_stats',
   },
   {
-    question: 'Revenue by team member / by service / by client',
-    tool: 'analytics_run_report (template)',
-  },
-  {
-    question: 'Income and expenses / P&L / cash flow',
-    tool: 'analytics_run_report (financial_transactions templates)',
-  },
-  {
-    question: 'Something none of the above covers',
-    tool: 'analytics_list_report_templates, then analytics_run_report',
+    question: 'Revenue by team member',
+    tool: 'analytics_get_overview with team_member_id or position_id',
   },
 ] as const;
 
@@ -251,12 +247,8 @@ export const SLICING_NOTES: readonly SlicingNote[] = [
     how: 'created_by_user_id restricts to appointments a single location user created — the way front-desk performance is attributed, and the way a receptionist without the Analytics right reads only their own numbers.',
   },
   {
-    dimension: 'Group-by (report builder)',
-    how: 'analytics_run_report groups a dataset by any dimension field key (team_member_name, service_or_product, client_name, account, appointment_source, …) and can add a day/week/month/year time bucket via granularity. Get the field keys from analytics_list_report_fields.',
-  },
-  {
-    dimension: 'Dataset (report builder)',
-    how: 'Four datasets scope what can be reported: sales (services and products, visits, clients, occupancy, group events, margin), financial_transactions (income and expenses, cash vs non-cash, accounts), loyalty (memberships and gift cards), team_member_schedules (scheduled, booked and idle hours).',
+    dimension: 'Group-by',
+    how: 'There is no grouped report table: the report builder is switched off. The available slices are the ones above — team member, position, receptionist and period — so a "by service" or "by client" table has to be declined rather than approximated.',
   },
   {
     dimension: 'Scope',
@@ -333,7 +325,7 @@ export const ANALYSIS_NOTES: readonly AnalysisNote[] = [
     text: 'A switched-off module (forecast), a missing access right (day-end report, Analytics), or an absent work schedule (occupancy) returns nothing or a clamped value, not a true zero. Say so plainly instead of reporting the empty result as a bad number.',
   },
   {
-    title: 'Running a report leaves a footprint',
-    text: 'analytics_run_report reuses a ready assistant-owned report per shape in the location’s report builder (named "[Altegio Assistant] …") and never edits a report the owner made. Period overrides work on the new report-data API; the legacy API is used only for a report’s stored period.',
+    title: 'No report tables',
+    text: 'The report builder is switched off, so there is no way to produce a grouped table (by service, by client, a P&L). Answer with the metrics that exist and name the gap; never assemble a table that looks like a report and label it with a period.',
   },
 ] as const;

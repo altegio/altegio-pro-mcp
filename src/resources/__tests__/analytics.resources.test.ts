@@ -9,8 +9,6 @@ import {
   GLOSSARY_URI,
   PLAYBOOK_URI,
   DATA_MODEL_URI,
-  REPORT_CSV_URI_TEMPLATE,
-  REPORT_FIELDS_URI_TEMPLATE,
   listAnalyticsResourceTemplates,
   listAnalyticsResources,
   readAnalyticsResource,
@@ -34,10 +32,10 @@ describe('resource listing', () => {
     ]);
   });
 
-  it('offers the field catalogue and the report CSV as templates', () => {
-    expect(
-      listAnalyticsResourceTemplates().map((entry) => entry.uriTemplate)
-    ).toEqual([REPORT_FIELDS_URI_TEMPLATE, REPORT_CSV_URI_TEMPLATE]);
+  it('advertises no templated resources while the report builder is off', () => {
+    // Both templates belonged to the report builder — see
+    // src/tools/disabled-tools.ts. Their readers still resolve a URI.
+    expect(listAnalyticsResourceTemplates()).toEqual([]);
   });
 
   it('gives every entry a name, a title, a description and a mime type', () => {
@@ -100,14 +98,13 @@ describe('playbook resource', () => {
 });
 
 describe('data model resource', () => {
-  it('maps the appointment → visit → client spine and the datasets', async () => {
+  it('maps the appointment → visit → client spine', async () => {
     const read = (await readAnalyticsResource(DATA_MODEL_URI))!;
     const text = read.contents[0]!.text;
 
     expect(text).toContain('appointment → visit → client');
     expect(text).toContain('Two ledgers');
     expect(text).toContain('visit_status');
-    expect(text).toContain('team_member_schedules');
   });
 });
 
