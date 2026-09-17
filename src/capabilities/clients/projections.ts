@@ -4,6 +4,16 @@
  * The structured content is the port DTO (already canonical and budgeted); these
  * helpers build the short human-readable summary that rides next to it. Money is
  * printed in major units, exactly as the API reports it, with no rounding.
+ *
+ * Two rules hold everywhere in this module:
+ *
+ *  - Free text belongs to other people. Names, tags, comments, service titles
+ *    and contacts were typed by clients and staff, so they are never
+ *    interpolated into one of our sentences; they go in the fenced untrusted
+ *    block that `withUntrustedBlock` appends, keyed back to our own rows by id
+ *    or index.
+ *  - Contacts are opt-in. Phone and email are withheld unless the caller asked
+ *    for them, matching the "read clients without contacts" access level.
  */
 import type {
   ClientCard,
@@ -11,12 +21,20 @@ import type {
   ClientSegment,
   VisitHistory,
 } from '../../api/clients-api.js';
+import {
+  withUntrustedBlock,
+  type UntrustedField,
+} from '../../tools/tool-result.js';
 
 /** Format a major-unit amount, or `n/a` when the API reported nothing. */
 export function formatMoney(amount: number | null): string {
   if (amount === null || amount === undefined) return 'n/a';
   return Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
 }
+
+/** The line that explains a withheld contact, so the model stops asking. */
+const CONTACTS_WITHHELD =
+  'Contacts: withheld by default. Pass include_contacts: true to read phone and email.';
 
 export function segmentSummary(
   segment: ClientSegment,
@@ -27,8 +45,11 @@ export function segmentSummary(
     `${segment.total_count} client(s) match this filter.`,
     `Showing page ${segment.page} (${segment.rows.length} of up to ${segment.page_size} rows${orderBy ? `, ordered by ${orderBy}` : ''}).`,
   ];
-  for (const row of segment.rows.slice(0, showRows)) {
-    lines.push(`- ${row.name || '(no name)'} — id ${row.id}`);
+  const shown = segment.rows.slice(0, showRows);
+  if (shown.length > 0) {
+    lines.push(
+      `Client ids on this page: ${shown.map((r) => r.id).join(', ')}.`
+    );
   }
   if (segment.rows.length > showRows) {
     lines.push(
@@ -40,33 +61,62 @@ export function segmentSummary(
       `More pages available: ask for page ${segment.page + 1} to continue.`
     );
   }
-  return lines.join('\n');
+
+  const names: UntrustedField[] = shown.map((row) => ({
+    label: `client ${row.id} name`,
+    value: row.name,
+  }));
+  return withUntrustedBlock(lines.join('\n'), names, { maxChars: 120 });
 }
 
-export function cardSummary(card: ClientCard): string {
-  const name =
-    [card.name, card.surname].filter(Boolean).join(' ') || '(no name)';
-  return [
-    `Client ${name} (id ${card.id}):`,
-    `Phone: ${card.phone ?? 'n/a'}, email: ${card.email ?? 'n/a'}`,
+export function cardSummary(
+  card: ClientCard,
+  options: { includeContacts?: boolean } = {}
+): string {
+  const lines = [
+    `Client id ${card.id}:`,
     `Importance: ${card.importance ?? 'n/a'}, discount: ${card.discount ?? 0}%`,
     `Visits: ${card.visit_count ?? 'n/a'}, total spent: ${formatMoney(card.total_spent)}, client-account balance: ${formatMoney(card.client_account_balance)}`,
-    `Tags: ${
-      card.tags
+    `SMS birthday greeting: ${card.sms_birthday_greeting ? 'on' : 'off'}, excluded from campaigns: ${card.sms_excluded_from_campaigns ? 'yes' : 'no'}`,
+  ];
+  if (!options.includeContacts) lines.push(CONTACTS_WITHHELD);
+
+  const fields: UntrustedField[] = [
+    {
+      label: 'name',
+      value: [card.name, card.surname].filter(Boolean).join(' '),
+    },
+    ...(options.includeContacts
+      ? [
+          { label: 'phone', value: card.phone },
+          { label: 'email', value: card.email },
+        ]
+      : []),
+    {
+      label: 'tags',
+      value: card.tags
         .map((t) => t.title)
         .filter(Boolean)
-        .join(', ') || 'none'
-    }`,
-    `SMS birthday greeting: ${card.sms_birthday_greeting ? 'on' : 'off'}, excluded from campaigns: ${card.sms_excluded_from_campaigns ? 'yes' : 'no'}`,
-  ].join('\n');
+        .join(', '),
+    },
+    { label: 'comment', value: card.comment },
+  ];
+  return withUntrustedBlock(lines.join('\n'), fields);
 }
 
 export function visitHistorySummary(history: VisitHistory): string {
   if (history.items.length === 0) {
     return 'No visits found for this client and filter.';
   }
+  const shown = history.items.slice(0, 15);
   const lines = [`${history.items.length} visit item(s) on this page:`];
-  for (const item of history.items.slice(0, 15)) {
+  const detail: UntrustedField[] = [];
+
+  shown.forEach((item, index) => {
+    const ref = index + 1;
+    lines.push(
+      `- [${ref}] ${item.date ?? 'n/a'} [${item.outcome ?? 'sale'}] · sold ${formatMoney(item.total_cost)}, paid ${formatMoney(item.total_paid)}`
+    );
     const what =
       item.services.length > 0
         ? item.services
@@ -77,25 +127,37 @@ export function visitHistorySummary(history: VisitHistory): string {
             .map((p) => p.title)
             .filter(Boolean)
             .join(', ');
-    lines.push(
-      `- ${item.date ?? 'n/a'} [${item.outcome ?? 'sale'}] ${what || '—'} · sold ${formatMoney(item.total_cost)}, paid ${formatMoney(item.total_paid)}`
-    );
-  }
+    detail.push({ label: `[${ref}] items`, value: what });
+    detail.push({
+      label: `[${ref}] team member`,
+      value: item.team_member_name,
+    });
+  });
+
   if (history.has_more) {
     lines.push(
       `More visits before this page: pass date_to=${history.next_to ?? '(next_to)'} to continue.`
     );
   }
-  return lines.join('\n');
+  return withUntrustedBlock(lines.join('\n'), detail, { maxChars: 200 });
 }
 
-export function lookupSummary(rows: ClientLookupRow[]): string {
+export function lookupSummary(
+  rows: ClientLookupRow[],
+  options: { includeContacts?: boolean } = {}
+): string {
   if (rows.length === 0) return 'No matching client found.';
-  return [
-    `${rows.length} match(es):`,
-    ...rows.map(
-      (r) =>
-        `- ${r.name ?? '(no name)'} — id ${r.id}${r.phone ? `, ${r.phone}` : ''}`
-    ),
-  ].join('\n');
+  const lines = [
+    `${rows.length} match(es), client ids: ${rows.map((r) => r.id).join(', ')}.`,
+  ];
+  if (!options.includeContacts) lines.push(CONTACTS_WITHHELD);
+
+  const fields: UntrustedField[] = [];
+  for (const row of rows) {
+    fields.push({ label: `client ${row.id} name`, value: row.name });
+    if (options.includeContacts) {
+      fields.push({ label: `client ${row.id} phone`, value: row.phone });
+    }
+  }
+  return withUntrustedBlock(lines.join('\n'), fields, { maxChars: 120 });
 }

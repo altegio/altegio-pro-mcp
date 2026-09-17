@@ -9,6 +9,7 @@
  * canonical vocabulary.
  */
 import { AltegioApiError, AuthenticationError } from '../../utils/errors.js';
+import { upstreamDetail } from '../../tools/tool-result.js';
 
 /** Bad or impossible tool input. */
 export class ClientsInputError extends AltegioApiError {
@@ -87,9 +88,13 @@ export function mapClientsHttpError(
     );
   }
   if (status === 400 || status === 422) {
-    const fields = backendFieldErrors(body);
+    // The next action is ours to write (ADR-001 D8); the backend's own wording
+    // is quoted after it as data, not spliced into the instruction.
+    const detail = upstreamDetail(
+      backendFieldErrors(body) ?? backendMessage(body)
+    );
     return new ClientsInputError(
-      `${context} was rejected: ${fields ?? backendMessage(body) ?? 'invalid arguments'}. Check the filter values and retry.`
+      `${context} was rejected as invalid. Check the filter values and retry.${detail ? ` ${detail}` : ''}`
     );
   }
   if (status === 429) {

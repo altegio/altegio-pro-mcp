@@ -12,6 +12,7 @@
  * through unchanged.
  */
 import { AltegioApiError } from '../../utils/errors.js';
+import { upstreamDetail } from '../../tools/tool-result.js';
 
 /** Bad or impossible tool input (range too long, missing period, unknown field). */
 export class AnalyticsInputError extends AltegioApiError {
@@ -152,13 +153,16 @@ export function mapAnalyticsHttpError(
 
   if (status === 422 || status === 400) {
     const fields = backendFieldErrors(body);
+    // The next action is ours to write (ADR-001 D8); the backend's own wording
+    // is quoted after it as data, not spliced into the instruction.
+    const detail = upstreamDetail(fields ?? backendMessage(body));
     if (fields && /maximum interval|date range/i.test(fields)) {
       return new AnalyticsInputError(
         'The requested period is longer than the 365 days analytics accepts. Narrow the range and retry.'
       );
     }
     return new AnalyticsInputError(
-      `${context} was rejected: ${fields ?? backendMessage(body) ?? 'invalid arguments'}. Check the dates and ids and retry.`
+      `${context} was rejected as invalid. Check the dates and ids and retry.${detail ? ` ${detail}` : ''}`
     );
   }
 

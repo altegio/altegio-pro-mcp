@@ -5,11 +5,18 @@
  * `ClientsApi` port through the v1 adapter, and returns the text summary next to
  * the structured content. The segmentation filter model is canonical here and
  * only becomes the v1 wire dialect inside the adapter.
+ *
+ * Contacts are opt-in throughout: a client's phone and email leave this module
+ * only when the caller passed `include_contacts`, in the text summary and in the
+ * structured content alike. That is the default projection of the "read clients
+ * without contacts" access level, and it keeps the cost of a leak low while the
+ * token still carries the full read scope.
  */
 import type { AltegioClient } from '../../providers/altegio-client.js';
 import { httpFromClient } from '../../api/altegio-http.js';
 import { V1ClientsAdapter } from '../../api/v1/clients-adapter.js';
 import type {
+  ClientSegmentRow,
   ClientSearchFilters,
   ClientSortField,
   FilterMatch,
@@ -35,8 +42,25 @@ const DEFAULT_PAGE_SIZE = 25;
 /** How many rows to spell out in the text summary. */
 const ROWS_IN_SUMMARY = 20;
 
+/**
+ * Client fields that are contact details. Withheld unless the caller asked for
+ * them — including through the advanced `fields` escape hatch of the search.
+ */
+const CONTACT_FIELDS = ['phone', 'email'] as const;
+
 function adapter(client: AltegioClient): V1ClientsAdapter {
   return new V1ClientsAdapter(httpFromClient(client));
+}
+
+/**
+ * Drop the contact keys from a card or from one row of opt-in fields. The
+ * result is a plain bag: what is left is no longer the full DTO, and it only
+ * ever flows into `structuredContent`.
+ */
+function withoutContacts(row: object): Record<string, unknown> {
+  const copy = { ...row } as Record<string, unknown>;
+  for (const field of CONTACT_FIELDS) delete copy[field];
+  return copy;
 }
 
 // ========== segmentation ==========
@@ -50,6 +74,7 @@ export interface SearchInput {
   page?: number;
   page_size?: number;
   fields?: string[];
+  include_contacts?: boolean;
 }
 
 export async function searchClients(
@@ -62,6 +87,15 @@ export async function searchClients(
     Math.min(input.page_size ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE)
   );
   const filters = input.filters ?? {};
+  const includeContacts = input.include_contacts === true;
+  // `fields` is free-form, so it is the one way a segment could ask for
+  // contacts without the flag. Drop them here rather than at the wire.
+  const fields = includeContacts
+    ? input.fields
+    : input.fields?.filter(
+        (field) =>
+          !(CONTACT_FIELDS as readonly string[]).includes(field.toLowerCase())
+      );
 
   const segment = await adapter(client).searchClients({
     location_id: input.location_id,
@@ -73,11 +107,16 @@ export async function searchClients(
     ...(input.order_direction
       ? { order_direction: input.order_direction }
       : {}),
-    ...(input.fields?.length ? { fields: input.fields } : {}),
+    ...(fields?.length ? { fields } : {}),
   });
+  // `id` and `name` are the two fields a row always carries, and neither is a
+  // contact, so the narrowed row is still a `ClientSegmentRow`.
+  const rows: ClientSegmentRow[] = includeContacts
+    ? segment.rows
+    : segment.rows.map((row) => withoutContacts(row) as ClientSegmentRow);
 
   return {
-    text: segmentSummary(segment, input.order_by, ROWS_IN_SUMMARY),
+    text: segmentSummary({ ...segment, rows }, input.order_by, ROWS_IN_SUMMARY),
     structuredContent: {
       location_id: input.location_id,
       match: input.match ?? 'all',
@@ -91,8 +130,9 @@ export async function searchClients(
       total_count: segment.total_count,
       page: segment.page,
       page_size: segment.page_size,
-      returned: segment.rows.length,
-      rows: segment.rows,
+      returned: rows.length,
+      rows,
+      contacts_included: includeContacts,
     },
   };
 }
@@ -101,10 +141,24 @@ export async function searchClients(
 
 export async function getClientCard(
   client: AltegioClient,
-  input: { location_id: number; client_id: number }
+  input: {
+    location_id: number;
+    client_id: number;
+    include_contacts?: boolean;
+  }
 ): Promise<ClientsResult> {
-  const card = await adapter(client).getClientCard(input);
-  return { text: cardSummary(card), structuredContent: card };
+  const card = await adapter(client).getClientCard({
+    location_id: input.location_id,
+    client_id: input.client_id,
+  });
+  const includeContacts = input.include_contacts === true;
+  return {
+    text: cardSummary(card, { includeContacts }),
+    structuredContent: {
+      ...(includeContacts ? card : withoutContacts(card)),
+      contacts_included: includeContacts,
+    },
+  };
 }
 
 // ========== visit history ==========
@@ -149,7 +203,12 @@ export async function getVisitHistory(
 
 export async function lookupClients(
   client: AltegioClient,
-  input: { location_id: number; query: string; limit?: number }
+  input: {
+    location_id: number;
+    query: string;
+    limit?: number;
+    include_contacts?: boolean;
+  }
 ): Promise<ClientsResult> {
   if (!input.query.trim()) {
     throw new ClientsInputError(
@@ -161,13 +220,18 @@ export async function lookupClients(
     query: input.query.trim(),
     ...(input.limit ? { limit: input.limit } : {}),
   });
+  const includeContacts = input.include_contacts === true;
+  const items = includeContacts
+    ? rows
+    : rows.map((row) => withoutContacts(row));
   return {
-    text: lookupSummary(rows),
+    text: lookupSummary(rows, { includeContacts }),
     structuredContent: {
       location_id: input.location_id,
       query: input.query.trim(),
-      items: rows,
-      count: rows.length,
+      items,
+      count: items.length,
+      contacts_included: includeContacts,
     },
   };
 }
