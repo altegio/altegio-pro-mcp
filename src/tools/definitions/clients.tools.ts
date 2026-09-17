@@ -27,6 +27,13 @@ const locationId = z
     'Location whose client base to work with. Call list_locations when the id is unknown.'
   );
 
+const includeContacts = z
+  .boolean()
+  .optional()
+  .describe(
+    'Return the client’s phone and email. Off by default: contacts are personal data and most questions do not need them. Turn it on only when the user explicitly asked to see or use a contact.'
+  );
+
 const moneyRange = z
   .object({
     from: z
@@ -234,8 +241,9 @@ export const clientsSearchTool = defineTool({
       .array(z.string())
       .optional()
       .describe(
-        'Advanced: extra client fields to return per row beyond id and name. Leave unset for a reliable id+name list; the total count is always returned.'
+        'Advanced: extra client fields to return per row beyond id and name. Leave unset for a reliable id+name list; the total count is always returned. Contact fields (phone, email) are dropped from this list unless include_contacts is true.'
       ),
+    include_contacts: includeContacts,
   }),
   outputSchema: objectSchema({
     location_id: { type: 'integer' as const },
@@ -246,6 +254,7 @@ export const clientsSearchTool = defineTool({
     page: { type: 'integer' as const },
     page_size: { type: 'integer' as const },
     returned: { type: 'integer' as const },
+    contacts_included: { type: 'boolean' as const },
     rows: {
       type: 'array' as const,
       items: {
@@ -266,7 +275,7 @@ export const clientsGetCardTool = defineTool({
   name: 'clients_get_card',
   category: 'Clients',
   description:
-    '[Clients] The full card of one client: name and contacts, loyalty importance and discount, lifetime money spent, client-account balance, visit count, tags, birthday-greeting and campaign-exclusion flags, and custom fields. Use it after clients_search or clients_lookup gives you a client id. For the client’s visit-by-visit history use clients_get_visit_history. Needs access to clients in this location.',
+    '[Clients] The full card of one client: name, loyalty importance and discount, lifetime money spent, client-account balance, visit count, tags, birthday-greeting and campaign-exclusion flags, and custom fields. Phone and email are withheld unless you pass include_contacts: true. Use it after clients_search or clients_lookup gives you a client id. For the client’s visit-by-visit history use clients_get_visit_history. Needs access to clients in this location.',
   annotations: { title: 'Clients: client card', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -275,6 +284,7 @@ export const clientsGetCardTool = defineTool({
       .int()
       .positive()
       .describe('Client id, from clients_search or clients_lookup.'),
+    include_contacts: includeContacts,
   }),
   outputSchema: objectSchema({
     id: { type: 'integer' as const },
@@ -300,6 +310,7 @@ export const clientsGetCardTool = defineTool({
     },
     custom_fields: { type: 'object' as const },
     last_changed_at: str,
+    contacts_included: { type: 'boolean' as const },
   }),
   handler: async ({ input, client }) => clients.getClientCard(client, input),
 });
@@ -383,7 +394,7 @@ export const clientsLookupTool = defineTool({
   name: 'clients_lookup',
   category: 'Clients',
   description:
-    '[Clients] Fast typeahead lookup of a client by a name fragment (also matches walk-in "comers"). Returns a short list of id, name and phone. Use it to resolve a name to a client id before clients_get_card or clients_get_visit_history. For a filtered, countable segment of the whole base use clients_search instead. Needs access to clients in this location.',
+    '[Clients] Fast typeahead lookup of a client by a name fragment (also matches walk-in "comers"). Returns a short list of id and name; the phone is withheld unless you pass include_contacts: true. Use it to resolve a name to a client id before clients_get_card or clients_get_visit_history. For a filtered, countable segment of the whole base use clients_search instead. Needs access to clients in this location.',
   annotations: { title: 'Clients: quick lookup', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -395,11 +406,13 @@ export const clientsLookupTool = defineTool({
       .max(25)
       .optional()
       .describe('Maximum matches, 1–25 (default 7).'),
+    include_contacts: includeContacts,
   }),
   outputSchema: objectSchema({
     location_id: { type: 'integer' as const },
     query: { type: 'string' as const },
     count: { type: 'integer' as const },
+    contacts_included: { type: 'boolean' as const },
     items: {
       type: 'array' as const,
       items: objectSchema({

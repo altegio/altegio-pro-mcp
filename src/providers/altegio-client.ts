@@ -20,6 +20,7 @@ import type {
 } from '../types/altegio.types.js';
 import { CredentialManager } from './credential-manager.js';
 import { AuthenticationError, AltegioApiError } from '../utils/errors.js';
+import { upstreamDetail } from '../tools/tool-result.js';
 import {
   assertCompanyAllowed,
   getRequestCompanyIds,
@@ -87,6 +88,17 @@ function formatApiErrorDetails(errors: unknown): string | undefined {
     return parts.length > 0 ? parts.join('; ') : undefined;
   }
   return undefined;
+}
+
+/**
+ * A 2xx response whose envelope says the call did not succeed. The sentence is
+ * ours; the API's own message is quoted after it as third-party text rather
+ * than becoming the whole error the model reads.
+ */
+function unexpectedResponseMessage(context: string, raw: unknown): string {
+  const detail = upstreamDetail(raw);
+  const base = `Unexpected response for ${context}.`;
+  return detail ? `${base} ${detail}` : base;
 }
 
 export interface AltegioClientOptions {
@@ -243,7 +255,12 @@ export class AltegioClient {
     // Surface the API's own validation details (meta.errors) alongside the
     // message so the caller sees the real cause, not just an HTTP status.
     const details = formatApiErrorDetails(meta?.errors);
-    const message = details ? `${rawMessage} (${details})` : rawMessage;
+    const raw = details ? `${rawMessage} (${details})` : rawMessage;
+    // What to do next is ours to say (ADR-001 D8). The API's own wording is
+    // third-party text: it is quoted after our sentence, never spliced into it,
+    // so it cannot read as the instruction the caller should follow.
+    const detail = upstreamDetail(raw);
+    const suffix = detail ? ` ${detail}` : '';
 
     switch (response.status) {
       case 401:
@@ -251,23 +268,23 @@ export class AltegioClient {
           `Session expired while trying to ${context}. Call altegio_login to re-authenticate.`
         );
       case 403:
-        // Pass the API message through: a permission problem and a plain
-        // validation refusal both arrive as 4xx and were previously collapsed
+        // A permission problem and a plain validation refusal both arrive as
+        // 4xx, so the upstream wording is kept — quoted — rather than collapsed
         // into one opaque "Access denied" string.
         throw new AltegioApiError(
-          `Access denied while trying to ${context}: ${message} (HTTP 403). Check location permissions or the user's role.`,
+          `Access denied while trying to ${context} (HTTP 403). Check location permissions or the user's role.${suffix}`,
           403,
           body
         );
       case 404:
         throw new AltegioApiError(
-          `Not found while trying to ${context}: ${message} (HTTP 404). Verify the ID is correct.`,
+          `Not found while trying to ${context} (HTTP 404). Verify the ID is correct.${suffix}`,
           404,
           body
         );
       default:
         throw new AltegioApiError(
-          `Failed to ${context}: ${message} (HTTP ${response.status})`,
+          `Failed to ${context} (HTTP ${response.status}).${suffix}`,
           response.status,
           body
         );
@@ -288,7 +305,7 @@ export class AltegioClient {
     const result = (await response.json()) as AltegioApiResponse<T>;
     if (!result.success || result.data === undefined || result.data === null) {
       throw new AltegioApiError(
-        result.meta?.message || `Unexpected response for ${context}`,
+        unexpectedResponseMessage(context, result.meta?.message),
         response.status,
         result
       );
@@ -1264,7 +1281,7 @@ export class AltegioClient {
       const envelope = body as AltegioApiResponse<T>;
       if (!envelope.success) {
         throw new AltegioApiError(
-          envelope.meta?.message || `Unexpected response for ${context}`,
+          unexpectedResponseMessage(context, envelope.meta?.message),
           response.status,
           envelope
         );

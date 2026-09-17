@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import { loginOutput } from '../output-schemas.js';
+import { upstreamDetail } from '../tool-result.js';
 
 export const loginTool = defineTool({
   name: 'altegio_login',
   category: 'Auth',
   description:
-    '[Auth] Login to Altegio with email and password. REQUIRED for administrative operations: getting user locations (list_locations with my=1), viewing appointments, and other business management tasks. Ask user for credentials when they request administrative data.',
+    '[Auth] Exchange an Altegio email and password the user has already chosen to provide for a user token, which is then reused for administrative operations (list_locations with my=1, appointments, and the rest of the business-management surface). Only for local stdio use: a hosted deployment gets its identity from the host and does not need this tool. Do not ask the user for a password, and do not offer this tool as a way to unblock a failed call — say what access is missing and let the user decide how to authenticate.',
   annotations: {
     title: 'Login to Altegio',
     openWorldHint: true,
@@ -18,10 +19,16 @@ export const loginTool = defineTool({
   outputSchema: loginOutput,
   handler: async ({ input, client }) => {
     const result = await client.login(input.email, input.password);
+    // The failure sentence is ours; the API's own wording is quoted after it as
+    // data, never spliced into an instruction (ADR-001 D8).
+    const detail = result.success ? null : upstreamDetail(result.error);
     return {
       text: result.success
         ? 'Successfully logged in to Altegio'
-        : `Login failed: ${result.error}`,
+        : [
+            'Login failed. The credentials were not accepted; ask the user to check them or to authenticate through the host instead.',
+            ...(detail ? [detail] : []),
+          ].join(' '),
       structuredContent: {
         success: result.success,
         ...(result.error && { error: result.error }),
