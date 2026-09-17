@@ -184,7 +184,7 @@ export const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     name: 'Attendance rate',
     definition:
       'Share of appointments the client actually attended, the inverse of the no-show share.',
-    tool: 'analytics_run_report',
+    tool: 'analytics_get_appointments_breakdown',
   },
 ] as const;
 
@@ -234,22 +234,30 @@ export const COVERAGE_GAPS: readonly {
   readonly alternative: string;
 }[] = [
   {
-    topic: 'Revenue by team member, by service or by client as a ready page',
-    reason: 'Those pages exist only inside the web interface.',
+    topic: 'The report builder (custom and template report tables)',
+    reason:
+      'The Analytics Constructor is not switched on for Altegio: its report-data API fails for every report, and the one endpoint that answers ignores the requested period, so any table it produced would be all-time data under the wrong label.',
     alternative:
-      'Run the "Revenue by team member", "Revenue by service" or "Revenue and visits by client" template with analytics_run_report.',
+      'analytics_get_overview (optionally narrowed by team_member_id or position_id), analytics_get_daily_series, analytics_get_appointments_breakdown, analytics_get_team_member_occupancy and analytics_get_day_end_report cover the same questions at location and team-member level.',
+  },
+  {
+    topic: 'Revenue by service or by client as a table',
+    reason:
+      'Those pages exist only inside the web interface, and the report builder behind them is switched off.',
+    alternative:
+      'None through this server. Revenue per team member is available from analytics_get_overview with team_member_id or position_id.',
   },
   {
     topic: 'Team member dynamics over time',
     reason: 'The dedicated page is web-only.',
     alternative:
-      'Use the dynamic templates "Team member dynamics — services / products / appointments".',
+      'analytics_get_daily_series for the location trend, plus analytics_get_overview per team member across the two periods.',
   },
   {
     topic: 'Client retention cohorts',
     reason: 'The cohort page is web-only.',
     alternative:
-      'The "Client retention" template covers new versus returning clients and the share that comes back.',
+      'analytics_get_overview reports new, returning, active and lost clients for the period, and analytics_get_receptionist_performance the rebooking rate that drives them.',
   },
   {
     topic: 'Reviews and ratings analytics',
@@ -266,19 +274,18 @@ export const COVERAGE_GAPS: readonly {
     topic: 'Finance dashboard and account balances',
     reason: 'Balances have no endpoint.',
     alternative:
-      'analytics_get_day_end_report shows takings per account for a day; the "Income and expenses" and "P&L" templates cover cash flow.',
+      'analytics_get_day_end_report shows takings per account for a day. There is no cash-flow or P&L table through this server.',
   },
   {
     topic: 'Account-period and annual finance reports',
     reason: 'Web-only.',
-    alternative:
-      'Use the "Income and expenses over time" template with a monthly granularity.',
+    alternative: 'None through this server.',
   },
   {
     topic: 'Inventory turnover and write-off analysis',
     reason: 'Web-only.',
     alternative:
-      'The "Product sales analysis" template covers product revenue, cost price and margin.',
+      'None through this server; analytics_get_day_end_report shows a single day’s discounts and write-offs.',
   },
   {
     topic: 'Payroll period sheets',

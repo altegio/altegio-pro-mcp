@@ -39,7 +39,6 @@ import {
 } from '../capabilities/analytics/playbook.js';
 import {
   CODED_VALUES,
-  DATASET_USES,
   ENTITY_MODEL,
   LEDGER_NOTE,
   METRIC_SOURCES,
@@ -218,10 +217,6 @@ export function renderDataModel(): string {
     (value) => `- **${value.field}** — ${value.values}\n  - ${value.meaning}`
   ).join('\n');
 
-  const datasets = DATASET_USES.map(
-    (use) => `- **${use.dataset}** — ${use.reachFor}`
-  ).join('\n');
-
   return [
     '# Analytics data model — where each number comes from',
     '',
@@ -253,10 +248,6 @@ export function renderDataModel(): string {
     '',
     coded,
     '',
-    '## The four report-builder datasets — what to reach for each',
-    '',
-    datasets,
-    '',
   ].join('\n');
 }
 
@@ -282,7 +273,6 @@ export function renderCoverage(): string {
     '- The day-end report: takings per account, discounts and write-offs, sales totals.',
     '- Occupancy per team member per day.',
     '- Visit history figures of one client.',
-    '- The report builder: built-in templates, four datasets, and ad-hoc tables grouped by any dimension with an optional day, week, month or year bucket.',
     '',
     '## Not available, and what to use instead',
     '',
@@ -291,9 +281,7 @@ export function renderCoverage(): string {
     '## Hard limits',
     '',
     '- At most 365 days per call.',
-    '- Report tables are capped in the tool result; the full table arrives as a CSV resource link that lives for 30 minutes in the server process.',
-    "- The report builder has two data APIs. Locations with the new API can override a saved report's period per run. The legacy fallback is used only when the requested period exactly matches the report's stored period; a different range is rejected rather than mislabeled.",
-    '- A report-builder status of `error` is a real upstream build failure, not a pending report. Use the overview, daily series or day-end report while the builder is unavailable.',
+    '- There is no report builder: grouped report tables (by service, by client, a P&L, a cash-flow sheet) cannot be produced at all. Answer from the metrics above and name the gap.',
     '- Everything is scoped to one location; there is no chain-wide roll-up.',
     '',
   ].join('\n');
@@ -372,30 +360,20 @@ export function listAnalyticsResources(): ResourceEntry[] {
       name: 'analytics-data-model',
       title: 'Analytics data model',
       description:
-        'Where each number comes from: the appointment → visit → client spine, which object every metric family is computed from, the two ledgers (money and products), the coded values an answer carries (visit status, payment status, source, client priority, money units), and what each report-builder dataset aggregates. Read this to know what a figure means and what it can be sliced by.',
+        'Where each number comes from: the appointment → visit → client spine, which object every metric family is computed from, the two ledgers (money and products), the coded values an answer carries (visit status, payment status, source, client priority, money units), and what a figure can be sliced by. Read this to know what a number means.',
       mimeType: 'text/markdown',
     },
   ];
 }
 
+/**
+ * No templated analytics resources are advertised: both belonged to the report
+ * builder (dataset field catalogue, truncated-report CSV), which is switched off
+ * — see `src/tools/disabled-tools.ts`. The readers below still resolve their
+ * URIs, so re-advertising them is a one-line change.
+ */
 export function listAnalyticsResourceTemplates(): ResourceTemplateEntry[] {
-  return [
-    {
-      uriTemplate: REPORT_FIELDS_URI_TEMPLATE,
-      name: 'analytics-report-fields',
-      title: 'Report fields of one dataset',
-      description: `Canonical field keys of one report-builder dataset (${DATASETS.join(', ')}), ready to pass to analytics_run_report.`,
-      mimeType: 'text/markdown',
-    },
-    {
-      uriTemplate: REPORT_CSV_URI_TEMPLATE,
-      name: 'analytics-report-csv',
-      title: 'Full report output as CSV',
-      description:
-        'Complete output of a report run whose table was truncated in the tool result. Kept in the server process for 30 minutes after the run.',
-      mimeType: 'text/csv',
-    },
-  ];
+  return [];
 }
 
 function datasetFromUri(uri: string): Dataset | null {

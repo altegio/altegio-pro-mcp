@@ -10,6 +10,7 @@ import { OnboardingHandlers } from './onboarding-handlers.js';
 import { OnboardingStateManager } from '../providers/onboarding-state-manager.js';
 import { onboardingTools } from './onboarding-registry.js';
 import * as definitions from './definitions/index.js';
+import { isToolDisabled } from './disabled-tools.js';
 import {
   buildFacetIndex,
   DEFAULT_FACET,
@@ -38,16 +39,21 @@ export interface RegisterToolsOptions {
   readonly excludeOnboardingFromDefault?: boolean;
 }
 
-/** Auto-discover every `DefinedTool` exported from the definitions barrel. */
+/**
+ * Auto-discover every `DefinedTool` exported from the definitions barrel, minus
+ * the ones withheld from every view (see `./disabled-tools.ts`).
+ */
 function collectDefinedTools(): DefinedTool[] {
-  return (Object.values(definitions) as unknown[]).filter(
-    (v): v is DefinedTool =>
-      !!v &&
-      typeof v === 'object' &&
-      'toMcpTool' in v &&
-      'createHandler' in v &&
-      'meta' in v
-  );
+  return (Object.values(definitions) as unknown[])
+    .filter(
+      (v): v is DefinedTool =>
+        !!v &&
+        typeof v === 'object' &&
+        'toMcpTool' in v &&
+        'createHandler' in v &&
+        'meta' in v
+    )
+    .filter((tool) => !isToolDisabled(tool.meta.name));
 }
 
 /**

@@ -102,7 +102,8 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 **[Clients] Client base (4):** `clients_search` (segment & count the base with a fully-typed filter model), `clients_get_card`, `clients_get_visit_history`, `clients_lookup` (autocomplete)
 **[Settings] Location Settings (6):** get/update appointment settings, get/update online booking settings, get/create booking forms
 **[Resources] Resources (1):** get (read-only; API has no create)
-**[Analytics] Analytics (14):** get_overview, get_daily_series, get_appointments_breakdown, get_receptionist_performance, get_loyalty_program_results, get_forecast, get_day_end_report, get_team_member_occupancy, get_client_visit_stats, list_report_templates, list_report_fields, run_report, list_saved_reports, run_saved_report
+**[Analytics] Analytics (9 served):** get_overview, get_daily_series, get_appointments_breakdown, get_receptionist_performance, get_loyalty_program_results, get_forecast, get_day_end_report, get_team_member_occupancy, get_client_visit_stats
+  - The 6 report-builder tools (list_report_templates, list_report_fields, run_report, list_saved_reports, run_saved_report, delete_assistant_report) are defined and tested but **served on no view** — the backend report-data API fails for every report in production. Never point guidance at them; read `src/tools/disabled-tools.ts` first.
 **[Onboarding] Wizard (12):** start, resume, status, batch imports (positions, staff, categories, services), set schedules, import clients, test appointments, preview, rollback
 **[API] Universal executor (3):** `altegio_search_operations`, `altegio_describe_operation`, `altegio_call_operation` - backed by `src/generated/catalog.json`; reads only (writes refused, see ADR-001 D2)
 
@@ -135,6 +136,12 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 - `src/utils/` - logging, errors, config, credential manager
 
 ### Change history
+
+**Report builder switched off (2026-09-17)**
+- **Withheld 6 tools (63 -> 57 defined, 66 served incl. onboarding):** the whole report-builder family, filtered out of tool discovery by `src/tools/disabled-tools.ts` so no view serves it, stdio included.
+- **Why:** verified in production — `POST /company/{id}/analytics_constructor/reports/{id}/data` answers 400 for every report (the endpoint always uses the new query builder while the mart is queued with the old context, because `new_query_builder_analytics_constructor` is off); the legacy `/ac/{id}/data` route takes no filters and ignores the stored period, so its rows are all-time data under the requested label; a new report's first mart build always fails and only an hourly upstream sweep repairs it; `DELETE /company/{id}/ac/{id}` needs the `analytics_constructor_access` right that neither identity has, so the `[Altegio Assistant] …` reports this server created cannot be removed.
+- **Guidance rewritten, not just the surface:** playbook plays and question routes, the four analytics prompts, the coverage/data-model resources and the `analytics_get_overview` cross-reference now answer from key metrics (optionally per team member or position), daily series, breakdowns, occupancy and the day-end report — or declare the gap. The two report-builder resource templates are no longer advertised.
+- **Re-enable:** confirm the backend flag is on and the data endpoint returns a table, then empty `DISABLED_TOOL_NAMES` and restore the guidance marked `report builder disabled`.
 
 **Schedule 422 fix + service↔team-member links + write/ergonomics gaps (2026-09-10)**
 - **Fixed schedules (PRIORITY 1):** `create_schedule`, `update_schedule`, `delete_schedule` and `onboarding_set_schedules` returned HTTP 422 for spec-correct input. **Root cause: a spec↔backend field-name mismatch.** The modern `PUT /company/{id}/staff/schedule` controller (`More\Master\Validation\SingleStaffScheduleDto`) expects the per-entry key **`staff_id`** and validates the body with a strict Symfony `Collection` (no missing/extra keys) — but the public OpenAPI documents the field as `team_member_id`, so following the spec sends an unknown key AND omits the required one → two violations → 422. `AltegioClient.setSchedule` now keeps the canonical `team_member_id` at the MCP boundary and maps it to `staff_id` on the wire, staying on the (non-deprecated) modern endpoint and batching all team members in one request. The `biz.erp.api.docs` spec is wrong here and should be corrected separately. Regression test pins the mapping and reads a schedule back with slots.

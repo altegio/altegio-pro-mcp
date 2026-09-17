@@ -11,6 +11,7 @@
  * generated domain packs.
  */
 import catalogJson from '../../generated/catalog.json' with { type: 'json' };
+import { isDisabledOperationPath } from '../disabled-tools.js';
 
 /** One documented parameter of an operation. */
 export interface CatalogParameter {
@@ -103,7 +104,9 @@ export const legacyAliases: Record<string, string[]> = (() => {
 })();
 
 const byOperationId = new Map<string, CatalogOperation>(
-  catalog.operations.map((op) => [op.operationId, op])
+  catalog.operations
+    .filter((op) => !isDisabledOperationPath(op.path))
+    .map((op) => [op.operationId, op])
 );
 
 export function getOperation(
@@ -112,8 +115,16 @@ export function getOperation(
   return byOperationId.get(operationId);
 }
 
+/**
+ * Every operation the executor may see. The report-builder routes are filtered
+ * out here — the one funnel search, describe and call share — for the reasons in
+ * `../disabled-tools.ts`.
+ */
+const searchableOperations: readonly CatalogOperation[] =
+  catalog.operations.filter((op) => !isDisabledOperationPath(op.path));
+
 export function allOperations(): readonly CatalogOperation[] {
-  return catalog.operations;
+  return searchableOperations;
 }
 
 /** The canonical name for a spec parameter, or the name itself when it is already canonical. */
