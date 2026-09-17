@@ -14,7 +14,10 @@ import * as definitions from './definitions/index.js';
 import { isToolDisabled } from './disabled-tools.js';
 import {
   buildFacetIndex,
+  facetToolsFromSpecs,
+  readOnlyRefusalMessage,
   DEFAULT_FACET,
+  READONLY_VIEW,
   type FacetKey,
   type FacetIndex,
 } from './facets.js';
@@ -34,6 +37,7 @@ import {
   requestContextFromHeaders,
   runWithContext,
 } from '../request-context.js';
+import { DEFAULT_PUBLIC_BASE_URL } from '../config/schema.js';
 
 type CallHandler = (args: unknown) => Promise<ToolResult>;
 
@@ -56,6 +60,12 @@ export interface RegisterToolsOptions {
    * Off by default; the unfiltered `all` view stdio uses always has them.
    */
   readonly exposePasswordLogin?: boolean;
+  /**
+   * Public base URL this deployment is reached at, used to name the complete
+   * surface in the read-only view's refusal. Defaults to the published public
+   * endpoint (`MCP_PUBLIC_BASE_URL`).
+   */
+  readonly publicBaseUrl?: string;
 }
 
 /**
@@ -108,8 +118,18 @@ export function orderedToolEntries(): ToolEntry[] {
 function outOfFacetError(
   name: string,
   facet: FacetKey,
-  index: FacetIndex
+  index: FacetIndex,
+  publicBaseUrl: string
 ): McpError {
+  // The read-only view refuses on policy, not on context budget, so it gets a
+  // message a model can act on rather than a pointer to a sibling facet.
+  if (facet === READONLY_VIEW) {
+    return new McpError(
+      ErrorCode.MethodNotFound,
+      readOnlyRefusalMessage(name, publicBaseUrl)
+    );
+  }
+
   const elsewhere = index.facetsProviding(name);
   const paths = [
     ...elsewhere.map((f) => `/mcp/${f}`),
@@ -234,13 +254,14 @@ export function registerTools(
   // One deterministic order for every view, computed once at startup.
   const entries = orderedToolEntries();
   const facetIndex = buildFacetIndex(
-    entries.map((entry) => entry.spec.name),
+    facetToolsFromSpecs(entries.map((entry) => entry.spec)),
     {
       excludeOnboardingFromDefault: options.excludeOnboardingFromDefault,
       exposePasswordLogin: options.exposePasswordLogin,
     }
   );
   const facet = options.facet ?? DEFAULT_FACET;
+  const publicBaseUrl = options.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL;
   const visible = new Set(facetIndex.members(facet));
   const visibleToolDefs = entries
     .filter((entry) => visible.has(entry.spec.name))
@@ -261,7 +282,7 @@ export function registerTools(
         throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
       }
       if (!visible.has(name)) {
-        throw outOfFacetError(name, facet, facetIndex);
+        throw outOfFacetError(name, facet, facetIndex, publicBaseUrl);
       }
 
       // Destructive operations stop here until a human says yes. `undefined`

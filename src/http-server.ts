@@ -6,7 +6,12 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { createServer } from './server.js';
 import { loadConfig } from './config/schema.js';
-import { DEFAULT_FACET, FACET_NAMES, type FacetKey } from './tools/facets.js';
+import {
+  DEFAULT_FACET,
+  FACET_NAMES,
+  READONLY_VIEW,
+  type FacetKey,
+} from './tools/facets.js';
 import { createLogger } from './utils/logger.js';
 import {
   requestContextFromHeaders,
@@ -18,20 +23,35 @@ const logger = createLogger('http-server');
 
 type TransportRegistry = Record<string, StreamableHTTPServerTransport>;
 
-/** Every path this app serves MCP on, and the facet each one exposes. */
+/**
+ * Every path this app serves MCP on, and the view each one exposes.
+ *
+ * `/mcp/readonly` is listed here, next to the facets, for one reason: these
+ * routes are all registered before the catch-all below, and a path that is not
+ * in this list falls into it and answers 404. It is still a different kind of
+ * view — a policy, not a context budget — which is why it is not a member of
+ * `FACET_NAMES`.
+ */
 const FACET_ROUTES: ReadonlyArray<{ path: string; facet: FacetKey }> = [
   { path: '/mcp', facet: DEFAULT_FACET },
+  { path: `/mcp/${READONLY_VIEW}`, facet: READONLY_VIEW },
   ...FACET_NAMES.map((facet) => ({ path: `/mcp/${facet}`, facet })),
 ];
+
+/** Sub-paths under `/mcp`, for the 404 that lists what this build serves. */
+const MCP_SUB_PATHS = FACET_ROUTES.map((route) => route.path).filter(
+  (path) => path !== '/mcp'
+);
 
 /**
  * Build the Express app and the per-session transport registries.
  *
- * MCP is served on `/mcp` (every tool) and on `/mcp/<facet>` (a fixed subset —
- * ADR-001 D3). Each facet keeps its own session registry, so a session always
- * talks to the server instance whose tool list it was initialized against. The
- * platform proxy forwards `/pro/*` with the prefix stripped, so these paths
- * need no proxy change.
+ * MCP is served on `/mcp` (every tool), on `/mcp/<facet>` (a fixed subset —
+ * ADR-001 D3) and on `/mcp/readonly` (only tools annotated `readOnlyHint`).
+ * Each view keeps its own session registry, so a session always talks to the
+ * server instance whose tool list it was initialized against. The platform
+ * proxy forwards `/pro/*` with the prefix stripped, so these paths need no
+ * proxy change.
  *
  * Every request's proxy-verified identity (`x-mcp-auth-*` headers) is bound to
  * the async context for the duration of the SDK message handling, so tool
@@ -176,14 +196,14 @@ export function createApp(): {
     });
   }
 
-  // Any other /mcp/<something> — registered after the known facets, so it only
-  // ever sees a facet name this build does not serve.
+  // Any other /mcp/<something> — registered after every known view, so it only
+  // ever sees a sub-path this build does not serve.
   app.all('/mcp/:facet', (req, res) => {
     res.status(404).json({
       jsonrpc: '2.0',
       error: {
         code: -32601,
-        message: `Unknown facet: ${req.params.facet}. Available facets: ${FACET_NAMES.join(', ')}. Use /mcp for every tool.`,
+        message: `Unknown facet: ${req.params.facet}. This endpoint serves ${MCP_SUB_PATHS.join(', ')}. Use /mcp for every tool, or /mcp/${READONLY_VIEW} for read operations only.`,
       },
       id: null,
     });
@@ -216,6 +236,9 @@ async function startHTTPServer(): Promise<void> {
       config.env.ALTEGIO_EXPOSE_PASSWORD_LOGIN
         ? 'Password login (altegio_login/altegio_logout) is SERVED on the HTTP views — intended only for the closed staff deployment (ALTEGIO_EXPOSE_PASSWORD_LOGIN=true)'
         : 'Password login (altegio_login/altegio_logout) is withheld from the HTTP views; callers authenticate through the proxy'
+    );
+    logger.info(
+      `Read-only view on /mcp/${READONLY_VIEW}: serves only tools annotated readOnlyHint, and refuses every other tool by name. Addresses named to callers are based on ${config.env.MCP_PUBLIC_BASE_URL}`
     );
   });
 }

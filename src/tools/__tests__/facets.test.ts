@@ -7,12 +7,19 @@ import {
   DEFAULT_FACET_EXTRA_TOOLS,
   FACET_BASE_TOOLS,
   FACET_NAMES,
+  facetToolsFromSpecs,
   isFacetName,
   PASSWORD_LOGIN_TOOLS,
+  READONLY_VIEW,
+  readOnlyRefusalMessage,
+  viewUrl,
+  type FacetTool,
 } from '../facets.js';
 import { orderedToolEntries } from '../registry.js';
 
 const allNames = () => orderedToolEntries().map((entry) => entry.spec.name);
+const allTools = (): FacetTool[] =>
+  facetToolsFromSpecs(orderedToolEntries().map((entry) => entry.spec));
 
 describe('tools/list ordering', () => {
   it('orders by category, then by name', () => {
@@ -44,8 +51,9 @@ describe('tools/list ordering', () => {
   });
 });
 
-describe('static facets', () => {
+describe('static views', () => {
   const names = allNames();
+  const tools = allTools();
 
   it('recognizes only the published facet names', () => {
     for (const facet of FACET_NAMES) {
@@ -57,7 +65,7 @@ describe('static facets', () => {
   });
 
   it('keeps every non-pack tool on the default view plus the named analytics entry points', () => {
-    const index = buildFacetIndex(names);
+    const index = buildFacetIndex(tools);
     const expected = names.filter(
       (name) =>
         !PASSWORD_LOGIN_TOOLS.includes(name) &&
@@ -69,7 +77,7 @@ describe('static facets', () => {
   });
 
   it('gives every facet the location tools', () => {
-    const index = buildFacetIndex(names);
+    const index = buildFacetIndex(tools);
     for (const facet of FACET_NAMES) {
       for (const base of FACET_BASE_TOOLS) {
         expect(index.includes(facet, base)).toBe(true);
@@ -78,7 +86,7 @@ describe('static facets', () => {
   });
 
   it('serves appointments on ops and nothing from the catalog', () => {
-    const index = buildFacetIndex(names);
+    const index = buildFacetIndex(tools);
     expect([...index.members('ops')].sort()).toEqual(
       [
         'clients_delete',
@@ -96,7 +104,7 @@ describe('static facets', () => {
   });
 
   it('serves the catalog domains on catalog', () => {
-    const index = buildFacetIndex(names);
+    const index = buildFacetIndex(tools);
     expect(index.includes('catalog', 'get_staff')).toBe(true);
     expect(index.includes('catalog', 'get_schedule')).toBe(true);
     expect(index.includes('catalog', 'get_online_booking_settings')).toBe(true);
@@ -105,7 +113,7 @@ describe('static facets', () => {
   });
 
   it('serves the whole wizard on onboarding and nothing else', () => {
-    const index = buildFacetIndex(names);
+    const index = buildFacetIndex(tools);
     const members = index.members('onboarding');
     const wizard = members.filter((name) => name.startsWith('onboarding_'));
     expect(wizard).toHaveLength(12);
@@ -113,14 +121,14 @@ describe('static facets', () => {
   });
 
   it('leaves marketing at the base tools until its packs land', () => {
-    const index = buildFacetIndex(names);
+    const index = buildFacetIndex(tools);
     expect([...index.members('marketing')].sort()).toEqual(
       [...FACET_BASE_TOOLS].sort()
     );
   });
 
   it('points an out-of-facet tool at the facets that serve it', () => {
-    const index = buildFacetIndex(names);
+    const index = buildFacetIndex(tools);
     expect(index.facetsProviding('get_staff')).toEqual(['catalog']);
     expect(index.facetsProviding('get_appointments')).toEqual(['ops']);
     expect(index.facetsProviding('list_locations')).toEqual([...FACET_NAMES]);
@@ -128,7 +136,9 @@ describe('static facets', () => {
 
   it('ignores facet rules for tools that do not exist', () => {
     // Simulate a build without the analytics pack: its rules must be inert.
-    const withoutPack = names.filter((name) => !name.startsWith('analytics_'));
+    const withoutPack = tools.filter(
+      (tool) => !tool.name.startsWith('analytics_')
+    );
     const index = buildFacetIndex(withoutPack);
     expect(index.members('analytics')).toEqual([...FACET_BASE_TOOLS]);
     for (const extra of DEFAULT_FACET_EXTRA_TOOLS) {
@@ -137,7 +147,7 @@ describe('static facets', () => {
   });
 
   it('keeps a facet list in the order the builder received', () => {
-    const index = buildFacetIndex(names);
+    const index = buildFacetIndex(tools);
     const catalog = index.members('catalog');
     expect(catalog).toEqual(names.filter((name) => catalog.includes(name)));
   });
@@ -157,7 +167,7 @@ describe('static facets', () => {
     });
 
     it('keeps password login off every HTTP view by default', () => {
-      const index = buildFacetIndex(names);
+      const index = buildFacetIndex(tools);
       for (const name of PASSWORD_LOGIN_TOOLS) {
         expect(index.includes(DEFAULT_FACET, name)).toBe(false);
         for (const facet of FACET_NAMES) {
@@ -169,8 +179,8 @@ describe('static facets', () => {
     });
 
     it('still serves password login on the unfiltered view stdio uses', () => {
-      const off = buildFacetIndex(names);
-      const on = buildFacetIndex(names, { exposePasswordLogin: true });
+      const off = buildFacetIndex(tools);
+      const on = buildFacetIndex(tools, { exposePasswordLogin: true });
       for (const name of PASSWORD_LOGIN_TOOLS) {
         expect(off.includes(ALL_TOOLS_FACET, name)).toBe(true);
         expect(on.includes(ALL_TOOLS_FACET, name)).toBe(true);
@@ -180,7 +190,7 @@ describe('static facets', () => {
     });
 
     it('admits password login to every view when on — the closed staff deployment', () => {
-      const index = buildFacetIndex(names, { exposePasswordLogin: true });
+      const index = buildFacetIndex(tools, { exposePasswordLogin: true });
       for (const name of PASSWORD_LOGIN_TOOLS) {
         expect(index.includes(DEFAULT_FACET, name)).toBe(true);
         for (const facet of FACET_NAMES) {
@@ -191,8 +201,8 @@ describe('static facets', () => {
     });
 
     it('changes nothing else about the views it filters', () => {
-      const off = buildFacetIndex(names);
-      const on = buildFacetIndex(names, { exposePasswordLogin: true });
+      const off = buildFacetIndex(tools);
+      const on = buildFacetIndex(tools, { exposePasswordLogin: true });
       const withoutLogin = (list: readonly string[]) =>
         list.filter((name) => !PASSWORD_LOGIN_TOOLS.includes(name));
 
@@ -206,12 +216,12 @@ describe('static facets', () => {
     // Handing out and revoking location access is a dangerous right that the
     // default endpoint does not offer a generic agent (v3 authorization RFC).
     it('withholds remove_location_user from /mcp', () => {
-      const index = buildFacetIndex(names);
+      const index = buildFacetIndex(tools);
       expect(index.includes(DEFAULT_FACET, 'remove_location_user')).toBe(false);
     });
 
     it('keeps it reachable on the catalog facet and on stdio', () => {
-      const index = buildFacetIndex(names);
+      const index = buildFacetIndex(tools);
       expect(index.includes('catalog', 'remove_location_user')).toBe(true);
       expect(index.includes(ALL_TOOLS_FACET, 'remove_location_user')).toBe(
         true
@@ -227,7 +237,7 @@ describe('static facets', () => {
         { exposePasswordLogin: true },
         { excludeOnboardingFromDefault: true },
       ]) {
-        const index = buildFacetIndex(names, options);
+        const index = buildFacetIndex(tools, options);
         for (const name of DEFAULT_FACET_EXCLUDED_TOOLS) {
           expect(index.includes(DEFAULT_FACET, name)).toBe(false);
         }
@@ -242,8 +252,8 @@ describe('static facets', () => {
         { exposePasswordLogin: true },
         { excludeOnboardingFromDefault: true },
       ]) {
-        const first = buildFacetIndex(names, options);
-        const second = buildFacetIndex(names, options);
+        const first = buildFacetIndex(tools, options);
+        const second = buildFacetIndex(tools, options);
         for (const key of first.keys) {
           expect(second.members(key)).toEqual(first.members(key));
         }
@@ -253,8 +263,8 @@ describe('static facets', () => {
 
   describe('the onboarding config switch', () => {
     it('removes the wizard from the default view only when on', () => {
-      const off = buildFacetIndex(names);
-      const on = buildFacetIndex(names, {
+      const off = buildFacetIndex(tools);
+      const on = buildFacetIndex(tools, {
         excludeOnboardingFromDefault: true,
       });
 
@@ -282,7 +292,7 @@ describe('static facets', () => {
     });
 
     it('admits only the named entry points to the default view', () => {
-      const index = buildFacetIndex(names);
+      const index = buildFacetIndex(tools);
       expect(index.includes(DEFAULT_FACET, 'analytics_get_overview')).toBe(
         true
       );
@@ -304,7 +314,7 @@ describe('static facets', () => {
     });
 
     it('serves everything on the unfiltered view stdio uses', () => {
-      const index = buildFacetIndex(names);
+      const index = buildFacetIndex(tools);
       expect(index.members(ALL_TOOLS_FACET)).toEqual(names);
       // Which is strictly more than the default HTTP view holds back to.
       expect(index.members(DEFAULT_FACET)).not.toEqual(names);
@@ -314,7 +324,7 @@ describe('static facets', () => {
     });
 
     it('admits the whole pack to its own facet and to finance', () => {
-      const index = buildFacetIndex(names);
+      const index = buildFacetIndex(tools);
       expect(index.members('analytics')).toHaveLength(
         FACET_BASE_TOOLS.length + analyticsCount
       );
@@ -322,6 +332,186 @@ describe('static facets', () => {
         FACET_BASE_TOOLS.length + analyticsCount
       );
       expect(index.includes('ops', 'analytics_get_overview')).toBe(false);
+    });
+  });
+});
+
+/**
+ * The read-only view served on `/mcp/readonly`.
+ *
+ * Its membership is computed from each tool's own `readOnlyHint`, never from a
+ * list kept here, so the tests below are written to fail on a *future* pack
+ * too: they compare the view against the annotations of whatever is registered
+ * at the time they run, and they check the computation itself with synthetic
+ * tools that no pack has to exist for.
+ */
+describe('the read-only view', () => {
+  const entries = orderedToolEntries();
+  const names = allNames();
+  const tools = allTools();
+  const index = buildFacetIndex(tools);
+  const members = index.members(READONLY_VIEW);
+  const annotationSaysReadOnly = (name: string): boolean =>
+    entries.find((entry) => entry.spec.name === name)?.spec.annotations
+      ?.readOnlyHint === true;
+
+  it('is a view, not a seventh facet', () => {
+    // Facets ration context; this rations what an agent may do. Keeping them
+    // separate is the point — see the module header.
+    expect(isFacetName(READONLY_VIEW)).toBe(false);
+    expect([...FACET_NAMES]).not.toContain(READONLY_VIEW);
+    expect(index.keys).toContain(READONLY_VIEW);
+    // And it is never offered as the answer to "where else can I call this?".
+    for (const name of names) {
+      expect([...index.facetsProviding(name)]).not.toContain(READONLY_VIEW);
+    }
+  });
+
+  // THE regression test: if a new pack lands with a writing tool that this
+  // view admits, this fails without anybody remembering to update a list.
+  it('admits nothing that is not annotated readOnlyHint: true', () => {
+    const leaked = members.filter((name) => !annotationSaysReadOnly(name));
+    expect(leaked).toEqual([]);
+  });
+
+  it('admits every registered read-only tool', () => {
+    const expected = names.filter(
+      (name) =>
+        annotationSaysReadOnly(name) &&
+        !PASSWORD_LOGIN_TOOLS.includes(name) &&
+        !DEFAULT_FACET_EXCLUDED_TOOLS.includes(name)
+    );
+    expect(members).toEqual(expected);
+    expect(members.length).toBeGreaterThan(0);
+    expect(members.length).toBeLessThan(names.length);
+  });
+
+  it('classifies a tool by its annotation and nothing else', () => {
+    // A pack that does not exist yet: the view has to pick up its reading tools
+    // and leave its writing ones out, with no entry added to this module.
+    const future: FacetTool[] = [
+      ...tools,
+      { name: 'future_pack_get_thing', readOnly: true },
+      { name: 'future_pack_create_thing', readOnly: false },
+    ];
+    const withFuture = buildFacetIndex(future).members(READONLY_VIEW);
+    expect(withFuture).toContain('future_pack_get_thing');
+    expect(withFuture).not.toContain('future_pack_create_thing');
+  });
+
+  it('treats a missing or malformed readOnlyHint as a write (fail closed)', () => {
+    const projected = facetToolsFromSpecs([
+      { name: 'no_annotations_at_all' },
+      { name: 'empty_annotations', annotations: {} },
+      { name: 'explicitly_false', annotations: { readOnlyHint: false } },
+      {
+        name: 'truthy_but_not_true',
+        annotations: { readOnlyHint: 1 as never },
+      },
+      { name: 'properly_read_only', annotations: { readOnlyHint: true } },
+    ]);
+    expect(buildFacetIndex(projected).members(READONLY_VIEW)).toEqual([
+      'properly_read_only',
+    ]);
+  });
+
+  it('does not force-admit the base tools the way a facet does', () => {
+    // list_locations is on this view because it reads, not because it is a
+    // base tool. If it ever stopped reading it would have to drop out.
+    expect(members).toContain('list_locations');
+    const hypothetical = tools.map((tool) =>
+      FACET_BASE_TOOLS.includes(tool.name) ? { ...tool, readOnly: false } : tool
+    );
+    const index2 = buildFacetIndex(hypothetical);
+    for (const base of FACET_BASE_TOOLS) {
+      expect(index2.includes(READONLY_VIEW, base)).toBe(false);
+      // …while every facet still carries it, which is the difference.
+      expect(index2.includes('ops', base)).toBe(true);
+    }
+  });
+
+  it('serves the whole analytics pack, which the default view holds back', () => {
+    // Chain-wide analytics is a named audience for this address, and every
+    // analytics tool only reads.
+    const analytics = names.filter((name) => name.startsWith('analytics_'));
+    expect(analytics.length).toBeGreaterThan(1);
+    for (const name of analytics) {
+      expect(index.includes(READONLY_VIEW, name)).toBe(true);
+    }
+    expect(
+      index.members(DEFAULT_FACET).filter((n) => analytics.includes(n)).length
+    ).toBeLessThan(analytics.length);
+  });
+
+  it('carries no destructive tool and no password login', () => {
+    for (const name of [
+      'delete_staff',
+      'delete_appointment',
+      'clients_delete',
+      'remove_location_user',
+      'onboarding_rollback_phase',
+      ...PASSWORD_LOGIN_TOOLS,
+    ]) {
+      expect(index.includes(READONLY_VIEW, name)).toBe(false);
+    }
+    // Even with the closed-deployment switch on, login is not a read.
+    const withLogin = buildFacetIndex(tools, { exposePasswordLogin: true });
+    for (const name of PASSWORD_LOGIN_TOOLS) {
+      expect(withLogin.includes(READONLY_VIEW, name)).toBe(false);
+    }
+  });
+
+  it('serves the read-only executor, which refuses writes itself', () => {
+    expect(index.includes(READONLY_VIEW, 'altegio_search_operations')).toBe(
+      true
+    );
+    expect(index.includes(READONLY_VIEW, 'altegio_call_operation')).toBe(true);
+  });
+
+  it('is deterministic and keeps the registry order (ADR-001 D7)', () => {
+    expect(buildFacetIndex(tools).members(READONLY_VIEW)).toEqual(members);
+    expect(members).toEqual(names.filter((name) => members.includes(name)));
+  });
+
+  it('is unaffected by the switches that shape the default view', () => {
+    for (const options of [
+      { exposePasswordLogin: true },
+      { excludeOnboardingFromDefault: true },
+    ]) {
+      expect(buildFacetIndex(tools, options).members(READONLY_VIEW)).toEqual(
+        members
+      );
+    }
+  });
+
+  describe('the refusal a writing tool gets here', () => {
+    const base = 'https://mcp.alteg.io/public/pro';
+    const message = readOnlyRefusalMessage('delete_staff', base);
+
+    it('names the tool and the full address of the complete surface', () => {
+      expect(message).toContain('delete_staff');
+      expect(message).toContain(viewUrl(base, READONLY_VIEW));
+      expect(message).toContain(viewUrl(base, DEFAULT_FACET));
+      expect(viewUrl(base, READONLY_VIEW)).toBe(
+        'https://mcp.alteg.io/public/pro/mcp/readonly'
+      );
+      expect(viewUrl(base, DEFAULT_FACET)).toBe(
+        'https://mcp.alteg.io/public/pro/mcp'
+      );
+    });
+
+    it('tolerates a base URL with a trailing slash', () => {
+      expect(viewUrl('https://example.test/pro/', DEFAULT_FACET)).toBe(
+        'https://example.test/pro/mcp'
+      );
+    });
+
+    it('tells the model to report rather than retry or seek elevation', () => {
+      // Hosts do not re-authorize on a refusal (Claude Code closed that as
+      // "not planned"), so the message must not imply a step-up exists.
+      expect(message).toMatch(/no confirmation, no wider scope and no retry/i);
+      expect(message).toMatch(/tell the user/i);
+      expect(message).toMatch(/separate MCP server/i);
     });
   });
 });

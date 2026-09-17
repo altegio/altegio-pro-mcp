@@ -9,6 +9,17 @@ import {
   PACKAGE_NAME,
   PACKAGE_VERSION,
 } from '../package-metadata.js';
+import { DEFAULT_FACET, READONLY_VIEW, viewUrl } from '../tools/facets.js';
+
+/**
+ * Public base URL this deployment is reached at — the prefix the platform proxy
+ * serves this server under, without a trailing slash. It is only ever used to
+ * name an address in text a model reads: the read-only view's refusal and its
+ * `initialize` instructions. Override with `MCP_PUBLIC_BASE_URL` when the
+ * deployment sits behind another prefix (the internal delegated lane is
+ * `https://mcp.alteg.io/pro`).
+ */
+export const DEFAULT_PUBLIC_BASE_URL = 'https://mcp.alteg.io/public/pro';
 
 /**
  * Server `instructions` returned in the MCP `initialize` result (ADR-001 §5.6).
@@ -53,6 +64,30 @@ export const DEFAULT_SERVER_INSTRUCTIONS = [
 ].join(' ');
 
 /**
+ * Extra `initialize` instructions for the read-only view, prefixed to the
+ * product instructions so the first thing a model reads about this address is
+ * what it cannot do here.
+ *
+ * It states the limit and the one honest way past it. A host cannot widen a
+ * token in place — re-authorizing on a refusal is not something MCP hosts do —
+ * so the only real next step is a person pointing their client at the complete
+ * surface, and the model is told to suggest that only if the person actually
+ * wants an agent that can change their business data, never as a workaround for
+ * a refusal it just hit.
+ */
+export function readOnlyViewInstructions(publicBaseUrl: string): string {
+  return [
+    `READ-ONLY ENDPOINT. This address (${viewUrl(publicBaseUrl, READONLY_VIEW)}) serves only tools that read.`,
+    'Creating, updating and deleting are absent by design, and calling one is refused outright — there is no confirmation,',
+    'no wider permission and no retry that turns this address into a writing one. Plan work accordingly: answer, analyse and',
+    'report, and when a task needs a change, say exactly what change is needed and where, rather than attempting it.',
+    `The complete surface is a separate server at ${viewUrl(publicBaseUrl, DEFAULT_FACET)}, which a person adds in their own`,
+    'client configuration. Mention it only if the user wants an agent that can modify their business data; do not propose',
+    'switching as a way around a refusal, and never ask a user to widen an agent’s access on your own initiative.',
+  ].join(' ');
+}
+
+/**
  * An environment flag that accepts the spellings a shell or `.env` file
  * produces. Unlike `z.coerce.boolean()` this reads `"false"` and `"0"` as
  * false instead of "any non-empty string is true".
@@ -84,6 +119,14 @@ export const EnvSchema = z.object({
 
   // Override the `initialize` instructions paragraph without a rebuild.
   MCP_SERVER_INSTRUCTIONS: z.string().min(1).optional(),
+
+  // Public base URL this deployment answers on, used only to name the complete
+  // surface and the read-only address in text the model reads.
+  MCP_PUBLIC_BASE_URL: z
+    .string()
+    .url()
+    .default(DEFAULT_PUBLIC_BASE_URL)
+    .transform((value) => value.replace(/\/+$/, '')),
 
   // Serve the onboarding walkthrough only on /mcp/onboarding, keeping the
   // default /mcp view under a host's active-tool cap. Off by default: turning
@@ -221,6 +264,7 @@ export class ConfigLoader {
         LOG_LEVEL: env.LOG_LEVEL,
         CREDENTIALS_DIR: env.CREDENTIALS_DIR,
         MCP_SERVER_INSTRUCTIONS: env.MCP_SERVER_INSTRUCTIONS,
+        MCP_PUBLIC_BASE_URL: env.MCP_PUBLIC_BASE_URL,
         MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING:
           env.MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING,
         ALTEGIO_DOCS_DIR: env.ALTEGIO_DOCS_DIR,

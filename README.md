@@ -188,6 +188,11 @@ surface served on its own HTTP sub-path, for hosts that cap how many tools may
 be active at once. A facet never changes what a tool does, carries no separate
 credential and is not a product boundary ([ADR-001](docs/architecture/2026-09-07-mcp-platform-architecture.md) D3).
 
+A facet answers *how many tools fit in this host's context*. The separate
+question — *what may this agent do at all* — is answered by the
+[read-only address](#the-read-only-address-mcpreadonly) below, which is a
+different kind of view and not a seventh facet.
+
 | Endpoint | Serves |
 |---|---|
 | `/mcp` | **Every tool except the analytics pack**, plus its entry point `analytics_get_overview` — the default view, minus password login and `remove_location_user` (see below) |
@@ -237,6 +242,70 @@ the closed staff deployment behind Google OIDC (`hd=alteg.io`), where a password
 login is still how a V1 user token is obtained — never on the public endpoint.
 stdio serves the unfiltered `all` view and always has both tools, whatever this
 variable says.
+
+## The read-only address (`/mcp/readonly`)
+
+```
+https://mcp.alteg.io/public/pro/mcp/readonly
+```
+
+The same server, the same credential, the same protocol — a surface that only
+reads. Every tool that creates, updates or deletes is absent from `tools/list`,
+and calling one anyway is **refused**, not silently ignored: the model gets a
+`MethodNotFound` error naming the full address of the complete surface and
+telling it to report the change it wanted rather than retry.
+
+**Who it is for.** Not the business owner — they connect an agent to the full
+surface. This address exists for the caller with no human watching the loop:
+
+- autonomous agents running on a schedule,
+- a shared agent several people in a team send tasks to,
+- a third-party or unaudited agent someone wants to give business context to,
+- chain-wide reporting and analysis, which is entirely read work,
+- our own internal builds.
+
+It is documented here, for developers and enterprise deployments. It is
+deliberately not offered during onboarding or in the marketplace, where the
+right default is the full surface.
+
+**Why a separate URL and not a header or a checkbox.** A separate URL is a
+separate OAuth protected resource, which is exactly how GitHub, Linear, Sentry,
+Stripe, Notion, Atlassian and Slack restrict an agent, and every host already
+understands it. A request header such as `X-MCP-Readonly` was considered and
+rejected: nothing enforces a header the caller sets for itself, Claude Desktop
+does not send one, and honouring it would make `tools/list` differ between two
+connections to the *same* resource, which ADR-001 D7 forbids.
+
+**What it is worth today — read this part.** While Altegio v3 still issues one
+full user token, **this is a guardrail, not a security boundary.** The token
+behind a read-only session is the same token as everywhere else; nothing at the
+API rejects a write performed with it. The address constrains what this MCP
+server offers and will do, not what the credential can do — a person can still
+ask the same agent to call the Altegio API directly, outside MCP, and it will
+work. The honest value is narrower and still real: it lets the consent screen
+stay *all or nothing* — no per-scope checkboxes for a user to reason about —
+while a deployment that wants a non-writing agent still has somewhere to point
+it. When v3 issues tokens carrying read scopes, this address is where they plug
+in, and the guarantee becomes a real one.
+
+**How membership is decided.** From each tool's own `readOnlyHint` annotation,
+computed at startup — never from a list kept by hand. A pack that lands next
+month is classified by the annotation its author wrote, and a tool that does not
+declare `readOnlyHint: true` is treated as a write. A test fails the build if
+anything without that annotation ever appears on this view.
+
+The view also differs from `/mcp` in one direction: it carries the **whole
+analytics pack**, which the default view holds back for context budget. Every
+analytics tool only reads, and chain-wide analysis is a named audience here.
+
+Sessions on this address get their own `initialize` instructions, which state
+that the surface only reads and that asking the user to switch to the full
+address makes sense only if the user actually wants an agent that can change
+their data — never as a way around a refusal the model has just hit.
+
+Set `MCP_PUBLIC_BASE_URL` if the deployment is reached under a different prefix
+(the internal delegated lane is `https://mcp.alteg.io/pro`). It is used only to
+name addresses in the refusal and in the instructions.
 
 ## Destructive operations require a human
 
@@ -479,6 +548,7 @@ See [CI-CD.md](CI-CD.md) for details.
 | `ALTEGIO_EXPOSE_PASSWORD_LOGIN` | No | `false` | HTTP mode: serve `altegio_login`/`altegio_logout`. Closed staff deployments only — never the public endpoint. stdio always serves them |
 | `MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING` | No | `false` | Drop `onboarding_*` from the default `/mcp` facet |
 | `MCP_SERVER_INSTRUCTIONS` | No | built-in | Override the `initialize` instructions paragraph |
+| `MCP_PUBLIC_BASE_URL` | No | `https://mcp.alteg.io/public/pro` | Public prefix this deployment answers on; only used to name addresses in the read-only view's refusal and instructions |
 | `ALTEGIO_DOCS_DIR` | No | `<pkg>/docs` | Where the `altegio://docs/*` markdown documents are read from |
 | `LOG_LEVEL` | No | `info` | `debug\|info\|warn\|error` |
 | `NODE_ENV` | No | `development` | `development\|production` |

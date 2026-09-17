@@ -8,6 +8,7 @@ import {
   DEFAULT_FACET_EXCLUDED_TOOLS,
   FACET_BASE_TOOLS,
   PASSWORD_LOGIN_TOOLS,
+  READONLY_VIEW,
   type FacetKey,
 } from '../tools/facets.js';
 import {
@@ -108,6 +109,92 @@ describe('tools/list per facet', () => {
       [...FACET_BASE_TOOLS].sort()
     );
     await client.close();
+  });
+});
+
+/**
+ * The read-only address (`/mcp/readonly`). Restricting an agent by giving it a
+ * different URL is how GitHub, Linear, Sentry, Stripe, Notion, Atlassian and
+ * Slack do it, and a separate URL is a separate OAuth resource, so `tools/list`
+ * may legitimately differ from `/mcp` without breaking ADR-001 D7.
+ */
+describe('the read-only view', () => {
+  it('lists only tools annotated readOnlyHint, computed from the registry', async () => {
+    const client = await connect(READONLY_VIEW);
+    const { tools } = await client.listTools();
+    expect(tools.length).toBeGreaterThan(0);
+    for (const tool of tools) {
+      expect(tool.annotations?.readOnlyHint).toBe(true);
+    }
+    // Nothing read-only is missing either.
+    expect(tools.map((tool) => tool.name)).toEqual(
+      orderedToolEntries()
+        .filter((entry) => entry.spec.annotations?.readOnlyHint === true)
+        .map((entry) => entry.spec.name)
+        .filter(
+          (name) =>
+            !PASSWORD_LOGIN_TOOLS.includes(name) &&
+            !DEFAULT_FACET_EXCLUDED_TOOLS.includes(name)
+        )
+    );
+    await client.close();
+  });
+
+  it('refuses a writing tool, naming the full address of the complete surface', async () => {
+    const client = await connect(READONLY_VIEW);
+    // Hiding it from tools/list is not the control: a model with the name from
+    // anywhere else still calls it, so the call itself is refused.
+    await expect(
+      client.callTool({
+        name: 'delete_staff',
+        arguments: { location_id: 1, staff_id: 2 },
+      })
+    ).rejects.toThrow(
+      /delete_staff.*read operations only.*https:\/\/[^\s]+\/mcp\b/s
+    );
+    await expect(
+      client.callTool({
+        name: 'create_appointment',
+        arguments: { location_id: 1 },
+      })
+    ).rejects.toThrow(/no confirmation, no wider scope and no retry/);
+    await client.close();
+  });
+
+  it('lets a read-only tool through to its handler', async () => {
+    const client = await connect(READONLY_VIEW);
+    // Reaches the handler, which refuses because nobody is authenticated —
+    // proof the view check did not intercept it.
+    const result = await client.callTool({
+      name: 'get_appointments',
+      arguments: { location_id: 1 },
+    });
+    expect(result.isError).toBe(true);
+    await client.close();
+  });
+
+  it('tells the model the surface only reads, and how to raise it with the user', async () => {
+    const client = await connect(READONLY_VIEW);
+    const instructions = client.getInstructions() ?? '';
+    expect(instructions).toContain('READ-ONLY ENDPOINT');
+    expect(instructions).toMatch(/refused outright/);
+    expect(instructions).toMatch(/separate server at https:\/\//);
+    // Only if the user wants it — never as a way around a refusal.
+    expect(instructions).toMatch(/only if the user wants/i);
+    expect(instructions).toMatch(/not propose\s+switching as a way around/);
+    // The product description is still there.
+    expect(instructions).toContain('Altegio Pro');
+    await client.close();
+  });
+
+  it('leaves the instructions of the other views untouched', async () => {
+    for (const view of [undefined, 'ops'] as const) {
+      const client = await connect(view);
+      expect(client.getInstructions() ?? '').not.toContain(
+        'READ-ONLY ENDPOINT'
+      );
+      await client.close();
+    }
   });
 });
 
