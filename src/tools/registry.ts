@@ -37,6 +37,11 @@ export interface RegisterToolsOptions {
   readonly facet?: FacetKey;
   /** Drop the onboarding walkthrough from the default view (config switch). */
   readonly excludeOnboardingFromDefault?: boolean;
+  /**
+   * Admit the email + password login tools to the HTTP views (config switch).
+   * Off by default; the unfiltered `all` view stdio uses always has them.
+   */
+  readonly exposePasswordLogin?: boolean;
 }
 
 /**
@@ -92,10 +97,17 @@ function outOfFacetError(
   index: FacetIndex
 ): McpError {
   const elsewhere = index.facetsProviding(name);
+  const paths = [
+    ...elsewhere.map((f) => `/mcp/${f}`),
+    // Only offer /mcp when /mcp actually serves it: a tool withheld from the
+    // default view (access management, password login) must not be advertised
+    // back to the caller as available one path up.
+    ...(index.includes(DEFAULT_FACET, name) ? ['/mcp'] : []),
+  ];
   const where =
-    elsewhere.length > 0
-      ? ` Reach it on ${elsewhere.map((f) => `/mcp/${f}`).join(' or ')}, or on /mcp.`
-      : ' Reach it on /mcp.';
+    paths.length > 0
+      ? ` Reach it on ${paths.join(' or ')}.`
+      : ' This deployment does not serve it.';
   return new McpError(
     ErrorCode.MethodNotFound,
     `Tool "${name}" is not served by the "${facet}" view of this endpoint.${where}`
@@ -138,7 +150,10 @@ export function registerTools(
   const entries = orderedToolEntries();
   const facetIndex = buildFacetIndex(
     entries.map((entry) => entry.spec.name),
-    { excludeOnboardingFromDefault: options.excludeOnboardingFromDefault }
+    {
+      excludeOnboardingFromDefault: options.excludeOnboardingFromDefault,
+      exposePasswordLogin: options.exposePasswordLogin,
+    }
   );
   const facet = options.facet ?? DEFAULT_FACET;
   const visible = new Set(facetIndex.members(facet));

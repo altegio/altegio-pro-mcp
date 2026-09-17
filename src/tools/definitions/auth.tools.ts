@@ -10,6 +10,10 @@ export const loginTool = defineTool({
     '[Auth] Exchange an Altegio email and password the user has already chosen to provide for a user token, which is then reused for administrative operations (list_locations with my=1, appointments, and the rest of the business-management surface). Only for local stdio use: a hosted deployment gets its identity from the host and does not need this tool. Do not ask the user for a password, and do not offer this tool as a way to unblock a failed call — say what access is missing and let the user decide how to authenticate.',
   annotations: {
     title: 'Login to Altegio',
+    destructiveHint: false,
+    // Each call mints and stores a fresh user token upstream, so a repeat
+    // is not a no-op.
+    idempotentHint: false,
     openWorldHint: true,
   },
   input: z.object({
@@ -43,6 +47,9 @@ export const logoutTool = defineTool({
   description: '[Auth] Logout from Altegio and clear stored credentials.',
   annotations: {
     title: 'Logout from Altegio',
+    destructiveHint: false,
+    // Clearing an already-cleared credential store changes nothing.
+    idempotentHint: true,
     openWorldHint: true,
   },
   input: z.object({}),

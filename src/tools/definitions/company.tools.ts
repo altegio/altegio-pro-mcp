@@ -82,6 +82,7 @@ export const updateLocationTool = defineTool({
     '[Location] Update a location — rename it or change documented address, city/country, website, coordinates, description, business type, or phone fields. AUTHENTICATION REQUIRED (admin access to the location). The result verifies requested fields against a documented location read. In particular, the API may accept phones without persisting them; such fields are reported as unconfirmed, never as successfully updated.',
   annotations: {
     title: 'Update Location',
+    destructiveHint: false,
     openWorldHint: true,
     idempotentHint: true,
   },

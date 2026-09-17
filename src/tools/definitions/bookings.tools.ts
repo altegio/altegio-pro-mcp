@@ -167,6 +167,7 @@ export const createAppointmentTool = defineTool({
     'To back-date a completed visit or force a booking onto a busy/off slot, pass save_if_busy=true. Set attendance=1 to mark a past visit as attended.',
   annotations: {
     title: 'Create Appointment',
+    destructiveHint: false,
     openWorldHint: true,
     idempotentHint: false,
   },
@@ -243,6 +244,7 @@ export const updateAppointmentTool = defineTool({
     '[Appointments] Update existing appointment. AUTHENTICATION REQUIRED. Provide only fields to update.',
   annotations: {
     title: 'Update Appointment',
+    destructiveHint: false,
     openWorldHint: true,
     idempotentHint: true,
   },
@@ -316,6 +318,7 @@ export const deleteAppointmentTool = defineTool({
   annotations: {
     title: 'Delete Appointment',
     destructiveHint: true,
+    idempotentHint: true,
     openWorldHint: true,
   },
   input: z.object({

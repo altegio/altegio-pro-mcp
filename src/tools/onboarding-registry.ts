@@ -8,6 +8,12 @@ export const onboardingTools: McpToolSpec[] = [
       '[Onboarding] Initialize new onboarding session for a location. Creates persistent state and guides through platform setup workflow.',
     annotations: {
       title: 'Start Onboarding',
+      // Resets the local wizard checkpoint file for this location; it never
+      // touches business data, so it is a write, not a destructive one.
+      destructiveHint: false,
+      // A repeat rewrites started_at and wipes whatever progress the
+      // previous session had, so it is not a no-op.
+      idempotentHint: false,
       openWorldHint: true,
     },
     inputSchema: {
@@ -28,6 +34,7 @@ export const onboardingTools: McpToolSpec[] = [
       '[Onboarding] Resume existing onboarding session and show progress. Displays completed phases and next steps.',
     annotations: {
       title: 'Resume Onboarding',
+      readOnlyHint: true,
       openWorldHint: true,
     },
     inputSchema: {
@@ -63,6 +70,7 @@ export const onboardingTools: McpToolSpec[] = [
       '[Onboarding] Bulk create staff positions/roles (e.g. Manager, Stylist, Receptionist) from a JSON array or CSV string. Create positions BEFORE staff so staff can reference position_id. The documented public V1 operation accepts title only. Created IDs are checkpointed for audit, but public V1 has no position delete operation, so this phase cannot be automatically rolled back.',
     annotations: {
       title: 'Batch Add Positions',
+      destructiveHint: false,
       openWorldHint: true,
       idempotentHint: false,
     },
@@ -98,6 +106,7 @@ export const onboardingTools: McpToolSpec[] = [
       'Bulk add staff members from JSON array or CSV string. Accepts name, specialization, phone, email, position_id, api_id. Creates checkpoint for rollback.',
     annotations: {
       title: 'Batch Add Staff',
+      destructiveHint: false,
       openWorldHint: true,
       idempotentHint: false,
     },
@@ -138,6 +147,7 @@ export const onboardingTools: McpToolSpec[] = [
       'Bulk add services from JSON array or CSV string. Accepts title, price_min, price_max, duration, category_id, api_id. Creates checkpoint for rollback.',
     annotations: {
       title: 'Batch Add Services',
+      destructiveHint: false,
       openWorldHint: true,
       idempotentHint: false,
     },
@@ -178,6 +188,7 @@ export const onboardingTools: McpToolSpec[] = [
       '[Onboarding] Set work schedules (working hours) for staff members. AUTHENTICATION REQUIRED. Accepts an array of { team_member_id, dates[], slots[{from,to}] }. Use the team member IDs returned by onboarding_add_staff_batch. Without schedules the appointment grid stays empty. Creates checkpoint for rollback.',
     annotations: {
       title: 'Set Work Schedules',
+      destructiveHint: false,
       openWorldHint: true,
       idempotentHint: true,
     },
@@ -230,6 +241,7 @@ export const onboardingTools: McpToolSpec[] = [
       'Create service categories. Accepts JSON array of category objects with title, api_id, weight. Creates checkpoint for rollback.',
     annotations: {
       title: 'Add Categories',
+      destructiveHint: false,
       openWorldHint: true,
       idempotentHint: false,
     },
@@ -264,6 +276,7 @@ export const onboardingTools: McpToolSpec[] = [
       '[Onboarding] Import client database from CSV string. CSV must have headers: name,phone,email,surname,comment. Either phone or email is required. Creates checkpoint for rollback.',
     annotations: {
       title: 'Import Clients',
+      destructiveHint: false,
       openWorldHint: true,
       idempotentHint: false,
     },
@@ -287,6 +300,7 @@ export const onboardingTools: McpToolSpec[] = [
       'Generate test appointments using previously created staff and services. Distributes appointments across next 1-7 days. Marks onboarding as complete.',
     annotations: {
       title: 'Create Test Appointments',
+      destructiveHint: false,
       openWorldHint: true,
       idempotentHint: false,
     },
@@ -338,6 +352,10 @@ export const onboardingTools: McpToolSpec[] = [
     annotations: {
       title: 'Rollback Onboarding Phase',
       destructiveHint: true,
+      // Not a no-op on repeat: a fully successful rollback consumes the
+      // checkpoint (the next call errors), and a partial one keeps the IDs
+      // the API refused, so the next call retries those deletions.
+      idempotentHint: false,
       openWorldHint: true,
     },
     inputSchema: {

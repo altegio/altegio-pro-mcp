@@ -1,9 +1,15 @@
-import { describe, it, expect } from '@jest/globals';
+import { afterEach, describe, it, expect } from '@jest/globals';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createServer } from '../server.js';
+import { ConfigLoader } from '../config/schema.js';
 import { orderedToolEntries } from '../tools/registry.js';
-import { FACET_BASE_TOOLS, type FacetKey } from '../tools/facets.js';
+import {
+  DEFAULT_FACET_EXCLUDED_TOOLS,
+  FACET_BASE_TOOLS,
+  PASSWORD_LOGIN_TOOLS,
+  type FacetKey,
+} from '../tools/facets.js';
 import {
   GLOSSARY_URI,
   ONBOARDING_GUIDE_URI,
@@ -56,8 +62,12 @@ describe('tools/list per facet', () => {
         .map((entry) => entry.spec.name)
         .filter(
           (name) =>
-            !name.startsWith('analytics_') ||
-            DEFAULT_FACET_EXTRA_TOOLS.includes(name)
+            // Password login and access management are withheld from the
+            // public HTTP surface; see src/tools/facets.ts.
+            !PASSWORD_LOGIN_TOOLS.includes(name) &&
+            !DEFAULT_FACET_EXCLUDED_TOOLS.includes(name) &&
+            (!name.startsWith('analytics_') ||
+              DEFAULT_FACET_EXTRA_TOOLS.includes(name))
         )
     );
     await client.close();
@@ -77,8 +87,6 @@ describe('tools/list per facet', () => {
     const client = await connect('ops');
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name).sort()).toEqual([
-      'altegio_login',
-      'altegio_logout',
       'clients_delete',
       'clients_get_card',
       'clients_get_visit_history',
@@ -109,6 +117,42 @@ describe('tools/call outside the facet', () => {
     await expect(
       client.callTool({ name: 'get_staff', arguments: { location_id: 1 } })
     ).rejects.toThrow(/not served by the "ops" view.*\/mcp\/catalog/s);
+    await client.close();
+  });
+
+  it('refuses password login on the public default view, without pointing anywhere', async () => {
+    const client = await connect();
+    await expect(
+      client.callTool({
+        name: 'altegio_login',
+        arguments: { email: 'someone@example.com', password: 'hunter2' },
+      })
+    ).rejects.toThrow(/not served by the "default" view/);
+    // Hidden is not enough: the refusal must not advertise another path, and
+    // must not fall back to suggesting /mcp, which does not serve it either.
+    await expect(
+      client.callTool({ name: 'altegio_logout', arguments: {} })
+    ).rejects.toThrow(/This deployment does not serve it\./);
+    await client.close();
+  });
+
+  it('refuses access management on the default view and names the facet that serves it', async () => {
+    const client = await connect();
+    await expect(
+      client.callTool({
+        name: 'remove_location_user',
+        arguments: { location_id: 1, user_id: 2, confirm_user_id: 2 },
+      })
+    ).rejects.toThrow(/not served by the "default" view.*\/mcp\/catalog/s);
+    await client.close();
+  });
+
+  it('serves password login and access management on the unfiltered view stdio uses', async () => {
+    const client = await connect('all');
+    const names = (await client.listTools()).tools.map((tool) => tool.name);
+    for (const name of [...PASSWORD_LOGIN_TOOLS, 'remove_location_user']) {
+      expect(names).toContain(name);
+    }
     await client.close();
   });
 
@@ -354,6 +398,55 @@ describe('prompts', () => {
     await expect(client.getPrompt({ name: 'no_such_prompt' })).rejects.toThrow(
       /Unknown prompt.*prompts\/list/s
     );
+    await client.close();
+  });
+});
+
+describe('the ALTEGIO_EXPOSE_PASSWORD_LOGIN switch', () => {
+  /**
+   * The env flag reaches the served tool list through createServer, so drive it
+   * the way a deployment does: set the variable, drop the cached config, and
+   * look at what a client sees.
+   */
+  const setFlag = (value?: string): void => {
+    if (value === undefined) {
+      delete process.env.ALTEGIO_EXPOSE_PASSWORD_LOGIN;
+    } else {
+      process.env.ALTEGIO_EXPOSE_PASSWORD_LOGIN = value;
+    }
+    ConfigLoader.getInstance().reset();
+  };
+
+  afterEach(() => setFlag());
+
+  it('serves password login on the HTTP views when the deployment turns it on', async () => {
+    setFlag('true');
+
+    for (const facet of [undefined, 'ops', 'catalog'] as const) {
+      const client = await connect(facet);
+      const names = (await client.listTools()).tools.map((tool) => tool.name);
+      for (const name of PASSWORD_LOGIN_TOOLS) {
+        expect(names).toContain(name);
+      }
+      await client.close();
+    }
+  });
+
+  it('does not re-admit access management along with it', async () => {
+    setFlag('true');
+    const client = await connect();
+    const names = (await client.listTools()).tools.map((tool) => tool.name);
+    expect(names).not.toContain('remove_location_user');
+    await client.close();
+  });
+
+  it('reads a falsy spelling as off', async () => {
+    setFlag('false');
+    const client = await connect();
+    const names = (await client.listTools()).tools.map((tool) => tool.name);
+    for (const name of PASSWORD_LOGIN_TOOLS) {
+      expect(names).not.toContain(name);
+    }
     await client.close();
   });
 });

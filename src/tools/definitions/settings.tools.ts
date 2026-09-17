@@ -48,6 +48,7 @@ export const updateAppointmentSettingsTool = defineTool({
     '[Settings] Update appointment calendar settings. AUTHENTICATION REQUIRED. Sets the default appointment type and the maximum number of seats per group event.',
   annotations: {
     title: 'Update Appointment Settings',
+    destructiveHint: false,
     openWorldHint: true,
     idempotentHint: true,
   },
@@ -154,6 +155,7 @@ export const updateOnlineBookingSettingsTool = defineTool({
     '[Settings] Update online booking settings. AUTHENTICATION REQUIRED. Controls "any team member" mode, SMS number confirmation, the delay before the next available session, and group-event capacity.',
   annotations: {
     title: 'Update Online Booking Settings',
+    destructiveHint: false,
     openWorldHint: true,
     idempotentHint: true,
   },
@@ -263,6 +265,7 @@ export const createBookingFormTool = defineTool({
     '[Settings] Create an online booking (appointment) form/widget for a location. AUTHENTICATION REQUIRED. Only a title is required; other options use platform defaults.',
   annotations: {
     title: 'Create Booking Form',
+    destructiveHint: false,
     openWorldHint: true,
     idempotentHint: false,
   },
