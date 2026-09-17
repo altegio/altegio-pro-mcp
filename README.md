@@ -352,6 +352,70 @@ enforced in one place, the `tools/call` handler in
 [`src/tools/confirmation.ts`](src/tools/confirmation.ts). Nothing is stored
 server-side.
 
+## Token scopes (plumbing, not yet a boundary)
+
+The v3 authorization RFC settled that the real access boundary is the **scope
+of the token** — not the endpoint address, and not the tool annotations, which
+MCP forbids clients from treating as a security decision. A separate HTTP path
+only helps a deployment pick a profile of rights; it restricts nothing by
+itself. The OAuth proxy in front of this server already forwards the caller's
+granted scopes as `x-mcp-auth-scope`, and until now nothing read that header.
+
+Every tool now declares what its execution requires, and the `tools/call`
+handler checks it. Three properties are deliberate:
+
+- **Execution only.** `tools/list` is never filtered by the caller's scopes —
+  one path, one tool list, for every connection (ADR-001 D7). A tool a caller
+  cannot run is still listed, and explains itself when called.
+- **No declared scopes means no restriction.** Every deployment today — the
+  public HTTP endpoint, stdio, the closed Google-OIDC one — sends no
+  `x-mcp-auth-scope`, so nothing changes for any of them. The check starts
+  enforcing by itself the day tokens carry scopes.
+- **The refusal is in band.** It is an `isError` tool result naming the missing
+  permission and what a person has to do about it — never an HTTP 403, which
+  would drop the session. Hosts do not re-authorise on a mid-session denial, so
+  the message says not to retry and routes the caller to a human instead.
+
+> ⚠️ **The scope names are placeholders.** Their shape follows the ratified v3
+> convention (`domain:action`) and most are taken verbatim from the v3 scope
+> catalog, but that catalog is explicitly not final and the API team owns the
+> names. Until they are approved this is plumbing: correct wiring against a
+> provisional vocabulary, not an access boundary anyone should rely on.
+
+| Tools                                                                                                                             | Required scope                                                            |
+| --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `list_locations`, `get_resources`, `get_*_settings`, `get_booking_forms`                                                          | `locations:read`                                                          |
+| `update_location`, `update_*_settings`, `create_booking_form`, `delete_booking_form`                                              | `locations:write`                                                         |
+| `get_staff`, `get_positions`, `get_schedule`                                                                                      | `team_members:read`                                                       |
+| `create_staff`, `update_staff`, `delete_staff`, `create_position`, `create_schedule`, `update_schedule`, `delete_schedule`        | `team_members:write`                                                      |
+| `remove_location_user`                                                                                                            | `team_members:manage_access`                                              |
+| `get_services`, `get_service_categories`                                                                                          | `services:read`                                                           |
+| `create_service`, `update_service`, `delete_service`, `delete_service_category`, the four service ↔ team-member link tools        | `services:write`                                                          |
+| `get_appointments`                                                                                                                | `appointments:read`                                                       |
+| `create_appointment`                                                                                                              | `appointments:create`                                                     |
+| `update_appointment`, `delete_appointment`                                                                                        | `appointments:write`                                                      |
+| `clients_search`, `clients_get_card`, `clients_get_visit_history`, `clients_lookup`                                               | `clients:read`                                                            |
+| `clients_delete`                                                                                                                  | `clients:write`                                                           |
+| `analytics_*` reads                                                                                                               | `analytics:read` _(placeholder domain — no v3 scope exists yet)_          |
+| `altegio_call_operation`                                                                                                          | `api:read` _(placeholder — one tool reaches every documented GET)_        |
+| `altegio_login`, `altegio_logout`, `altegio_search_operations`, `altegio_describe_operation`, the wizard's local-state tools      | none                                                                      |
+
+The onboarding wizard's write phases take the scope of what they create
+(`onboarding_import_clients` → `clients:write`, and so on);
+`onboarding_rollback_phase` requires all four write scopes it can reach, since
+one tool name deletes across four domains.
+
+One implication is honoured, the one the v3 catalog ratified: **`X:write`
+covers `X:read`** on the same domain. Nothing else is — `create`,
+`manage_access`, `refund` and `capture` need an explicit grant, and
+`clients:read_contact` is a separate axis that gates _fields_, which V1 cannot
+express and this server therefore does not pretend to enforce.
+
+The map is one file — [`src/tools/scopes.ts`](src/tools/scopes.ts) — so a
+rename when the vocabulary is approved is a single edit. No tool definition
+spells a scope out: `defineTool` fills `requiredScopes` from the map by tool
+name, and a test fails the build if a tool is missing an entry.
+
 ## Resources and prompts
 
 Besides tools, the server serves MCP **resources** (documents a session can read

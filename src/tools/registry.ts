@@ -34,10 +34,16 @@ import {
   onboardingTools,
 } from './onboarding-registry.js';
 import {
+  getRequestScopes,
   requestContextFromHeaders,
   runWithContext,
 } from '../request-context.js';
 import { DEFAULT_PUBLIC_BASE_URL } from '../config/schema.js';
+import {
+  checkToolScopes,
+  requiredScopesFor,
+  type ToolScope,
+} from './scopes.js';
 
 type CallHandler = (args: unknown) => Promise<ToolResult>;
 
@@ -232,6 +238,18 @@ export function registerTools(
     }
   }
 
+  // What each tool's execution requires of the caller's token (ADR-001 D7
+  // keeps this out of `tools/list` — see ./scopes.ts). Factory tools carry the
+  // requirement on their definition, where the factory filled it in from the
+  // map; the hand-written onboarding specs are looked up by name in the same
+  // map, so both come from one source.
+  const requiredScopes = new Map<string, readonly ToolScope[]>(
+    onboardingTools.map((spec) => [spec.name, requiredScopesFor(spec.name)])
+  );
+  for (const tool of factoryTools) {
+    requiredScopes.set(tool.meta.name, tool.meta.requiredScopes ?? []);
+  }
+
   // Onboarding wizard — stateful subsystem kept in its own registry/handlers.
   const stateManager = new OnboardingStateManager();
   const onboarding = new OnboardingHandlers(client, stateManager);
@@ -284,6 +302,18 @@ export function registerTools(
       if (!visible.has(name)) {
         throw outOfFacetError(name, facet, facetIndex, publicBaseUrl);
       }
+
+      // Scope check before anything else the call does. It precedes the
+      // confirmation gate on purpose: a call the token cannot authorise must
+      // not prompt a human, and must not make the API read that resolves the
+      // prompt's target. A caller with no declared scopes — every deployment
+      // today — passes straight through.
+      const denial = checkToolScopes({
+        toolName: name,
+        required: requiredScopes.get(name) ?? [],
+        granted: getRequestScopes(),
+      });
+      if (denial) return denial;
 
       // Destructive operations stop here until a human says yes. `undefined`
       // means "already confirmed, or nothing to confirm"; anything else is the

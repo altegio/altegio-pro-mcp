@@ -335,6 +335,62 @@ export function assertCompanyAllowed(companyId: number): void {
 }
 
 /**
+ * The OAuth scope-token grammar (RFC 6749 §3.3): any printable ASCII except
+ * space, double quote and backslash. Applied on the way in, so a scope name
+ * can never carry markup or control characters into a tool result that quotes
+ * it back to the model.
+ */
+const SCOPE_TOKEN = /^[\x21\x23-\x5B\x5D-\x7E]+$/;
+
+/**
+ * Parse the proxy's `x-mcp-auth-scope` value into the set of granted scopes.
+ *
+ * Returns `undefined` for "no scopes declared" — an absent, blank, or
+ * entirely unparseable header. That is the state every deployment is in
+ * today, and downstream it means "no scope restriction applies" (see
+ * `src/tools/scopes.ts`). Treating a malformed header as an EMPTY grant
+ * instead would refuse every call on what is indistinguishable from a proxy
+ * bug; a header that carries at least one well-formed token is taken at face
+ * value, and the bad fragments are dropped with a warning.
+ */
+export function parseScopes(
+  value: string | undefined
+): ReadonlySet<string> | undefined {
+  if (!value) return undefined;
+
+  const scopes = new Set<string>();
+  let dropped = 0;
+  for (const fragment of value.split(/\s+/)) {
+    if (fragment === '') continue;
+    if (!SCOPE_TOKEN.test(fragment)) {
+      dropped += 1;
+      continue;
+    }
+    scopes.add(fragment);
+  }
+  if (dropped > 0) {
+    logger.warn(
+      { dropped },
+      'Ignoring malformed fragments in x-mcp-auth-scope'
+    );
+  }
+
+  return scopes.size > 0 ? scopes : undefined;
+}
+
+/**
+ * The scopes granted to the current request's token, or `undefined` when the
+ * caller declared none — stdio, an anonymous HTTP request, or a proxy that
+ * does not send `x-mcp-auth-scope` (every deployment as of today).
+ *
+ * `undefined` is not "no permissions": it is "this caller is not scoped", and
+ * the execution gate lets such a call through unchanged.
+ */
+export function getRequestScopes(): ReadonlySet<string> | undefined {
+  return parseScopes(storage.getStore()?.identity?.scope);
+}
+
+/**
  * Stable, non-reversible key for an identity, used to scope stored tokens.
  * Prefers the opaque subject, then email, then the machine name.
  */
