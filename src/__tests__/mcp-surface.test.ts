@@ -186,7 +186,9 @@ describe('server instructions', () => {
     expect(instructions).toContain('altegio_login');
     expect(instructions).toContain('/mcp/analytics');
     expect(instructions).toContain('/mcp/onboarding');
-    expect(instructions).toContain('report builder');
+    // The report builder is withheld until the backend works, so the
+    // instructions must not point at it (src/tools/disabled-tools.ts).
+    expect(instructions).toContain('no ad-hoc report builder');
     expect(instructions).toContain('executor');
     expect(instructions).toContain('delegated Altegio identity');
     for (const uri of [

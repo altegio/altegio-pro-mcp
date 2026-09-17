@@ -14,7 +14,8 @@ const nullableBoolProp = { type: ['boolean', 'null'] as const };
 
 function listSchema(
   itemProps: Record<string, object>,
-  itemRequired?: string[]
+  itemRequired?: string[],
+  extraProps?: Record<string, object>
 ) {
   return {
     type: 'object' as const,
@@ -28,6 +29,7 @@ function listSchema(
         },
       },
       count: numProp,
+      ...(extraProps ?? {}),
     },
     required: ['items', 'count'],
   };
@@ -127,7 +129,9 @@ export const bookingsOutput = listSchema(
     comment: nullableStrProp,
     deleted: boolProp,
   },
-  ['id', 'status', 'services', 'deleted']
+  ['id', 'status', 'services', 'deleted'],
+  // Whether `client_phone` is present on the rows at all (see include_contacts).
+  { contacts_included: boolProp }
 );
 
 export const staffListOutput = listSchema(

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import { bookingsOutput, bookingEntityOutput } from '../output-schemas.js';
+import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
 import { visitStatusFromLegacyCode } from '../../capabilities/analytics/vocabulary.js';
 import type { AltegioBooking } from '../../types/altegio.types.js';
 
@@ -42,7 +43,10 @@ function appointmentTotalCost(appointment: AltegioBooking): number | null {
   );
 }
 
-function projectAppointment(appointment: AltegioBooking) {
+function projectAppointment(
+  appointment: AltegioBooking,
+  options: { includeContacts?: boolean } = {}
+) {
   return {
     id: appointment.id,
     location_id: appointment.company_id,
@@ -53,7 +57,11 @@ function projectAppointment(appointment: AltegioBooking) {
     team_member_name: appointment.staff?.name ?? null,
     client_id: appointment.client?.id ?? null,
     client_name: appointment.client?.name ?? null,
-    client_phone: appointment.client?.phone ?? null,
+    // A phone is personal data, and a date range can return hundreds of rows.
+    // Opt in per call, exactly as the clients pack does.
+    ...(options.includeContacts
+      ? { client_phone: appointment.client?.phone ?? null }
+      : {}),
     services: (appointment.services ?? []).map((service) => ({
       id: service.id,
       title: service.title,
@@ -123,36 +131,71 @@ export const getAppointmentsTool = defineTool({
       .describe(
         'Filter appointments until this date (YYYY-MM-DD format). Use to reduce result set.'
       ),
+    include_contacts: z
+      .boolean()
+      .optional()
+      .describe(
+        'Return each client’s phone number. Off by default: a date range can cover hundreds of appointments, and a phone is personal data. Turn it on only when the user explicitly asked to contact someone.'
+      ),
   }),
   outputSchema: bookingsOutput,
   handler: async ({ input, client }) => {
-    const { location_id, ...listParams } = input;
+    const { location_id, include_contacts, ...listParams } = input;
+    const includeContacts = include_contacts === true;
     const appointments = await client.getBookings(
       location_id,
       Object.keys(listParams).length > 0 ? listParams : undefined
     );
 
-    const summary = `Found ${appointments.length} ${appointments.length === 1 ? 'appointment' : 'appointments'} for location ${location_id}:\n\n`;
-    const appointmentsList = appointments
-      .map((b, idx) => {
-        const projected = projectAppointment(b);
-        return (
-          `${idx + 1}. Appointment ID: ${b.id}\n` +
-          `   Date: ${projected.datetime ?? projected.date ?? 'not reported'}\n` +
-          `   Client: ${projected.client_name ?? 'not reported'} (${projected.client_phone ?? 'no phone'})\n` +
-          `   Team member: ${projected.team_member_name ?? 'not reported'}\n` +
-          `   Services: ${projected.services.map((s) => s.title).join(', ') || 'none'}\n` +
-          `   Visit status: ${projected.status}\n` +
-          `   Total cost: ${projected.total_cost ?? 'not reported'}`
-        );
-      })
-      .join('\n\n');
+    const lines = [
+      `Found ${appointments.length} ${appointments.length === 1 ? 'appointment' : 'appointments'} for location ${location_id}:`,
+    ];
+    if (!includeContacts && appointments.length > 0) {
+      lines.push(
+        'Client phones withheld by default. Pass include_contacts: true when the user asked to contact someone.'
+      );
+    }
+    // Free text — client and team-member names, service titles, the comment the
+    // client typed at online booking — never goes inside our own rows; it is
+    // keyed back to them by appointment id in the untrusted block below.
+    const untrusted: UntrustedField[] = [];
+    for (const booking of appointments) {
+      const projected = projectAppointment(booking, { includeContacts });
+      lines.push(
+        `- Appointment ${booking.id}: ${projected.datetime ?? projected.date ?? 'date not reported'}` +
+          ` · ${projected.status}` +
+          ` · client id ${projected.client_id ?? 'not reported'}` +
+          ` · team member id ${projected.team_member_id ?? 'not reported'}` +
+          ` · ${projected.services.length} service(s)` +
+          ` · total ${projected.total_cost ?? 'not reported'}`
+      );
+      const key = `appointment ${booking.id}`;
+      untrusted.push({ label: `${key} client`, value: projected.client_name });
+      untrusted.push({
+        label: `${key} team member`,
+        value: projected.team_member_name,
+      });
+      untrusted.push({
+        label: `${key} services`,
+        value: projected.services.map((s) => s.title).join(', '),
+      });
+      untrusted.push({ label: `${key} comment`, value: projected.comment });
+      if (includeContacts) {
+        untrusted.push({
+          label: `${key} client phone`,
+          value: booking.client?.phone ?? null,
+        });
+      }
+    }
 
     return {
-      text: summary + appointmentsList,
+      text: withUntrustedBlock(lines.join('\n'), untrusted, { maxChars: 200 }),
       structuredContent: {
-        items: appointments.map(projectAppointment),
+        items: appointments.map((booking) =>
+          projectAppointment(booking, { includeContacts })
+        ),
         count: appointments.length,
+        contacts_included: includeContacts,
       },
     };
   },

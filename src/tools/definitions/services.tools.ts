@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
+import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
 import { servicesOutput, serviceEntityOutput } from '../output-schemas.js';
 import type { AltegioService } from '../../types/altegio.types.js';
 
@@ -90,21 +91,32 @@ export const getServicesTool = defineTool({
       Object.keys(listParams).length > 0 ? listParams : undefined
     );
 
-    const summary = `Found ${services.length} ${services.length === 1 ? 'service' : 'services'} for location ${location_id}:\n\n`;
-    const servicesList = services
-      .map(
-        (s, idx) =>
-          `${idx + 1}. ID: ${s.id} - "${s.title}"\n` +
-          `   Price: ${servicePriceText(s)}\n` +
-          `   Active: ${s.active === undefined ? 'not reported' : Boolean(Number(s.active))}\n` +
-          `   Duration: ${s.duration === undefined ? 'not reported' : `${s.duration} seconds`}` +
-          `${s.category_id ? `\n   Category ID: ${s.category_id}` : ''}\n` +
-          `   Team members: ${s.staff?.length ?? 0}`
-      )
-      .join('\n\n');
+    const lines = [
+      `Found ${services.length} ${services.length === 1 ? 'service' : 'services'} for location ${location_id}:`,
+    ];
+    // A service title and its comment are typed by the location's staff, so
+    // they stay out of our rows and go in the untrusted block, keyed by id.
+    const untrusted: UntrustedField[] = [];
+    for (const service of services) {
+      lines.push(
+        `- Service ${service.id}: price ${servicePriceText(service)}` +
+          ` · active ${service.active === undefined ? 'not reported' : Boolean(Number(service.active))}` +
+          ` · duration ${service.duration === undefined ? 'not reported' : `${service.duration}s`}` +
+          `${service.category_id ? ` · category ${service.category_id}` : ''}` +
+          ` · ${service.staff?.length ?? 0} team member(s)`
+      );
+      untrusted.push({
+        label: `service ${service.id} title`,
+        value: service.title,
+      });
+      untrusted.push({
+        label: `service ${service.id} comment`,
+        value: service.comment,
+      });
+    }
 
     return {
-      text: summary + servicesList,
+      text: withUntrustedBlock(lines.join('\n'), untrusted, { maxChars: 200 }),
       structuredContent: {
         items: services.map(projectService),
         count: services.length,
