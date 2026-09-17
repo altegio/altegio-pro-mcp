@@ -318,6 +318,7 @@ export const deleteAppointmentTool = defineTool({
   annotations: {
     title: 'Delete Appointment',
     destructiveHint: true,
+    idempotentHint: true,
     openWorldHint: true,
   },
   input: z.object({

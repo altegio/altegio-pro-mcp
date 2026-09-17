@@ -192,6 +192,7 @@ export const deleteStaffTool = defineTool({
   annotations: {
     title: 'Delete Staff Member',
     destructiveHint: true,
+    idempotentHint: true,
     openWorldHint: true,
   },
   input: z.object({

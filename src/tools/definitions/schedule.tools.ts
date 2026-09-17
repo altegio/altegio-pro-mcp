@@ -178,6 +178,7 @@ export const deleteScheduleTool = defineTool({
   annotations: {
     title: 'Delete Schedule',
     destructiveHint: true,
+    idempotentHint: true,
     openWorldHint: true,
   },
   input: z.object({

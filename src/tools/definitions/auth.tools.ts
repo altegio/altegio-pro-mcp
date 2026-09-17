@@ -10,6 +10,9 @@ export const loginTool = defineTool({
   annotations: {
     title: 'Login to Altegio',
     destructiveHint: false,
+    // Each call mints and stores a fresh user token upstream, so a repeat
+    // is not a no-op.
+    idempotentHint: false,
     openWorldHint: true,
   },
   input: z.object({
@@ -38,6 +41,8 @@ export const logoutTool = defineTool({
   annotations: {
     title: 'Logout from Altegio',
     destructiveHint: false,
+    // Clearing an already-cleared credential store changes nothing.
+    idempotentHint: true,
     openWorldHint: true,
   },
   input: z.object({}),

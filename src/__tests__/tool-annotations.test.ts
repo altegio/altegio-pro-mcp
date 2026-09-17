@@ -19,6 +19,15 @@ import type {
  * prompts. This test makes the default unreachable — a new domain pack has to
  * state what its writes do.
  *
+ * `idempotentHint` is held to the same standard, for a different reason. Its
+ * default (`false`) is the harmless one, so nothing breaks when it is omitted —
+ * which is exactly why it drifted: identical by-id deletions ended up split
+ * between `true` and unset depending on who wrote them. The spec defines it by
+ * effect — "calling the tool repeatedly with the same arguments will have no
+ * additional effect on its environment" — so a second `DELETE` answering 404 is
+ * still idempotent: that is a response, not an effect (RFC 9110 §9.2.2 lists
+ * DELETE as idempotent on the same grounds).
+ *
  * Every defined tool is checked, including the ones withheld from every view by
  * `disabled-tools.ts`, so a tool that is switched back on cannot slip in on a
  * silent default.
@@ -106,6 +115,49 @@ describe('tool annotations', () => {
       .filter((spec) => annotationsOf(spec).destructiveHint !== false)
       .map((spec) => spec.name);
     expect(wronglyDestructive).toEqual([]);
+  });
+
+  it('states idempotentHint explicitly on every tool that is not read-only', () => {
+    const silent = specs
+      .filter((spec) => !isReadOnly(spec))
+      .filter((spec) => typeof annotationsOf(spec).idempotentHint !== 'boolean')
+      .map((spec) => spec.name);
+    expect(silent).toEqual([]);
+  });
+
+  it('treats a deletion addressed by id as idempotent', () => {
+    // Repeating one of these removes nothing further — the entity is already
+    // gone and the API answers 404, which is a response, not an effect. The
+    // exceptions are named because they are compound or stateful, not because
+    // the endpoint behaves differently.
+    const notPlainDeletes = new Set([
+      // Consumes its checkpoint on success and retries the leftovers after a
+      // partial failure, so a repeat can still change the environment.
+      'onboarding_rollback_phase',
+    ]);
+    const plainDeletes = specs
+      .filter((spec) => annotationsOf(spec).destructiveHint === true)
+      .filter((spec) => !notPlainDeletes.has(spec.name));
+    expect(plainDeletes.length).toBeGreaterThan(0);
+
+    const notIdempotent = plainDeletes
+      .filter((spec) => annotationsOf(spec).idempotentHint !== true)
+      .map((spec) => spec.name);
+    expect(notIdempotent).toEqual([]);
+  });
+
+  it('never claims a create is idempotent', () => {
+    const creates = specs.filter(
+      (spec) =>
+        spec.name.startsWith('create_') ||
+        spec.name.startsWith('onboarding_add_')
+    );
+    expect(creates.length).toBeGreaterThan(0);
+
+    const claimed = creates
+      .filter((spec) => annotationsOf(spec).idempotentHint !== false)
+      .map((spec) => spec.name);
+    expect(claimed).toEqual([]);
   });
 
   it('never claims a read-only tool is destructive', () => {
