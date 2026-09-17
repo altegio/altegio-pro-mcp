@@ -190,7 +190,7 @@ credential and is not a product boundary ([ADR-001](docs/architecture/2026-09-07
 
 | Endpoint | Serves |
 |---|---|
-| `/mcp` | **Every tool except the analytics pack**, plus its entry point `analytics_get_overview` (58 tools) — the default view |
+| `/mcp` | **Every tool except the analytics pack**, plus its entry point `analytics_get_overview` — the default view, minus password login and `remove_location_user` (see below) |
 | `/mcp/ops` | Appointments (the daily work; clients and journal tools join as they land) |
 | `/mcp/catalog` | Services, service categories, team members, positions, work schedules, resources, location settings |
 | `/mcp/finance` | Analytics (visits, payments and payroll join as they land) |
@@ -200,10 +200,18 @@ credential and is not a product boundary ([ADR-001](docs/architecture/2026-09-07
 
 Rules:
 
-- Every facet always serves `altegio_login`, `altegio_logout` and
-  `list_locations`. Public OAuth and direct-token callers are already
-  authenticated; local stdio callers can use `altegio_login`. Nearly every tool
-  needs a `location_id`.
+- Every facet always serves `list_locations` — nearly every tool needs a
+  `location_id`.
+- **Password login is off the HTTP surface by default.** `altegio_login` tells
+  the model to ask the user for an email and a password; on the public endpoint,
+  which authenticates through OAuth and never needs them, that is a standing
+  prompt-injection target. `altegio_login` and `altegio_logout` are therefore
+  served on no HTTP path unless `ALTEGIO_EXPOSE_PASSWORD_LOGIN=true`, and a call
+  to one is refused rather than merely hidden. stdio always has them.
+- **Access management is off the default view.** `remove_location_user` grants
+  and revokes access to a location — a dangerous right no integration receives
+  by default — so `/mcp` does not carry it. It stays on `/mcp/catalog` and on
+  stdio.
 - Membership is declared once in [`src/tools/facets.ts`](src/tools/facets.ts) as
   explicit tool names plus tool-name prefixes (`analytics_*`, `onboarding_*`),
   and the index is computed once at startup. `tools/list` is therefore identical
@@ -222,6 +230,13 @@ Rules:
 Set `MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING=true` to drop the onboarding
 walkthrough from `/mcp` and serve it only on `/mcp/onboarding`. It is off by
 default: turning it on is a visible change for current clients of `/mcp`.
+
+Set `ALTEGIO_EXPOSE_PASSWORD_LOGIN=true` to serve `altegio_login` and
+`altegio_logout` on the HTTP views. It is off by default. Turn it on only for
+the closed staff deployment behind Google OIDC (`hd=alteg.io`), where a password
+login is still how a V1 user token is obtained — never on the public endpoint.
+stdio serves the unfiltered `all` view and always has both tools, whatever this
+variable says.
 
 ## Resources and prompts
 
@@ -416,6 +431,7 @@ See [CI-CD.md](CI-CD.md) for details.
 | `ALTEGIO_USER_TOKEN` | No | - | Pre-seeded user token (stdio single-user only) |
 | `CREDENTIALS_DIR` | No | `~/.altegio-mcp` | Directory for stored user tokens |
 | `REQUIRE_DELEGATED_IDENTITY` | No | `false` | HTTP mode: require a proxy-verified identity per request |
+| `ALTEGIO_EXPOSE_PASSWORD_LOGIN` | No | `false` | HTTP mode: serve `altegio_login`/`altegio_logout`. Closed staff deployments only — never the public endpoint. stdio always serves them |
 | `MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING` | No | `false` | Drop `onboarding_*` from the default `/mcp` facet |
 | `MCP_SERVER_INSTRUCTIONS` | No | built-in | Override the `initialize` instructions paragraph |
 | `ALTEGIO_DOCS_DIR` | No | `<pkg>/docs` | Where the `altegio://docs/*` markdown documents are read from |

@@ -59,6 +59,7 @@ export function createServer(options: CreateServerOptions = {}): MCPServer {
     facet,
     excludeOnboardingFromDefault:
       config.env.MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING,
+    exposePasswordLogin: config.env.ALTEGIO_EXPOSE_PASSWORD_LOGIN,
   });
 
   // Resources and prompts are the same on every facet: they describe the
