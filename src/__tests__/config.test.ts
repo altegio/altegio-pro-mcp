@@ -55,6 +55,39 @@ describe('Configuration Schema', () => {
     });
   });
 
+  describe('ALTEGIO_EXPOSE_PASSWORD_LOGIN', () => {
+    // The default decides whether a public HTTP deployment hands a model a
+    // tool that asks the user for a password, so pin it and pin the spellings
+    // a shell or .env file actually produces.
+    it('is off when unset', () => {
+      const result = EnvSchema.parse({ ALTEGIO_API_TOKEN: 'test-token' });
+      expect(result.ALTEGIO_EXPOSE_PASSWORD_LOGIN).toBe(false);
+    });
+
+    it('reads the flag spellings, including the falsy ones', () => {
+      const parse = (value: unknown) =>
+        EnvSchema.parse({
+          ALTEGIO_API_TOKEN: 'test-token',
+          ALTEGIO_EXPOSE_PASSWORD_LOGIN: value,
+        }).ALTEGIO_EXPOSE_PASSWORD_LOGIN;
+
+      expect(parse('true')).toBe(true);
+      expect(parse('1')).toBe(true);
+      expect(parse(true)).toBe(true);
+      expect(parse('false')).toBe(false);
+      expect(parse('0')).toBe(false);
+      expect(parse('')).toBe(false);
+    });
+
+    it('reaches the loaded config', () => {
+      const config = loadConfig({
+        ALTEGIO_API_TOKEN: 'test-token',
+        ALTEGIO_EXPOSE_PASSWORD_LOGIN: 'true',
+      } as NodeJS.ProcessEnv);
+      expect(config.env.ALTEGIO_EXPOSE_PASSWORD_LOGIN).toBe(true);
+    });
+  });
+
   describe('ServerConfigSchema', () => {
     it('should provide default values', () => {
       const result = ServerConfigSchema.parse({});

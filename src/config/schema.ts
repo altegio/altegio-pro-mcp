@@ -87,6 +87,14 @@ export const EnvSchema = z.object({
   // request. Anonymous requests get no user token and cannot login.
   REQUIRE_DELEGATED_IDENTITY: z.coerce.boolean().default(false),
 
+  // Serve altegio_login / altegio_logout on the HTTP views. Off by default:
+  // the public endpoint authenticates through OAuth, so a tool that tells the
+  // model to collect an email and a password there is only an injection
+  // target. Turn it on for the closed staff deployment (Google OIDC), which
+  // still needs a password login to obtain a V1 user token. stdio serves the
+  // unfiltered `all` view and always has both tools.
+  ALTEGIO_EXPOSE_PASSWORD_LOGIN: BooleanFlagSchema,
+
   // Rate limiting
   RATE_LIMIT_REQUESTS: z.coerce.number().min(1).default(200),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().min(1000).default(60000), // 1 minute
@@ -205,6 +213,7 @@ export class ConfigLoader {
           env.MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING,
         ALTEGIO_DOCS_DIR: env.ALTEGIO_DOCS_DIR,
         REQUIRE_DELEGATED_IDENTITY: env.REQUIRE_DELEGATED_IDENTITY,
+        ALTEGIO_EXPOSE_PASSWORD_LOGIN: env.ALTEGIO_EXPOSE_PASSWORD_LOGIN,
         RATE_LIMIT_REQUESTS: env.RATE_LIMIT_REQUESTS,
         RATE_LIMIT_WINDOW_MS: env.RATE_LIMIT_WINDOW_MS,
         MAX_RETRY_ATTEMPTS: env.MAX_RETRY_ATTEMPTS,

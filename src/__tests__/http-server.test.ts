@@ -331,8 +331,6 @@ describe('HTTP server facet wiring, end to end', () => {
 
       const ops = await toolNamesOn(port, '/mcp/ops');
       expect([...ops].sort()).toEqual([
-        'altegio_login',
-        'altegio_logout',
         'clients_delete',
         'clients_get_card',
         'clients_get_visit_history',
@@ -354,6 +352,49 @@ describe('HTTP server facet wiring, end to end', () => {
       expect(all.filter((name) => name.startsWith('onboarding_'))).toHaveLength(
         12
       );
+    } finally {
+      server.close();
+    }
+  });
+
+  it('serves no password login and no access management on any HTTP path', async () => {
+    const { app } = createApp();
+    const server = app.listen(0);
+    try {
+      const { port } = server.address() as AddressInfo;
+      const withheld = ['altegio_login', 'altegio_logout'];
+
+      for (const path of ['/mcp', ...FACET_NAMES.map((f) => `/mcp/${f}`)]) {
+        const names = await toolNamesOn(port, path);
+        for (const name of withheld) {
+          expect(names).not.toContain(name);
+        }
+      }
+      // Access management stays on the facet a deployment opts into, but not
+      // on the default path a generic agent lands on.
+      expect(await toolNamesOn(port, '/mcp')).not.toContain(
+        'remove_location_user'
+      );
+      expect(await toolNamesOn(port, '/mcp/catalog')).toContain(
+        'remove_location_user'
+      );
+    } finally {
+      server.close();
+    }
+  });
+
+  it('gives every connection to a path the same list (ADR-001 D7)', async () => {
+    const { app } = createApp();
+    const server = app.listen(0);
+    try {
+      const { port } = server.address() as AddressInfo;
+      for (const path of ['/mcp', '/mcp/catalog']) {
+        const [first, second] = await Promise.all([
+          toolNamesOn(port, path),
+          toolNamesOn(port, path),
+        ]);
+        expect(second).toEqual(first);
+      }
     } finally {
       server.close();
     }

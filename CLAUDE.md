@@ -115,6 +115,7 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
   - `/health` - health check
   - `/mcp` - MCP Streamable HTTP (POST for messages, GET for SSE stream, DELETE for session termination)
   - `/mcp/<facet>` - the same protocol on a static filtered tool list; facets: `ops`, `catalog`, `finance`, `marketing`, `analytics`, `onboarding` (ADR-001 D3). stdio uses the unfiltered `all` view and always exposes everything.
+  - **Withheld from HTTP by default:** `altegio_login`/`altegio_logout` (password prompt under an OAuth endpoint — set `ALTEGIO_EXPOSE_PASSWORD_LOGIN=true` only for the closed staff deployment) and, from the default `/mcp` view only, `remove_location_user` (access management; still on `/mcp/catalog`). Both stay on stdio.
 
 **Resources & prompts:**
 - Resources: `altegio://docs/product-logic`, `altegio://docs/glossary`, `altegio://docs/onboarding-guide`
@@ -136,6 +137,12 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 - `src/utils/` - logging, errors, config, credential manager
 
 ### Change history
+
+**Public HTTP surface hardening (2026-09-17)**
+- **Password login off the HTTP surface:** `altegio_login` / `altegio_logout` left `FACET_BASE_TOOLS` for a new `PASSWORD_LOGIN_TOOLS` list, admitted to the default view and the named facets only when `ALTEGIO_EXPOSE_PASSWORD_LOGIN=true`. **Why:** the login description tells the model to ask the user for an email and a password; on the public endpoint, which is under OAuth and never needs them, that is a standing prompt-injection target. Hidden *and* refused — the facet gate in `registry.ts` rejects the call too. stdio's unfiltered `all` view is not filtered by the switch and always serves both; the closed staff deployment behind Google OIDC turns the switch on, because a password login is still how a V1 user token is obtained.
+- **Access management off the default view:** `remove_location_user` joined a new `DEFAULT_FACET_EXCLUDED_TOOLS` list (the by-name counterpart of `DEFAULT_FACET_EXCLUDED_PREFIXES`), so `/mcp` no longer offers a generic agent a tool that revokes location access — a dangerous right the v3 authorization RFC does not grant by default. It stays on `/mcp/catalog` and on stdio.
+- **Refusal message fixed:** an out-of-facet error no longer falls back to "Reach it on /mcp" for a tool `/mcp` does not serve either; with nowhere to point it says the deployment does not serve it.
+- **Files:** `src/tools/facets.ts`, `src/tools/registry.ts`, `src/server.ts`, `src/http-server.ts` (boot log states the posture), `src/config/schema.ts`. Tests in `src/tools/__tests__/facets.test.ts`, `src/__tests__/{mcp-surface,http-server,config}.test.ts`.
 
 **Report builder switched off (2026-09-17)**
 - **Withheld 6 tools (63 -> 57 defined, 66 served incl. onboarding):** the whole report-builder family, filtered out of tool discovery by `src/tools/disabled-tools.ts` so no view serves it, stdio included.
@@ -282,6 +289,12 @@ ALTEGIO_API_TOKEN=your_partner_token
 
 # Optional
 ALTEGIO_API_BASE=https://api.alteg.io/api/v1
+ALTEGIO_EXPOSE_PASSWORD_LOGIN=false   # HTTP: serve altegio_login/altegio_logout.
+                                      # Off by default — the public endpoint is
+                                      # under OAuth and must not ask for a
+                                      # password. On only for the closed staff
+                                      # deployment (Google OIDC). stdio always
+                                      # serves them.
 NODE_ENV=development|production
 LOG_LEVEL=debug|info|warn|error
 PORT=3000

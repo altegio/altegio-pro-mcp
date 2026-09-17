@@ -5,6 +5,7 @@ import express from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { createServer } from './server.js';
+import { loadConfig } from './config/schema.js';
 import { DEFAULT_FACET, FACET_NAMES, type FacetKey } from './tools/facets.js';
 import { createLogger } from './utils/logger.js';
 import {
@@ -197,6 +198,10 @@ export function createApp(): {
 
 async function startHTTPServer(): Promise<void> {
   const port = parseInt(process.env.PORT || '3000', 10);
+  // Load once up front so a misconfigured deployment fails at boot rather than
+  // on the first request, and so the posture below is read from the same
+  // cached config every session will see.
+  const config = loadConfig();
   const { app } = createApp();
 
   // Start Express server
@@ -205,6 +210,13 @@ async function startHTTPServer(): Promise<void> {
     for (const { path } of FACET_ROUTES) {
       logger.info(`MCP endpoint: http://localhost:${port}${path}`);
     }
+    // The tool surface an HTTP deployment hands out is a security posture, so
+    // state it in the boot log instead of leaving it to be inferred.
+    logger.info(
+      config.env.ALTEGIO_EXPOSE_PASSWORD_LOGIN
+        ? 'Password login (altegio_login/altegio_logout) is SERVED on the HTTP views — intended only for the closed staff deployment (ALTEGIO_EXPOSE_PASSWORD_LOGIN=true)'
+        : 'Password login (altegio_login/altegio_logout) is withheld from the HTTP views; callers authenticate through the proxy'
+    );
   });
 }
 

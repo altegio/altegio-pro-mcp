@@ -35,7 +35,8 @@ export const DEFAULT_FACET = 'default';
 /**
  * Key of the unfiltered view: every registered tool, no exclusions. stdio uses
  * it — a desktop host connects to one process and must see the whole surface,
- * including packs the default HTTP view holds back. It has no HTTP route.
+ * including packs the default HTTP view holds back, the password login tools
+ * and access management. It has no HTTP route.
  */
 export const ALL_TOOLS_FACET = 'all';
 
@@ -47,14 +48,32 @@ export function isFacetName(value: string): value is FacetName {
 }
 
 /**
- * Tools every facet carries: authentication and location discovery. Without
- * them a narrow facet is unusable — no tool works before `altegio_login`, and
- * nearly every tool needs a `location_id`.
+ * Tools every facet carries unconditionally. Location discovery is the whole
+ * list: nearly every tool needs a `location_id`, so a facet without it is
+ * unusable. Password login is admitted per deployment instead — see
+ * `PASSWORD_LOGIN_TOOLS`.
  */
-export const FACET_BASE_TOOLS: readonly string[] = [
+export const FACET_BASE_TOOLS: readonly string[] = ['list_locations'];
+
+/**
+ * Email + password login, admitted to the HTTP views only when the deployment
+ * asks for it (`exposePasswordLogin`, set from `ALTEGIO_EXPOSE_PASSWORD_LOGIN`).
+ *
+ * `altegio_login` tells the model to ask the user for an email and a password.
+ * On the public endpoint, which authenticates through OAuth and never needs
+ * them, that is a standing prompt-injection target: any text the model reads
+ * can try to talk it into collecting credentials. So the public HTTP surface
+ * does not carry these tools, and a call to one is refused, not merely hidden.
+ *
+ * Two deployments still need them and turn the switch on:
+ *  - stdio — the desktop host logs in with a password. It serves the unfiltered
+ *    `all` view, which is never filtered by this switch.
+ *  - the closed staff deployment behind Google OIDC (`hd=alteg.io`), where a
+ *    password login is still how a V1 user token is obtained.
+ */
+export const PASSWORD_LOGIN_TOOLS: readonly string[] = [
   'altegio_login',
   'altegio_logout',
-  'list_locations',
 ];
 
 interface FacetRule {
@@ -172,6 +191,22 @@ export const DEFAULT_FACET_EXCLUDED_PREFIXES: readonly string[] = [
 ];
 
 /**
+ * Individual tools withheld from the default `/mcp` view while staying on a
+ * narrower path and on stdio's unfiltered `all` view. Unlike the prefix list
+ * above this names one tool at a time, for a tool whose pack is otherwise
+ * served by default.
+ *
+ * `remove_location_user` hands out and revokes access to a location. The v3
+ * authorization RFC puts access management among the dangerous rights that no
+ * integration is granted by default, so it is not part of what `/mcp` offers a
+ * generic agent. It stays on `/mcp/catalog` — a path a deployment points a
+ * client at deliberately — and on stdio.
+ */
+export const DEFAULT_FACET_EXCLUDED_TOOLS: readonly string[] = [
+  'remove_location_user',
+];
+
+/**
  * Individual tools re-admitted to `/mcp` despite an excluded prefix: the entry
  * point a session needs before it knows to switch to `/mcp/analytics`. Names
  * that no tool provides are ignored — the report-builder entries that used to
@@ -192,6 +227,14 @@ export interface FacetIndexOptions {
    * current users of the default endpoint.
    */
   readonly excludeOnboardingFromDefault?: boolean;
+
+  /**
+   * Admit `PASSWORD_LOGIN_TOOLS` to the default view and to every named facet.
+   * Off by default, which is the safe posture for a public HTTP endpoint. The
+   * unfiltered `all` view stdio serves is not affected either way — it always
+   * carries them.
+   */
+  readonly exposePasswordLogin?: boolean;
 }
 
 export interface FacetIndex {
@@ -218,17 +261,28 @@ export function buildFacetIndex(
   toolNames: readonly string[],
   options: FacetIndexOptions = {}
 ): FacetIndex {
-  const base = new Set(FACET_BASE_TOOLS);
+  const exposePasswordLogin = options.exposePasswordLogin ?? false;
+  const base = new Set([
+    ...FACET_BASE_TOOLS,
+    ...(exposePasswordLogin ? PASSWORD_LOGIN_TOOLS : []),
+  ]);
   const extras = new Set(DEFAULT_FACET_EXTRA_TOOLS);
   const excludedFromDefault = [
     ...DEFAULT_FACET_EXCLUDED_PREFIXES,
     ...(options.excludeOnboardingFromDefault ? [ONBOARDING_PREFIX] : []),
   ];
+  // Withheld by name, ahead of every admitting rule: an excluded tool stays
+  // excluded even if a base or extra entry would otherwise let it back in.
+  const excludedNames = new Set([
+    ...DEFAULT_FACET_EXCLUDED_TOOLS,
+    ...(exposePasswordLogin ? [] : PASSWORD_LOGIN_TOOLS),
+  ]);
 
   const inDefault = (name: string): boolean =>
-    base.has(name) ||
-    extras.has(name) ||
-    !matchesPrefix(name, excludedFromDefault);
+    !excludedNames.has(name) &&
+    (base.has(name) ||
+      extras.has(name) ||
+      !matchesPrefix(name, excludedFromDefault));
 
   const inFacet = (facet: FacetName, name: string): boolean => {
     const rule = FACET_RULES[facet];
