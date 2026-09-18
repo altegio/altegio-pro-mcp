@@ -22,6 +22,11 @@ import {
   NARROW_HINT,
   serializedSize,
 } from './budget.js';
+import {
+  sanitizeUntrustedDeep,
+  untrustedBlock,
+  UNTRUSTED_NOTE,
+} from '../tool-result.js';
 import { exposedParamName } from './describe.js';
 
 /** Characters of payload kept in `structuredContent` (the rest of the budget is the text summary). */
@@ -365,7 +370,19 @@ export async function callOperation(
       ? applyProjection(data, projection)
       : data;
 
-  const budgeted = enforceBudget(projected, PAYLOAD_BUDGET_CHARS);
+  // One tool reaches every documented GET, so the response schema is not known
+  // until it arrives and there is no field list to guard by name. The whole
+  // payload is other people's text — client comments, names, service titles,
+  // whatever an endpoint nobody curated happens to carry — so it is cleaned as
+  // a whole and, below, echoed only inside the fence.
+  //
+  // The per-field cap is the payload budget itself: no single field is cut
+  // before the budget would have cut the result anyway.
+  const cleaned = sanitizeUntrustedDeep(projected, {
+    maxChars: PAYLOAD_BUDGET_CHARS,
+  });
+
+  const budgeted = enforceBudget(cleaned, PAYLOAD_BUDGET_CHARS);
 
   const structuredContent: Record<string, unknown> = {
     operation_id: op.operationId,
@@ -373,6 +390,7 @@ export async function callOperation(
     path,
     ...(Object.keys(query).length > 0 ? { query } : {}),
     data: budgeted.value,
+    data_note: UNTRUSTED_NOTE,
     ...(budgeted.total !== undefined
       ? { returned: budgeted.returned, total: budgeted.total }
       : {}),
@@ -405,14 +423,26 @@ export async function callOperation(
   }
   if (budgeted.truncated) lines.push(NARROW_HINT);
   for (const warning of warnings) lines.push(warning);
+  if (serializedSize(budgeted.value) > TEXT_PREVIEW_CHARS) {
+    lines.push(
+      'Preview below is cut; the full payload is in the structured result.'
+    );
+  }
 
-  const preview = JSON.stringify(budgeted.value);
-  lines.push(
-    '',
-    serializedSize(budgeted.value) <= TEXT_PREVIEW_CHARS
-      ? preview
-      : `${preview.slice(0, TEXT_PREVIEW_CHARS)}… (full payload in the structured result)`
-  );
+  // The payload is echoed inside the fence, never as a line of our own summary.
+  // `untrustedBlock` cleans it a second time, which is what makes the fence
+  // hold: a value that forged `<<<END UNTRUSTED>>>` cannot close it.
+  const preview =
+    untrustedBlock(
+      [
+        {
+          label: `${op.operationId} payload`,
+          value: JSON.stringify(budgeted.value),
+        },
+      ],
+      { maxChars: TEXT_PREVIEW_CHARS }
+    ) ?? '(the API returned no content)';
+  lines.push('', preview);
 
   return { text: lines.join('\n'), structuredContent };
 }

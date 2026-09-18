@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import { bookingsOutput, bookingEntityOutput } from '../output-schemas.js';
 import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
+import { includeContactsArg, CONTACTS_WITHHELD_NOTICE } from '../contacts.js';
 import { visitStatusFromLegacyCode } from '../../capabilities/analytics/vocabulary.js';
 import type { AltegioBooking } from '../../types/altegio.types.js';
 
@@ -57,8 +58,7 @@ function projectAppointment(
     team_member_name: appointment.staff?.name ?? null,
     client_id: appointment.client?.id ?? null,
     client_name: appointment.client?.name ?? null,
-    // A phone is personal data, and a date range can return hundreds of rows.
-    // Opt in per call, exactly as the clients pack does.
+    // Opt-in contacts, one rule for the whole server: see `../contacts.ts`.
     ...(options.includeContacts
       ? { client_phone: appointment.client?.phone ?? null }
       : {}),
@@ -131,12 +131,7 @@ export const getAppointmentsTool = defineTool({
       .describe(
         'Filter appointments until this date (YYYY-MM-DD format). Use to reduce result set.'
       ),
-    include_contacts: z
-      .boolean()
-      .optional()
-      .describe(
-        'Return each client’s phone number. Off by default: a date range can cover hundreds of appointments, and a phone is personal data. Turn it on only when the user explicitly asked to contact someone.'
-      ),
+    include_contacts: includeContactsArg,
   }),
   outputSchema: bookingsOutput,
   handler: async ({ input, client }) => {
@@ -151,9 +146,7 @@ export const getAppointmentsTool = defineTool({
       `Found ${appointments.length} ${appointments.length === 1 ? 'appointment' : 'appointments'} for location ${location_id}:`,
     ];
     if (!includeContacts && appointments.length > 0) {
-      lines.push(
-        'Client phones withheld by default. Pass include_contacts: true when the user asked to contact someone.'
-      );
+      lines.push(CONTACTS_WITHHELD_NOTICE);
     }
     // Free text — client and team-member names, service titles, the comment the
     // client typed at online booking — never goes inside our own rows; it is

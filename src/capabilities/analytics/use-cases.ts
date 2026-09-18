@@ -42,6 +42,11 @@ import {
   type StoredReport,
 } from './report-store.js';
 import { DATASET_TABLE, REPORT_TEMPLATES, type Dataset } from './vocabulary.js';
+import {
+  sanitizeUntrusted,
+  withUntrustedBlock,
+  type UntrustedField,
+} from '../../tools/tool-result.js';
 
 /** A `resource_link` content block, for output that does not fit inline. */
 export interface ResourceLinkBlock {
@@ -231,13 +236,24 @@ export async function getAppointmentsBreakdown(
       : withShares(await ctx.api.getVisitStatusBreakdown(query));
 
   const total = slices.reduce((sum, slice) => sum + slice.count, 0);
-  const text = [
-    `Appointments by ${input.group_by === 'source' ? 'source' : 'visit status'} for ${ctx.period.date_from}…${ctx.period.date_to} (${total} in total):`,
-    ...slices.map(
-      (slice) =>
-        `${slice.key}${slice.key === 'other' ? ` (${slice.label})` : ''}: ${slice.count} (${slice.share_percent}%)`
-    ),
-  ].join('\n');
+  // Our keys are canonical; only the `other` bucket carries a label the API
+  // took from the location's own data (a booking widget's name, a referrer).
+  const labels: UntrustedField[] = slices
+    .filter((slice) => slice.key === 'other')
+    .map((slice, index) => ({
+      label: `other bucket ${index + 1} label`,
+      value: slice.label,
+    }));
+  const text = withUntrustedBlock(
+    [
+      `Appointments by ${input.group_by === 'source' ? 'source' : 'visit status'} for ${ctx.period.date_from}…${ctx.period.date_to} (${total} in total):`,
+      ...slices.map(
+        (slice) => `${slice.key}: ${slice.count} (${slice.share_percent}%)`
+      ),
+    ].join('\n'),
+    labels,
+    { maxChars: 120 }
+  );
 
   return {
     text:
@@ -423,7 +439,7 @@ export async function getDayEndReport(
     `Services: ${report.totals.services_count ?? 'n/a'} for ${formatMoney(report.totals.services_revenue, report.currency)}`,
     `Products: ${report.totals.products_count ?? 'n/a'} for ${formatMoney(report.totals.products_revenue, report.currency)}`,
     `Memberships: ${report.totals.memberships_count ?? 'n/a'} for ${formatMoney(report.totals.memberships_revenue, report.currency)}; gift cards: ${report.totals.gift_cards_count ?? 'n/a'} for ${formatMoney(report.totals.gift_cards_revenue, report.currency)}`,
-    `Taken in: ${formatMoney(report.takings_total, report.currency)} across ${report.takings_by_account.length} account(s) — ${report.takings_by_account.map((a) => `${a.title} ${formatMoney(a.amount, null)}`).join(', ') || 'none'}`,
+    `Taken in: ${formatMoney(report.takings_total, report.currency)} across ${report.takings_by_account.length} account(s); the amount per account is listed below, under the name the location gave that account.`,
     `Written off (discounts, bonuses, memberships, gift cards): ${formatMoney(report.write_offs_total, report.currency)}`,
   ];
   if (clamped) {
@@ -438,8 +454,16 @@ export async function getDayEndReport(
     );
   }
 
+  // Payment accounts ("Cash desk", "Card terminal", …) are named by the staff.
+  const accounts: UntrustedField[] = report.takings_by_account.map(
+    (account, index) => ({
+      label: `account ${index + 1}`,
+      value: `${account.title} — ${formatMoney(account.amount, null)}`,
+    })
+  );
+
   return {
-    text: lines.join('\n'),
+    text: withUntrustedBlock(lines.join('\n'), accounts, { maxChars: 120 }),
     structuredContent: {
       ...periodBlock(ctx),
       requested_date_from: ctx.period.date_from,
@@ -542,14 +566,23 @@ export async function listReportTemplates(
     ? all.filter((template) => template.dataset === input.dataset)
     : all;
 
-  const text = [
-    `${templates.length} report template(s) available in this location:`,
-    ...templates.map(
-      (template) =>
-        `${template.name} [${template.kind}, ${template.dataset ?? 'unknown dataset'}] — ${template.answers ?? (template.description || 'no description')} (template_id ${template.template_id})`
-    ),
-    'Run one with analytics_run_report by passing its template_id and a period.',
-  ].join('\n');
+  // A template's name and description come back from the location's builder,
+  // which holds templates the owner created next to the platform's own.
+  const text = withUntrustedBlock(
+    [
+      `${templates.length} report template(s) available in this location:`,
+      ...templates.map(
+        (template) =>
+          `template_id ${template.template_id} [${template.kind}, ${template.dataset ?? 'unknown dataset'}]`
+      ),
+      'Run one with analytics_run_report by passing its template_id and a period.',
+    ].join('\n'),
+    templates.map((template) => ({
+      label: `template ${template.template_id}`,
+      value: `${template.name} — ${template.answers ?? template.description ?? 'no description'}`,
+    })),
+    { maxChars: 200 }
+  );
 
   return {
     text,
@@ -648,14 +681,22 @@ export async function listSavedReports(
     created_by_this_assistant: report.name.startsWith(OWNED_REPORT_PREFIX),
   }));
 
-  const text = [
-    `${items.length} saved report(s) in this location's report builder:`,
-    ...items.map(
-      (item) =>
-        `${item.name} [${item.kind}] — report_id ${item.report_id}${item.created_by_this_assistant ? ' (created by this assistant)' : ''}`
-    ),
-    'Run one with analytics_run_saved_report and a period.',
-  ].join('\n');
+  // A saved report is named by whoever built it — usually the owner.
+  const text = withUntrustedBlock(
+    [
+      `${items.length} saved report(s) in this location's report builder:`,
+      ...items.map(
+        (item) =>
+          `report_id ${item.report_id} [${item.kind}]${item.created_by_this_assistant ? ' (created by this assistant)' : ''}`
+      ),
+      'Run one with analytics_run_saved_report and a period.',
+    ].join('\n'),
+    items.map((item) => ({
+      label: `report ${item.report_id} name`,
+      value: item.name,
+    })),
+    { maxChars: 200 }
+  );
 
   return { text, structuredContent: { items, count: items.length } };
 }
@@ -680,8 +721,10 @@ export async function deleteAssistantReport(
   }
 
   if (!report.name.startsWith(OWNED_REPORT_PREFIX)) {
+    // No fence fits inside a one-line error, so the name is sanitized in place
+    // and quoted; the instruction is ours and comes first (ADR-001 D8).
     throw new AnalyticsInputError(
-      `Refusing to delete "${report.name}": this tool deletes only reports whose name starts with "${OWNED_REPORT_PREFIX}".`
+      `Refusing to delete report ${input.report_id}: this tool deletes only reports whose name starts with "${OWNED_REPORT_PREFIX}". Its name, as data: "${sanitizeUntrusted(report.name, { maxChars: 120 }) ?? '(empty)'}".`
     );
   }
 
@@ -691,7 +734,11 @@ export async function deleteAssistantReport(
   });
 
   return {
-    text: `Deleted assistant-created report "${report.name}" (${report.report_id}) from location ${input.location_id}.`,
+    text: withUntrustedBlock(
+      `Deleted assistant-created report ${report.report_id} from location ${input.location_id}.`,
+      [{ label: 'deleted report name', value: report.name }],
+      { maxChars: 200 }
+    ),
     structuredContent: {
       location_id: input.location_id,
       report_id: report.report_id,

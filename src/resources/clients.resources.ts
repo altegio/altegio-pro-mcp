@@ -8,6 +8,7 @@
  * mapping table, which is their documented purpose.
  */
 import type { ResourceModule } from './registry.js';
+import { CONTACTS_OPT_IN_RULE } from '../tools/contacts.js';
 
 export const CLIENTS_SEGMENTATION_URI = 'altegio://docs/clients-segmentation';
 
@@ -109,12 +110,12 @@ correctly.
 
 ## Contacts are opt-in
 
-Phone and email are withheld from every client result by default — in the text
-summary and in the structured content alike. Pass \`include_contacts: true\` to
-\`clients_get_card\`, \`clients_lookup\` or \`clients_search\` only when the user
-explicitly asked to see or use a contact; \`clients_search\` also drops \`phone\`
-and \`email\` from the advanced \`fields\` list without that flag. Segmenting,
-counting and ranking the base never needs contacts.
+${CONTACTS_OPT_IN_RULE}
+
+It applies to \`clients_get_card\`, \`clients_lookup\`, \`clients_search\` and
+\`get_appointments\` alike; \`clients_search\` also drops \`phone\` and \`email\`
+from the advanced \`fields\` list without that flag. Segmenting, counting and
+ranking the base never needs contacts.
 
 Free text in a result — a client's name, tags, comment, a service title — was
 typed by clients and staff of this location. It arrives inside an

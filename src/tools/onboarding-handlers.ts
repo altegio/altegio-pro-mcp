@@ -3,7 +3,11 @@ import { OnboardingStateManager } from '../providers/onboarding-state-manager.js
 import { z } from 'zod';
 import { parseCSV } from '../utils/csv-parser.js';
 import { logger } from '../utils/logger.js';
-import { withErrorHandling } from './tool-result.js';
+import {
+  withErrorHandling,
+  withUntrustedBlock,
+  type UntrustedField,
+} from './tool-result.js';
 import { AuthenticationError } from '../utils/errors.js';
 import {
   StaffBatchSchema,
@@ -21,6 +25,28 @@ import type {
   CreatePositionRequest,
   SetScheduleRequest,
 } from '../types/altegio.types.js';
+
+/**
+ * Append the rows a batch import could not create, inside the untrusted fence.
+ *
+ * A failed row carries two pieces of text nobody on this side wrote: the name
+ * or title as it stood in the file the user brought, and the API's own
+ * complaint about it. Onboarding is the one flow whose whole input is an
+ * imported spreadsheet, so this is where a cell of that file would otherwise
+ * land in the middle of our own report.
+ */
+function withFailedRows(summary: string, errors: readonly string[]): string {
+  if (errors.length === 0) return summary;
+  const rows: UntrustedField[] = errors.map((error, index) => ({
+    label: `failed row ${index + 1}`,
+    value: error,
+  }));
+  return withUntrustedBlock(
+    `${summary}\n\n✗ ${errors.length} failed; each row and the reason the API gave are listed below.`,
+    rows,
+    { maxChars: 300 }
+  );
+}
 
 /**
  * Map an internal persisted phase key to its agent-facing name so no legacy
@@ -231,15 +257,14 @@ export class OnboardingHandlers {
         content: [
           {
             type: 'text' as const,
-            text:
+            text: withFailedRows(
               `Positions batch processing complete:\n\n` +
-              `✓ ${created.length} positions created\n` +
-              (errors.length
-                ? `✗ ${errors.length} failed:\n  ${errors.join('\n  ')}\n`
-                : '') +
-              `\nCreated position IDs: [${created.join(', ')}]\n` +
-              `Use these position_id values when adding staff.\n` +
-              `\nNext: Add staff with onboarding_add_staff_batch`,
+                `✓ ${created.length} positions created\n` +
+                `\nCreated position IDs: [${created.join(', ')}]\n` +
+                `Use these position_id values when adding staff.\n` +
+                `\nNext: Add staff with onboarding_add_staff_batch`,
+              errors
+            ),
           },
         ],
       };
@@ -291,13 +316,12 @@ export class OnboardingHandlers {
         content: [
           {
             type: 'text' as const,
-            text:
+            text: withFailedRows(
               `Staff batch processing complete:\n\n` +
-              `✓ ${created.length} staff members created\n` +
-              (errors.length
-                ? `✗ ${errors.length} failed:\n  ${errors.join('\n  ')}\n`
-                : '') +
-              `\nNext: Add service categories with onboarding_add_categories`,
+                `✓ ${created.length} staff members created\n` +
+                `\nNext: Add service categories with onboarding_add_categories`,
+              errors
+            ),
           },
         ],
       };
@@ -338,13 +362,12 @@ export class OnboardingHandlers {
         content: [
           {
             type: 'text' as const,
-            text:
+            text: withFailedRows(
               `Categories batch processing complete:\n\n` +
-              `✓ ${created.length} categories created\n` +
-              (errors.length
-                ? `✗ ${errors.length} failed:\n  ${errors.join('\n  ')}\n`
-                : '') +
-              `\nNext: Add services with onboarding_add_services_batch`,
+                `✓ ${created.length} categories created\n` +
+                `\nNext: Add services with onboarding_add_services_batch`,
+              errors
+            ),
           },
         ],
       };
@@ -396,13 +419,12 @@ export class OnboardingHandlers {
         content: [
           {
             type: 'text' as const,
-            text:
+            text: withFailedRows(
               `Services batch processing complete:\n\n` +
-              `✓ ${created.length} services created\n` +
-              (errors.length
-                ? `✗ ${errors.length} failed:\n  ${errors.join('\n  ')}\n`
-                : '') +
-              `\nNext: Set work schedules with onboarding_set_schedules`,
+                `✓ ${created.length} services created\n` +
+                `\nNext: Set work schedules with onboarding_set_schedules`,
+              errors
+            ),
           },
         ],
       };
@@ -502,13 +524,12 @@ export class OnboardingHandlers {
         content: [
           {
             type: 'text' as const,
-            text:
+            text: withFailedRows(
               `Client import complete:\n\n` +
-              `✓ ${created.length} clients imported\n` +
-              (errors.length
-                ? `✗ ${errors.length} failed:\n  ${errors.join('\n  ')}\n`
-                : '') +
-              `\nNext: Create test appointments with onboarding_create_test_appointments`,
+                `✓ ${created.length} clients imported\n` +
+                `\nNext: Create test appointments with onboarding_create_test_appointments`,
+              errors
+            ),
           },
         ],
       };
@@ -623,15 +644,16 @@ export class OnboardingHandlers {
         };
       }
 
-      const preview = parsed
-        .slice(0, 5)
-        .map(
-          (row, idx) =>
-            `${idx + 1}. ${Object.entries(row)
-              .map(([k, v]) => `${k}: ${v}`)
-              .join(', ')}`
-        )
-        .join('\n');
+      // This tool exists to show data the user brought from somewhere else:
+      // every cell of it is free text written outside this server, and the
+      // field names are whatever their file called them. All of it goes in the
+      // fenced block, one field per row.
+      const preview: UntrustedField[] = parsed.slice(0, 5).map((row, idx) => ({
+        label: `row ${idx + 1}`,
+        value: Object.entries(row)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(', '),
+      }));
 
       const fieldCount = Object.keys(parsed[0]).length;
       const importTool = {
@@ -645,12 +667,21 @@ export class OnboardingHandlers {
         content: [
           {
             type: 'text' as const,
-            text:
+            text: withUntrustedBlock(
               `Preview of ${data_type} data:\n\n` +
-              `Total rows: ${parsed.length}\n` +
-              `Fields: ${fieldCount} (${Object.keys(parsed[0]).join(', ')})\n\n` +
-              `First ${Math.min(5, parsed.length)} rows:\n${preview}\n\n` +
-              `Proceed with ${importTool} to create entities.`,
+                `Total rows: ${parsed.length}\n` +
+                `Fields per row: ${fieldCount}\n` +
+                `Showing the first ${Math.min(5, parsed.length)} row(s) below, with the field names as the file spells them.\n\n` +
+                `Proceed with ${importTool} to create entities.`,
+              [
+                {
+                  label: 'field names',
+                  value: Object.keys(parsed[0]).join(', '),
+                },
+                ...preview,
+              ],
+              { maxChars: 400 }
+            ),
           },
         ],
       };

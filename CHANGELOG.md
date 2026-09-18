@@ -26,8 +26,7 @@ visible.
   interpolated into our own sentences, with crude turn-markup forgeries
   (`System:`, `[INST]`, `<|im_start|>`), invisible and control characters
   removed and a per-field length cap. Applied across the `clients_*`
-  projections; the appointment and service `comment` projections still need the
-  same treatment.
+  projections first, then the rest of the surface (below).
 - Error text from the Altegio API is no longer spliced into the "what to do
   next" sentence (ADR-001 D8). The instruction is ours and comes first; the
   upstream wording follows, sanitized and labelled as data. Fixed in
@@ -54,6 +53,55 @@ visible.
 - Dropped the stale "analytics with a report builder" pointer from the server
   `instructions`: the report builder has been withheld since 2026-09-17 and the
   paragraph was still advertising it.
+- **The universal executor now fences the whole API response.**
+  `altegio_call_operation` reaches every documented GET, so its response schema
+  is not known until it arrives and there is no field list to guard by name —
+  it was the widest unguarded surface on the server, echoing the raw payload
+  into the text summary verbatim. A new `sanitizeUntrustedDeep` cleans every
+  string leaf **and every object key** of the payload (so a key cannot forge
+  the fence either), and the preview is emitted inside the `<<<UNTRUSTED …>>>`
+  block instead of as a line of our own. The same cleaned payload goes to
+  `structuredContent.data`, next to a `data_note` carrying the warning in the
+  one place a fence does not fit. The per-field cap is the payload budget
+  itself, so nothing is cut that the budget would have kept. Depth is bounded.
+- Extended the rule to the remaining packs: `get_service_categories`,
+  `get_positions`, `get_resources`, `get_booking_forms` (titles), `list_locations`
+  (name, address, phone), `update_location`, `update_staff` and `update_service`
+  (a partial update reads back fields the call never sent),
+  `analytics_get_appointments_breakdown` (the `other` bucket's label),
+  `analytics_get_day_end_report` (the names staff gave their payment accounts),
+  the four withheld report-builder tools that carry report names and table rows,
+  `onboarding_preview_data` (whose whole job is showing the file the user
+  brought) and the five onboarding batch imports (each failed row's name plus
+  the API's reason).
+- Where there is no free text, nothing was added: schedules (dates and slot
+  boundaries), appointment and online-booking settings (enums, numbers,
+  booleans), every delete and link tool (ids), the creates (they echo back what
+  this same call sent), `analytics_list_report_fields` (the builder's own field
+  registry is platform vocabulary), the analytics tools that report only money
+  and counts, and `altegio_search_operations` / `altegio_describe_operation`
+  (the catalog is a committed build artifact, not business data).
+- A resolved confirmation target is sanitized centrally in
+  `src/tools/confirmation.ts`. The headline a human approves names the object
+  read back from the API — "team member Ivan Petrov, id 123" — which is a name
+  someone chose. It is one sentence shown to a person, with nowhere to put a
+  fence, so it is cleaned in place instead; a name that cleans away to nothing
+  falls back to the ids. One edit covers all eleven destructive tools.
+- **`include_contacts` has one definition.** The argument, its description and
+  the "contacts withheld" notice were written out separately in
+  `bookings.tools.ts`, `clients.tools.ts`, the clients projections and the
+  segmentation resource, and had already started to drift. They now come from
+  `src/tools/contacts.ts`, which also states the rule itself once.
+- **A test that keeps this from rotting:** `src/tools/__tests__/untrusted-coverage.test.ts`
+  classifies **every** tool — all 60 factory tools and all 12 onboarding tools —
+  as either carrying other people's free text or not, with the reason written
+  next to it, and fails when a new tool is added without a verdict. The
+  free-text entries are then driven with a canary (a forged turn marker, a
+  forged closing fence and an invisible character) and must come back with our
+  summary clean, the forged closer defused and the text inside the fence.
+  Deliberately a written list rather than a heuristic over field names: `title`
+  is someone's writing, `date` and `field_key` are not, and a guard that fires
+  on the wrong things teaches people to route around it.
 
 ## [0.3.0-alpha.0] - 2026-09-17
 

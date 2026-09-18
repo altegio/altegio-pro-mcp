@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import { positionsOutput, positionEntityOutput } from '../output-schemas.js';
+import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
 
 export const getPositionsTool = defineTool({
   name: 'get_positions',
@@ -26,12 +27,17 @@ export const getPositionsTool = defineTool({
       };
     }
 
-    const positionsList = positions
-      .map((p, idx) => `${idx + 1}. ${p.title} (ID: ${p.id})`)
-      .join('\n');
+    // A position title is named by the staff of the location.
+    const lines = [
+      `Found ${positions.length} position(s), ids: ${positions.map((p) => p.id).join(', ')}.`,
+    ];
+    const untrusted: UntrustedField[] = positions.map((p) => ({
+      label: `position ${p.id} title`,
+      value: p.title,
+    }));
 
     return {
-      text: `Found ${positions.length} position(s):\n\n${positionsList}`,
+      text: withUntrustedBlock(lines.join('\n'), untrusted, { maxChars: 200 }),
       structuredContent: {
         items: positions.map((p) => ({
           id: p.id,

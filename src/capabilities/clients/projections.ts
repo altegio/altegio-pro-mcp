@@ -25,16 +25,13 @@ import {
   withUntrustedBlock,
   type UntrustedField,
 } from '../../tools/tool-result.js';
+import { CONTACTS_WITHHELD_NOTICE } from '../../tools/contacts.js';
 
 /** Format a major-unit amount, or `n/a` when the API reported nothing. */
 export function formatMoney(amount: number | null): string {
   if (amount === null || amount === undefined) return 'n/a';
   return Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
 }
-
-/** The line that explains a withheld contact, so the model stops asking. */
-const CONTACTS_WITHHELD =
-  'Contacts: withheld by default. Pass include_contacts: true to read phone and email.';
 
 export function segmentSummary(
   segment: ClientSegment,
@@ -79,7 +76,7 @@ export function cardSummary(
     `Visits: ${card.visit_count ?? 'n/a'}, total spent: ${formatMoney(card.total_spent)}, client-account balance: ${formatMoney(card.client_account_balance)}`,
     `SMS birthday greeting: ${card.sms_birthday_greeting ? 'on' : 'off'}, excluded from campaigns: ${card.sms_excluded_from_campaigns ? 'yes' : 'no'}`,
   ];
-  if (!options.includeContacts) lines.push(CONTACTS_WITHHELD);
+  if (!options.includeContacts) lines.push(CONTACTS_WITHHELD_NOTICE);
 
   const fields: UntrustedField[] = [
     {
@@ -150,7 +147,7 @@ export function lookupSummary(
   const lines = [
     `${rows.length} match(es), client ids: ${rows.map((r) => r.id).join(', ')}.`,
   ];
-  if (!options.includeContacts) lines.push(CONTACTS_WITHHELD);
+  if (!options.includeContacts) lines.push(CONTACTS_WITHHELD_NOTICE);
 
   const fields: UntrustedField[] = [];
   for (const row of rows) {

@@ -15,6 +15,7 @@
  */
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
+import { includeContactsArg } from '../contacts.js';
 import * as clients from '../../capabilities/clients/use-cases.js';
 
 // ========== shared input pieces ==========
@@ -25,13 +26,6 @@ const locationId = z
   .positive()
   .describe(
     'Location whose client base to work with. Call list_locations when the id is unknown.'
-  );
-
-const includeContacts = z
-  .boolean()
-  .optional()
-  .describe(
-    'Return the client’s phone and email. Off by default: contacts are personal data and most questions do not need them. Turn it on only when the user explicitly asked to see or use a contact.'
   );
 
 const moneyRange = z
@@ -243,7 +237,7 @@ export const clientsSearchTool = defineTool({
       .describe(
         'Advanced: extra client fields to return per row beyond id and name. Leave unset for a reliable id+name list; the total count is always returned. Contact fields (phone, email) are dropped from this list unless include_contacts is true.'
       ),
-    include_contacts: includeContacts,
+    include_contacts: includeContactsArg,
   }),
   outputSchema: objectSchema({
     location_id: { type: 'integer' as const },
@@ -284,7 +278,7 @@ export const clientsGetCardTool = defineTool({
       .int()
       .positive()
       .describe('Client id, from clients_search or clients_lookup.'),
-    include_contacts: includeContacts,
+    include_contacts: includeContactsArg,
   }),
   outputSchema: objectSchema({
     id: { type: 'integer' as const },
@@ -406,7 +400,7 @@ export const clientsLookupTool = defineTool({
       .max(25)
       .optional()
       .describe('Maximum matches, 1–25 (default 7).'),
-    include_contacts: includeContacts,
+    include_contacts: includeContactsArg,
   }),
   outputSchema: objectSchema({
     location_id: { type: 'integer' as const },
