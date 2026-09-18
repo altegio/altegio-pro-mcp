@@ -8,15 +8,19 @@
  * below therefore goes through `createApp()` and a real session — no stubbing
  * of the request context.
  *
- * Four things are asserted, in the order they matter:
+ * Five things are asserted, in the order they matter:
  *
- *  1. A caller that declares no scopes is unaffected. That is every
- *     deployment today, and a regression here breaks all of them at once.
- *  2. A caller whose token lacks the scope is refused *in band* — HTTP 200,
+ *  1. The vocabulary the proxy really sends — `mcp:pro:read mcp:pro:write` —
+ *     runs the server, and a read-only grant of it refuses every write. This
+ *     is the regression suite for the outage described in `src/tools/scopes.ts`
+ *     and the evidence that a narrow token is a real boundary.
+ *  2. A caller that declares no scopes is unaffected. That is stdio and
+ *     `/public/pro`, and a regression here breaks both at once.
+ *  3. A caller whose token lacks the scope is refused *in band* — HTTP 200,
  *     a JSON-RPC result with `isError`, an actionable message, no upstream
  *     call, and a session that is still usable afterwards.
- *  3. A caller that holds the scope gets through to the API.
- *  4. `tools/list` does not depend on the caller's scopes (ADR-001 D7).
+ *  4. A caller that holds the scope gets through to the API.
+ *  5. `tools/list` does not depend on the caller's scopes (ADR-001 D7).
  */
 import {
   afterAll,
@@ -176,6 +180,87 @@ describe('token scopes gate execution, end to end', () => {
         post({ jsonrpc: '2.0', id: nextId++, method: 'tools/list' }, sessionId),
     };
   };
+
+  /**
+   * The literal `x-mcp-auth-scope` value the mcp-proxy forwards today, traced
+   * through `routes.json` → `lib/as.js` (scope filtered to the route's list)
+   * → `lib/rs.js` → `lib/identity-headers.js`. The first version of the gate
+   * assumed this header never arrived and refused every gated tool when it
+   * did; nothing below may ever refuse on the full grant again.
+   */
+  const PROXY_FULL_GRANT = 'mcp:pro:read mcp:pro:write';
+  const PROXY_READ_GRANT = 'mcp:pro:read';
+
+  it('runs a read under the grant the proxy actually sends', async () => {
+    const session = await openSession(PROXY_FULL_GRANT);
+    const payload = await parseSse<JsonRpcToolResult>(
+      await session.call('list_locations', { my: 1, count: 1 })
+    );
+
+    expect(payload.result.isError).not.toBe(true);
+    expect(upstreamCalls).toHaveLength(1);
+  });
+
+  it('runs a write under the full proxy grant', async () => {
+    const session = await openSession(PROXY_FULL_GRANT);
+    const payload = await parseSse<JsonRpcToolResult>(
+      await session.call('update_location', {
+        location_id: 4564,
+        title: 'Renamed by the scope e2e',
+      })
+    );
+
+    expect(payload.result.isError).not.toBe(true);
+    // The handler reached Altegio (it reads the location back around the PUT),
+    // which is all this case needs: the gate did not stand in the way.
+    expect(upstreamCalls.length).toBeGreaterThan(0);
+    expect(upstreamCalls[0]).toContain('/company/4564');
+  });
+
+  /**
+   * The point of reconciling the vocabularies: the proxy can already issue a
+   * token carrying only `mcp:pro:read`, so a read-scoped session is a real
+   * access boundary on EVERY address — not a `/mcp/readonly` guardrail that
+   * merely hides the write tools from `tools/list`.
+   */
+  it('refuses a write on a read-only proxy grant, on the full surface', async () => {
+    const session = await openSession(PROXY_READ_GRANT);
+
+    const denied = await session.call('update_location', {
+      location_id: 4564,
+      title: 'Should never reach Altegio',
+    });
+    expect(denied.status).toBe(200);
+    const payload = await parseSse<JsonRpcToolResult>(denied);
+
+    expect(payload.result.isError).toBe(true);
+    const text = payload.result.content[0]!.text;
+    expect(text).toContain('update_location');
+    expect(text).toContain('locations:write');
+    expect(text).toContain('mcp:pro:read');
+    // Nothing was written: the gate runs before the handler.
+    expect(upstreamCalls).toEqual([]);
+
+    // Reads on the same session still work — this narrows, it does not break.
+    const allowed = await parseSse<JsonRpcToolResult>(
+      await session.call('list_locations', { my: 1, count: 1 })
+    );
+    expect(allowed.result.isError).not.toBe(true);
+    expect(upstreamCalls).toHaveLength(1);
+  });
+
+  it('imposes nothing when the grant is in a vocabulary this build cannot read', async () => {
+    // A rename upstream, or another service's names: the gate stands aside
+    // rather than refusing everything, which is the failure mode this suite
+    // exists to prevent.
+    const session = await openSession('openid email profile');
+    const payload = await parseSse<JsonRpcToolResult>(
+      await session.call('list_locations', { my: 1, count: 1 })
+    );
+
+    expect(payload.result.isError).not.toBe(true);
+    expect(upstreamCalls).toHaveLength(1);
+  });
 
   it('lets a caller that declares no scopes through unchanged', async () => {
     const session = await openSession();

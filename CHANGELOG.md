@@ -6,6 +6,44 @@ is declared stable.
 
 ## [Unreleased]
 
+### Fixed — the scope gate refused every gated tool on the closed endpoint
+
+The execution gate shipped on a premise that was false when it was written: that
+no deployment sent `x-mcp-auth-scope`. The platform proxy had in fact been
+forwarding `mcp:pro:read mcp:pro:write` on every `forward_identity` route since
+the platform shipped — `/pro`, which reaches this same backend. Those names are
+well-formed scope tokens, so the grant parsed non-empty; none of them matched a
+v3 `domain:action` requirement, so every gated tool was refused. The gate meant
+to be dormant until v3 instead took the closed endpoint down.
+
+- **The two vocabularies are now reconciled, in one place.**
+  `src/tools/scopes.ts` recognises the platform's `mcp:pro:read` /
+  `mcp:pro:write` alongside the v3 `domain:action` requirements, and documents
+  which is which, where each comes from, and that the platform pair is
+  temporary. `mcp:pro:write` satisfies every requirement including the
+  action-scopes (`appointments:create`, `team_members:manage_access`): the
+  platform vocabulary has two grades for the whole service and cannot express
+  the distinction, so withholding them would make `create_appointment`
+  permanently unreachable rather than strictly guarded — the reasoning is in the
+  `scopeSatisfied` comment. `mcp:pro:read` satisfies only `:read`.
+- **An unrecognised vocabulary now restricts nothing**, which was the original
+  intent. A grant carrying only names this build cannot map — another service's
+  scopes, a rename upstream — lets the call through and logs once per distinct
+  grant, instead of refusing everything. Failing closed on an unknown name turns
+  any upstream vocabulary change into a total outage.
+- **`/mcp/readonly` is a real boundary when the token is narrow.** The proxy can
+  already issue `mcp:pro:read` alone, and such a session is now refused every
+  write on every address, `/mcp` included, before the handler runs and before
+  anything reaches Altegio. Documented accordingly in `README.md` and in a
+  correction to the 2026-09-17 addendum in ADR-001 — with a full grant, or no
+  scopes at all, it remains a guardrail.
+- **Fixed the comments the premise came from** in `src/request-context.ts`
+  (`parseScopes`, `getRequestScopes`).
+- Tests: the literal production header, a read-only grant refusing writes across
+  the surface, an unknown vocabulary, a mixed grant, and no scopes at all — as
+  units in `src/tools/__tests__/scopes.test.ts` and over real HTTP sessions in
+  `src/__tests__/scope-enforcement-e2e.test.ts`.
+
 ### Security — untrusted-data handling
 
 Every free-text field these tools return was typed by someone outside this

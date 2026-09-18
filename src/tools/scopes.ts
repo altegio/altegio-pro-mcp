@@ -5,9 +5,10 @@
  * boundary is the scope of the token, not the endpoint address and not the
  * tool annotations: MCP forbids clients from treating annotations as a
  * security decision, and a separate HTTP path only helps a deployment pick a
- * profile of rights — it does not restrict anything on its own. Today this
- * server has no boundary at all. The OAuth proxy already forwards the caller's
- * granted scopes as `x-mcp-auth-scope`, and until now nothing read it.
+ * profile of rights — it does not restrict anything on its own. The OAuth
+ * proxy already forwards the caller's granted scopes as `x-mcp-auth-scope` on
+ * every `forward_identity` route, and until this file existed nothing read
+ * it.
  *
  * **What this is, honestly.** Plumbing, not a live boundary. The scope names
  * below are PLACEHOLDERS: their shape follows the ratified v3 convention
@@ -16,21 +17,30 @@
  * catalog is explicitly not final and the API team owns the names. Renaming is
  * a one-file edit here, by design — no tool definition spells a scope out.
  *
+ * **Two vocabularies live here.** Requirements are written in the v3
+ * `domain:action` names; the grants that actually arrive are the platform's
+ * `mcp:pro:read` / `mcp:pro:write`, issued by the OAuth proxy today. The rule
+ * for reconciling them is stated once, under "Satisfaction" below, and nowhere
+ * else.
+ *
  * **Three rules this file obeys.**
  *
  * 1. *Execution only.* The check runs in `tools/call` and nowhere else.
  *    `tools/list` must stay identical for every connection to one path
  *    (ADR-001 D7), so the tool list is never filtered by the caller's scopes.
  *    A tool a caller cannot execute is still listed, and says why when called.
- * 2. *No scopes declared means no restriction.* Every deployment today — the
- *    public HTTP endpoint, stdio, the closed Google-OIDC one — sends no
- *    `x-mcp-auth-scope`, so `getRequestScopes()` is `undefined` and the gate
- *    steps aside. It starts enforcing by itself the day tokens carry scopes.
+ * 2. *A vocabulary this server does not know restricts nothing.* A caller that
+ *    declares no scopes at all — stdio, an anonymous HTTP request — passes
+ *    straight through, and so does one whose token carries only names this
+ *    file cannot map onto a requirement. Failing closed on an unrecognised
+ *    name would turn any vocabulary change upstream into a total outage of
+ *    this server; see `grantIsRecognised`.
  * 3. *The refusal is in-band.* It is an `isError` tool result, the same
  *    channel as the confirmation gate and `ExecutorRefusalError` — never an
  *    HTTP 403, which would drop the session, and never a protocol error the
  *    host may swallow before the model sees why.
  */
+import { logger } from '../utils/logger.js';
 import type { ToolResult } from './tool-result.js';
 
 // ==========================================================================
@@ -92,6 +102,49 @@ export type ToolScope = (typeof KNOWN_SCOPES)[number];
 /** Scope names that are NOT from the v3 catalog — surfaced for the PR/tests. */
 export const PLACEHOLDER_ONLY_SCOPES: readonly ToolScope[] =
   LOCAL_PLACEHOLDER_SCOPES;
+
+// ==========================================================================
+// The platform vocabulary (the one that actually arrives)
+// ==========================================================================
+
+/**
+ * The scope names the OAuth proxy really issues for this server today.
+ *
+ * Traced end to end in `altegio-mcp-platform/mcp-proxy`: `routes.json`
+ * declares `scopes: ["mcp:pro:read", "mcp:pro:write"]` on both routes that
+ * reach this backend — `/pro` (closed, Google OIDC, `forward_identity: true`)
+ * and `/public/pro` (Altegio-IdP) — `lib/as.js` filters a token's requested
+ * scope down to the resolved route's declared list, `lib/rs.js` puts the
+ * surviving value on `req.auth.scope`, and `lib/identity-headers.js` forwards
+ * it verbatim as `x-mcp-auth-scope`. The literal string arriving at
+ * `tools/call` on the closed route is therefore `"mcp:pro:read mcp:pro:write"`
+ * — or `"mcp:pro:read"` alone when the token was granted read only.
+ *
+ * This vocabulary is coarse by construction: one pair of grades per *service*,
+ * because a route's scope list is service-wide and the consent screen is
+ * all-or-nothing (ADR-001 D6). It is also temporary — it disappears the day
+ * Altegio v3 issues tokens in the `domain:action` vocabulary above, and this
+ * section is deleted with it.
+ */
+const PLATFORM_SCOPE_READ = 'mcp:pro:read';
+const PLATFORM_SCOPE_WRITE = 'mcp:pro:write';
+
+/** The full platform vocabulary for this service, in ascending order of power. */
+export const PLATFORM_SCOPES: readonly string[] = Object.freeze([
+  PLATFORM_SCOPE_READ,
+  PLATFORM_SCOPE_WRITE,
+]);
+
+const PLATFORM_SCOPE_SET: ReadonlySet<string> = new Set(PLATFORM_SCOPES);
+
+/**
+ * The v3 domains this server reasons about — derived from `KNOWN_SCOPES`, so a
+ * new requirement widens it automatically. Used only for recognition (is this
+ * name one of ours?), never for satisfaction.
+ */
+const KNOWN_V3_DOMAINS: ReadonlySet<string> = new Set(
+  KNOWN_SCOPES.map((scope) => scope.slice(0, scope.lastIndexOf(':')))
+);
 
 // ==========================================================================
 // The map: tool -> required scope(s)
@@ -276,16 +329,24 @@ export function requiredScopesFor(toolName: string): readonly ToolScope[] {
 }
 
 // ==========================================================================
-// Satisfaction
+// Satisfaction: two vocabularies, one rule, stated here and nowhere else
 // ==========================================================================
 
 /**
  * Whether a granted set satisfies one required scope.
  *
- * Implements exactly one implication, the one the v3 catalog ratified
- * (decision A8/F-13): **`X:write` covers `X:read`** for the same domain, so a
- * grant of `clients:write` is also a grant of `clients:read`. Nothing else is
- * implied, and the catalog is explicit about why:
+ * **The coexistence rule.** Requirements in `TOOL_SCOPES` are written in the
+ * *v3* vocabulary (`domain:action`), which no token carries yet. Grants
+ * arriving on `x-mcp-auth-scope` are written in the *platform* vocabulary
+ * (`mcp:pro:read` / `mcp:pro:write`), which is the only thing issued today.
+ * Both are read here; a name belonging to neither grants nothing, and — when
+ * the whole grant is of that kind — imposes nothing either
+ * (`grantIsRecognised`).
+ *
+ * **v3 — the target vocabulary, not yet issued.** Exactly one implication, the
+ * one the catalog ratified (decision A8/F-13): **`X:write` covers `X:read`**
+ * for the same domain, so a grant of `clients:write` is also a grant of
+ * `clients:read`. Nothing else is implied, and the catalog is explicit why:
  *
  *  - `read_contact` is a separate axis of sensitivity — `clients:write` does
  *    not let you see a phone number;
@@ -295,17 +356,91 @@ export function requiredScopesFor(toolName: string): readonly ToolScope[] {
  *    `team_members:manage_access`;
  *  - the level is part of the domain name, so `chain_services:write` cannot
  *    satisfy `services:read` — they are simply different domains here.
+ *
+ * **Platform — temporary, coarse, and the only live input.**
+ * `mcp:pro:read` satisfies a requirement whose action is `read`, and nothing
+ * else. `mcp:pro:write` satisfies **every** requirement, action-scopes
+ * included.
+ *
+ * *Why `mcp:pro:write` covers `appointments:create`, `analytics:write` and
+ * `team_members:manage_access`, which v3 deliberately keeps out of `:write`.*
+ * The v3 split is meaningful because a v3 token can express it: a caller may
+ * hold `appointments:write` and be denied `appointments:create`. The platform
+ * vocabulary cannot express it — there are two grades for the entire service
+ * and no third grant anyone can be issued. Refusing to imply the action-scopes
+ * would therefore not be strictness, it would be a permanently dead tool:
+ * `create_appointment` and `onboarding_create_test_appointments` would be
+ * unreachable for every caller on every address, forever — the same failure
+ * this rule exists to undo, only narrower. The consent a user actually gave
+ * for `mcp:pro:write` reads "bookings, staff, clients and services (read and
+ * write)", a full change grant on the service, which is precisely what
+ * creating an appointment is. `manage_access` is the uncomfortable member and
+ * is admitted with open eyes: `remove_location_user` is already withheld from
+ * the default `/mcp` view and reachable only where a deployment chose to serve
+ * it, so the narrowing that matters for it is the address, not this rule. When
+ * v3 issues tokens that carry the fine distinction, this branch stops being
+ * consulted — the grant will be in the vocabulary above.
  */
 export function scopeSatisfied(
   granted: ReadonlySet<string>,
   required: ToolScope
 ): boolean {
   if (granted.has(required)) return true;
+
   const separator = required.lastIndexOf(':');
   if (separator <= 0) return false;
   const domain = required.slice(0, separator);
   const action = required.slice(separator + 1);
-  return action === 'read' && granted.has(`${domain}:write`);
+
+  // v3 vocabulary: the single ratified implication.
+  if (action === 'read' && granted.has(`${domain}:write`)) return true;
+
+  // Platform vocabulary: one grade for the whole service.
+  if (granted.has(PLATFORM_SCOPE_WRITE)) return true;
+  if (action === 'read' && granted.has(PLATFORM_SCOPE_READ)) return true;
+
+  return false;
+}
+
+/** Whether one granted name belongs to a vocabulary this file can reason about. */
+function isRecognisedScope(scope: string): boolean {
+  if (PLATFORM_SCOPE_SET.has(scope)) return true;
+  const separator = scope.lastIndexOf(':');
+  if (separator <= 0) return false;
+  return KNOWN_V3_DOMAINS.has(scope.slice(0, separator));
+}
+
+/**
+ * Whether the granted set speaks a vocabulary this server can act on.
+ *
+ * `false` means the token does carry scopes, but not one of them can be
+ * mapped onto a requirement here: names from a platform release this build
+ * predates, from another service, or from a proxy this deployment has never
+ * seen. The gate then imposes **nothing**, which is the original intent of the
+ * scope work — an unrecognised name must never become a refusal.
+ *
+ * This is not caution for its own sake. The first version of this file assumed
+ * no proxy sent `x-mcp-auth-scope` at all; the proxy had in fact been sending
+ * `mcp:pro:read mcp:pro:write` on every `forward_identity` route since the
+ * platform shipped, every one of those names failed to match a v3 requirement,
+ * and the gate refused every gated tool on the closed endpoint. Failing closed
+ * on a vocabulary this file does not know turns any rename upstream into a
+ * total outage here; failing open costs exactly the restrictions that could
+ * not have been evaluated anyway.
+ *
+ * The trade this accepts, stated plainly: a token holding *only* scopes from
+ * another service (`mcp:bi-data:read`) or from an unmapped v3 domain
+ * (`visits:read` alone) passes unrestricted. Neither can arrive through the
+ * platform — the proxy's resource server rejects a token whose audience is not
+ * this route and whose scopes do not intersect the route's declared list — and
+ * closing that hypothesis would reintroduce the outage above. When v3 lands,
+ * widen `KNOWN_SCOPES` before relying on any of its other domains.
+ */
+export function grantIsRecognised(granted: ReadonlySet<string>): boolean {
+  for (const scope of granted) {
+    if (isRecognisedScope(scope)) return true;
+  }
+  return false;
 }
 
 /** Required scopes the granted set does not cover, in declaration order. */
@@ -368,11 +503,34 @@ export function scopeRefusalMessage(
 }
 
 /**
+ * Grants already reported as unrecognised, so the warning below fires once per
+ * distinct grant instead of once per tool call. Bounded: the key is built from
+ * validated scope tokens, but nothing upstream promises a small alphabet.
+ */
+const warnedUnrecognisedGrants = new Set<string>();
+const MAX_WARNED_GRANTS = 32;
+
+function warnUnrecognisedGrantOnce(granted: ReadonlySet<string>): void {
+  const key = [...granted].sort().join(' ');
+  if (warnedUnrecognisedGrants.has(key)) return;
+  if (warnedUnrecognisedGrants.size >= MAX_WARNED_GRANTS) {
+    warnedUnrecognisedGrants.clear();
+  }
+  warnedUnrecognisedGrants.add(key);
+  logger.warn(
+    { grantedCount: granted.size },
+    'x-mcp-auth-scope carries no vocabulary this build knows; ' +
+      'scope enforcement stands aside for these calls'
+  );
+}
+
+/**
  * Enforce one tool's scope requirement for the current request.
  *
  * Returns `undefined` when the call may proceed — which includes every caller
- * that declares no scopes at all — or the `isError` result to return instead
- * of executing the tool.
+ * that declares no scopes at all, and every caller whose grant is in a
+ * vocabulary this build cannot map (rule 2 at the top of this file) — or the
+ * `isError` result to return instead of executing the tool.
  */
 export function checkToolScopes(options: {
   readonly toolName: string;
@@ -382,6 +540,13 @@ export function checkToolScopes(options: {
 }): ToolResult | undefined {
   const { toolName, required, granted } = options;
   if (granted === undefined || required.length === 0) return undefined;
+
+  // A grant this build cannot read is not an empty grant. Stand aside, and say
+  // so once — an operator seeing this has a vocabulary mismatch to fix.
+  if (!grantIsRecognised(granted)) {
+    warnUnrecognisedGrantOnce(granted);
+    return undefined;
+  }
 
   const missing = missingScopes(granted, required);
   if (missing.length === 0) return undefined;
