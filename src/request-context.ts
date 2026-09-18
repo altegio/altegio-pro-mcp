@@ -346,12 +346,16 @@ const SCOPE_TOKEN = /^[\x21\x23-\x5B\x5D-\x7E]+$/;
  * Parse the proxy's `x-mcp-auth-scope` value into the set of granted scopes.
  *
  * Returns `undefined` for "no scopes declared" — an absent, blank, or
- * entirely unparseable header. That is the state every deployment is in
- * today, and downstream it means "no scope restriction applies" (see
- * `src/tools/scopes.ts`). Treating a malformed header as an EMPTY grant
- * instead would refuse every call on what is indistinguishable from a proxy
- * bug; a header that carries at least one well-formed token is taken at face
- * value, and the bad fragments are dropped with a warning.
+ * entirely unparseable header — which downstream means "no scope restriction
+ * applies" (see `src/tools/scopes.ts`). Treating a malformed header as an
+ * EMPTY grant instead would refuse every call on what is indistinguishable
+ * from a proxy bug; a header that carries at least one well-formed token is
+ * taken at face value, and the bad fragments are dropped with a warning.
+ *
+ * Parsing says nothing about whether the names mean anything here. The proxy
+ * sends its own vocabulary (`mcp:pro:read mcp:pro:write`), which is
+ * well-formed under this grammar and is reconciled with the tool requirements
+ * in `src/tools/scopes.ts` — the only place that decides what a scope grants.
  */
 export function parseScopes(
   value: string | undefined
@@ -380,8 +384,13 @@ export function parseScopes(
 
 /**
  * The scopes granted to the current request's token, or `undefined` when the
- * caller declared none — stdio, an anonymous HTTP request, or a proxy that
- * does not send `x-mcp-auth-scope` (every deployment as of today).
+ * caller declared none — stdio, an anonymous HTTP request, or a route the
+ * OAuth proxy does not forward identity on (`/public/pro` today, which has no
+ * `forward_identity` flag).
+ *
+ * The closed `/pro` route DOES forward it, and has since the platform shipped:
+ * `x-mcp-auth-scope: "mcp:pro:read mcp:pro:write"`. Anyone reasoning about
+ * this function should assume a real value arrives, not an absent header.
  *
  * `undefined` is not "no permissions": it is "this caller is not scoped", and
  * the execution gate lets such a call through unchanged.
