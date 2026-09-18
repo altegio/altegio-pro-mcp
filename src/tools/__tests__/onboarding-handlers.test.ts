@@ -225,12 +225,18 @@ describe('Onboarding Handlers', () => {
         raw_input: csv,
       });
 
-      const textContent = result.content[0]?.text;
-      expect(textContent).toContain('Alice');
-      expect(textContent).toContain('+1234567890');
-      expect(textContent).toContain('Fields: 2');
+      const textContent = result.content[0]?.text ?? '';
       expect(textContent).toContain('Total rows: 2');
+      expect(textContent).toContain('Fields per row: 2');
       expect(textContent).toContain('onboarding_add_staff_batch');
+      // The rows themselves came out of the user's own file: they are shown
+      // inside the fence, after our summary, never woven into it.
+      expect(textContent).toContain('<<<UNTRUSTED');
+      const [summary, block] = textContent.split('<<<UNTRUSTED');
+      expect(summary).not.toContain('Alice');
+      expect(block).toContain('row 1: name: Alice, phone: +1234567890');
+      expect(block).toContain('row 2: name: Bob, phone: +0987654321');
+      expect(block).toContain('field names: name, phone');
     });
 
     it.each([

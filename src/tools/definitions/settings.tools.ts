@@ -6,6 +6,7 @@ import {
   bookingFormsOutput,
   bookingFormEntityOutput,
 } from '../output-schemas.js';
+import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
 
 // ========== Appointment calendar settings ==========
 
@@ -237,15 +238,19 @@ export const getBookingFormsTool = defineTool({
       };
     }
 
-    const list = forms
-      .map(
-        (f, idx) =>
-          `${idx + 1}. ${f.title} (ID: ${f.id})${f.is_default ? ' [default]' : ''}`
-      )
-      .join('\n');
+    // A booking form is titled by the staff of the location, and that title is
+    // shown to clients — so it is exactly the kind of text someone chooses.
+    const lines = [
+      `Found ${forms.length} booking form(s):`,
+      ...forms.map((f) => `- Form ${f.id}${f.is_default ? ' [default]' : ''}`),
+    ];
+    const untrusted: UntrustedField[] = forms.map((f) => ({
+      label: `form ${f.id} title`,
+      value: f.title,
+    }));
 
     return {
-      text: `Found ${forms.length} booking form(s):\n\n${list}`,
+      text: withUntrustedBlock(lines.join('\n'), untrusted, { maxChars: 200 }),
       structuredContent: {
         items: forms.map((f) => ({
           id: f.id,

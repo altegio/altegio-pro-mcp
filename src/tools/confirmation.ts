@@ -31,7 +31,7 @@
  */
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { AltegioClient } from '../providers/altegio-client.js';
-import type { ToolResult } from './tool-result.js';
+import { sanitizeUntrusted, type ToolResult } from './tool-result.js';
 
 /** The argument every confirmable tool accepts, on every host (ADR-001 D7). */
 export const CONFIRMATION_TOKEN_ARG = 'confirmation_token';
@@ -289,7 +289,15 @@ async function resolveTarget(
   if (!prepared.resolve) return prepared.target;
   try {
     const resolved = await prepared.resolve(client);
-    return resolved && resolved.trim().length > 0 ? resolved : prepared.target;
+    // `target` is built from the arguments alone, but a resolved label is a
+    // name read back from the API — a client, a team member, a booking form,
+    // named by someone outside this server. It cannot go in a fenced block:
+    // the point of the headline is that it reads as one sentence, to a person.
+    // So it is cleaned in place instead, which is the whole job of
+    // `sanitizeUntrusted`: crude turn markup and invisible characters out, one
+    // line, capped. The gate itself never depends on this value.
+    const safe = sanitizeUntrusted(resolved, { maxChars: 200 });
+    return safe ?? prepared.target;
   } catch {
     // A lookup failure must not decide whether the operator is asked.
     return prepared.target;

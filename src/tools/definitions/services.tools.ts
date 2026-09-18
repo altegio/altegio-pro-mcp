@@ -214,10 +214,14 @@ export const updateServiceTool = defineTool({
       updateData
     );
     return {
-      text:
-        `Successfully updated service ${service_id}:\nTitle: ${service.title}\n` +
-        `Active: ${service.active === undefined ? 'not reported' : Boolean(Number(service.active))}\n` +
-        `Team-member links preserved: ${service.staff?.length ?? 'not reported by update response'}`,
+      // A partial update reads back a title this call never sent.
+      text: withUntrustedBlock(
+        `Successfully updated service ${service_id}.\n` +
+          `Active: ${service.active === undefined ? 'not reported' : Boolean(Number(service.active))}\n` +
+          `Team-member links preserved: ${service.staff?.length ?? 'not reported by update response'}`,
+        [{ label: 'title as stored', value: service.title }],
+        { maxChars: 200 }
+      ),
       structuredContent: projectService(service),
     };
   },

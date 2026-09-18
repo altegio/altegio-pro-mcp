@@ -191,7 +191,16 @@ export const updateStaffTool = defineTool({
       updateData
     );
     return {
-      text: `Successfully updated staff member ${team_member_id}:\nName: ${staff.name}\nSpecialization: ${staff.specialization}`,
+      // A partial update reads back fields this call never sent, so the name
+      // and specialization here may be someone else's text, not the caller's.
+      text: withUntrustedBlock(
+        `Successfully updated staff member ${team_member_id}. Name and specialization as stored are below.`,
+        [
+          { label: 'name', value: staff.name },
+          { label: 'specialization', value: staff.specialization },
+        ],
+        { maxChars: 200 }
+      ),
       structuredContent: {
         id: staff.id,
         name: staff.name,

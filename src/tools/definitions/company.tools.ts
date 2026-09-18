@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import { companiesOutput, locationUpdateOutput } from '../output-schemas.js';
+import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
 import type { AltegioCompany } from '../../types/altegio.types.js';
 
 function sameValue(requested: unknown, observed: unknown): boolean {
@@ -52,16 +53,23 @@ export const listLocationsTool = defineTool({
   handler: async ({ input, client }) => {
     const locations = await client.getCompanies(input);
 
-    const summary = `Found ${locations.length} ${locations.length === 1 ? 'location' : 'locations'}${input.my === 1 ? ' (user locations)' : ''}:\n\n`;
-    const locationsList = locations
-      .map(
-        (c, idx) =>
-          `${idx + 1}. ID: ${c.id} - "${c.title || c.public_title}"\n   Address: ${c.address || 'N/A'}\n   Phone: ${c.phone || 'N/A'}`
-      )
-      .join('\n\n');
+    // Name, address and phone of a location are typed by its owner, and the
+    // public list is not even limited to locations this user manages.
+    const lines = [
+      `Found ${locations.length} ${locations.length === 1 ? 'location' : 'locations'}${input.my === 1 ? ' (user locations)' : ''}, ids: ${locations.map((c) => c.id).join(', ')}.`,
+    ];
+    const untrusted: UntrustedField[] = [];
+    for (const c of locations) {
+      untrusted.push({
+        label: `location ${c.id} name`,
+        value: c.title || c.public_title,
+      });
+      untrusted.push({ label: `location ${c.id} address`, value: c.address });
+      untrusted.push({ label: `location ${c.id} phone`, value: c.phone });
+    }
 
     return {
-      text: summary + locationsList,
+      text: withUntrustedBlock(lines.join('\n'), untrusted, { maxChars: 200 }),
       structuredContent: {
         items: locations.map((c) => ({
           id: c.id,
@@ -156,13 +164,22 @@ export const updateLocationTool = defineTool({
         ? `Verified by ${verificationSource.replace('_', ' ')}: ${verifiedFields.join(', ') || 'no fields requested'}.`
         : `Not confirmed by ${verificationSource.replace('_', ' ')}: ${unconfirmedFields.join(', ')}. The API accepted the request, but these values were absent or different in the result; do not claim they persisted.`;
     return {
-      text:
+      text: withUntrustedBlock(
         `Location ${location_id} update request completed.\n` +
-        `Title: ${location.title ?? location.public_title ?? 'not reported'}\n` +
-        `${verificationText}` +
-        (verificationError
-          ? `\nRead-back unavailable: ${verificationError}`
-          : ''),
+          `${verificationText}` +
+          (verificationError
+            ? `\nRead-back unavailable: ${verificationError}`
+            : ''),
+        // The name read back is whatever the location now stores, which is not
+        // necessarily what this call sent.
+        [
+          {
+            label: 'location name as stored',
+            value: location.title ?? location.public_title,
+          },
+        ],
+        { maxChars: 200 }
+      ),
       structuredContent: {
         id: location.id,
         title: location.title ?? location.public_title ?? null,

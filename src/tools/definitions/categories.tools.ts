@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import { categoriesOutput } from '../output-schemas.js';
+import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
 
 export const getServiceCategoriesTool = defineTool({
   name: 'get_service_categories',
@@ -54,16 +55,22 @@ export const getServiceCategoriesTool = defineTool({
       Object.keys(listParams).length > 0 ? listParams : undefined
     );
 
-    const summary = `Found ${categories.length} service ${categories.length === 1 ? 'category' : 'categories'} for location ${location_id}:\n\n`;
-    const categoriesList = categories
-      .map(
-        (c, idx) =>
-          `${idx + 1}. ID: ${c.id} - "${c.title}"${c.services ? `\n   Services count: ${c.services.length}` : ''}`
-      )
-      .join('\n\n');
+    // A category title is named by the staff of the location, so it stays out
+    // of our rows and is keyed back to them by id.
+    const lines = [
+      `Found ${categories.length} service ${categories.length === 1 ? 'category' : 'categories'} for location ${location_id}:`,
+      ...categories.map(
+        (c) =>
+          `- Category ${c.id}${c.services ? ` · ${c.services.length} service(s)` : ''}`
+      ),
+    ];
+    const untrusted: UntrustedField[] = categories.map((c) => ({
+      label: `category ${c.id} title`,
+      value: c.title,
+    }));
 
     return {
-      text: summary + categoriesList,
+      text: withUntrustedBlock(lines.join('\n'), untrusted, { maxChars: 200 }),
       structuredContent: {
         items: categories.map((c) => ({ id: c.id, title: c.title })),
         count: categories.length,

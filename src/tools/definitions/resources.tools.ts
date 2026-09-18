@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import { resourcesOutput } from '../output-schemas.js';
+import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
 
 export const getResourcesTool = defineTool({
   name: 'get_resources',
@@ -26,17 +27,21 @@ export const getResourcesTool = defineTool({
       };
     }
 
-    const list = resources
-      .map((r, idx) => {
-        const instances = r.instances?.length
-          ? ` — ${r.instances.length} instance(s)`
-          : '';
-        return `${idx + 1}. ${r.title} (ID: ${r.id})${instances}`;
-      })
-      .join('\n');
+    // A resource title (a cabinet, a chair, a machine) is named by the staff.
+    const lines = [
+      `Found ${resources.length} resource(s):`,
+      ...resources.map(
+        (r) =>
+          `- Resource ${r.id}${r.instances?.length ? ` · ${r.instances.length} instance(s)` : ''}`
+      ),
+    ];
+    const untrusted: UntrustedField[] = resources.map((r) => ({
+      label: `resource ${r.id} title`,
+      value: r.title,
+    }));
 
     return {
-      text: `Found ${resources.length} resource(s):\n\n${list}`,
+      text: withUntrustedBlock(lines.join('\n'), untrusted, { maxChars: 200 }),
       structuredContent: {
         items: resources.map((r) => ({ id: r.id, title: r.title })),
         count: resources.length,

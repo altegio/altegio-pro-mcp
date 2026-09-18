@@ -15,6 +15,10 @@ import type {
 } from '../../api/analytics-api.js';
 import type { Period } from './periods.js';
 import { REPORT_ROW_CAP } from './report-store.js';
+import {
+  withUntrustedBlock,
+  type UntrustedField,
+} from '../../tools/tool-result.js';
 
 /** Format a money amount for the text summary. */
 export function formatMoney(
@@ -233,36 +237,53 @@ export function projectReportTable(
   };
 }
 
-/** Text summary of a report table: the first rows, rendered as fixed columns. */
+/**
+ * Text summary of a report table: the first rows, rendered as fixed columns.
+ *
+ * A report is named by whoever built it, and its rows are the location's own
+ * data — client and team-member names, service titles, account names. None of
+ * that is interpolated into our own lines: the counts are ours, the name and
+ * the preview rows go in the fenced block, one field per row so the table keeps
+ * its shape (a field is collapsed to one line, a whole table would not be).
+ */
 export function tableSummary(
   name: string,
   table: RenamedTable,
   previewRows = 10
 ): string {
+  const named: UntrustedField = { label: 'report name', value: name };
   if (table.row_count === 0) {
-    return `"${name}" returned no rows for this period. Widen the period or relax the filters.`;
-  }
-  const header = table.columns.map((c) => c.title).join(' | ');
-  const preview = table.rows
-    .slice(0, previewRows)
-    .map((row) =>
-      table.columns.map((c) => String(row[c.key] ?? '')).join(' | ')
+    return withUntrustedBlock(
+      'The report returned no rows for this period. Widen the period or relax the filters.',
+      [named],
+      { maxChars: 200 }
     );
+  }
   const lines = [
-    `"${name}" — ${table.row_count} row${table.row_count === 1 ? '' : 's'}${
+    `${table.row_count} row${table.row_count === 1 ? '' : 's'}${
       table.truncated
         ? `, ${table.rows.length} returned in this result; the full table is attached as a CSV resource`
         : ''
-    }.`,
-    header,
-    ...preview,
+    }. Columns, in order: ${table.columns.map((c) => c.key).join(', ')}.`,
   ];
   if (table.rows.length > previewRows) {
     lines.push(
       `… ${table.rows.length - previewRows} more rows in the structured result.`
     );
   }
-  return lines.join('\n');
+
+  const preview: UntrustedField[] = [
+    named,
+    {
+      label: 'column titles',
+      value: table.columns.map((c) => c.title).join(' | '),
+    },
+    ...table.rows.slice(0, previewRows).map((row, index) => ({
+      label: `row ${index + 1}`,
+      value: table.columns.map((c) => String(row[c.key] ?? '')).join(' | '),
+    })),
+  ];
+  return withUntrustedBlock(lines.join('\n'), preview, { maxChars: 400 });
 }
 
 /** Cut a series set down to the days that carry a value, for a tighter result. */
