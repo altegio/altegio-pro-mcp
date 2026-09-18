@@ -10,8 +10,7 @@ import {
 import { AltegioClient } from '../providers/altegio-client.js';
 import { OnboardingHandlers } from './onboarding-handlers.js';
 import { OnboardingStateManager } from '../providers/onboarding-state-manager.js';
-import * as definitions from './definitions/index.js';
-import { isToolDisabled } from './disabled-tools.js';
+import { orderedToolEntries, servedDefinedTools } from './inventory.js';
 import {
   buildFacetIndex,
   facetToolsFromSpecs,
@@ -21,7 +20,6 @@ import {
   type FacetKey,
   type FacetIndex,
 } from './facets.js';
-import type { DefinedTool, McpToolSpec } from './factory.js';
 import type { ToolResult } from './tool-result.js';
 import {
   requireConfirmation,
@@ -50,12 +48,6 @@ type CallHandler = (args: unknown) => Promise<ToolResult>;
 /** A tool's confirmation spec bound to raw arguments (see `./confirmation.ts`). */
 type PrepareConfirmation = (args: unknown) => PreparedConfirmation | undefined;
 
-/** A tool spec plus the category that orders it in `tools/list`. */
-interface ToolEntry {
-  readonly spec: McpToolSpec;
-  readonly category: string;
-}
-
 export interface RegisterToolsOptions {
   /** Which static view to serve. Defaults to the full default view. */
   readonly facet?: FacetKey;
@@ -75,51 +67,11 @@ export interface RegisterToolsOptions {
 }
 
 /**
- * Auto-discover every `DefinedTool` exported from the definitions barrel, minus
- * the ones withheld from every view (see `./disabled-tools.ts`).
+ * The tool inventory and its `tools/list` order live in `./inventory.ts`, the
+ * one module that enumerates the surface; re-exported here because that is
+ * where callers have always imported it from.
  */
-function collectDefinedTools(): DefinedTool[] {
-  return (Object.values(definitions) as unknown[])
-    .filter(
-      (v): v is DefinedTool =>
-        !!v &&
-        typeof v === 'object' &&
-        'toMcpTool' in v &&
-        'createHandler' in v &&
-        'meta' in v
-    )
-    .filter((tool) => !isToolDisabled(tool.meta.name));
-}
-
-/**
- * Total order over tools: category first, then name — both compared as plain
- * code-unit strings so the result never depends on the host's locale. A
- * deterministic `tools/list` is required by MCP 2026-07-28 (ADR-001 D7) and
- * makes tool-surface changes readable in a diff.
- */
-function compareToolEntries(a: ToolEntry, b: ToolEntry): number {
-  if (a.category !== b.category) {
-    return a.category < b.category ? -1 : 1;
-  }
-  if (a.spec.name !== b.spec.name) {
-    return a.spec.name < b.spec.name ? -1 : 1;
-  }
-  return 0;
-}
-
-/** Build the ordered tool list exactly as `tools/list` returns it. */
-export function orderedToolEntries(): ToolEntry[] {
-  const factoryTools = collectDefinedTools().map((tool) => ({
-    spec: tool.toMcpTool(),
-    category: tool.meta.category,
-  }));
-  // The onboarding wizard keeps hand-written specs; they all share one category.
-  const onboardingEntries = onboardingTools.map((spec) => ({
-    spec,
-    category: 'Onboarding',
-  }));
-  return [...factoryTools, ...onboardingEntries].sort(compareToolEntries);
-}
+export { orderedToolEntries, type ToolEntry } from './inventory.js';
 
 function outOfFacetError(
   name: string,
@@ -218,7 +170,7 @@ export function registerTools(
   // Factory-defined CRUD tools (auth, location, team members, positions,
   // services, categories, schedules, appointments) — discovered from
   // ./definitions.
-  const factoryTools = collectDefinedTools();
+  const factoryTools = servedDefinedTools();
   const handlers = new Map<string, CallHandler>(
     factoryTools.map((tool) => [tool.meta.name, tool.createHandler(client)])
   );

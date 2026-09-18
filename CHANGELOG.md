@@ -6,6 +6,58 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — one resolved table for where each tool is served, and why
+
+Six mechanisms decide whether a tool reaches a given address and two more decide
+whether the call it receives there runs. Each is justified on its own terms, but
+nothing joined them: answering "why is tool X not on address Y" meant holding
+six lists in your head, which is how a new pack lands in the wrong place and
+nobody sees it in the diff. This joins them without collapsing them — losing
+their separate reasons for existing would be worse than six lists.
+
+- **`src/tools/surface.ts`** — one cell per tool x per view (`all`, `default`,
+  `readonly`, the six facets): served or withheld, a **machine value** for the
+  reason, and the gates that still refuse the call (token scope, human
+  confirmation, the executor's own read-only policy), listed in the order
+  `tools/call` checks them.
+- **Not a second implementation.** `decideView` in `src/tools/facets.ts` now
+  decides *and explains*, and `buildFacetIndex` is a projection of it; a test
+  compares the two under every switch combination.
+  `src/tools/inventory.ts` is the single enumeration of what exists, disabled
+  tools included — "why is this tool nowhere?" cannot be answered about a tool
+  the inventory already dropped.
+- **`docs/architecture/tool-surface.md`** is generated from that table
+  (`npm run surface:build`) and pinned by `npm run surface:check`, a CI step and
+  `surface-doc.test.ts` — the same contract `src/generated/catalog.json` has, so
+  a surface change reaches the reviewer's diff (ADR-001 D4/D7).
+
+### Fixed — documented tool counts disagreed with the server
+
+`CLAUDE.md` claimed "69 total" while 72 tools were defined and 66 served, and
+five per-category counts were wrong. Counts are now computed:
+`toolCountSentence()` is quoted verbatim by `README.md`, `CLAUDE.md` and the
+generated table, and `tool-count.test.ts` pins every per-category count in
+`CLAUDE.md` against `tools/list`.
+
+- 69 → **66 served** (72 defined, 6 withheld from every view)
+- Positions 4 → **2** — no `update_position` / `delete_position` tool was ever
+  written
+- Categories 1 → **2**, Clients 4 → **5**, Settings 6 → **7**, and a missing
+  `[Users]` line for `remove_location_user`
+
+### Documented
+
+ADR-001 gains three addenda — the surface table (D4), token-scope enforcement
+(D6) and the human-confirmation gate (D8) — and §8 open decision 5 (writes
+through `altegio_call_operation`) is marked **resolved: reads only**, with the
+reasoning rather than a rewrite of the decision's history.
+
+Two gaps the table exposed, recorded and not fixed here: the three executor
+tools are served on **no facet** although ADR-001 D2 calls them always-loaded,
+and `marketing` still serves only `list_locations`.
+
+No behaviour change: every pre-existing test passes untouched.
+
 ### Fixed — the scope gate refused every gated tool on the closed endpoint
 
 The execution gate shipped on a premise that was false when it was written: that

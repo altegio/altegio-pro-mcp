@@ -28,7 +28,9 @@
  * where it was rewritten.
  *
  * **To re-enable:** confirm the backend flag is on and that the data endpoint
- * returns a table, then empty this set and restore the guidance.
+ * returns a table, then empty this set and restore the guidance. `./surface.ts`
+ * renders the effect of this set next to every other admission rule, so the
+ * generated `docs/architecture/tool-surface.md` shows it turning back on.
  */
 export const DISABLED_TOOL_NAMES: ReadonlySet<string> = new Set([
   'analytics_list_report_templates',
