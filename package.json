@@ -70,7 +70,9 @@
     "prepare": "husky",
     "api:inventory": "node scripts/api-inventory/openapi-inventory.mjs",
     "catalog:build": "node scripts/catalog/build.mjs",
-    "catalog:check": "node scripts/catalog/build.mjs --check"
+    "catalog:check": "node scripts/catalog/build.mjs --check",
+    "surface:build": "tsx scripts/surface/build.ts",
+    "surface:check": "tsx scripts/surface/build.ts --check"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

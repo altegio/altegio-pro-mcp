@@ -37,6 +37,12 @@ jobs:
       - name: Catalog drift check
         run: npm run catalog:check
 
+      # Tool-surface drift (ADR-001 D4 addendum): docs/architecture/tool-surface.md
+      # is generated from src/tools/surface.ts and must be regenerated whenever a
+      # tool moves between views.
+      - name: Tool surface drift check
+        run: npm run surface:check
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 30

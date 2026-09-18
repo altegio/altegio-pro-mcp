@@ -14,7 +14,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Features
 
-- **71 MCP tools** including a 14-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
+- **66 tools served (72 defined, 6 withheld from every view)** — including a 9-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
 - **Administrative writes** for staff, services, appointments, schedules, clients, categories, booking forms, and location users
 - **Analytics**: key metrics with period comparison, daily series, breakdowns, day-end report, occupancy (the report builder is switched off — see below)
 - **Location settings**: appointment calendar, online booking, booking forms, resources
@@ -28,7 +28,10 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Available Tools
 
-**72 tools organized by category** for complete business management:
+**66 tools served (72 defined, 6 withheld from every view)**, organized by category
+for complete business management. Which of them a given address serves, and why,
+is the generated table in
+[`docs/architecture/tool-surface.md`](docs/architecture/tool-surface.md).
 
 ### 🔐 Authentication
 - `altegio_login` - Authenticate with email/password
@@ -192,6 +195,18 @@ A facet answers *how many tools fit in this host's context*. The separate
 question — *what may this agent do at all* — is answered by the
 [read-only address](#the-read-only-address-mcpreadonly) below, which is a
 different kind of view and not a seventh facet.
+
+**Which tool is served where, and why:**
+[`docs/architecture/tool-surface.md`](docs/architecture/tool-surface.md) — one
+generated table over every tool × every view. Eight mechanisms decide where a
+tool appears and whether the call it receives runs (the report-builder closure,
+the default view's excluded prefixes, excluded names and re-admitted names, the
+password-login switch, the read-only rule, token scopes and the human
+confirmation). Each is justified on its own terms and none is collapsed into the
+others, so the table is where they are *joined*: every cell carries a machine
+value for why the tool is served or withheld, plus the gates that still refuse
+the call. Regenerate it with `npm run surface:build` after anything that moves a
+tool; `npm run surface:check` and the test suite fail when it is stale.
 
 | Endpoint | Serves |
 |---|---|

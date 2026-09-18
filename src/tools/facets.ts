@@ -22,6 +22,13 @@
  * Legacy tool names (`get_staff`, `create_staff`, …) are listed verbatim
  * because they are the names on the wire today; the canonical vocabulary calls
  * these team member tools and the rename is tracked separately.
+ *
+ * **Where the mechanisms are joined:** this module is one of several that
+ * decide where a tool is served. `./surface.ts` puts all of them into one
+ * table — tool × view, with a machine-readable reason — and renders it to
+ * `docs/architecture/tool-surface.md`. `decideView` below is the only
+ * membership function; everything else, `buildFacetIndex` included, is a
+ * projection of it.
  */
 
 /** Every facet served on `/mcp/<facet>`. */
@@ -319,74 +326,162 @@ function matchesPrefix(name: string, prefixes: readonly string[]): boolean {
 }
 
 /**
+ * Why a view serves a tool. A machine value, not a comment: `./surface.ts`
+ * turns these into the one table that answers "why is tool X on address Y",
+ * and the generated `docs/architecture/tool-surface.md` renders them, so a
+ * change of rule shows up in a reviewer's diff instead of in someone's head.
+ */
+export type ViewAdmitReason =
+  /** The unfiltered `all` view stdio serves: no rule applies. */
+  | 'unfiltered-view'
+  /** In `FACET_BASE_TOOLS`: every facet carries it unconditionally. */
+  | 'facet-base-tool'
+  /** In `PASSWORD_LOGIN_TOOLS` with `exposePasswordLogin` on. */
+  | 'password-login-exposed'
+  /** Named one by one in this facet's rule. */
+  | 'facet-rule-name'
+  /** Matched by one of this facet's tool-name prefixes. */
+  | 'facet-rule-prefix'
+  /** In `DEFAULT_FACET_EXTRA_TOOLS`: re-admitted despite an excluded prefix. */
+  | 'default-view-extra-tool'
+  /** On `/mcp` because nothing excludes it — the default for everything. */
+  | 'default-view-not-excluded'
+  /** On `/mcp/readonly` because its own `readOnlyHint` says it only reads. */
+  | 'read-only-annotation';
+
+/** Why a view withholds a tool. Machine values, same contract as above. */
+export type ViewWithholdReason =
+  /** In `PASSWORD_LOGIN_TOOLS` with `exposePasswordLogin` off. */
+  | 'password-login-not-exposed'
+  /** In `DEFAULT_FACET_EXCLUDED_TOOLS` (also applied to the read-only view). */
+  | 'default-view-excluded-tool'
+  /** Matched by `DEFAULT_FACET_EXCLUDED_PREFIXES` and not re-admitted. */
+  | 'default-view-excluded-prefix'
+  /** The `excludeOnboardingFromDefault` config switch is on. */
+  | 'onboarding-excluded-from-default'
+  /** This facet's rule names neither the tool nor a prefix matching it. */
+  | 'not-in-facet-rule'
+  /** Not annotated `readOnlyHint: true`, so `/mcp/readonly` will not serve it. */
+  | 'not-read-only';
+
+export type ViewDecision =
+  | { readonly served: true; readonly reason: ViewAdmitReason }
+  | { readonly served: false; readonly reason: ViewWithholdReason };
+
+const admit = (reason: ViewAdmitReason): ViewDecision => ({
+  served: true,
+  reason,
+});
+const withhold = (reason: ViewWithholdReason): ViewDecision => ({
+  served: false,
+  reason,
+});
+
+/**
+ * **The one decision function.** Whether a view serves a tool, and the reason.
+ *
+ * Every view built anywhere in this server goes through here —
+ * `buildFacetIndex` is a projection of it, and so is the surface table — so
+ * the six admission mechanisms that grew up independently (disabled tools,
+ * excluded prefixes, excluded names, extra names, password login, the
+ * read-only rule) have exactly one implementation and one explanation.
+ *
+ * It does NOT know about `./disabled-tools.ts`: a disabled tool never reaches
+ * the registry at all, so that exclusion sits one level up, in `./surface.ts`.
+ */
+export function decideView(
+  view: FacetKey,
+  tool: FacetTool,
+  options: FacetIndexOptions = {}
+): ViewDecision {
+  const { name } = tool;
+  const exposePasswordLogin = options.exposePasswordLogin ?? false;
+  const isPasswordLogin = PASSWORD_LOGIN_TOOLS.includes(name);
+  const isBase = FACET_BASE_TOOLS.includes(name);
+
+  if (view === ALL_TOOLS_FACET) {
+    // stdio's view: never filtered, not even by the password-login switch.
+    return admit('unfiltered-view');
+  }
+
+  // Withheld from every HTTP view by the deployment, ahead of every admitting
+  // rule — a base or extra entry must not let an excluded tool back in.
+  if (isPasswordLogin && !exposePasswordLogin) {
+    return withhold('password-login-not-exposed');
+  }
+
+  if (view === READONLY_VIEW) {
+    // The view's own rule first: a writing tool is absent because it writes,
+    // whatever else would also have excluded it.
+    if (!tool.readOnly) return withhold('not-read-only');
+    if (DEFAULT_FACET_EXCLUDED_TOOLS.includes(name)) {
+      return withhold('default-view-excluded-tool');
+    }
+    // Note what is deliberately NOT here: `FACET_BASE_TOOLS` is not
+    // force-admitted the way it is to a facet, so a base tool that ever
+    // stopped being read-only would drop out instead of quietly widening the
+    // view; and the default view's prefix exclusions do not apply, so the
+    // whole analytics pack is served here.
+    return admit('read-only-annotation');
+  }
+
+  if (view === DEFAULT_FACET) {
+    if (DEFAULT_FACET_EXCLUDED_TOOLS.includes(name)) {
+      return withhold('default-view-excluded-tool');
+    }
+    if (isPasswordLogin) return admit('password-login-exposed');
+    if (isBase) return admit('facet-base-tool');
+    if (DEFAULT_FACET_EXTRA_TOOLS.includes(name)) {
+      return admit('default-view-extra-tool');
+    }
+    if (matchesPrefix(name, DEFAULT_FACET_EXCLUDED_PREFIXES)) {
+      return withhold('default-view-excluded-prefix');
+    }
+    if (
+      options.excludeOnboardingFromDefault &&
+      name.startsWith(ONBOARDING_PREFIX)
+    ) {
+      return withhold('onboarding-excluded-from-default');
+    }
+    return admit('default-view-not-excluded');
+  }
+
+  // A named facet. `DEFAULT_FACET_EXCLUDED_TOOLS` deliberately does not apply:
+  // a tool kept off the generic default endpoint stays reachable on the
+  // narrower path a deployment points a client at on purpose.
+  if (isPasswordLogin) return admit('password-login-exposed');
+  if (isBase) return admit('facet-base-tool');
+  const rule = FACET_RULES[view];
+  if (rule.tools.includes(name)) return admit('facet-rule-name');
+  if (matchesPrefix(name, rule.prefixes)) return admit('facet-rule-prefix');
+  return withhold('not-in-facet-rule');
+}
+
+/** Every view this server can serve, in the order the table renders them. */
+export const VIEW_KEYS: readonly FacetKey[] = [
+  ALL_TOOLS_FACET,
+  DEFAULT_FACET,
+  READONLY_VIEW,
+  ...FACET_NAMES,
+];
+
+/**
  * Compute the view index once, from the registered tools in their final
  * `tools/list` order. Each view preserves that order, so every view's list is
- * deterministic without sorting again.
+ * deterministic without sorting again. Membership is `decideView` and nothing
+ * else.
  */
 export function buildFacetIndex(
   tools: readonly FacetTool[],
   options: FacetIndexOptions = {}
 ): FacetIndex {
-  const toolNames = tools.map((tool) => tool.name);
-  const readOnlyNames = new Set(
-    tools.filter((tool) => tool.readOnly).map((tool) => tool.name)
-  );
-  const exposePasswordLogin = options.exposePasswordLogin ?? false;
-  const base = new Set([
-    ...FACET_BASE_TOOLS,
-    ...(exposePasswordLogin ? PASSWORD_LOGIN_TOOLS : []),
-  ]);
-  const extras = new Set(DEFAULT_FACET_EXTRA_TOOLS);
-  const excludedFromDefault = [
-    ...DEFAULT_FACET_EXCLUDED_PREFIXES,
-    ...(options.excludeOnboardingFromDefault ? [ONBOARDING_PREFIX] : []),
-  ];
-  // Withheld by name, ahead of every admitting rule: an excluded tool stays
-  // excluded even if a base or extra entry would otherwise let it back in.
-  const excludedNames = new Set([
-    ...DEFAULT_FACET_EXCLUDED_TOOLS,
-    ...(exposePasswordLogin ? [] : PASSWORD_LOGIN_TOOLS),
-  ]);
-
-  const inDefault = (name: string): boolean =>
-    !excludedNames.has(name) &&
-    (base.has(name) ||
-      extras.has(name) ||
-      !matchesPrefix(name, excludedFromDefault));
-
-  const inFacet = (facet: FacetName, name: string): boolean => {
-    const rule = FACET_RULES[facet];
-    return (
-      base.has(name) ||
-      rule.tools.includes(name) ||
-      matchesPrefix(name, rule.prefixes)
-    );
-  };
-
-  // The read-only view: every tool that declares it only reads, minus the
-  // tools this deployment withholds from the HTTP surface by name. Note what is
-  // deliberately absent — `FACET_BASE_TOOLS` is NOT force-admitted here the way
-  // it is to a facet, so a base tool that ever stopped being read-only would
-  // drop out of this view instead of quietly widening it. The default view's
-  // prefix exclusions do not apply either: the whole analytics pack only reads,
-  // and chain-wide analytics is exactly who this address is for.
-  const inReadOnly = (name: string): boolean =>
-    readOnlyNames.has(name) && !excludedNames.has(name);
-
   const members = new Map<FacetKey, readonly string[]>();
-  members.set(ALL_TOOLS_FACET, [...toolNames]);
-  members.set(
-    DEFAULT_FACET,
-    toolNames.filter((name) => inDefault(name))
-  );
-  members.set(
-    READONLY_VIEW,
-    toolNames.filter((name) => inReadOnly(name))
-  );
-  for (const facet of FACET_NAMES) {
+  for (const view of VIEW_KEYS) {
     members.set(
-      facet,
-      toolNames.filter((name) => inFacet(facet, name))
+      view,
+      tools
+        .filter((tool) => decideView(view, tool, options).served)
+        .map((tool) => tool.name)
     );
   }
 
@@ -396,7 +491,7 @@ export function buildFacetIndex(
   }
 
   return {
-    keys: [ALL_TOOLS_FACET, DEFAULT_FACET, READONLY_VIEW, ...FACET_NAMES],
+    keys: VIEW_KEYS,
     members: (facet) => members.get(facet) ?? [],
     includes: (facet, toolName) => sets.get(facet)?.has(toolName) ?? false,
     facetsProviding: (toolName) =>

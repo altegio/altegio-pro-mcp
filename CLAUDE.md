@@ -87,22 +87,25 @@ Always check BUILD.md / never add it to Git
 
 MCP server for **B2B business management only** (Altegio.Pro, not public booking /b2c). Local service business business owners, admins and team members manage their operations through authenticated tools
 
-### Tools Available (69 total)
+### Tools Available
+
+**66 tools served (72 defined, 6 withheld from every view).** The counts below are pinned by `src/tools/__tests__/tool-count.test.ts` — edit them only with the code. Which tool is served on which address, and why, is the generated table in [`docs/architecture/tool-surface.md`](docs/architecture/tool-surface.md) (`npm run surface:build`).
 
 **Category-organized with [Prefix] tags for LLM navigation:**
 
 **[Auth] Authentication (2):** login, logout
 **[Location] Location (2):** list_locations, update_location
 **[Staff] Staff CRUD (4):** get, create, update, delete (create supports `is_paid_staff`)
-**[Positions] Positions CRUD (4):** get, create, update, delete
+**[Positions] Positions (2):** get, create (no update/delete tool exists — the 2025-10-30 note below overstated this)
 **[Services] Services (8):** get, create, update, delete, plus service↔team-member links: link_service_team_member, update_service_team_member, unlink_service_team_member, link_team_member_services (bulk)
-**[Categories] Service Categories (1):** get
+**[Categories] Service Categories (2):** get, delete
 **[Schedule] Schedule CRUD (4):** get, create, update, delete
 **[Appointments] Appointments CRUD (4):** get, create, update, delete
-**[Clients] Client base (4):** `clients_search` (segment & count the base with a fully-typed filter model), `clients_get_card`, `clients_get_visit_history`, `clients_lookup` (autocomplete)
-**[Settings] Location Settings (6):** get/update appointment settings, get/update online booking settings, get/create booking forms
+**[Clients] Client base (5):** `clients_search` (segment & count the base with a fully-typed filter model), `clients_get_card`, `clients_get_visit_history`, `clients_lookup` (autocomplete), `clients_delete`
+**[Settings] Location Settings (7):** get/update appointment settings, get/update online booking settings, get/create/delete booking forms
 **[Resources] Resources (1):** get (read-only; API has no create)
-**[Analytics] Analytics (9 served):** get_overview, get_daily_series, get_appointments_breakdown, get_receptionist_performance, get_loyalty_program_results, get_forecast, get_day_end_report, get_team_member_occupancy, get_client_visit_stats
+**[Users] Location access (1):** `remove_location_user` — off the default `/mcp` view, served on `/mcp/catalog` and stdio
+**[Analytics] Analytics (9):** get_overview, get_daily_series, get_appointments_breakdown, get_receptionist_performance, get_loyalty_program_results, get_forecast, get_day_end_report, get_team_member_occupancy, get_client_visit_stats
   - The 6 report-builder tools (list_report_templates, list_report_fields, run_report, list_saved_reports, run_saved_report, delete_assistant_report) are defined and tested but **served on no view** — the backend report-data API fails for every report in production. Never point guidance at them; read `src/tools/disabled-tools.ts` first.
 **[Onboarding] Wizard (12):** start, resume, status, batch imports (positions, staff, categories, services), set schedules, import clients, test appointments, preview, rollback
 **[API] Universal executor (3):** `altegio_search_operations`, `altegio_describe_operation`, `altegio_call_operation` - backed by `src/generated/catalog.json`; reads only (writes refused, see ADR-001 D2)
@@ -138,6 +141,17 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 - `src/utils/` - logging, errors, config, credential manager
 
 ### Change history
+
+**One surface table, and counts that cannot lie (2026-09-17)**
+- **The problem, not the symptom.** Six mechanisms decide whether a tool reaches a given address (`disabled-tools.ts`, `DEFAULT_FACET_EXCLUDED_PREFIXES`, `DEFAULT_FACET_EXCLUDED_TOOLS`, `DEFAULT_FACET_EXTRA_TOOLS`, `PASSWORD_LOGIN_TOOLS` + its switch, `READONLY_VIEW`) and two more decide whether the call it receives runs (`scopes.ts`, `confirmation.ts`). Every one is justified; none of them answered "why is tool X not on address Y" — that took six lists held in your head, which is how a new pack lands in the wrong place without anyone seeing it in the diff.
+- **Not collapsed — joined.** `src/tools/surface.ts` produces one cell per tool x per view: served or withheld, a **machine value** for the reason (`default-view-excluded-prefix`, `not-read-only`, `disabled-everywhere`, …), and the gates that still refuse the call (`scope`, `human-confirmation`, `executor-read-only`). The six mechanisms keep their separate reasons for existing; losing those reasons would be worse than six lists.
+- **One membership function.** `decideView` in `src/tools/facets.ts` now decides *and explains*; `buildFacetIndex` is a projection of it, so the table can never describe a server nobody runs. `surface.test.ts` compares the two under every switch combination. `src/tools/inventory.ts` is the single enumeration of what exists (disabled tools included — you cannot explain "nowhere" about a tool you already dropped); `registry.ts` re-exports `orderedToolEntries` from it.
+- **The snapshot is the documentation.** `docs/architecture/tool-surface.md` is generated by `npm run surface:build` and pinned by `npm run surface:check` + `surface-doc.test.ts` — same contract as `src/generated/catalog.json`. Never edit it by hand; regenerate it whenever a tool moves.
+- **Counts are computed.** `toolCountSentence()` is quoted verbatim by README.md, CLAUDE.md and the generated doc, and `tool-count.test.ts` also pins every per-category count in CLAUDE.md against `tools/list`. It corrected: 69 -> **66 served (72 defined, 6 withheld)**, Positions 4 -> 2 (no `update_position`/`delete_position` tool was ever written), Categories 1 -> 2, Clients 4 -> 5, Settings 6 -> 7, and a missing `[Users]` line.
+- **Behaviour unchanged.** Consolidation and documentation only; every pre-existing test passes untouched.
+- **Two gaps the table exposed** (recorded, not fixed here): the three executor tools are on **no facet** although ADR-001 D2 calls them always-loaded — the hosts that use a facet are exactly the ones that need the long-tail executor; and `marketing` still serves only `list_locations`.
+- **ADR-001 addenda (2026-09-17):** the surface table under D4; token-scope enforcement under D6; the human-confirmation gate under D8; §8 open decision 5 (executor writes) marked **resolved — reads only**.
+- **Files:** `src/tools/{surface,surface-doc,inventory}.ts` (new), `src/tools/facets.ts` (`decideView`, `VIEW_KEYS`, reason types), `src/tools/registry.ts`, `scripts/surface/build.ts` (new), `docs/architecture/tool-surface.md` (generated), `.github/workflows/ci.yml`, `README.md`, `CLAUDE.md`, `docs/architecture/2026-09-07-mcp-platform-architecture.md`. Tests: `src/tools/__tests__/{surface,surface-doc,tool-count}.test.ts`.
 
 **Token-scope check on execution (2026-09-17)**
 - **The `x-mcp-auth-scope` header is finally read.** The OAuth proxy has been forwarding the caller's granted scopes since the platform shipped; `src/request-context.ts` parsed it into `RequestIdentity.scope` and nothing used it. Every tool now declares what its execution requires and the `tools/call` handler enforces it.
