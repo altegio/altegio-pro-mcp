@@ -291,17 +291,31 @@ rejected: nothing enforces a header the caller sets for itself, Claude Desktop
 does not send one, and honouring it would make `tools/list` differ between two
 connections to the *same* resource, which ADR-001 D7 forbids.
 
-**What it is worth today — read this part.** While Altegio v3 still issues one
-full user token, **this is a guardrail, not a security boundary.** The token
-behind a read-only session is the same token as everywhere else; nothing at the
-API rejects a write performed with it. The address constrains what this MCP
-server offers and will do, not what the credential can do — a person can still
-ask the same agent to call the Altegio API directly, outside MCP, and it will
-work. The honest value is narrower and still real: it lets the consent screen
-stay *all or nothing* — no per-scope checkboxes for a user to reason about —
-while a deployment that wants a non-writing agent still has somewhere to point
-it. When v3 issues tokens carrying read scopes, this address is where they plug
-in, and the guarantee becomes a real one.
+**What it is worth — read this part, it depends on the token.** The address by
+itself is a **guardrail**: it constrains what this MCP server offers and will
+do, not what the credential can do. With a full token behind the session,
+nothing at the Altegio API rejects a write performed with it, and a person can
+still ask the same agent to call the API directly, outside MCP.
+
+What changes that is the **scope of the token**, and it no longer waits for
+Altegio v3. The OAuth proxy in front of this server already issues tokens
+carrying `mcp:pro:read` alone, and this server now [enforces
+them](#token-scopes-the-boundary-when-the-token-is-narrow) on execution:
+
+- **Token scoped to `mcp:pro:read`** — a real boundary. Every write tool is
+  refused on *every* address, `/mcp` included, before the handler runs and
+  before anything reaches Altegio. The read-only address then adds tidiness
+  (the write tools are not listed at all) on top of a guarantee that already
+  holds.
+- **Token carrying `mcp:pro:write`, or no scopes at all** — a guardrail, as
+  above. The value is still real: it lets the consent screen stay *all or
+  nothing* — no per-scope checkboxes for a user to reason about — while a
+  deployment that wants a non-writing agent has somewhere to point it.
+
+So the honest summary is: the address narrows the surface, the token narrows
+the rights, and the two together are what makes a read-only agent enforceable.
+Point an agent here *and* connect it with a read-scoped token when you need the
+guarantee.
 
 **How membership is decided.** From each tool's own `readOnlyHint` annotation,
 computed at startup — never from a list kept by hand. A pack that lands next
@@ -367,35 +381,55 @@ enforced in one place, the `tools/call` handler in
 [`src/tools/confirmation.ts`](src/tools/confirmation.ts). Nothing is stored
 server-side.
 
-## Token scopes (plumbing, not yet a boundary)
+## Token scopes (the boundary, when the token is narrow)
 
 The v3 authorization RFC settled that the real access boundary is the **scope
 of the token** — not the endpoint address, and not the tool annotations, which
 MCP forbids clients from treating as a security decision. A separate HTTP path
 only helps a deployment pick a profile of rights; it restricts nothing by
-itself. The OAuth proxy in front of this server already forwards the caller's
-granted scopes as `x-mcp-auth-scope`, and until now nothing read that header.
+itself. Every tool declares what its execution requires, and the `tools/call`
+handler checks it before anything else the call does.
 
-Every tool now declares what its execution requires, and the `tools/call`
-handler checks it. Three properties are deliberate:
+**Two vocabularies meet here**, and the rule for reconciling them lives in one
+file, [`src/tools/scopes.ts`](src/tools/scopes.ts):
+
+| Vocabulary | Who writes it | Status |
+| --- | --- | --- |
+| `mcp:pro:read`, `mcp:pro:write` | the OAuth proxy — `routes.json` declares these on `/pro` and `/public/pro`, and forwards the granted subset as `x-mcp-auth-scope` | **live today**, temporary |
+| `locations:read`, `clients:write`, … | this server's tool requirements, in the v3 `domain:action` convention | the target; no token carries them yet |
+
+`mcp:pro:write` satisfies every requirement — the platform vocabulary has two
+grades for the whole service and cannot express `create` or `manage_access`
+separately, so refusing those would make `create_appointment` permanently
+unreachable rather than strictly guarded. `mcp:pro:read` satisfies only
+requirements whose action is `read`, which is what makes a read-scoped token a
+real boundary. Inside the v3 vocabulary the single ratified implication holds
+and nothing more: `X:write` covers `X:read`, while `create`, `manage_access`,
+`refund` and `capture` need an explicit grant.
+
+Four properties are deliberate:
 
 - **Execution only.** `tools/list` is never filtered by the caller's scopes —
   one path, one tool list, for every connection (ADR-001 D7). A tool a caller
   cannot run is still listed, and explains itself when called.
-- **No declared scopes means no restriction.** Every deployment today — the
-  public HTTP endpoint, stdio, the closed Google-OIDC one — sends no
-  `x-mcp-auth-scope`, so nothing changes for any of them. The check starts
-  enforcing by itself the day tokens carry scopes.
+- **No declared scopes means no restriction.** stdio and `/public/pro` (which
+  the proxy does not forward identity on) send no `x-mcp-auth-scope`, and the
+  gate is a no-op for them.
+- **An unknown vocabulary also means no restriction.** If a grant carries only
+  names this build cannot map — another service's scopes, or a rename upstream
+  — the gate stands aside and logs once, rather than refusing every call. A
+  vocabulary mismatch must never be able to take the server down; that is
+  exactly the failure this rule was written after.
 - **The refusal is in band.** It is an `isError` tool result naming the missing
   permission and what a person has to do about it — never an HTTP 403, which
   would drop the session. Hosts do not re-authorise on a mid-session denial, so
   the message says not to retry and routes the caller to a human instead.
 
-> ⚠️ **The scope names are placeholders.** Their shape follows the ratified v3
+> ⚠️ **The v3 names are placeholders.** Their shape follows the ratified v3
 > convention (`domain:action`) and most are taken verbatim from the v3 scope
 > catalog, but that catalog is explicitly not final and the API team owns the
-> names. Until they are approved this is plumbing: correct wiring against a
-> provisional vocabulary, not an access boundary anyone should rely on.
+> names. What is enforceable today is the `mcp:pro:*` column; the table below
+> is the map those grants are resolved against.
 
 | Tools                                                                                                                             | Required scope                                                            |
 | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
@@ -420,16 +454,15 @@ The onboarding wizard's write phases take the scope of what they create
 `onboarding_rollback_phase` requires all four write scopes it can reach, since
 one tool name deletes across four domains.
 
-One implication is honoured, the one the v3 catalog ratified: **`X:write`
-covers `X:read`** on the same domain. Nothing else is — `create`,
-`manage_access`, `refund` and `capture` need an explicit grant, and
-`clients:read_contact` is a separate axis that gates _fields_, which V1 cannot
-express and this server therefore does not pretend to enforce.
+`clients:read_contact` is a separate axis that gates _fields_ rather than
+endpoints, which V1 cannot express and this server therefore does not pretend
+to enforce.
 
 The map is one file — [`src/tools/scopes.ts`](src/tools/scopes.ts) — so a
-rename when the vocabulary is approved is a single edit. No tool definition
-spells a scope out: `defineTool` fills `requiredScopes` from the map by tool
-name, and a test fails the build if a tool is missing an entry.
+rename when the vocabulary is approved is a single edit, and so is deleting the
+`mcp:pro:*` rule once v3 tokens carry the fine-grained names. No tool
+definition spells a scope out: `defineTool` fills `requiredScopes` from the map
+by tool name, and a test fails the build if a tool is missing an entry.
 
 ## Resources and prompts
 

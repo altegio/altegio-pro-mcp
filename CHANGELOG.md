@@ -6,6 +6,96 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — one resolved table for where each tool is served, and why
+
+Six mechanisms decide whether a tool reaches a given address and two more decide
+whether the call it receives there runs. Each is justified on its own terms, but
+nothing joined them: answering "why is tool X not on address Y" meant holding
+six lists in your head, which is how a new pack lands in the wrong place and
+nobody sees it in the diff. This joins them without collapsing them — losing
+their separate reasons for existing would be worse than six lists.
+
+- **`src/tools/surface.ts`** — one cell per tool x per view (`all`, `default`,
+  `readonly`, the six facets): served or withheld, a **machine value** for the
+  reason, and the gates that still refuse the call (token scope, human
+  confirmation, the executor's own read-only policy), listed in the order
+  `tools/call` checks them.
+- **Not a second implementation.** `decideView` in `src/tools/facets.ts` now
+  decides *and explains*, and `buildFacetIndex` is a projection of it; a test
+  compares the two under every switch combination.
+  `src/tools/inventory.ts` is the single enumeration of what exists, disabled
+  tools included — "why is this tool nowhere?" cannot be answered about a tool
+  the inventory already dropped.
+- **`docs/architecture/tool-surface.md`** is generated from that table
+  (`npm run surface:build`) and pinned by `npm run surface:check`, a CI step and
+  `surface-doc.test.ts` — the same contract `src/generated/catalog.json` has, so
+  a surface change reaches the reviewer's diff (ADR-001 D4/D7).
+
+### Fixed — documented tool counts disagreed with the server
+
+`CLAUDE.md` claimed "69 total" while 72 tools were defined and 66 served, and
+five per-category counts were wrong. Counts are now computed:
+`toolCountSentence()` is quoted verbatim by `README.md`, `CLAUDE.md` and the
+generated table, and `tool-count.test.ts` pins every per-category count in
+`CLAUDE.md` against `tools/list`.
+
+- 69 → **66 served** (72 defined, 6 withheld from every view)
+- Positions 4 → **2** — no `update_position` / `delete_position` tool was ever
+  written
+- Categories 1 → **2**, Clients 4 → **5**, Settings 6 → **7**, and a missing
+  `[Users]` line for `remove_location_user`
+
+### Documented
+
+ADR-001 gains three addenda — the surface table (D4), token-scope enforcement
+(D6) and the human-confirmation gate (D8) — and §8 open decision 5 (writes
+through `altegio_call_operation`) is marked **resolved: reads only**, with the
+reasoning rather than a rewrite of the decision's history.
+
+Two gaps the table exposed, recorded and not fixed here: the three executor
+tools are served on **no facet** although ADR-001 D2 calls them always-loaded,
+and `marketing` still serves only `list_locations`.
+
+No behaviour change: every pre-existing test passes untouched.
+
+### Fixed — the scope gate refused every gated tool on the closed endpoint
+
+The execution gate shipped on a premise that was false when it was written: that
+no deployment sent `x-mcp-auth-scope`. The platform proxy had in fact been
+forwarding `mcp:pro:read mcp:pro:write` on every `forward_identity` route since
+the platform shipped — `/pro`, which reaches this same backend. Those names are
+well-formed scope tokens, so the grant parsed non-empty; none of them matched a
+v3 `domain:action` requirement, so every gated tool was refused. The gate meant
+to be dormant until v3 instead took the closed endpoint down.
+
+- **The two vocabularies are now reconciled, in one place.**
+  `src/tools/scopes.ts` recognises the platform's `mcp:pro:read` /
+  `mcp:pro:write` alongside the v3 `domain:action` requirements, and documents
+  which is which, where each comes from, and that the platform pair is
+  temporary. `mcp:pro:write` satisfies every requirement including the
+  action-scopes (`appointments:create`, `team_members:manage_access`): the
+  platform vocabulary has two grades for the whole service and cannot express
+  the distinction, so withholding them would make `create_appointment`
+  permanently unreachable rather than strictly guarded — the reasoning is in the
+  `scopeSatisfied` comment. `mcp:pro:read` satisfies only `:read`.
+- **An unrecognised vocabulary now restricts nothing**, which was the original
+  intent. A grant carrying only names this build cannot map — another service's
+  scopes, a rename upstream — lets the call through and logs once per distinct
+  grant, instead of refusing everything. Failing closed on an unknown name turns
+  any upstream vocabulary change into a total outage.
+- **`/mcp/readonly` is a real boundary when the token is narrow.** The proxy can
+  already issue `mcp:pro:read` alone, and such a session is now refused every
+  write on every address, `/mcp` included, before the handler runs and before
+  anything reaches Altegio. Documented accordingly in `README.md` and in a
+  correction to the 2026-09-17 addendum in ADR-001 — with a full grant, or no
+  scopes at all, it remains a guardrail.
+- **Fixed the comments the premise came from** in `src/request-context.ts`
+  (`parseScopes`, `getRequestScopes`).
+- Tests: the literal production header, a read-only grant refusing writes across
+  the surface, an unknown vocabulary, a mixed grant, and no scopes at all — as
+  units in `src/tools/__tests__/scopes.test.ts` and over real HTTP sessions in
+  `src/__tests__/scope-enforcement-e2e.test.ts`.
+
 ### Security — untrusted-data handling
 
 Every free-text field these tools return was typed by someone outside this
