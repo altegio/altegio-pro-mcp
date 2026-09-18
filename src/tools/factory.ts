@@ -26,6 +26,7 @@ import {
   type ToolContent,
   type ToolResult,
 } from './tool-result.js';
+import { requiredScopesFor, type ToolScope } from './scopes.js';
 
 export interface ToolAnnotations {
   title?: string;
@@ -66,6 +67,18 @@ export interface ToolDefinition<T extends ZodType> {
    * sees the token.
    */
   confirm?: ConfirmationSpec<z.infer<T>>;
+  /**
+   * Token scopes this tool's execution requires (see `./scopes.ts`).
+   *
+   * A definition never authors this: `defineTool` fills it from the one map
+   * in `./scopes.ts`, keyed by tool name, and a value written here is
+   * overwritten. That indirection is the point — the scope vocabulary is a
+   * placeholder awaiting the API team, so a rename has to be an edit in one
+   * file rather than across seventy definitions. The field exists so a tool's
+   * requirement is readable off `meta`, next to its annotations and its
+   * confirmation spec, and so the registry enforces what the tool declares.
+   */
+  requiredScopes?: readonly ToolScope[];
   handler: (ctx: ToolContext<z.infer<T>>) => Promise<HandlerOutput>;
 }
 
@@ -159,6 +172,6 @@ export function defineTool<T extends ZodType>(
         return result;
       }),
 
-    meta: def,
+    meta: { ...def, requiredScopes: requiredScopesFor(def.name) },
   };
 }
