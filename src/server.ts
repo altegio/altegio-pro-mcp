@@ -56,6 +56,7 @@ export function createServer(options: CreateServerOptions = {}): MCPServer {
   const altegioClient = new AltegioClient(
     {
       apiBase: config.altegio.apiBase,
+      legacyWebBase: config.altegio.legacyWebBase,
       partnerToken: config.altegio.partnerToken,
       userToken: config.altegio.userToken,
     },

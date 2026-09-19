@@ -37,8 +37,9 @@ export const DEFAULT_SERVER_INSTRUCTIONS = [
   'owners, receptionists and team members. Today’s tools cover locations,',
   'team members and positions, services and categories, work schedules,',
   'appointments, the client base (segment, cards, visit history, lookup),',
-  'analytics (key metrics, series, breakdowns, occupancy, forecast and the',
-  'day-end report — there is no ad-hoc report builder), location settings,',
+  'analytics (key metrics, series, client sales and retention, service',
+  'profitability, team-member sales, occupancy, forecasts and the day-end',
+  'report — there is no ad-hoc report builder), location settings,',
   'resources, and a guided onboarding walkthrough. Use the delegated Altegio identity or direct user token already',
   'provided by the host; in local stdio mode call altegio_login if needed. Then',
   'call list_locations for a location_id. The default /mcp endpoint serves the',
@@ -105,6 +106,12 @@ export const EnvSchema = z.object({
   // Optional
   ALTEGIO_USER_TOKEN: z.string().optional(),
   ALTEGIO_API_BASE: z.string().url().default('https://api.alteg.io/api/v1'),
+  // Temporary bridge to stable ERP web reports until V3 analytics replaces it.
+  ALTEGIO_LEGACY_WEB_BASE: z
+    .string()
+    .url()
+    .default('https://yclients.com')
+    .transform((value) => value.replace(/\/+$/, '')),
 
   // Server config
   NODE_ENV: z
@@ -201,6 +208,7 @@ export type ServerConfig = z.infer<typeof ServerConfigSchema>;
 // Altegio client configuration
 export const AltegioConfigSchema = z.object({
   apiBase: z.string().url(),
+  legacyWebBase: z.string().url().default('https://yclients.com'),
   partnerToken: z.string().min(1),
   userToken: z.string().optional(),
   timeout: z.number().min(1000).default(30000),
@@ -260,6 +268,7 @@ export class ConfigLoader {
         ALTEGIO_API_TOKEN: env.ALTEGIO_API_TOKEN,
         ALTEGIO_USER_TOKEN: env.ALTEGIO_USER_TOKEN,
         ALTEGIO_API_BASE: env.ALTEGIO_API_BASE,
+        ALTEGIO_LEGACY_WEB_BASE: env.ALTEGIO_LEGACY_WEB_BASE,
         NODE_ENV: env.NODE_ENV,
         LOG_LEVEL: env.LOG_LEVEL,
         CREDENTIALS_DIR: env.CREDENTIALS_DIR,
@@ -288,6 +297,7 @@ export class ConfigLoader {
       // Build Altegio client config
       const altegioConfig = AltegioConfigSchema.parse({
         apiBase: envConfig.ALTEGIO_API_BASE,
+        legacyWebBase: envConfig.ALTEGIO_LEGACY_WEB_BASE,
         partnerToken: envConfig.ALTEGIO_API_TOKEN,
         userToken: envConfig.ALTEGIO_USER_TOKEN,
         retryConfig: {

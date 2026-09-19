@@ -28,6 +28,9 @@ describe('Configuration Schema', () => {
         expect(result.data.ALTEGIO_API_BASE).toBe(
           'https://api.alteg.io/api/v1'
         );
+        expect(result.data.ALTEGIO_LEGACY_WEB_BASE).toBe(
+          'https://yclients.com'
+        );
         expect(result.data.LOG_LEVEL).toBe('info');
       }
     });
@@ -42,6 +45,7 @@ describe('Configuration Schema', () => {
       const result = EnvSchema.safeParse({
         ALTEGIO_API_TOKEN: 'test-token',
         ALTEGIO_API_BASE: 'https://custom.api.com',
+        ALTEGIO_LEGACY_WEB_BASE: 'https://erp.example.test/',
         LOG_LEVEL: 'debug',
         RATE_LIMIT_REQUESTS: 100,
         MAX_RETRY_ATTEMPTS: 5,
@@ -50,6 +54,9 @@ describe('Configuration Schema', () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.ALTEGIO_API_BASE).toBe('https://custom.api.com');
+        expect(result.data.ALTEGIO_LEGACY_WEB_BASE).toBe(
+          'https://erp.example.test'
+        );
         expect(result.data.LOG_LEVEL).toBe('debug');
         expect(result.data.RATE_LIMIT_REQUESTS).toBe(100);
         expect(result.data.MAX_RETRY_ATTEMPTS).toBe(5);
@@ -154,6 +161,7 @@ describe('Configuration Schema', () => {
       });
 
       expect(result.apiBase).toBe('https://api.alteg.io/api/v1');
+      expect(result.legacyWebBase).toBe('https://yclients.com');
       expect(result.partnerToken).toBe('test-token');
       expect(result.timeout).toBe(30000);
       expect(result.retryConfig.maxAttempts).toBe(3);
@@ -230,6 +238,18 @@ describe('Configuration Schema', () => {
 
       expect(config.env.ALTEGIO_USER_TOKEN).toBe('user-token-123');
       expect(config.altegio.userToken).toBe('user-token-123');
+    });
+
+    it('should support a legacy web report base override', () => {
+      const config = loadConfig({
+        ALTEGIO_API_TOKEN: 'partner-token',
+        ALTEGIO_LEGACY_WEB_BASE: 'https://erp.example.test/',
+      });
+
+      expect(config.env.ALTEGIO_LEGACY_WEB_BASE).toBe(
+        'https://erp.example.test'
+      );
+      expect(config.altegio.legacyWebBase).toBe('https://erp.example.test');
     });
 
     it('should support custom rate limiting', () => {

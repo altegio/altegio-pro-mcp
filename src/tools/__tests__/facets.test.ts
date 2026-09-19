@@ -287,8 +287,8 @@ describe('static views', () => {
     ).length;
 
     it('has the whole served pack registered', () => {
-      // 15 defined, 6 withheld — see src/tools/disabled-tools.ts.
-      expect(analyticsCount).toBe(9);
+      // 20 defined, 6 withheld — see src/tools/disabled-tools.ts.
+      expect(analyticsCount).toBe(14);
     });
 
     it('admits only the named entry points to the default view', () => {
@@ -332,6 +332,24 @@ describe('static views', () => {
         FACET_BASE_TOOLS.length + analyticsCount
       );
       expect(index.includes('ops', 'analytics_get_overview')).toBe(false);
+    });
+
+    it('places the temporary legacy-report tools only on analytics surfaces', () => {
+      const index = buildFacetIndex(tools);
+      for (const name of [
+        'analytics_get_client_sales',
+        'analytics_get_client_retention',
+        'analytics_get_client_forecast',
+        'analytics_get_service_profitability',
+        'analytics_get_team_member_sales',
+      ]) {
+        expect(index.includes(DEFAULT_FACET, name)).toBe(false);
+        expect(index.includes('analytics', name)).toBe(true);
+        expect(index.includes('finance', name)).toBe(true);
+        expect(index.includes(READONLY_VIEW, name)).toBe(true);
+        expect(index.includes('ops', name)).toBe(false);
+        expect(index.includes('catalog', name)).toBe(false);
+      }
     });
   });
 });

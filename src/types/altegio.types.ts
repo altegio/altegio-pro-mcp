@@ -4,6 +4,8 @@
 
 export interface AltegioConfig {
   apiBase?: string;
+  /** Temporary authenticated ERP web origin used by legacy analytics reports. */
+  legacyWebBase?: string;
   partnerToken: string;
   userToken?: string;
   timeout?: number;

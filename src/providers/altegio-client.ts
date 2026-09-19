@@ -110,8 +110,20 @@ export interface AltegioClientOptions {
   requireDelegatedIdentity?: boolean;
 }
 
+export type LegacyWebQueryValue =
+  string | number | readonly string[] | readonly number[] | undefined;
+
+export interface LegacyWebRequest {
+  /** Location boundary enforced before any request leaves this process. */
+  locationId: number;
+  /** Absolute path on the configured ERP web origin. Never include a query. */
+  path: string;
+  query?: Readonly<Record<string, LegacyWebQueryValue>>;
+}
+
 export class AltegioClient {
   private apiUrl: string;
+  private legacyWebUrl: string;
   private partnerToken: string;
   /** Legacy single-user token (stdio / transition mode only). */
   private userToken?: string;
@@ -126,6 +138,9 @@ export class AltegioClient {
     options?: AltegioClientOptions
   ) {
     this.apiUrl = config.apiBase || 'https://api.alteg.io/api/v1';
+    this.legacyWebUrl = (
+      config.legacyWebBase || 'https://yclients.com'
+    ).replace(/\/+$/, '');
     this.partnerToken = config.partnerToken;
     this.userToken = config.userToken;
     this.credentials = new CredentialManager(credentialsDir);
@@ -233,6 +248,93 @@ export class AltegioClient {
       ...options,
       headers,
     });
+  }
+
+  /**
+   * Fetch one temporary legacy ERP web report without creating a browser
+   * session. The current request's Altegio user token is injected here, and
+   * nowhere else, as the accepted `user_hash` query parameter. Callers receive
+   * only the response body; URL construction, the secret and redirect handling
+   * stay inside this boundary so diagnostics can never echo the query string.
+   */
+  async requestLegacyWebReport(request: LegacyWebRequest): Promise<Response> {
+    assertCompanyAllowed(request.locationId);
+    this.requireAuth();
+
+    const userToken = this.resolveUserToken();
+    // `requireAuth` resolved the same request-scoped credential immediately
+    // above. Keep this defensive branch explicit for future resolver changes.
+    if (!userToken) {
+      throw new AuthenticationError('Not authenticated.');
+    }
+
+    if (!request.path.startsWith('/') || request.path.includes('?')) {
+      throw new AltegioApiError(
+        'The legacy analytics adapter built an invalid report path.',
+        500
+      );
+    }
+
+    const url = new URL(`${this.legacyWebUrl}${request.path}`);
+    for (const [name, raw] of Object.entries(request.query ?? {})) {
+      if (raw === undefined) continue;
+      const values = Array.isArray(raw) ? raw : [raw];
+      for (const value of values) url.searchParams.append(name, String(value));
+    }
+    url.searchParams.set('user_hash', userToken);
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json, text/html, application/vnd.ms-excel',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        redirect: 'manual',
+        credentials: 'omit',
+      });
+    } catch {
+      // Deliberately discard the native fetch error: it may include the URL,
+      // whose query carries the user token.
+      throw new AltegioApiError(
+        'The legacy analytics report could not be reached. Retry once; if it persists, the temporary ERP report endpoint is unavailable.',
+        503
+      );
+    }
+
+    if (response.status >= 300 && response.status < 400) {
+      throw new AltegioApiError(
+        'The legacy analytics report redirected instead of returning data. Refresh the delegated Altegio authentication and retry.',
+        401
+      );
+    }
+    if (response.status === 401) {
+      throw new AltegioApiError(
+        'The delegated Altegio authentication was not accepted by the legacy analytics report. Refresh it and retry.',
+        401
+      );
+    }
+    if (response.status === 403) {
+      throw new AltegioApiError(
+        'Access to this analytics report is denied for the current Altegio user. Ask a location owner to grant the matching report permission.',
+        403
+      );
+    }
+    if (response.status === 404) {
+      throw new AltegioApiError(
+        'This temporary legacy analytics report is not enabled for the location.',
+        404
+      );
+    }
+    if (!response.ok) {
+      throw new AltegioApiError(
+        `The legacy analytics report failed with HTTP ${response.status}. Retry later or use a neighboring analytics tool.`,
+        response.status
+      );
+    }
+
+    return response;
   }
 
   /**

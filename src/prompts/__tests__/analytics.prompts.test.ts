@@ -41,7 +41,8 @@ describe('getAnalyticsPrompt', () => {
     expect(text).toContain('analytics_get_overview');
     expect(text).toContain('analytics_get_daily_series');
     expect(text).toContain('analytics_get_appointments_breakdown');
-    expect(text).toContain('team_member_id');
+    expect(text).toContain('analytics_get_team_member_sales');
+    expect(text).toContain('analytics_get_service_profitability');
     expect(text).toContain('no-show');
   });
 

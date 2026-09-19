@@ -13,12 +13,14 @@
 # behaviour that surprised us while integrating.
 #
 # All paths are relative to https://api.alteg.io/api/v1 unless the operation
-# carries `x-altegio-api-version: v2`.
+# carries `x-altegio-api-version: v2` or `web`. Web operations are temporary
+# authenticated ERP reports; their `user_hash` credential is transport-only
+# and deliberately absent from this public operation contract.
 
 openapi: 3.1.0
 info:
   title: Altegio analytics — undocumented operations used by the MCP analytics pack
-  version: '2026-09-11'
+  version: '2026-09-19'
   description: >-
     Hand-written stubs for the undocumented analytics endpoints the
     `analytics_*` tool pack depends on. Candidates for publication in the
@@ -665,6 +667,94 @@ paths:
       responses:
         '204':
           description: Report deleted.
+
+  /analytics_clients/clients_search/{location_id}/:
+    get:
+      operationId: get_legacy_client_sales_report
+      summary: Read the stable sales-by-client web report
+      x-altegio-api-version: web
+      x-altegio-permission: Sales by clients report
+      x-altegio-caveat: >-
+        Temporary until an equivalent V3 operation exists. Returns a JSON
+        envelope whose content field is HTML; the contract fixture pins the
+        parsed structure. Authentication is injected by the transport and is
+        never exposed as a tool argument or catalog parameter.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: start_date, in: query, required: true, schema: { type: string, format: date } }
+        - { name: end_date, in: query, required: true, schema: { type: string, format: date } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: editable_length, in: query, schema: { type: integer, minimum: 1, maximum: 250 } }
+      responses:
+        '200': { description: JSON envelope containing the report HTML and total row count. }
+
+  /analytics_retention/retention_search/{location_id}/:
+    get:
+      operationId: get_legacy_client_retention_report
+      summary: Read the stable client-retention web report
+      x-altegio-api-version: web
+      x-altegio-permission: Client retention report
+      x-altegio-caveat: Temporary until an equivalent V3 operation exists; response content is HTML pinned by a contract fixture.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: start_date, in: query, required: true, schema: { type: string, format: date } }
+        - { name: end_date, in: query, required: true, schema: { type: string, format: date } }
+        - { name: service_id, in: query, schema: { type: integer, minimum: 0 } }
+      responses:
+        '200': { description: JSON envelope containing the report HTML and totals. }
+
+  /analytics/rfm/{location_id}/excel/clients:
+    get:
+      operationId: export_legacy_client_forecast
+      summary: Export the stable per-client forecast workbook
+      x-altegio-api-version: web
+      x-altegio-permission: Analytics, client export and forecast module
+      x-altegio-caveat: >-
+        Temporary BIFF8 workbook export. It contains no client id, so the MCP
+        reports client_id as null rather than inferring identity from contact data.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: prediction_date, in: query, schema: { type: string, format: date } }
+      responses:
+        '200': { description: BIFF8 workbook with one forecast row per client. }
+
+  /analytics_services/services_search/{location_id}/:
+    get:
+      operationId: get_legacy_service_profitability_report
+      summary: Read the stable service-profitability web report
+      x-altegio-api-version: web
+      x-altegio-permission: Sales by services report
+      x-altegio-caveat: Temporary until an equivalent V3 operation exists; response content is HTML pinned by a contract fixture.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: start_date, in: query, required: true, schema: { type: string, format: date } }
+        - { name: end_date, in: query, required: true, schema: { type: string, format: date } }
+        - { name: master_id, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: category_id, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: detailing, in: query, schema: { type: integer, enum: [0, 1] } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: editable_length, in: query, schema: { type: integer, minimum: 1, maximum: 500 } }
+      responses:
+        '200': { description: JSON envelope containing the report HTML and total row count. }
+
+  /analytics_masters/masters_search/{location_id}/:
+    get:
+      operationId: get_legacy_team_member_sales_report
+      summary: Read the stable sales-by-team-member web report
+      x-altegio-api-version: web
+      x-altegio-permission: Sales by team members report
+      x-altegio-caveat: Temporary until an equivalent V3 operation exists; repeated filter ids match the ERP report form.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: start_date, in: query, required: true, schema: { type: string, format: date } }
+        - { name: end_date, in: query, required: true, schema: { type: string, format: date } }
+        - { name: 'services_ids[]', in: query, schema: { type: array, items: { type: integer } } }
+        - { name: 'groups_ids[]', in: query, schema: { type: array, items: { type: integer } } }
+        - { name: 'goods_ids[]', in: query, schema: { type: array, items: { type: integer } } }
+        - { name: 'goods_categories_ids[]', in: query, schema: { type: array, items: { type: integer } } }
+        - { name: 'position_ids[]', in: query, schema: { type: array, items: { type: integer } } }
+      responses:
+        '200': { description: JSON envelope containing the report HTML and totals. }
 
 components:
   schemas:

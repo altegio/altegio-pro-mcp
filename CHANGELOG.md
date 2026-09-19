@@ -6,6 +6,21 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — five temporary read-only analytics reports
+
+Five curated tools expose stable authenticated ERP reports while equivalent V3
+operations are pending: client sales, client retention, per-client forecast,
+service profitability and team-member sales. The adapter is stateless and
+location-scoped, injects the request's current user credential without a cookie
+session, keeps contacts opt-in, caps response sizes, normalizes English,
+Russian and Brazilian-Portuguese number formats, and fails closed when report
+markup or team-member identity is ambiguous. The tools are served on the
+analytics, finance, read-only and stdio surfaces, not default `/mcp`.
+
+Their undocumented web routes are allowlisted in
+`catalog/extended/analytics.yaml`; golden HTML/BIFF8 fixtures, concurrency and
+redaction tests, and an opt-in read-only live suite pin the temporary contract.
+
 ### Added — one resolved table for where each tool is served, and why
 
 Six mechanisms decide whether a tool reaches a given address and two more decide

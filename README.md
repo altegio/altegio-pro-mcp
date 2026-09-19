@@ -14,9 +14,9 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Features
 
-- **66 tools served (72 defined, 6 withheld from every view)** — including a 9-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
+- **71 tools served (77 defined, 6 withheld from every view)** — including a 14-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
 - **Administrative writes** for staff, services, appointments, schedules, clients, categories, booking forms, and location users
-- **Analytics**: key metrics with period comparison, daily series, breakdowns, day-end report, occupancy (the report builder is switched off — see below)
+- **Analytics**: key metrics with period comparison, daily series, client sales and retention, service profitability, team-member sales, forecasts, day-end report and occupancy (the ad-hoc report builder is switched off — see below)
 - **Location settings**: appointment calendar, online booking, booking forms, resources
 - **Universal API executor**: search, describe and call any of the 317 documented API operations, even the ones without a dedicated tool
 - **Conversational onboarding** with bulk CSV/JSON import and automatic checkpoint/resume
@@ -28,7 +28,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Available Tools
 
-**66 tools served (72 defined, 6 withheld from every view)**, organized by category
+**71 tools served (77 defined, 6 withheld from every view)**, organized by category
 for complete business management. Which of them a given address serves, and why,
 is the generated table in
 [`docs/architecture/tool-surface.md`](docs/architecture/tool-surface.md).
@@ -137,6 +137,18 @@ the call, and amounts come back in major units with an ISO currency code.
 - `analytics_get_day_end_report` - Day-end totals: clients, appointments, services and products sold, memberships and gift cards, takings per account (cash vs card) and write-offs. Per-client detail is off by default and never carries names or phone numbers
 - `analytics_get_team_member_occupancy` - Day-by-day occupancy for up to ten named team members
 - `analytics_get_client_visit_stats` - One client's attended and missed visits, spend and client-account balance
+- `analytics_get_client_sales` - Source-paginated revenue, average check and visits by client; contacts are opt-in
+- `analytics_get_client_retention` - New, returning, eligible-to-return and returned clients by team member
+- `analytics_get_client_forecast` - Per-client forecast export with predicted visits, return window and revenue; contacts are opt-in
+- `analytics_get_service_profitability` - Revenue, costs, compensation and profit by service or service category
+- `analytics_get_team_member_sales` - Services, products, revenue, future appointments and working-hour efficiency by team member
+
+These five temporary adapters read the same stable reports as the authenticated
+ERP web application while equivalent V3 endpoints are pending. They are
+read-only, stateless, location-scoped, inject the current request's user token
+without a cookie session, and keep contacts opt-in. They are available on the
+analytics, finance, read-only and stdio surfaces, not the default `/mcp` view.
+
 **The report builder is switched off.** Six tools
 (`analytics_list_report_templates`, `analytics_list_report_fields`,
 `analytics_run_report`, `analytics_list_saved_reports`,
@@ -151,9 +163,11 @@ and only an hourly upstream sweep repairs it; and the delete route needs the
 `analytics_constructor_access` user right, which neither an owner's OAuth token
 nor the marketplace system user carries. The reasons, the evidence and the
 one-line re-enable step live in
-[`src/tools/disabled-tools.ts`](src/tools/disabled-tools.ts). Questions that
-needed a report table (by service, by client, a P&L) are declined through
-`altegio://analytics/coverage` instead of answered with an unfiltered table.
+[`src/tools/disabled-tools.ts`](src/tools/disabled-tools.ts). The five curated
+legacy-report tools above cover stable client, retention,
+service-profitability and team-member-sales reports without creating saved
+reports. Other custom tables and finance statements are declined through
+`altegio://analytics/coverage` instead of answered with unfiltered data.
 
 **Access rights.** Analytics needs the Analytics access right in the location;
 the day-end report needs the finance reporting right and occupancy needs access
@@ -654,6 +668,7 @@ See [CI-CD.md](CI-CD.md) for details.
 |----------|----------|---------|-------------|
 | `ALTEGIO_API_TOKEN` | Yes | - | Partner API token |
 | `ALTEGIO_API_BASE` | No | `https://api.alteg.io/api/v1` | API base URL |
+| `ALTEGIO_LEGACY_WEB_BASE` | No | `https://yclients.com` | Temporary authenticated ERP report base URL; override only for tests or an alternate first-party deployment |
 | `ALTEGIO_USER_TOKEN` | No | - | Pre-seeded user token (stdio single-user only) |
 | `CREDENTIALS_DIR` | No | `~/.altegio-mcp` | Directory for stored user tokens |
 | `REQUIRE_DELEGATED_IDENTITY` | No | `false` | HTTP mode: require a proxy-verified identity per request |
@@ -772,6 +787,16 @@ npx jest analytics-live
   The partner token has its own variable here because the shared Jest setup pins
   `ALTEGIO_API_TOKEN` to a dummy value for every other suite. The suite is
   read-only and reuses a maintained assistant-owned report for builder checks.
+- **Opt-in legacy-report live suite** — reads and parses the five temporary ERP
+  reports without recording or printing client data:
+
+```bash
+ALTEGIO_E2E=1 \
+ALTEGIO_PARTNER_TOKEN=... ALTEGIO_USER_TOKEN=... \
+CREDENTIALS_DIR=/tmp/altegio-mcp-live \
+npx jest legacy-analytics-live
+```
+
 - **Jest** for unit tests with mocked API responses
 - **Test isolation** with temporary credentials directory
 - Run: `npm test` or `npm run test:coverage`
