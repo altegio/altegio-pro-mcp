@@ -6,6 +6,17 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — capacity, reactivation, group events, product sales and cash flow
+
+Five more read-only analytics tools extend the existing temporary report adapter.
+They preserve source pagination and permissions, withhold client contacts by
+default and category costs unconditionally, and distinguish appointment value,
+lifetime payments, product cost and signed cash movement. Cash-flow columns
+retain both authorized account and account-type breakdowns without double
+counting. The source cash-only zero-row filter is replaced by filtering parsed
+movements so cashless-only items remain visible. See the
+[source semantics and migration notes](docs/architecture/2026-09-19-next-legacy-analytics.md).
+
 ### Added — five temporary read-only analytics reports
 
 Five curated tools expose stable authenticated ERP reports while equivalent V3

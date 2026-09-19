@@ -756,6 +756,116 @@ paths:
       responses:
         '200': { description: JSON envelope containing the report HTML and totals. }
 
+  /analytics_workload/workload_search/{location_id}/:
+    get:
+      operationId: get_legacy_team_member_capacity_report
+      summary: Read temporary team member capacity report
+      x-altegio-api-version: web
+      x-altegio-permission: Team occupancy report
+      x-altegio-caveat: Temporary until equivalent V3; golden contracts in legacy-analytics-next.test.ts and legacy-analytics-adapter.test.ts.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: "start_date", in: query, schema: { type: string, format: date } }
+        - { name: "end_date", in: query, schema: { type: string, format: date } }
+      responses:
+        '200': { description: JSON search envelope containing HTML; bounded parsing and explicit structural drift failures. }
+
+  /analytics/loyalty_programs/{location_id}/excel/lost_clients:
+    get:
+      operationId: get_legacy_client_reactivation_candidates_report
+      summary: Read temporary client reactivation candidates report
+      x-altegio-api-version: web
+      x-altegio-permission: Loyalty analytics and client contacts access
+      x-altegio-caveat: Temporary until equivalent V3; golden contracts in legacy-analytics-next.test.ts and legacy-analytics-adapter.test.ts.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: "loyalty_program_id", in: query, schema: { type: integer } }
+        - { name: "date_from", in: query, schema: { type: string, format: date } }
+        - { name: "date_to", in: query, schema: { type: string, format: date } }
+      responses:
+        '200': { description: BIFF8 workbook; no stable client ids. }
+
+  /dashboard/activities/{location_id}/search:
+    get:
+      operationId: get_legacy_group_event_performance_report
+      summary: Read temporary group event performance report
+      x-altegio-api-version: web
+      x-altegio-permission: Group-event dashboard access
+      x-altegio-caveat: Temporary until equivalent V3; golden contracts in legacy-analytics-next.test.ts and legacy-analytics-adapter.test.ts.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: "start_date", in: query, schema: { type: string, format: date } }
+        - { name: "end_date", in: query, schema: { type: string, format: date } }
+        - { name: "page", in: query, schema: { type: integer } }
+        - { name: "editable_length", in: query, schema: { type: integer } }
+        - { name: "master", in: query, schema: { type: integer } }
+        - { name: "service", in: query, schema: { type: integer } }
+        - { name: "service_category", in: query, schema: { type: integer } }
+        - { name: "category", in: query, schema: { type: integer } }
+        - { name: "removed", in: query, schema: { type: integer } }
+      responses:
+        '200': { description: JSON search envelope containing HTML; bounded parsing and explicit structural drift failures. }
+
+  /storages/sales_analysis/search/{location_id}/:
+    get:
+      operationId: get_legacy_product_sales_report
+      summary: Read temporary product sales report
+      x-altegio-api-version: web
+      x-altegio-permission: Inventory sales report; cost view separately enforced
+      x-altegio-caveat: Temporary until equivalent V3; golden contracts in legacy-analytics-next.test.ts and legacy-analytics-adapter.test.ts.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: "start_date", in: query, schema: { type: string, format: date } }
+        - { name: "end_date", in: query, schema: { type: string, format: date } }
+        - { name: "page", in: query, schema: { type: integer } }
+        - { name: "editable_length", in: query, schema: { type: integer } }
+        - { name: "category_id", in: query, schema: { type: integer } }
+        - { name: "employee_id", in: query, schema: { type: integer } }
+        - { name: "supplier_id", in: query, schema: { type: integer } }
+      responses:
+        '200': { description: JSON search envelope containing HTML; bounded parsing and explicit structural drift failures. }
+
+  /finances_reports/account_period_search/{location_id}/:
+    get:
+      operationId: get_legacy_cash_flow_breakdown_report
+      summary: Read temporary cash flow breakdown report
+      x-altegio-api-version: web
+      x-altegio-permission: Finance period report; no CSV export permission needed
+      x-altegio-caveat: Temporary until equivalent V3; golden contracts in legacy-analytics-next.test.ts and legacy-analytics-adapter.test.ts.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: "start_date", in: query, schema: { type: string, format: date } }
+        - { name: "end_date", in: query, schema: { type: string, format: date } }
+        - { name: "accounts_ids[]", in: query, schema: { type: array, items: { type: integer } } }
+        - { name: "master_id", in: query, schema: { type: integer } }
+        - { name: "supplier_id", in: query, schema: { type: integer } }
+        - { name: "type", in: query, schema: { type: integer } }
+        - { name: "account_type", in: query, schema: { type: integer } }
+        - { name: "services_ids[]", in: query, schema: { type: array, items: { type: integer } } }
+        - { name: "goods_ids[]", in: query, schema: { type: array, items: { type: integer } } }
+        - { name: "groups_ids[]", in: query, schema: { type: array, items: { type: integer } } }
+        - { name: "goods_categories_ids[]", in: query, schema: { type: array, items: { type: integer } } }
+        - { name: "movements_funds", in: query, schema: { type: integer } }
+      responses:
+        '200': { description: JSON search envelope containing HTML; bounded parsing and explicit structural drift failures. }
+
+  /storages/sales_analysis/categories_search/{location_id}/:
+    get:
+      operationId: get_legacy_product_category_sales_report
+      summary: Read temporary product category sales report
+      x-altegio-api-version: web
+      x-altegio-permission: Inventory sales report; category costs withheld by MCP
+      x-altegio-caveat: Temporary until equivalent V3; golden contracts in legacy-analytics-next.test.ts and legacy-analytics-adapter.test.ts.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: "start_date", in: query, schema: { type: string, format: date } }
+        - { name: "end_date", in: query, schema: { type: string, format: date } }
+        - { name: "category_id", in: query, schema: { type: integer } }
+        - { name: "employee_id", in: query, schema: { type: integer } }
+        - { name: "supplier_id", in: query, schema: { type: integer } }
+      responses:
+        '200': { description: JSON search envelope containing HTML; bounded parsing and explicit structural drift failures. }
+
 components:
   schemas:
     ReportBuilderReport:

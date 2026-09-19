@@ -287,8 +287,8 @@ describe('static views', () => {
     ).length;
 
     it('has the whole served pack registered', () => {
-      // 20 defined, 6 withheld — see src/tools/disabled-tools.ts.
-      expect(analyticsCount).toBe(14);
+      // 25 defined, 6 withheld — see src/tools/disabled-tools.ts.
+      expect(analyticsCount).toBe(19);
     });
 
     it('admits only the named entry points to the default view', () => {
@@ -342,6 +342,11 @@ describe('static views', () => {
         'analytics_get_client_forecast',
         'analytics_get_service_profitability',
         'analytics_get_team_member_sales',
+        'analytics_get_team_member_capacity',
+        'analytics_get_client_reactivation_candidates',
+        'analytics_get_group_event_performance',
+        'analytics_get_product_sales',
+        'analytics_get_cash_flow_breakdown',
       ]) {
         expect(index.includes(DEFAULT_FACET, name)).toBe(false);
         expect(index.includes('analytics', name)).toBe(true);

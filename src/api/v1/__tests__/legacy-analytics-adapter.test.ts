@@ -224,3 +224,200 @@ describe('temporary legacy analytics adapter wire mapping', () => {
     ).rejects.toThrow(/too large/);
   });
 });
+
+const nextPeriod = {
+  location_id: 4564,
+  date_from: '2026-09-01',
+  date_to: '2026-09-19',
+};
+describe('next temporary report adapter contracts', () => {
+  it('maps every search route and its complete filter vocabulary', async () => {
+    const { client, requests } = fakeClient([
+      searchResponse(fixture('capacity-en.html')),
+      searchResponse(fixture('products-en-cost.html'), 26),
+      searchResponse(fixture('product-categories-en.html')),
+      searchResponse(fixture('cash-flow-en.html')),
+    ]);
+    const adapter = new V1LegacyAnalyticsAdapter(client);
+    await adapter.getTeamMemberCapacity(nextPeriod);
+    await adapter.getProductSales({
+      ...nextPeriod,
+      page: 2,
+      page_size: 25,
+      group_by: 'product',
+      product_category_id: 5,
+      team_member_id: 77,
+      supplier_id: 0,
+    });
+    await adapter.getProductSales({
+      ...nextPeriod,
+      page: 1,
+      page_size: 25,
+      group_by: 'product_category',
+    });
+    await adapter.getCashFlowBreakdown({
+      ...nextPeriod,
+      cash_account_ids: [1, 2],
+      team_member_id: 77,
+      supplier_id: 9,
+      service_ids: [3],
+      product_ids: [4],
+      service_category_ids: [5],
+      product_category_ids: [6],
+      include_zero_movement_rows: false,
+    });
+    expect(requests.map((r) => r.path)).toEqual([
+      '/analytics_workload/workload_search/4564/',
+      '/storages/sales_analysis/search/4564/',
+      '/storages/sales_analysis/categories_search/4564/',
+      '/finances_reports/account_period_search/4564/',
+    ]);
+    expect(requests[1]?.query).toMatchObject({
+      page: 2,
+      editable_length: 25,
+      category_id: 5,
+      employee_id: 77,
+      supplier_id: 0,
+    });
+    expect(requests[3]?.query).toMatchObject({
+      'accounts_ids[]': [1, 2],
+      master_id: 77,
+      supplier_id: 9,
+      'services_ids[]': [3],
+      'goods_ids[]': [4],
+      'groups_ids[]': [5],
+      'goods_categories_ids[]': [6],
+      account_type: 2,
+      movements_funds: 1,
+    });
+  });
+  it.each([
+    ['all', 0],
+    ['active', 2],
+    ['deleted', 1],
+  ] as const)(
+    'maps event status %s and canonical filters',
+    async (status, wire) => {
+      const { client, requests } = fakeClient([
+        searchResponse(fixture('events-en.html')),
+      ]);
+      jest
+        .spyOn(client, 'getStaff')
+        .mockResolvedValue([
+          { id: 77, name: 'Alice', specialization: 'Trainer' },
+        ] as never);
+      const report = await new V1LegacyAnalyticsAdapter(
+        client
+      ).getGroupEventPerformance({
+        ...nextPeriod,
+        page: 1,
+        page_size: 25,
+        team_member_id: 77,
+        service_id: 2,
+        service_category_id: 3,
+        label_id: 4,
+        status,
+      });
+      expect(report.rows[0]?.group_event_id).toBe(10);
+      expect(requests[0]).toMatchObject({
+        path: '/dashboard/activities/4564/search',
+        query: {
+          master: 77,
+          service: 2,
+          service_category: 3,
+          category: 4,
+          removed: wire,
+        },
+      });
+    }
+  );
+  it('uses the bounded workbook reader and exact reactivation filters', async () => {
+    const sheet = XLSX.utils.aoa_to_sheet([
+      [
+        'Name',
+        'Phone',
+        'Email',
+        'Registration',
+        'Visit',
+        'Paid',
+        'Balance',
+        'Visits',
+      ],
+      ['A', '', '', '2020-01-01', '2026-01-01', 100, 0, ''],
+    ]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, sheet, 'Clients');
+    const { client, requests } = fakeClient([
+      new Response(XLSX.write(workbook, { type: 'buffer', bookType: 'biff8' })),
+    ]);
+    const report = await new V1LegacyAnalyticsAdapter(
+      client
+    ).getClientReactivationCandidates({
+      ...nextPeriod,
+      loyalty_program_id: 2,
+      page: 1,
+      page_size: 25,
+      include_contacts: false,
+    });
+    expect(report.rows[0]?.client_id).toBeNull();
+    expect(requests[0]).toEqual({
+      locationId: 4564,
+      path: '/analytics/loyalty_programs/4564/excel/lost_clients',
+      query: {
+        loyalty_program_id: 2,
+        date_from: '2026-09-01',
+        date_to: '2026-09-19',
+      },
+    });
+  });
+  it.each(['Need Auth', '{"success":false,"error":"user_hash=secret"}'])(
+    'does not reflect authentication or permission response content',
+    async (body) => {
+      const { client } = fakeClient([new Response(body)]);
+      await expect(
+        new V1LegacyAnalyticsAdapter(client).getTeamMemberCapacity(nextPeriod)
+      ).rejects.not.toThrow('user_hash');
+    }
+  );
+  it('caps reactivation exports before parsing and rejects body-level authentication', async () => {
+    for (const response of [
+      new Response('x', {
+        headers: { 'content-length': String(13 * 1024 * 1024) },
+      }),
+      new Response('Need Auth'),
+    ]) {
+      const { client } = fakeClient([response]);
+      await expect(
+        new V1LegacyAnalyticsAdapter(client).getClientReactivationCandidates({
+          ...nextPeriod,
+          loyalty_program_id: 2,
+          page: 1,
+          page_size: 25,
+          include_contacts: false,
+        })
+      ).rejects.toThrow();
+    }
+  });
+});
+it('recognizes the cash-flow permission envelope without reflecting source diagnostics', async () => {
+  const { client } = fakeClient([
+    new Response(JSON.stringify({ error: 'user_hash=secret' })),
+  ]);
+  await expect(
+    new V1LegacyAnalyticsAdapter(client).getCashFlowBreakdown(nextPeriod)
+  ).rejects.toMatchObject({ statusCode: 403 });
+});
+it('keeps nonzero cashless-only items when zero movement rows are excluded', async () => {
+  const html = fixture('cash-flow-en.html').replace(
+    /<td class="by-type report-amount-cell">1,234.56<\/td><td class="by-type report-amount-cell">0<\/td>/g,
+    '<td class="by-type report-amount-cell">0</td><td class="by-type report-amount-cell">1,234.56</td>'
+  );
+  const { client, requests } = fakeClient([searchResponse(html)]);
+  const report = await new V1LegacyAnalyticsAdapter(
+    client
+  ).getCashFlowBreakdown({ ...nextPeriod, include_zero_movement_rows: false });
+  expect(
+    report.rows.find((row) => row.kind === 'payment_item')?.amounts[1]
+  ).toBe(1234.56);
+  expect(requests[0]?.query?.movements_funds).toBe(1);
+});

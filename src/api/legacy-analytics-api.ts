@@ -158,3 +158,170 @@ export interface LegacyTeamMemberIdentity {
   name: string;
   position_title?: string | null;
 }
+
+export interface TeamMemberCapacityMetrics {
+  worked_days: number | null;
+  working_hours: number | null;
+  booked_hours: number | null;
+  idle_hours: number | null;
+  occupancy_percent: number | null;
+  upcoming_appointments_count: number | null;
+}
+export interface TeamMemberCapacityReport {
+  rows: Array<
+    TeamMemberCapacityMetrics & {
+      team_member_id: number;
+      team_member_name: string | null;
+      position_title: string | null;
+    }
+  >;
+  totals: TeamMemberCapacityMetrics;
+}
+export interface ReactivationCandidate {
+  client_id: null;
+  client_name: string | null;
+  registration_date: string | null;
+  last_visit_date: string | null;
+  lifetime_paid_amount: number | null;
+  client_account_balance: number | null;
+  last_visits: Array<{ date: string; description: string }>;
+  last_visits_parse_status: 'parsed' | 'empty' | 'unavailable';
+  phone?: string | null;
+  email?: string | null;
+  contacts_status?: 'source_values_may_be_masked';
+}
+export interface ClientReactivationReport {
+  currency: string | null;
+  rows: ReactivationCandidate[];
+  page: PageMeta;
+}
+export interface GroupEventMetric {
+  participants: number | null;
+  capacity: number | null;
+  percent: number | null;
+}
+export interface GroupEventPerformanceReport {
+  currency: string | null;
+  rows: Array<{
+    group_event_id: number;
+    team_member_id: number | null;
+    team_member_name: string | null;
+    position_title: string | null;
+    service_id: null;
+    service_title: string | null;
+    date_display: string | null;
+    capacity: number | null;
+    booked_participants: number | null;
+    attended_clients: number | null;
+    fully_paid_clients: number | null;
+    appointment_value: number | null;
+    creator_display: string | null;
+    created_at_display: string | null;
+    duration_minutes: number | null;
+    is_deleted: boolean;
+  }>;
+  metrics: {
+    booked: GroupEventMetric;
+    attended: GroupEventMetric;
+    paid: GroupEventMetric;
+    average_occupancy: GroupEventMetric;
+  } | null;
+  page: PageMeta;
+}
+export type ProductSalesGroup = 'product' | 'product_category';
+export interface ProductSalesAmounts {
+  quantity: number | null;
+  /** Total cost for the sold quantity, never a unit cost. */
+  cost: number | null;
+  markup: number | null;
+  markup_percent: number | null;
+  /** Money plus client-account payments. */
+  revenue: number | null;
+}
+export interface ProductSalesReport {
+  currency: string | null;
+  group_by: ProductSalesGroup;
+  cost_fields_status: 'available' | 'withheld';
+  rows: Array<
+    ProductSalesAmounts & {
+      product_id: number | null;
+      product_category_id: number | null;
+      title: string | null;
+      sku: string | null;
+      barcode: string | null;
+      unit: string | null;
+    }
+  >;
+  totals: ProductSalesAmounts;
+  page: PageMeta;
+  pagination_source: 'upstream' | 'local';
+}
+export type CashAccountType = 'all' | 'cash' | 'cashless';
+export interface CashFlowColumn {
+  period_label: string;
+  period_kind: 'day' | 'period_total';
+  dimension: 'cash_account_type' | 'cash_account' | 'total';
+  cash_account_type: CashAccountType | null;
+  cash_account_id: null;
+  cash_account_title: string | null;
+}
+export interface CashFlowRow {
+  payment_item_id: number | null;
+  payment_item_title: string;
+  kind: 'inflow' | 'outflow' | 'balance' | 'payment_item';
+  direction: 'inflow' | 'outflow' | null;
+  amounts: Array<number | null>;
+  total: number | null;
+}
+export interface CashFlowBreakdownReport {
+  currency: string | null;
+  columns: CashFlowColumn[];
+  rows: CashFlowRow[];
+  totals: {
+    inflow: number | null;
+    outflow: number | null;
+    balance: number | null;
+  };
+}
+
+export interface LegacyPeriodRequest {
+  location_id: number;
+  date_from: string;
+  date_to: string;
+}
+export interface LegacyPageRequest {
+  page: number;
+  page_size: number;
+}
+export interface ClientReactivationRequest
+  extends LegacyPeriodRequest, LegacyPageRequest {
+  loyalty_program_id: number;
+  include_contacts: boolean;
+}
+export interface GroupEventPerformanceRequest
+  extends LegacyPeriodRequest, LegacyPageRequest {
+  team_member_id?: number;
+  service_id?: number;
+  service_category_id?: number;
+  label_id?: number;
+  status?: 'all' | 'active' | 'deleted';
+}
+export interface ProductSalesRequest
+  extends LegacyPeriodRequest, LegacyPageRequest {
+  group_by: ProductSalesGroup;
+  product_category_id?: number;
+  team_member_id?: number;
+  supplier_id?: number;
+}
+export interface CashFlowBreakdownRequest extends LegacyPeriodRequest {
+  cash_account_ids?: number[];
+  team_member_id?: number;
+  supplier_id?: number;
+  transaction_type?: number;
+  cash_account_type?: CashAccountType;
+  service_ids?: number[];
+  product_ids?: number[];
+  service_category_ids?: number[];
+  product_category_ids?: number[];
+  include_zero_movement_rows?: boolean;
+}
