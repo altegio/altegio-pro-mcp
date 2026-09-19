@@ -140,8 +140,8 @@ the call, and amounts come back in major units with an ISO currency code.
 - `analytics_get_client_sales` - Source-paginated revenue, average check and visits by client; contacts are opt-in
 - `analytics_get_client_retention` - New, returning, eligible-to-return and returned clients by team member
 - `analytics_get_client_forecast` - Per-client forecast export with predicted visits, return window and revenue; contacts are opt-in
-- `analytics_get_service_profitability` - Revenue, costs, compensation and profit by service or service category
-- `analytics_get_team_member_sales` - Services, products, revenue, future appointments and working-hour efficiency by team member
+- `analytics_get_service_profitability` - Revenue, costs, compensation and contribution result by service or service category
+- `analytics_get_team_member_sales` - Services, products, revenue, future appointments and worked-hour efficiency by team member
 - `analytics_get_profit_and_loss_statement` - Posted income and expense categories, sales-stream memo figures and service contribution, with explicit missing-cost disclosure instead of an unproven net-profit label
 - `analytics_get_capacity_heatmap` - Scheduled, booked, completed-utilized and idle hours by hour, weekday or date-hour, with peak and underused buckets
 - `analytics_get_revenue_leakage` - No-show, cancellation, unpaid-risk and discount signals plus optional unbooked-capacity opportunity; unlike estimates are never summed into a false total
@@ -150,7 +150,7 @@ the call, and amounts come back in major units with an ISO currency code.
 - `analytics_get_team_member_capacity` - Working, booked and idle hours, occupancy and upcoming appointments
 - `analytics_get_client_reactivation_candidates` - Loyalty-program nonreturners, lifetime paid amounts and recent visit descriptions; contacts opt-in, client ids unavailable
 - `analytics_get_group_event_performance` - Capacity, booked/attended/paid participants and appointment value; aggregate occupancy metrics
-- `analytics_get_product_sales` - Product or category sales, quantity and markup; permission-aware product costs, category costs withheld
+- `analytics_get_product_sales` - Product or category sales, quantity, total cost and total markup; permission-aware product costs, category costs withheld
 - `analytics_get_cash_flow_breakdown` - Signed movements by payment item, day and returned cash-account/type columns
 
 The curated legacy-report adapters read the same stable reports as the
@@ -683,7 +683,7 @@ See [CI-CD.md](CI-CD.md) for details.
 |----------|----------|---------|-------------|
 | `ALTEGIO_API_TOKEN` | Yes | - | Partner API token |
 | `ALTEGIO_API_BASE` | No | `https://api.alteg.io/api/v1` | API base URL |
-| `ALTEGIO_LEGACY_WEB_BASE` | No | `https://yclients.com` | Temporary authenticated ERP report base URL; override only for tests or an alternate first-party deployment |
+| `ALTEGIO_LEGACY_WEB_BASE` | No | `https://app.alteg.io` | Temporary authenticated ERP report base URL. Set `https://yclients.com` for a YCLIENTS deployment. |
 | `ALTEGIO_USER_TOKEN` | No | - | Pre-seeded user token (stdio single-user only) |
 | `CREDENTIALS_DIR` | No | `~/.altegio-mcp` | Directory for stored user tokens |
 | `REQUIRE_DELEGATED_IDENTITY` | No | `false` | HTTP mode: require a proxy-verified identity per request |

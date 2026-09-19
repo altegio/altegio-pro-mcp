@@ -382,6 +382,32 @@ function resolveTeamMember(
   return candidates[0]!.id;
 }
 
+function resolveOptionalTeamMember(
+  name: string,
+  position: string,
+  identities: readonly LegacyTeamMemberIdentity[]
+): {
+  id: number | null;
+  status: 'matched' | 'unavailable' | 'ambiguous';
+} {
+  const expectedName = normalizedIdentity(name);
+  if (!expectedName) return { id: null, status: 'unavailable' };
+  const expectedPosition = normalizedIdentity(position);
+  const named = identities.filter(
+    (item) => normalizedIdentity(item.name) === expectedName
+  );
+  const exact = named.filter(
+    (item) => normalizedIdentity(item.position_title) === expectedPosition
+  );
+  const candidates = expectedPosition ? exact : named;
+  if (candidates.length === 1)
+    return { id: candidates[0]!.id, status: 'matched' };
+  return {
+    id: null,
+    status: candidates.length > 1 ? 'ambiguous' : 'unavailable',
+  };
+}
+
 export function parseClientRetentionHtml(args: {
   html: string;
   count: number;
@@ -504,12 +530,12 @@ export function parseServiceProfitabilityHtml(args: {
         title: title || null,
         service_category_title:
           args.groupBy === 'service' ? category || null : null,
-        services_count: integer(values[1]) ?? 0,
+        services_rendered_count: integer(values[1]) ?? 0,
         payments: paymentBreakdown(values, 2),
         cash_or_card_revenue: parseLocaleNumber(values[7]),
         consumables_cost: parseLocaleNumber(values[8]),
         team_member_compensation: parseLocaleNumber(values[9]),
-        profit: parseLocaleNumber(values[10]),
+        contribution_result: parseLocaleNumber(values[10]),
         revenue_share_percent: percent(values[11]),
       };
     })
@@ -535,12 +561,12 @@ export function parseServiceProfitabilityHtml(args: {
     group_by: args.groupBy,
     rows,
     totals: {
-      services_count: integer(totalValues[1]) ?? 0,
+      services_rendered_count: integer(totalValues[1]) ?? 0,
       payments: paymentBreakdown(totalValues, 2),
       cash_or_card_revenue: parseLocaleNumber(totalValues[7]),
       consumables_cost: parseLocaleNumber(totalValues[8]),
       team_member_compensation: parseLocaleNumber(totalValues[9]),
-      profit: parseLocaleNumber(totalValues[10]),
+      contribution_result: parseLocaleNumber(totalValues[10]),
     },
     page: pageMeta(args.page, args.pageSize, args.count, rows.length),
   };
@@ -581,13 +607,13 @@ export function parseTeamMemberSalesHtml(args: {
         position_title: position || null,
         revenue: parseLocaleNumber(values[2]),
         services_revenue: parseLocaleNumber(values[3]),
-        services_count: integer(values[4]),
+        services_rendered_count: integer(values[4]),
         products_revenue: parseLocaleNumber(values[5]),
         products_count: integer(values[6]),
         payments: paymentBreakdown(values, 7),
         upcoming_appointments_revenue: parseLocaleNumber(values[12]),
-        working_hours: parseLocaleNumber(values[13]),
-        revenue_per_working_hour: parseLocaleNumber(values[14]),
+        worked_hours: parseLocaleNumber(values[13]),
+        revenue_per_worked_hour: parseLocaleNumber(values[14]),
         revenue_share_percent: percent(values[15]),
       };
     })
@@ -611,12 +637,12 @@ export function parseTeamMemberSalesHtml(args: {
     totals: {
       revenue: parseLocaleNumber(totalValues[1]),
       services_revenue: parseLocaleNumber(totalValues[2]),
-      services_count: integer(totalValues[3]),
+      services_rendered_count: integer(totalValues[3]),
       products_revenue: parseLocaleNumber(totalValues[4]),
       products_count: integer(totalValues[5]),
       payments: paymentBreakdown(totalValues, 6),
       upcoming_appointments_revenue: parseLocaleNumber(totalValues[11]),
-      working_hours: parseLocaleNumber(totalValues[12]),
+      worked_hours: parseLocaleNumber(totalValues[12]),
     },
   };
 }
@@ -741,7 +767,7 @@ export function parseTeamMemberCapacityHtml(args: {
       );
     return {
       worked_days: integer(v[2]),
-      working_hours: parseLocaleNumber(v[3]),
+      scheduled_hours: parseLocaleNumber(v[3]),
       booked_hours: parseLocaleNumber(v[4]),
       idle_hours: parseLocaleNumber(v[5]),
       occupancy_percent: percent(v[6]),
@@ -783,7 +809,7 @@ export function parseTeamMemberCapacityHtml(args: {
         : args.count === 0
           ? {
               worked_days: null,
-              working_hours: null,
+              scheduled_hours: null,
               booked_hours: null,
               idle_hours: null,
               occupancy_percent: null,
@@ -848,8 +874,8 @@ export function parseProductSalesHtml(args: {
       barcode: category ? null : v[1] || null,
       quantity: parseLocaleNumber(quantityMatch[1]),
       unit: category ? null : cleanText(quantityMatch[2]) || null,
-      cost: showCost ? parseLocaleNumber(v[4]) : null,
-      markup: showCost ? parseLocaleNumber(v[5]) : null,
+      total_cost: showCost ? parseLocaleNumber(v[4]) : null,
+      total_markup: showCost ? parseLocaleNumber(v[5]) : null,
       markup_percent: showCost ? percent(v[6]) : null,
       revenue: parseLocaleNumber(v[width - 1]),
     };
@@ -892,8 +918,8 @@ export function parseProductSalesHtml(args: {
     rows: selected,
     totals: {
       quantity: parseLocaleNumber(v[1]),
-      cost: showCost ? parseLocaleNumber(v[2]) : null,
-      markup: showCost ? parseLocaleNumber(v[3]) : null,
+      total_cost: showCost ? parseLocaleNumber(v[2]) : null,
+      total_markup: showCost ? parseLocaleNumber(v[3]) : null,
       markup_percent: null,
       revenue: parseLocaleNumber(v.at(-1)),
     },
@@ -1040,16 +1066,15 @@ export function parseGroupEventPerformanceHtml(args: {
       const creatorCell = $(row).children('td').eq(9).clone();
       const created = cleanText(creatorCell.find('small').text());
       creatorCell.find('small,br').remove();
+      const identity = resolveOptionalTeamMember(
+        name,
+        position,
+        args.teamMembers
+      );
       return {
         group_event_id: id,
-        team_member_id: name
-          ? resolveTeamMember(
-              name,
-              position,
-              args.teamMembers,
-              'group-event performance'
-            )
-          : null,
+        team_member_id: identity.id,
+        team_member_identity_status: identity.status,
         team_member_name: name || null,
         position_title: position || null,
         service_id: null,
@@ -1152,7 +1177,7 @@ export function parseCashFlowBreakdownHtml(args: {
     );
   periods.forEach((label, i) => {
     for (const type of all
-      ? (['cash', 'cashless'] as const)
+      ? (['cash', 'non_cash'] as const)
       : [args.accountType])
       columns.push({
         period_label: label,
@@ -1218,7 +1243,7 @@ export function parseCashFlowBreakdownHtml(args: {
   const rows: CashFlowRow[] = sourceRows.toArray().map((row) => {
     const aggregate = $(row).hasClass('row-aggregated');
     const kind = aggregate
-      ? (['inflow', 'outflow', 'balance'] as const)[aggregateIndex++]
+      ? (['inflow', 'outflow', 'net_movement'] as const)[aggregateIndex++]
       : 'payment_item';
     if (!kind)
       throw new LegacyAnalyticsParseError(
@@ -1269,7 +1294,7 @@ export function parseCashFlowBreakdownHtml(args: {
         $(row).children('.report-title-cell').text()
       ),
       kind,
-      direction: kind === 'balance' ? null : direction,
+      direction: kind === 'net_movement' ? null : direction,
       amounts,
       total: parseLocaleNumber(totalCell.text()),
     };
@@ -1286,7 +1311,7 @@ export function parseCashFlowBreakdownHtml(args: {
     totals: {
       inflow: rows.find((r) => r.kind === 'inflow')?.total ?? null,
       outflow: rows.find((r) => r.kind === 'outflow')?.total ?? null,
-      balance: rows.find((r) => r.kind === 'balance')?.total ?? null,
+      net_movement: rows.find((r) => r.kind === 'net_movement')?.total ?? null,
     },
   };
 }

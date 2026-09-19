@@ -29,7 +29,7 @@ describe('Configuration Schema', () => {
           'https://api.alteg.io/api/v1'
         );
         expect(result.data.ALTEGIO_LEGACY_WEB_BASE).toBe(
-          'https://yclients.com'
+          'https://app.alteg.io'
         );
         expect(result.data.LOG_LEVEL).toBe('info');
       }
@@ -61,6 +61,14 @@ describe('Configuration Schema', () => {
         expect(result.data.RATE_LIMIT_REQUESTS).toBe(100);
         expect(result.data.MAX_RETRY_ATTEMPTS).toBe(5);
       }
+    });
+
+    it('keeps the YCLIENTS legacy origin available as an explicit override', () => {
+      const result = EnvSchema.parse({
+        ALTEGIO_API_TOKEN: 'test-token',
+        ALTEGIO_LEGACY_WEB_BASE: 'https://yclients.com/',
+      });
+      expect(result.ALTEGIO_LEGACY_WEB_BASE).toBe('https://yclients.com');
     });
   });
 
@@ -161,7 +169,7 @@ describe('Configuration Schema', () => {
       });
 
       expect(result.apiBase).toBe('https://api.alteg.io/api/v1');
-      expect(result.legacyWebBase).toBe('https://yclients.com');
+      expect(result.legacyWebBase).toBe('https://app.alteg.io');
       expect(result.partnerToken).toBe('test-token');
       expect(result.timeout).toBe(30000);
       expect(result.retryConfig.maxAttempts).toBe(3);

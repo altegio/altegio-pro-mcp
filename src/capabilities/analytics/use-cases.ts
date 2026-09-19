@@ -429,33 +429,67 @@ export async function getDayEndReport(
     ...(input.include_details ? { include_details: true } : {}),
   });
 
-  const clamped =
-    report.date_from !== ctx.period.date_from ||
-    report.date_to !== ctx.period.date_to;
+  const clamped = report.period_status === 'clamped';
+  const available = report.period_status !== 'unverified';
+  const visibleReport = available
+    ? report
+    : {
+        ...report,
+        currency: null,
+        totals: {
+          clients_count: null,
+          average_per_client: null,
+          appointments_count: null,
+          average_per_appointment: null,
+          appointments_with_client_count: null,
+          average_per_appointment_with_client: null,
+          appointments_without_client_count: null,
+          average_per_appointment_without_client: null,
+          services_rendered_count: null,
+          services_revenue: null,
+          products_count: null,
+          products_revenue: null,
+          gift_cards_count: null,
+          gift_cards_revenue: null,
+          memberships_count: null,
+          memberships_revenue: null,
+        },
+        takings_by_account: [],
+        write_offs: [],
+        takings_total: null,
+        write_offs_total: null,
+        ...(input.include_details ? { details: [] } : {}),
+      };
 
-  const lines = [
-    `Day-end report for ${report.date_from}${report.date_to !== report.date_from ? `…${report.date_to}` : ''}:`,
-    `Clients: ${report.totals.clients_count ?? 'n/a'}, appointments: ${report.totals.appointments_count ?? 'n/a'}`,
-    `Services: ${report.totals.services_count ?? 'n/a'} for ${formatMoney(report.totals.services_revenue, report.currency)}`,
-    `Products: ${report.totals.products_count ?? 'n/a'} for ${formatMoney(report.totals.products_revenue, report.currency)}`,
-    `Memberships: ${report.totals.memberships_count ?? 'n/a'} for ${formatMoney(report.totals.memberships_revenue, report.currency)}; gift cards: ${report.totals.gift_cards_count ?? 'n/a'} for ${formatMoney(report.totals.gift_cards_revenue, report.currency)}`,
-    `Taken in: ${formatMoney(report.takings_total, report.currency)} across ${report.takings_by_account.length} account(s); the amount per account is listed below, under the name the location gave that account.`,
-    `Written off (discounts, bonuses, memberships, gift cards): ${formatMoney(report.write_offs_total, report.currency)}`,
-  ];
+  const lines = available
+    ? [
+        `Day-end report for ${visibleReport.date_from}${visibleReport.date_to !== visibleReport.date_from ? `…${visibleReport.date_to}` : ''}:`,
+        `Clients: ${visibleReport.totals.clients_count ?? 'n/a'}, appointments: ${visibleReport.totals.appointments_count ?? 'n/a'}`,
+        `Services: ${visibleReport.totals.services_rendered_count ?? 'n/a'} for ${formatMoney(visibleReport.totals.services_revenue, visibleReport.currency)}`,
+        `Products: ${visibleReport.totals.products_count ?? 'n/a'} for ${formatMoney(visibleReport.totals.products_revenue, visibleReport.currency)}`,
+        `Memberships: ${visibleReport.totals.memberships_count ?? 'n/a'} for ${formatMoney(visibleReport.totals.memberships_revenue, visibleReport.currency)}; gift cards: ${visibleReport.totals.gift_cards_count ?? 'n/a'} for ${formatMoney(visibleReport.totals.gift_cards_revenue, visibleReport.currency)}`,
+        `Taken in: ${formatMoney(visibleReport.takings_total, visibleReport.currency)} across ${visibleReport.takings_by_account.length} account(s); the amount per account is listed below, under the name the location gave that account.`,
+        `Written off (discounts, bonuses, memberships, gift cards): ${formatMoney(visibleReport.write_offs_total, visibleReport.currency)}`,
+      ]
+    : [
+        `Day-end report for ${ctx.period.date_from}${ctx.period.date_to !== ctx.period.date_from ? `…${ctx.period.date_to}` : ''} is unavailable because the source did not prove which period it actually returned.`,
+        report.period_status_reason ??
+          'The effective period could not be verified.',
+      ];
   if (clamped) {
     lines.push(
       'Note: the location returned a different date range than requested. ' +
         'Without the right to look past today, the day-end report is clamped to today.'
     );
   }
-  if (!input.include_details) {
+  if (available && !input.include_details) {
     lines.push(
       'Per-client detail is off by default; pass include_details=true to add it (larger result, ids only, no names or phone numbers).'
     );
   }
 
   // Payment accounts ("Cash desk", "Card terminal", …) are named by the staff.
-  const accounts: UntrustedField[] = report.takings_by_account.map(
+  const accounts: UntrustedField[] = visibleReport.takings_by_account.map(
     (account, index) => ({
       label: `account ${index + 1}`,
       value: `${account.title} — ${formatMoney(account.amount, null)}`,
@@ -469,7 +503,8 @@ export async function getDayEndReport(
       requested_date_from: ctx.period.date_from,
       requested_date_to: ctx.period.date_to,
       clamped_by_access_right: clamped,
-      ...report,
+      data_available: available,
+      ...visibleReport,
     },
   };
 }

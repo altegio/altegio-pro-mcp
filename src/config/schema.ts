@@ -20,6 +20,7 @@ import { DEFAULT_FACET, READONLY_VIEW, viewUrl } from '../tools/facets.js';
  * `https://mcp.alteg.io/pro`).
  */
 export const DEFAULT_PUBLIC_BASE_URL = 'https://mcp.alteg.io/public/pro';
+export const DEFAULT_LEGACY_WEB_BASE = 'https://app.alteg.io';
 
 /**
  * Server `instructions` returned in the MCP `initialize` result (ADR-001 §5.6).
@@ -110,7 +111,7 @@ export const EnvSchema = z.object({
   ALTEGIO_LEGACY_WEB_BASE: z
     .string()
     .url()
-    .default('https://yclients.com')
+    .default(DEFAULT_LEGACY_WEB_BASE)
     .transform((value) => value.replace(/\/+$/, '')),
 
   // Server config
@@ -208,7 +209,7 @@ export type ServerConfig = z.infer<typeof ServerConfigSchema>;
 // Altegio client configuration
 export const AltegioConfigSchema = z.object({
   apiBase: z.string().url(),
-  legacyWebBase: z.string().url().default('https://yclients.com'),
+  legacyWebBase: z.string().url().default(DEFAULT_LEGACY_WEB_BASE),
   partnerToken: z.string().min(1),
   userToken: z.string().optional(),
   timeout: z.number().min(1000).default(30000),

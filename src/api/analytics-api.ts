@@ -234,7 +234,7 @@ export interface DayEndTotals {
   average_per_appointment_with_client: number | null;
   appointments_without_client_count: number | null;
   average_per_appointment_without_client: number | null;
-  services_count: number | null;
+  services_rendered_count: number | null;
   services_revenue: number | null;
   products_count: number | null;
   products_revenue: number | null;
@@ -266,6 +266,10 @@ export interface DayEndReportDetailRow {
 }
 
 export interface DayEndReport {
+  /** Requested period is trusted only when the source can prove it. */
+  period_status: 'verified' | 'clamped' | 'unverified';
+  effective_period: { date_from: string; date_to: string } | null;
+  period_status_reason: string | null;
   date_from: string;
   date_to: string;
   currency: string | null;

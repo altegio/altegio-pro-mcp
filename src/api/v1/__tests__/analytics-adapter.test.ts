@@ -402,7 +402,15 @@ describe('V1AnalyticsAdapter — day-end report', () => {
     expect(calls[0]!.path).toContain('start_date=01.08.2026');
     expect(calls[0]!.path).toContain('end_date=03.08.2026');
     expect(report.currency).toBe('EUR');
-    expect(report.totals.services_count).toBe(31);
+    expect(report).toMatchObject({
+      period_status: 'verified',
+      effective_period: {
+        date_from: '2026-08-01',
+        date_to: '2026-08-03',
+      },
+      period_status_reason: null,
+    });
+    expect(report.totals.services_rendered_count).toBe(31);
     expect(report.totals.services_revenue).toBe(1180.5);
     expect(report.totals.products_revenue).toBe(168);
     expect(report.totals.gift_cards_count).toBe(1);
@@ -435,6 +443,35 @@ describe('V1AnalyticsAdapter — day-end report', () => {
     expect(row.other[0]!.title).toBe('Other operations');
     expect(JSON.stringify(row)).not.toContain('phone');
     expect(JSON.stringify(row)).not.toContain('client_name');
+  });
+
+  it('detects a clamped effective period from returned detail dates', async () => {
+    const { api } = adapter([[/z_report/, 'z-report']]);
+    const report = await api.getDayEndReport({
+      location_id: 4564,
+      date_from: '2026-07-01',
+      date_to: '2026-07-01',
+    });
+    expect(report).toMatchObject({
+      period_status: 'clamped',
+      effective_period: {
+        date_from: '2026-08-01',
+        date_to: '2026-08-01',
+      },
+    });
+  });
+
+  it('does not verify a historical period when the source returns no dated detail', async () => {
+    const body = structuredClone(fixture('z-report')) as {
+      data: { z_data: Record<string, unknown> };
+    };
+    body.data.z_data = {};
+    const { api } = adapter([[/z_report/, { status: 200, body }]]);
+    const report = await api.getDayEndReport(period);
+    expect(report).toMatchObject({
+      period_status: 'unverified',
+      effective_period: null,
+    });
   });
 
   it('explains a missing finance right instead of leaking the backend message', async () => {

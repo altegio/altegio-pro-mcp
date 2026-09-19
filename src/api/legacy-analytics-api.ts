@@ -100,12 +100,12 @@ export interface ServiceProfitabilityRow {
   service_category_id: number | null;
   title: string | null;
   service_category_title: string | null;
-  services_count: number;
+  services_rendered_count: number;
   payments: PaymentBreakdown;
   cash_or_card_revenue: number | null;
   consumables_cost: number | null;
   team_member_compensation: number | null;
-  profit: number | null;
+  contribution_result: number | null;
   revenue_share_percent: number | null;
 }
 
@@ -130,13 +130,13 @@ export interface TeamMemberSalesRow {
   position_title: string | null;
   revenue: number | null;
   services_revenue: number | null;
-  services_count: number | null;
+  services_rendered_count: number | null;
   products_revenue: number | null;
   products_count: number | null;
   payments: PaymentBreakdown;
   upcoming_appointments_revenue: number | null;
-  working_hours: number | null;
-  revenue_per_working_hour: number | null;
+  worked_hours: number | null;
+  revenue_per_worked_hour: number | null;
   revenue_share_percent: number | null;
 }
 
@@ -148,7 +148,7 @@ export interface TeamMemberSalesReport {
     | 'team_member_id'
     | 'team_member_name'
     | 'position_title'
-    | 'revenue_per_working_hour'
+    | 'revenue_per_worked_hour'
     | 'revenue_share_percent'
   >;
 }
@@ -161,7 +161,7 @@ export interface LegacyTeamMemberIdentity {
 
 export interface TeamMemberCapacityMetrics {
   worked_days: number | null;
-  working_hours: number | null;
+  scheduled_hours: number | null;
   booked_hours: number | null;
   idle_hours: number | null;
   occupancy_percent: number | null;
@@ -205,6 +205,8 @@ export interface GroupEventPerformanceReport {
   rows: Array<{
     group_event_id: number;
     team_member_id: number | null;
+    /** Stable-id resolution is explicit; stale/deleted rows are never guessed. */
+    team_member_identity_status: 'matched' | 'unavailable' | 'ambiguous';
     team_member_name: string | null;
     position_title: string | null;
     service_id: null;
@@ -232,8 +234,8 @@ export type ProductSalesGroup = 'product' | 'product_category';
 export interface ProductSalesAmounts {
   quantity: number | null;
   /** Total cost for the sold quantity, never a unit cost. */
-  cost: number | null;
-  markup: number | null;
+  total_cost: number | null;
+  total_markup: number | null;
   markup_percent: number | null;
   /** Money plus client-account payments. */
   revenue: number | null;
@@ -256,7 +258,7 @@ export interface ProductSalesReport {
   page: PageMeta;
   pagination_source: 'upstream' | 'local';
 }
-export type CashAccountType = 'all' | 'cash' | 'cashless';
+export type CashAccountType = 'all' | 'cash' | 'non_cash';
 export interface CashFlowColumn {
   period_label: string;
   period_kind: 'day' | 'period_total';
@@ -268,7 +270,7 @@ export interface CashFlowColumn {
 export interface CashFlowRow {
   payment_item_id: number | null;
   payment_item_title: string;
-  kind: 'inflow' | 'outflow' | 'balance' | 'payment_item';
+  kind: 'inflow' | 'outflow' | 'net_movement' | 'payment_item';
   direction: 'inflow' | 'outflow' | null;
   amounts: Array<number | null>;
   total: number | null;
@@ -280,7 +282,7 @@ export interface CashFlowBreakdownReport {
   totals: {
     inflow: number | null;
     outflow: number | null;
-    balance: number | null;
+    net_movement: number | null;
   };
 }
 
@@ -317,7 +319,7 @@ export interface CashFlowBreakdownRequest extends LegacyPeriodRequest {
   cash_account_ids?: number[];
   team_member_id?: number;
   supplier_id?: number;
-  transaction_type?: number;
+  payment_item_id?: number;
   cash_account_type?: CashAccountType;
   service_ids?: number[];
   product_ids?: number[];

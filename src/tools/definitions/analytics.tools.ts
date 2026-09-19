@@ -19,7 +19,10 @@
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import { PERIOD_PRESETS } from '../../capabilities/analytics/periods.js';
-import { DATASETS } from '../../capabilities/analytics/vocabulary.js';
+import {
+  DATASETS,
+  VISIT_STATUSES,
+} from '../../capabilities/analytics/vocabulary.js';
 import { REPORT_ROW_CAP } from '../../capabilities/analytics/report-store.js';
 import * as analytics from '../../capabilities/analytics/use-cases.js';
 import * as legacyAnalytics from '../../capabilities/analytics/legacy-use-cases.js';
@@ -145,6 +148,49 @@ function objectSchema(properties: Record<string, object>, required?: string[]) {
     ...(required ? { required } : {}),
   };
 }
+
+function closedObjectSchema(
+  properties: Record<string, object>,
+  required: string[] = Object.keys(properties)
+) {
+  return {
+    type: 'object' as const,
+    properties,
+    required,
+    additionalProperties: false,
+  };
+}
+
+const bool = { type: 'boolean' as const };
+const requiredString = { type: 'string' as const };
+const requiredInteger = { type: 'integer' as const };
+const requiredNumber = { type: 'number' as const };
+const nullValue = { type: 'null' as const };
+const strictPeriodSchema = closedObjectSchema(
+  {
+    date_from: requiredString,
+    date_to: requiredString,
+    days: requiredInteger,
+    timezone: requiredString,
+    preset: requiredString,
+  },
+  ['date_from', 'date_to', 'days', 'timezone']
+);
+const strictDateRangeSchema = closedObjectSchema({
+  date_from: requiredString,
+  date_to: requiredString,
+});
+const nullableDateRangeSchema = {
+  anyOf: [strictDateRangeSchema, nullValue],
+};
+const comparedValueSchema = closedObjectSchema(
+  {
+    current: num,
+    previous: num,
+    change_percent: num,
+  },
+  ['current']
+);
 
 const READ_ONLY = {
   readOnlyHint: true,
@@ -412,7 +458,7 @@ export const analyticsGetDayEndReportTool = defineTool({
   name: 'analytics_get_day_end_report',
   category: 'Analytics',
   description:
-    '[Analytics] Day-end report for one day or a short range: clients served, appointments, services and products sold with their revenue, memberships and gift cards sold, money actually taken per account (the cash-versus-card split), and everything written off as discounts, loyalty bonuses, memberships or gift cards. This is the report a receptionist closes the day with. Answers "what did we take today", "how much cash is in the till", "how much did we discount". Per-client detail is off by default because it is large; include_details=true adds it with ids and amounts only, never names or phone numbers. Needs the finance reporting right; without the right to look past today the location silently returns today, and the result says when that happened.',
+    '[Analytics] Day-end report for one day or a short range: clients served, appointments, services and products sold with their revenue, memberships and gift cards sold, money actually taken per account (the cash-versus-card split), and everything written off as discounts, loyalty bonuses, memberships or gift cards. This is the report a receptionist closes the day with. Answers "what did we take today", "how much cash is in the till", "how much did we discount". Per-client detail is off by default because it is large; include_details=true adds it with ids and amounts only, never names or phone numbers. Needs the finance reporting right. Historical values are withheld when the source cannot prove its effective period, so silently clamped data is never labelled as the requested range.',
   annotations: { title: 'Analytics: day-end report', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -436,6 +482,13 @@ export const analyticsGetDayEndReportTool = defineTool({
     requested_date_from: { type: 'string' as const },
     requested_date_to: { type: 'string' as const },
     clamped_by_access_right: { type: 'boolean' as const },
+    data_available: { type: 'boolean' as const },
+    period_status: {
+      type: 'string' as const,
+      enum: ['verified', 'clamped', 'unverified'],
+    },
+    effective_period: nullableDateRangeSchema,
+    period_status_reason: str,
     date_from: { type: 'string' as const },
     date_to: { type: 'string' as const },
     currency: str,
@@ -704,7 +757,7 @@ export const analyticsGetServiceProfitabilityTool = defineTool({
   name: 'analytics_get_service_profitability',
   category: 'Analytics',
   description:
-    '[Analytics] Service profitability by service or service category: quantity, discounts and loyalty write-offs, client-account and cash/card revenue, consumables cost, team-member compensation, resulting profit and share of revenue. Filter by one team member or service category and paginate at source. Temporary stable legacy-report adapter pending V3; it never creates a saved report. Needs the Sales by services report permission.',
+    '[Analytics] Service contribution by service or service category: rendered-service count, discounts and loyalty write-offs, client-account and cash/card revenue, consumables cost, team-member compensation, contribution result and share of revenue. Filter by one team member or service category and paginate at source. Temporary stable legacy-report adapter pending V3; it never creates a saved report. Needs the Sales by services report permission.',
   annotations: { title: 'Analytics: service profitability', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -738,22 +791,22 @@ export const analyticsGetServiceProfitabilityTool = defineTool({
         service_category_id: int,
         title: str,
         service_category_title: str,
-        services_count: { type: 'integer' as const },
+        services_rendered_count: { type: 'integer' as const },
         payments: paymentBreakdownOutput,
         cash_or_card_revenue: num,
         consumables_cost: num,
         team_member_compensation: num,
-        profit: num,
+        contribution_result: num,
         revenue_share_percent: num,
       }),
     },
     totals: objectSchema({
-      services_count: { type: 'integer' as const },
+      services_rendered_count: { type: 'integer' as const },
       payments: paymentBreakdownOutput,
       cash_or_card_revenue: num,
       consumables_cost: num,
       team_member_compensation: num,
-      profit: num,
+      contribution_result: num,
     }),
     page: legacyPageOutput,
     untrusted_data_note: { type: 'string' as const },
@@ -766,7 +819,7 @@ export const analyticsGetTeamMemberSalesTool = defineTool({
   name: 'analytics_get_team_member_sales',
   category: 'Analytics',
   description:
-    '[Analytics] Sales by team member: total revenue, service and product revenue and quantities, discounts and loyalty write-offs, client-account payments, upcoming-appointment revenue, working hours, revenue per working hour and share of location revenue. Supports the source report’s filters for positions, services, service categories, products and product categories. Temporary stable legacy-report adapter pending V3; it never creates a saved report. Needs the Sales by team members report permission.',
+    '[Analytics] Sales by team member: total revenue, service and product revenue and quantities, discounts and loyalty write-offs, client-account payments, upcoming-appointment revenue, worked hours, revenue per worked hour and share of location revenue. Supports the source report’s filters for positions, services, service categories, products and product categories. Temporary stable legacy-report adapter pending V3; it never creates a saved report. Needs the Sales by team members report permission.',
   annotations: { title: 'Analytics: sales by team member', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -815,25 +868,25 @@ export const analyticsGetTeamMemberSalesTool = defineTool({
         position_title: str,
         revenue: num,
         services_revenue: num,
-        services_count: int,
+        services_rendered_count: int,
         products_revenue: num,
         products_count: int,
         payments: paymentBreakdownOutput,
         upcoming_appointments_revenue: num,
-        working_hours: num,
-        revenue_per_working_hour: num,
+        worked_hours: num,
+        revenue_per_worked_hour: num,
         revenue_share_percent: num,
       }),
     },
     totals: objectSchema({
       revenue: num,
       services_revenue: num,
-      services_count: int,
+      services_rendered_count: int,
       products_revenue: num,
       products_count: int,
       payments: paymentBreakdownOutput,
       upcoming_appointments_revenue: num,
-      working_hours: num,
+      worked_hours: num,
     }),
     untrusted_data_note: { type: 'string' as const },
   }),
@@ -850,6 +903,152 @@ const boundedIds = (description: string, max = 25) =>
     .max(max)
     .optional()
     .describe(description);
+
+const capacityBucketOutput = closedObjectSchema({
+  key: requiredString,
+  scheduled_hours: requiredNumber,
+  booked_hours: requiredNumber,
+  completed_utilized_hours: requiredNumber,
+  idle_hours: requiredNumber,
+  occupancy_percent: num,
+  completed_appointments_count: requiredInteger,
+  no_show_appointments_count: requiredInteger,
+  cancelled_appointments_count: requiredInteger,
+  pending_appointments_count: requiredInteger,
+  revenue: num,
+  revenue_per_scheduled_hour: num,
+});
+
+const matrixRowOutput = closedObjectSchema({
+  team_member_id: requiredInteger,
+  team_member_name: str,
+  position_id: int,
+  position_title: str,
+  service_id: requiredInteger,
+  service_title: str,
+  service_category_id: int,
+  service_category_title: str,
+  completed_appointments_count: nullValue,
+  services_rendered_count: requiredInteger,
+  clients_count: nullValue,
+  revenue: num,
+  average_check: num,
+  booked_duration_hours: nullValue,
+  delivered_duration_hours: nullValue,
+  occupancy_contribution_percent: nullValue,
+  team_member_compensation: num,
+  consumables_cost: num,
+  contribution_result: num,
+  repeat_or_rebooking_rate_percent: nullValue,
+  sample_size: requiredInteger,
+  revenue_share_within_team_member_percent: num,
+  revenue_share_within_service_percent: num,
+});
+
+const inventoryRiskRowOutput = closedObjectSchema({
+  product_id: requiredInteger,
+  sku: nullValue,
+  title: str,
+  unit: str,
+  supplier_title: str,
+  inventory_id: int,
+  product_category_id: int,
+  current_stock: num,
+  reserved_stock: nullValue,
+  available_stock: nullValue,
+  units_sold: num,
+  average_daily_sales: num,
+  days_of_cover: num,
+  last_sale_date: nullValue,
+  stock_value: nullValue,
+  cost_per_unit: nullValue,
+  risk: { type: 'string' as const, enum: decisionAnalytics.INVENTORY_RISKS },
+  recommended_reorder_quantity: num,
+  negative_stock: bool,
+  source_metrics: closedObjectSchema({
+    units_received: num,
+    opening_stock: num,
+    average_stock: num,
+    turnover_days: num,
+    turnover_count: num,
+    stock_level_days: num,
+  }),
+});
+
+const leakageAmountCoverageOutput = closedObjectSchema({
+  amount_available_count: requiredInteger,
+  amount_missing_count: requiredInteger,
+});
+const leakageUnavailableCoverageOutput = closedObjectSchema({
+  available: { type: 'boolean' as const, const: false },
+  reason: requiredString,
+});
+const leakageCategoryOutput = {
+  oneOf: [
+    closedObjectSchema({
+      key: {
+        type: 'string' as const,
+        enum: [
+          'no_show_appointments',
+          'cancelled_appointments',
+          'completed_but_not_marked_paid',
+          'discounts',
+        ],
+      },
+      observed_count: requiredInteger,
+      observed_amount: num,
+      estimated_opportunity_amount: num,
+      formula: requiredString,
+      denominator: requiredString,
+      coverage: leakageAmountCoverageOutput,
+      quality: { type: 'string' as const, enum: ['high', 'medium', 'low'] },
+    }),
+    closedObjectSchema({
+      key: { type: 'string' as const, const: 'loyalty_write_offs' },
+      observed_count: nullValue,
+      observed_amount: nullValue,
+      estimated_opportunity_amount: nullValue,
+      formula: nullValue,
+      denominator: nullValue,
+      coverage: leakageUnavailableCoverageOutput,
+      quality: { type: 'string' as const, const: 'unavailable' },
+    }),
+    closedObjectSchema({
+      key: {
+        type: 'string' as const,
+        const: 'scheduled_but_unbooked_capacity',
+      },
+      observed_count: nullValue,
+      observed_amount: nullValue,
+      opportunity_capacity_hours: num,
+      estimated_opportunity_amount: num,
+      formula: requiredString,
+      denominator: requiredString,
+      coverage: closedObjectSchema({
+        selected_team_members: requiredInteger,
+        available_team_members: requiredInteger,
+      }),
+      quality: {
+        type: 'string' as const,
+        enum: ['low', 'insufficient_data'],
+      },
+    }),
+    closedObjectSchema({
+      key: {
+        type: 'string' as const,
+        const: 'scheduled_but_unbooked_capacity',
+      },
+      observed_count: nullValue,
+      observed_amount: nullValue,
+      opportunity_capacity_hours: nullValue,
+      estimated_opportunity_amount: nullValue,
+      formula: nullValue,
+      denominator: nullValue,
+      coverage: leakageUnavailableCoverageOutput,
+      quality: { type: 'string' as const, const: 'unavailable' },
+    }),
+  ],
+};
 
 export const analyticsGetProfitAndLossStatementTool = defineTool({
   name: 'analytics_get_profit_and_loss_statement',
@@ -884,21 +1083,157 @@ export const analyticsGetProfitAndLossStatementTool = defineTool({
         'Optional last day of an explicit comparison period, YYYY-MM-DD, inclusive.'
       ),
   }),
-  outputSchema: objectSchema({
-    location_id: { type: 'integer' as const },
-    period: periodSchema,
-    comparison_period: previousPeriodSchema,
-    currency: str,
-    sales_revenue_by_stream: { type: 'object' as const },
-    operating_ledger: { type: 'object' as const },
-    service_contribution: { type: 'object' as const },
-    cost_classification: { type: 'object' as const },
-    gross_result: num,
-    net_profit: num,
-    completeness: { type: 'object' as const },
-    provenance: { type: 'array' as const, items: { type: 'object' as const } },
-    untrusted_data_note: { type: 'string' as const },
-  }),
+  outputSchema: closedObjectSchema(
+    {
+      location_id: requiredInteger,
+      period: strictPeriodSchema,
+      comparison_period: strictDateRangeSchema,
+      currency: str,
+      sales_revenue_by_stream: closedObjectSchema({
+        current_period_status: {
+          type: 'string' as const,
+          enum: ['verified', 'clamped', 'unverified'],
+        },
+        current_effective_period: nullableDateRangeSchema,
+        comparison_period_status: {
+          enum: ['verified', 'clamped', 'unverified', null],
+        },
+        comparison_effective_period: nullableDateRangeSchema,
+        unavailable_reason: str,
+        services: comparedValueSchema,
+        products: comparedValueSchema,
+        memberships: comparedValueSchema,
+        gift_cards: comparedValueSchema,
+        other: closedObjectSchema({
+          current: nullValue,
+          reason: requiredString,
+        }),
+        formula: requiredString,
+      }),
+      operating_ledger: closedObjectSchema({
+        income_total: comparedValueSchema,
+        expense_total: comparedValueSchema,
+        tracked_operating_result: comparedValueSchema,
+        categories: {
+          type: 'array' as const,
+          items: closedObjectSchema({
+            category_id: int,
+            title: str,
+            direction: {
+              type: 'string' as const,
+              enum: ['income', 'expense'],
+            },
+            amount: comparedValueSchema,
+          }),
+        },
+        category_coverage: closedObjectSchema({
+          total_count: requiredInteger,
+          returned: requiredInteger,
+          limit: requiredInteger,
+          complete: bool,
+        }),
+        formula: requiredString,
+      }),
+      service_contribution: closedObjectSchema({
+        cash_or_card_revenue: comparedValueSchema,
+        client_account_payments: comparedValueSchema,
+        consumables_cost: comparedValueSchema,
+        team_member_compensation: comparedValueSchema,
+        contribution_result: comparedValueSchema,
+        contribution_margin_percent: comparedValueSchema,
+        formula: requiredString,
+      }),
+      cost_classification: closedObjectSchema({
+        direct_service_costs: closedObjectSchema({
+          consumables: num,
+          team_member_compensation: num,
+          total: num,
+          scope: requiredString,
+        }),
+        indirect_costs: nullValue,
+        indirect_costs_unavailable_reason: requiredString,
+      }),
+      gross_result: nullValue,
+      net_profit: nullValue,
+      completeness: closedObjectSchema({
+        result_label: {
+          type: 'string' as const,
+          const: 'tracked_operating_result',
+        },
+        included_cost_classes: {
+          type: 'array' as const,
+          items: {
+            type: 'string' as const,
+            enum: [
+              'posted_finance_expense_categories',
+              'service_consumables_cost',
+              'attributed_team_member_compensation',
+            ],
+          },
+        },
+        missing_or_unproven_cost_classes: {
+          type: 'array' as const,
+          items: {
+            type: 'string' as const,
+            enum: [
+              'retail_product_cost',
+              'taxes_completeness',
+              'rent_completeness',
+              'external_payroll_completeness',
+              'unposted_expenses',
+            ],
+          },
+        },
+        limitations: {
+          type: 'array' as const,
+          items: requiredString,
+        },
+      }),
+      provenance: {
+        type: 'array' as const,
+        items: closedObjectSchema({
+          source_id: {
+            type: 'string' as const,
+            enum: [
+              'posted_finance_ledger',
+              'day_end_sales_memo',
+              'service_contribution_report',
+            ],
+          },
+          format: {
+            type: 'string' as const,
+            enum: ['HTML', 'JSON', 'JSON envelope with HTML table'],
+          },
+          metrics: {
+            type: 'array' as const,
+            items: {
+              type: 'string' as const,
+              enum: [
+                'operating_ledger',
+                'sales_revenue_by_stream',
+                'service_contribution',
+              ],
+            },
+          },
+        }),
+      },
+      untrusted_data_note: requiredString,
+    },
+    [
+      'location_id',
+      'period',
+      'currency',
+      'sales_revenue_by_stream',
+      'operating_ledger',
+      'service_contribution',
+      'cost_classification',
+      'gross_result',
+      'net_profit',
+      'completeness',
+      'provenance',
+      'untrusted_data_note',
+    ]
+  ),
   handler: async ({ input, client }) =>
     decisionAnalytics.getProfitAndLossStatement(client, input),
 });
@@ -924,25 +1259,58 @@ export const analyticsGetCapacityHeatmapTool = defineTool({
         'hour_of_day combines the same hour across dates; weekday combines each weekday; date_hour returns each local date and hour and is limited to 31 days.'
       ),
   }),
-  outputSchema: objectSchema({
-    location_id: { type: 'integer' as const },
-    period: periodSchema,
-    granularity: { type: 'string' as const },
+  outputSchema: closedObjectSchema({
+    location_id: requiredInteger,
+    period: strictPeriodSchema,
+    granularity: {
+      type: 'string' as const,
+      enum: ['hour_of_day', 'weekday', 'date_hour'],
+    },
     team_member_ids: {
       type: 'array' as const,
-      items: { type: 'integer' as const },
+      items: requiredInteger,
     },
-    buckets: { type: 'array' as const, items: { type: 'object' as const } },
+    buckets: { type: 'array' as const, items: capacityBucketOutput },
     peak_buckets: {
       type: 'array' as const,
-      items: { type: 'object' as const },
+      items: capacityBucketOutput,
     },
     underutilized_buckets: {
       type: 'array' as const,
-      items: { type: 'object' as const },
+      items: capacityBucketOutput,
     },
-    coverage: { type: 'object' as const },
-    provenance: { type: 'array' as const, items: { type: 'object' as const } },
+    coverage: closedObjectSchema({
+      complete: bool,
+      selected_team_members: requiredInteger,
+      available_team_members: requiredInteger,
+      appointment_pages_read: requiredInteger,
+      appointment_page_cap: requiredInteger,
+      unscheduled_appointment_count: requiredInteger,
+      notes: { type: 'array' as const, items: requiredString },
+    }),
+    provenance: {
+      type: 'array' as const,
+      items: closedObjectSchema({
+        source_id: {
+          type: 'string' as const,
+          enum: ['team_member_schedule', 'appointments'],
+        },
+        metrics: {
+          type: 'array' as const,
+          items: {
+            type: 'string' as const,
+            enum: [
+              'scheduled_hours',
+              'booked_hours_from_busy_intervals',
+              'booked_hours_from_appointments',
+              'completed_utilized_hours',
+              'appointment_counts',
+              'revenue',
+            ],
+          },
+        },
+      }),
+    },
   }),
   handler: async ({ input, client }) =>
     decisionAnalytics.getCapacityHeatmap(client, input),
@@ -967,16 +1335,7 @@ export const analyticsGetRevenueLeakageTool = defineTool({
       'Keep appointments containing a service in one of these categories.'
     ),
     visit_statuses: z
-      .array(
-        z.enum([
-          'waiting',
-          'confirmed',
-          'arrived',
-          'no_show',
-          'cancelled',
-          'unknown',
-        ])
-      )
+      .array(z.enum(VISIT_STATUSES))
       .min(1)
       .optional()
       .describe(
@@ -989,15 +1348,40 @@ export const analyticsGetRevenueLeakageTool = defineTool({
         'Include scheduled-but-unbooked capacity and its optional low-confidence opportunity estimate. Defaults to true.'
       ),
   }),
-  outputSchema: objectSchema({
-    location_id: { type: 'integer' as const },
-    period: periodSchema,
+  outputSchema: closedObjectSchema({
+    location_id: requiredInteger,
+    period: strictPeriodSchema,
     currency: str,
-    categories: { type: 'array' as const, items: { type: 'object' as const } },
-    totals: { type: ['object', 'null'] as const },
-    totals_not_combined_reason: { type: 'string' as const },
-    coverage: { type: 'object' as const },
-    provenance: { type: 'array' as const, items: { type: 'object' as const } },
+    categories: { type: 'array' as const, items: leakageCategoryOutput },
+    totals: nullValue,
+    totals_not_combined_reason: requiredString,
+    coverage: closedObjectSchema({
+      complete: bool,
+      appointment_pages_read: requiredInteger,
+      appointment_page_cap: requiredInteger,
+      limitations: { type: 'array' as const, items: requiredString },
+    }),
+    provenance: {
+      type: 'array' as const,
+      items: closedObjectSchema({
+        source_id: {
+          type: 'string' as const,
+          enum: ['appointments', 'team_member_schedule'],
+        },
+        metrics: {
+          type: 'array' as const,
+          items: {
+            type: 'string' as const,
+            enum: [
+              'appointment outcomes',
+              'booked prices',
+              'discount reductions',
+              'scheduled capacity',
+            ],
+          },
+        },
+      }),
+    },
   }),
   handler: async ({ input, client }) =>
     decisionAnalytics.getRevenueLeakage(client, input),
@@ -1036,7 +1420,7 @@ export const analyticsGetTeamMemberServiceMatrixTool = defineTool({
         'Restrict the source report to one service category; the source supports one category at a time.'
       ),
     sort_by: z
-      .enum(['contribution_result', 'revenue', 'services_delivered'])
+      .enum(['contribution_result', 'revenue', 'services_rendered_count'])
       .optional()
       .describe('Metric used to order matrix rows and compact summaries.'),
     sort_order: z
@@ -1066,22 +1450,66 @@ export const analyticsGetTeamMemberServiceMatrixTool = defineTool({
       .optional()
       .describe('Matrix cells returned per page, at most 100.'),
   }),
-  outputSchema: objectSchema({
-    location_id: { type: 'integer' as const },
-    period: periodSchema,
+  outputSchema: closedObjectSchema({
+    location_id: requiredInteger,
+    period: strictPeriodSchema,
     currency: str,
-    rows: { type: 'array' as const, items: { type: 'object' as const } },
-    page: { type: 'object' as const },
-    top_cells: { type: 'array' as const, items: { type: 'object' as const } },
+    rows: { type: 'array' as const, items: matrixRowOutput },
+    page: closedObjectSchema({
+      page: requiredInteger,
+      page_size: requiredInteger,
+      total_count: requiredInteger,
+      returned: requiredInteger,
+      has_more: bool,
+    }),
+    top_cells: { type: 'array' as const, items: matrixRowOutput },
     bottom_cells: {
       type: 'array' as const,
-      items: { type: 'object' as const },
+      items: matrixRowOutput,
     },
-    ranking: { type: 'object' as const },
-    coverage: { type: 'object' as const },
-    formulae: { type: 'object' as const },
-    provenance: { type: 'array' as const, items: { type: 'object' as const } },
-    untrusted_data_note: { type: 'string' as const },
+    ranking: closedObjectSchema({
+      sort_by: {
+        type: 'string' as const,
+        enum: ['contribution_result', 'revenue', 'services_rendered_count'],
+      },
+      sort_order: { type: 'string' as const, enum: ['asc', 'desc'] },
+      minimum_sample_size: requiredInteger,
+      excluded_small_sample_cells: requiredInteger,
+    }),
+    coverage: closedObjectSchema({
+      complete: bool,
+      selected_team_members: requiredInteger,
+      available_team_members: requiredInteger,
+      source_pages_per_team_member_cap: requiredInteger,
+      unavailable_metrics: closedObjectSchema({
+        completed_appointments_count: requiredString,
+        clients_count: requiredString,
+        booked_duration_hours: requiredString,
+        delivered_duration_hours: requiredString,
+        occupancy_contribution_percent: requiredString,
+        repeat_or_rebooking_rate_percent: requiredString,
+      }),
+    }),
+    formulae: closedObjectSchema({
+      average_check: requiredString,
+      contribution_result: requiredString,
+      shares: requiredString,
+    }),
+    provenance: {
+      type: 'array' as const,
+      items: closedObjectSchema({
+        source_id: {
+          type: 'string' as const,
+          const: 'service_contribution_report',
+        },
+        format: {
+          type: 'string' as const,
+          const: 'JSON envelope with HTML table',
+        },
+        grouping: requiredString,
+      }),
+    },
+    untrusted_data_note: requiredString,
   }),
   handler: async ({ input, client }) =>
     decisionAnalytics.getTeamMemberServiceMatrix(client, input),
@@ -1151,16 +1579,62 @@ export const analyticsGetInventoryReorderRisksTool = defineTool({
       .optional()
       .describe('Products requested from the source page, at most 100.'),
   }),
-  outputSchema: objectSchema({
-    location_id: { type: 'integer' as const },
-    period: periodSchema,
-    assumptions: { type: 'object' as const },
-    rows: { type: 'array' as const, items: { type: 'object' as const } },
-    page: { type: 'object' as const },
-    formulae: { type: 'object' as const },
-    coverage: { type: 'object' as const },
-    provenance: { type: 'array' as const, items: { type: 'object' as const } },
-    untrusted_data_note: { type: 'string' as const },
+  outputSchema: closedObjectSchema({
+    location_id: requiredInteger,
+    period: strictPeriodSchema,
+    assumptions: closedObjectSchema({
+      lead_time_days: requiredInteger,
+      safety_stock_days: requiredInteger,
+    }),
+    rows: { type: 'array' as const, items: inventoryRiskRowOutput },
+    page: closedObjectSchema({
+      page: requiredInteger,
+      page_size: requiredInteger,
+      total_count: requiredInteger,
+      returned: requiredInteger,
+      has_more: bool,
+      returned_after_risk_filter: requiredInteger,
+    }),
+    formulae: closedObjectSchema({
+      average_daily_sales: requiredString,
+      days_of_cover: requiredString,
+      recommended_reorder_quantity: requiredString,
+      risk: requiredString,
+    }),
+    coverage: closedObjectSchema({
+      complete: bool,
+      filters_supported_by_source: {
+        type: 'array' as const,
+        items: {
+          type: 'string' as const,
+          enum: ['inventory_id', 'product_category_id', 'supplier_id'],
+        },
+      },
+      unavailable_fields: closedObjectSchema({
+        sku: requiredString,
+        reserved_stock: requiredString,
+        available_stock: requiredString,
+        last_sale_date: requiredString,
+        stock_value: requiredString,
+        cost_per_unit: requiredString,
+      }),
+      multiple_inventories: requiredString,
+    }),
+    provenance: {
+      type: 'array' as const,
+      items: closedObjectSchema({
+        source_id: {
+          type: 'string' as const,
+          const: 'inventory_turnover_report',
+        },
+        format: {
+          type: 'string' as const,
+          const: 'JSON envelope with HTML table',
+        },
+        permission: requiredString,
+      }),
+    },
+    untrusted_data_note: requiredString,
   }),
   handler: async ({ input, client }) =>
     decisionAnalytics.getInventoryReorderRisks(client, input),
@@ -1456,7 +1930,7 @@ const nextBaseOutput = {
 };
 const capacityMetricsOutput = {
   worked_days: num,
-  working_hours: num,
+  scheduled_hours: num,
   booked_hours: num,
   idle_hours: num,
   occupancy_percent: num,
@@ -1544,7 +2018,7 @@ export const analyticsGetGroupEventPerformanceTool = defineTool({
   name: 'analytics_get_group_event_performance',
   category: 'Analytics',
   description:
-    '[Analytics] Group events with capacity, booked participants, attended and fully paid clients, appointment value and aggregate fill, attendance, payment and average occupancy metrics. Appointment value is not collected revenue. Source dates retain their display format; service ids are unavailable. Filter by team member, service, service category, label and active/deleted status; deleted does not imply cancelled. Requires group-event dashboard access. Temporary read-only report pending V3, paginated at source.',
+    '[Analytics] Group events with capacity, booked participants, attended and fully paid clients, appointment value and aggregate fill, attendance, payment and average occupancy metrics. Appointment value is not collected revenue. Source dates retain their display format; service ids are unavailable. Team-member ids are matched only when name and position identify one current member; stale/deleted or ambiguous identities remain null with an explicit status. Filter by team member, service, service category, label and active/deleted status; deleted does not imply cancelled. Requires group-event dashboard access. Temporary read-only report pending V3, paginated at source.',
   annotations: { title: 'Analytics: group-event performance', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -1581,6 +2055,10 @@ export const analyticsGetGroupEventPerformanceTool = defineTool({
       items: objectSchema({
         group_event_id: int,
         team_member_id: int,
+        team_member_identity_status: {
+          type: 'string' as const,
+          enum: ['matched', 'unavailable', 'ambiguous'],
+        },
         team_member_name: str,
         position_title: str,
         service_id: { type: 'null' as const },
@@ -1603,8 +2081,8 @@ export const analyticsGetGroupEventPerformanceTool = defineTool({
 });
 const productAmountsOutput = {
   quantity: num,
-  cost: num,
-  markup: num,
+  total_cost: num,
+  total_markup: num,
   markup_percent: num,
   revenue: num,
 };
@@ -1612,7 +2090,7 @@ export const analyticsGetProductSalesTool = defineTool({
   name: 'analytics_get_product_sales',
   category: 'Analytics',
   description:
-    '[Analytics] Product sales by product or product category with quantity, SKU, barcode, unit, total cost, markup and revenue including client-account payments. Cost is for the sold quantity, not unit cost; missing cost permission produces nulls. Category costs are always withheld because the source category report does not enforce that permission. Category rows include hierarchy and must not be summed; use totals. Product pages come from source; category pagination is local. Requires inventory sales-report access, not export access. Temporary read-only report pending V3.',
+    '[Analytics] Product sales by product or product category with quantity, SKU, barcode, unit, total cost, total markup, markup percentage and revenue including client-account payments. Total cost is for the sold quantity, not unit cost; missing cost permission produces nulls. Category costs are always withheld because the source category report does not enforce that permission. Category rows include hierarchy and must not be summed; use totals. Product pages come from source; category pagination is local. Requires inventory sales-report access, not export access. Temporary read-only report pending V3.',
   annotations: { title: 'Analytics: product sales', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -1631,9 +2109,18 @@ export const analyticsGetProductSalesTool = defineTool({
   outputSchema: objectSchema({
     ...nextBaseOutput,
     currency: str,
-    group_by: str,
-    cost_fields_status: str,
-    pagination_source: str,
+    group_by: {
+      type: 'string' as const,
+      enum: ['product', 'product_category'],
+    },
+    cost_fields_status: {
+      type: 'string' as const,
+      enum: ['available', 'withheld'],
+    },
+    pagination_source: {
+      type: 'string' as const,
+      enum: ['upstream', 'local'],
+    },
     page: legacyPageOutput,
     rows: {
       type: 'array' as const,
@@ -1656,7 +2143,7 @@ export const analyticsGetCashFlowBreakdownTool = defineTool({
   name: 'analytics_get_cash_flow_breakdown',
   category: 'Analytics',
   description:
-    '[Analytics] Period cash movement by payment item, day, cash-account type and returned account columns, with signed inflow/outflow and net movement totals. Balance is period movement, not account closing balance. Amount arrays align with columns; account and type views overlap and must not be summed. Source account ids are unavailable. Supports account, team-member, supplier, payment-item, service and product filters. Requires finance period-report access, not export access. Temporary read-only report pending V3; narrow the period or filters for large tables.',
+    '[Analytics] Period cash movement by payment item, day, cash-account type and returned account columns, with signed inflow/outflow and net movement totals. Net movement is not an opening or closing account balance. Amount arrays align with columns; account and type views overlap and must not be summed. Source account ids are unavailable. Supports account, team-member, supplier, payment-item, service and product filters. Requires finance period-report access, not export access. Temporary read-only report pending V3; narrow the period or filters for large tables.',
   annotations: { title: 'Analytics: cash-flow breakdown', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -1666,7 +2153,7 @@ export const analyticsGetCashFlowBreakdownTool = defineTool({
     ),
     team_member_id: z.number().int().positive().optional(),
     supplier_id: z.number().int().positive().optional(),
-    transaction_type: z
+    payment_item_id: z
       .number()
       .int()
       .positive()
@@ -1674,7 +2161,7 @@ export const analyticsGetCashFlowBreakdownTool = defineTool({
       .describe(
         'Source payment-item id, including custom items; not an inflow/outflow enum. When selected, aggregate rows are unavailable.'
       ),
-    cash_account_type: z.enum(['all', 'cash', 'cashless']).optional(),
+    cash_account_type: z.enum(['all', 'cash', 'non_cash']).optional(),
     service_ids: legacyIdList('Service ids.'),
     product_ids: legacyIdList('Product ids.'),
     service_category_ids: legacyIdList('Service category ids.'),
@@ -1687,14 +2174,51 @@ export const analyticsGetCashFlowBreakdownTool = defineTool({
   outputSchema: objectSchema({
     ...nextBaseOutput,
     currency: str,
-    filters_applied: { type: 'object' as const },
+    filters_applied: objectSchema({
+      cash_account_ids: {
+        type: 'array' as const,
+        items: { type: 'integer' as const },
+      },
+      team_member_id: int,
+      supplier_id: int,
+      payment_item_id: int,
+      cash_account_type: {
+        type: 'string' as const,
+        enum: ['all', 'cash', 'non_cash'],
+      },
+      service_ids: {
+        type: 'array' as const,
+        items: { type: 'integer' as const },
+      },
+      product_ids: {
+        type: 'array' as const,
+        items: { type: 'integer' as const },
+      },
+      service_category_ids: {
+        type: 'array' as const,
+        items: { type: 'integer' as const },
+      },
+      product_category_ids: {
+        type: 'array' as const,
+        items: { type: 'integer' as const },
+      },
+      include_zero_movement_rows: { type: 'boolean' as const },
+    }),
     columns: {
       type: 'array' as const,
       items: objectSchema({
         period_label: str,
-        period_kind: str,
-        dimension: str,
-        cash_account_type: str,
+        period_kind: {
+          type: 'string' as const,
+          enum: ['day', 'period_total'],
+        },
+        dimension: {
+          type: 'string' as const,
+          enum: ['cash_account_type', 'cash_account', 'total'],
+        },
+        cash_account_type: {
+          enum: ['all', 'cash', 'non_cash', null],
+        },
         cash_account_id: { type: 'null' as const },
         cash_account_title: str,
       }),
@@ -1704,13 +2228,16 @@ export const analyticsGetCashFlowBreakdownTool = defineTool({
       items: objectSchema({
         payment_item_id: int,
         payment_item_title: str,
-        kind: str,
-        direction: str,
+        kind: {
+          type: 'string' as const,
+          enum: ['inflow', 'outflow', 'net_movement', 'payment_item'],
+        },
+        direction: { enum: ['inflow', 'outflow', null] },
         amounts: { type: 'array' as const, items: num },
         total: num,
       }),
     },
-    totals: objectSchema({ inflow: num, outflow: num, balance: num }),
+    totals: objectSchema({ inflow: num, outflow: num, net_movement: num }),
   }),
   handler: async ({ input, client }) =>
     legacyAnalytics.getCashFlowBreakdown(client, input),

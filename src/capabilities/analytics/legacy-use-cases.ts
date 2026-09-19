@@ -255,7 +255,7 @@ export async function getServiceProfitability(
   return {
     text: [
       `${report.page.total_count} ${groupBy === 'service' ? 'service' : 'service-category'} row(s) for ${period.date_from}–${period.date_to}; showing ${report.page.returned}.`,
-      `Total profit ${report.totals.profit ?? 'n/a'} ${report.currency ?? '(currency unavailable)'} after consumables and team-member compensation.`,
+      `Total service contribution ${report.totals.contribution_result ?? 'n/a'} ${report.currency ?? '(currency unavailable)'} after consumables and team-member compensation.`,
       ...(report.page.has_more ? [`More rows: request page ${page + 1}.`] : []),
     ].join('\n'),
     structuredContent: {
@@ -382,7 +382,7 @@ export async function getTeamMemberCapacity(
     input.location_id,
     period,
     report,
-    `Capacity for ${report.rows.length} team member(s): ${report.totals.booked_hours ?? 'n/a'} booked hours of ${report.totals.working_hours ?? 'n/a'} working hours; occupancy ${report.totals.occupancy_percent ?? 'n/a'}%.`
+    `Capacity for ${report.rows.length} team member(s): ${report.totals.booked_hours ?? 'n/a'} booked hours of ${report.totals.scheduled_hours ?? 'n/a'} scheduled hours; occupancy ${report.totals.occupancy_percent ?? 'n/a'}%.`
   );
 }
 export async function getClientReactivationCandidates(
@@ -464,13 +464,13 @@ export async function getCashFlowBreakdown(
     input.location_id,
     period,
     report,
-    `Cash flow: inflow ${report.totals.inflow ?? 'n/a'}, signed outflow ${report.totals.outflow ?? 'n/a'}, net movement ${report.totals.balance ?? 'n/a'} ${report.currency ?? ''}. Balance is period movement, not an opening or closing account balance. Amount arrays correspond to columns; account and account-type breakdowns overlap and must not be added together.`,
+    `Cash flow: inflow ${report.totals.inflow ?? 'n/a'}, signed outflow ${report.totals.outflow ?? 'n/a'}, net movement ${report.totals.net_movement ?? 'n/a'} ${report.currency ?? ''}. Net movement is not an opening or closing account balance. Amount arrays correspond to columns; account and account-type breakdowns overlap and must not be added together.`,
     {
       filters_applied: {
         cash_account_ids: input.cash_account_ids ?? [],
         team_member_id: input.team_member_id ?? null,
         supplier_id: input.supplier_id ?? null,
-        transaction_type: input.transaction_type ?? null,
+        payment_item_id: input.payment_item_id ?? null,
         cash_account_type: input.cash_account_type ?? 'all',
         service_ids: input.service_ids ?? [],
         product_ids: input.product_ids ?? [],

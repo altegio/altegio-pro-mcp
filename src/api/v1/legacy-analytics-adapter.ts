@@ -181,6 +181,31 @@ async function readWorkbook(
   const bytes = await readBounded(response, MAX_WORKBOOK_BYTES, report);
   const preview = new TextDecoder().decode(bytes.subarray(0, 128)).trim();
   assertAuthenticatedBody(preview);
+  if (response.headers.get('content-type')?.includes('application/json')) {
+    let envelope: unknown;
+    try {
+      envelope = JSON.parse(new TextDecoder().decode(bytes));
+    } catch {
+      throw new AltegioApiError(
+        `The temporary ${report} report returned malformed JSON instead of a workbook.`,
+        502
+      );
+    }
+    const value = envelope as {
+      success?: unknown;
+      meta?: { status_code?: unknown };
+    };
+    if (value.success === false && Number(value.meta?.status_code) === 403) {
+      throw new AltegioApiError(
+        `Access to the ${report} report is denied for the current Altegio user. Ask a location owner to grant the required analytics permission.`,
+        403
+      );
+    }
+    throw new AltegioApiError(
+      `The temporary ${report} report rejected the export request.`,
+      502
+    );
+  }
   return bytes;
 }
 
@@ -506,11 +531,11 @@ export class V1LegacyAnalyticsAdapter {
           'accounts_ids[]': input.cash_account_ids,
           master_id: input.team_member_id ?? 0,
           supplier_id: input.supplier_id ?? 0,
-          type: input.transaction_type ?? 0,
+          type: input.payment_item_id ?? 0,
           account_type:
             input.cash_account_type === 'cash'
               ? 0
-              : input.cash_account_type === 'cashless'
+              : input.cash_account_type === 'non_cash'
                 ? 1
                 : 2,
           'services_ids[]': input.service_ids,
@@ -518,7 +543,7 @@ export class V1LegacyAnalyticsAdapter {
           'groups_ids[]': input.service_category_ids,
           'goods_categories_ids[]': input.product_category_ids,
           // The source false filter checks only cash totals and drops nonzero
-          // cashless items. Read all permitted rows, then filter canonical amounts.
+          // non-cash items. Read all permitted rows, then filter canonical amounts.
           movements_funds: 1,
         },
       }),
@@ -528,8 +553,8 @@ export class V1LegacyAnalyticsAdapter {
       ...(await readSearchEnvelope(response, 'cash-flow breakdown', true)),
       currency,
       accountType: input.cash_account_type ?? 'all',
-      ...(input.transaction_type
-        ? { paymentItemId: input.transaction_type }
+      ...(input.payment_item_id
+        ? { paymentItemId: input.payment_item_id }
         : {}),
     });
     if (input.include_zero_movement_rows === false) {

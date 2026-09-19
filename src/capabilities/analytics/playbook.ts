@@ -244,7 +244,8 @@ export const QUESTION_ROUTES: readonly QuestionRoute[] = [
     tool: 'analytics_get_group_event_performance',
   },
   {
-    question: 'Which products sell and what is their markup',
+    question:
+      'Which products sell and what are their total cost and total markup',
     tool: 'analytics_get_product_sales',
   },
   {
