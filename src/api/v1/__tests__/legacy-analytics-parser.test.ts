@@ -10,6 +10,8 @@ import {
   parseSearchEnvelope,
   parseServiceProfitabilityHtml,
   parseTeamMemberSalesHtml,
+  parseProfitAndLossHtml,
+  parseInventoryTurnoverHtml,
 } from '../legacy-analytics-parser.js';
 
 const FIXTURES = join(__dirname, 'fixtures/legacy-analytics');
@@ -49,6 +51,49 @@ describe('legacy search envelope', () => {
 });
 
 describe('HTML reports', () => {
+  it.each([
+    ['profit-loss-en.html', 12000, 7500, 4500],
+    ['profit-loss-ru.html', 1200000.5, 750000.25, 450000.25],
+    ['profit-loss-pt-br.html', 12000, 7500, 4500],
+  ])('parses locale P&L totals from %s', (name, income, expense, result) => {
+    const report = parseProfitAndLossHtml({
+      html: fixture(name),
+      currency: 'USD',
+    });
+    expect(report).toMatchObject({
+      income_total: income,
+      expense_total: expense,
+      tracked_operating_result: result,
+    });
+    expect(report.categories).toHaveLength(2);
+    expect(report.categories[0]).toMatchObject({
+      category_id: 101,
+      direction: 'income',
+    });
+  });
+
+  it.each([
+    ['inventory-turnover-en.html', 501, 8.5, 26.5, 'pc'],
+    ['inventory-turnover-ru.html', 502, -1.5, 16.75, 'шт'],
+    ['inventory-turnover-pt-br.html', 503, 50.25, 50.25, 'un'],
+  ])(
+    'parses locale inventory quantities from %s',
+    (name, productId, currentStock, unitsSold, unit) => {
+      const report = parseInventoryTurnoverHtml({
+        html: fixture(name),
+        count: 1,
+        page: 1,
+        pageSize: 50,
+      });
+      expect(report.rows[0]).toMatchObject({
+        product_id: productId,
+        current_stock: currentStock,
+        units_sold: unitsSold,
+        unit,
+      });
+    }
+  );
+
   it('parses English client sales and withholds contacts by default', () => {
     const report = parseClientSalesHtml({
       html: fixture('client-sales-en.html'),
@@ -161,6 +206,23 @@ describe('HTML reports', () => {
         pageSize: 50,
         currency: 'EUR',
         includeContacts: false,
+      })
+    ).toThrow(/markup may have changed/);
+  });
+
+  it('rejects changed profit-and-loss and inventory markup', () => {
+    expect(() =>
+      parseProfitAndLossHtml({
+        html: '<section>new finance component</section>',
+        currency: 'USD',
+      })
+    ).toThrow(/markup may have changed/);
+    expect(() =>
+      parseInventoryTurnoverHtml({
+        html: '<section>new inventory component</section>',
+        count: 2,
+        page: 1,
+        pageSize: 50,
       })
     ).toThrow(/markup may have changed/);
   });

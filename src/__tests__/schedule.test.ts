@@ -53,6 +53,38 @@ describe('AltegioClient Schedule Operations', () => {
     });
   });
 
+  describe('getTeamMemberSchedules', () => {
+    it('uses one documented batch request with repeated ids and busy intervals', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true, data: [] }),
+      });
+      const client = new AltegioClient(
+        {
+          apiBase: 'https://api.alteg.io/api/v1',
+          partnerToken: 'partner123',
+          userToken: 'user456',
+        },
+        join(tmpdir(), `altegio-test-${Date.now()}`)
+      );
+
+      await client.getTeamMemberSchedules(123, {
+        start_date: '2026-09-01',
+        end_date: '2026-09-07',
+        team_member_ids: [7, 9],
+        include_busy_intervals: true,
+      });
+
+      const url = new URL((global.fetch as jest.Mock).mock.calls[0][0]);
+      expect(url.pathname).toBe('/api/v1/company/123/staff/schedule');
+      expect(url.searchParams.get('start_date')).toBe('2026-09-01');
+      expect(url.searchParams.get('end_date')).toBe('2026-09-07');
+      expect(url.searchParams.getAll('staff_ids[]')).toEqual(['7', '9']);
+      expect(url.searchParams.getAll('include[]')).toEqual(['busy_intervals']);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('setSchedule', () => {
     it('should require user token', async () => {
       const testDir = join(tmpdir(), `altegio-test-${Date.now()}`);

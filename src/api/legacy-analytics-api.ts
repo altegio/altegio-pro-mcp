@@ -325,3 +325,38 @@ export interface CashFlowBreakdownRequest extends LegacyPeriodRequest {
   product_category_ids?: number[];
   include_zero_movement_rows?: boolean;
 }
+
+export interface ProfitAndLossCategory {
+  category_id: number | null;
+  title: string | null;
+  direction: 'income' | 'expense';
+  amount: number | null;
+}
+
+export interface ProfitAndLossReport {
+  currency: string | null;
+  income_total: number | null;
+  expense_total: number | null;
+  tracked_operating_result: number | null;
+  categories: ProfitAndLossCategory[];
+}
+
+export interface InventoryTurnoverRow {
+  product_id: number;
+  product_title: string | null;
+  supplier_title: string | null;
+  unit: string | null;
+  units_received: number | null;
+  opening_stock: number | null;
+  current_stock: number | null;
+  units_sold: number | null;
+  average_stock: number | null;
+  source_turnover_days: number | null;
+  source_turnover_count: number | null;
+  source_stock_level_days: number | null;
+}
+
+export interface InventoryTurnoverReport {
+  rows: InventoryTurnoverRow[];
+  page: PageMeta;
+}

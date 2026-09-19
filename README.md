@@ -14,9 +14,9 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Features
 
-- **76 tools served (82 defined, 6 withheld from every view)** — including a 19-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
+- **81 tools served (87 defined, 6 withheld from every view)** — including a 24-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
 - **Administrative writes** for staff, services, appointments, schedules, clients, categories, booking forms, and location users
-- **Analytics**: key metrics with period comparison, daily series, client sales and retention, service profitability, team-member sales, forecasts, day-end report and occupancy (the ad-hoc report builder is switched off — see below)
+- **Analytics**: key metrics, profit-and-loss and cash-flow views, capacity heatmaps, revenue leakage, team-member × service analysis, product/inventory decisions, retention, forecasts and day-end reporting
 - **Location settings**: appointment calendar, online booking, booking forms, resources
 - **Universal API executor**: search, describe and call any of the 317 documented API operations, even the ones without a dedicated tool
 - **Conversational onboarding** with bulk CSV/JSON import and automatic checkpoint/resume
@@ -28,7 +28,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Available Tools
 
-**76 tools served (82 defined, 6 withheld from every view)**, organized by category
+**81 tools served (87 defined, 6 withheld from every view)**, organized by category
 for complete business management. Which of them a given address serves, and why,
 is the generated table in
 [`docs/architecture/tool-surface.md`](docs/architecture/tool-surface.md).
@@ -142,18 +142,25 @@ the call, and amounts come back in major units with an ISO currency code.
 - `analytics_get_client_forecast` - Per-client forecast export with predicted visits, return window and revenue; contacts are opt-in
 - `analytics_get_service_profitability` - Revenue, costs, compensation and profit by service or service category
 - `analytics_get_team_member_sales` - Services, products, revenue, future appointments and working-hour efficiency by team member
-
+- `analytics_get_profit_and_loss_statement` - Posted income and expense categories, sales-stream memo figures and service contribution, with explicit missing-cost disclosure instead of an unproven net-profit label
+- `analytics_get_capacity_heatmap` - Scheduled, booked, completed-utilized and idle hours by hour, weekday or date-hour, with peak and underused buckets
+- `analytics_get_revenue_leakage` - No-show, cancellation, unpaid-risk and discount signals plus optional unbooked-capacity opportunity; unlike estimates are never summed into a false total
+- `analytics_get_team_member_service_matrix` - Genuine team-member × service cells with revenue, contribution and share metrics, bounded ranking and explicit unavailable dimensions
+- `analytics_get_inventory_reorder_risks` - Stock velocity, days of cover, deterministic reorder risk and quantity from configurable lead-time and safety-stock assumptions
 - `analytics_get_team_member_capacity` - Working, booked and idle hours, occupancy and upcoming appointments
 - `analytics_get_client_reactivation_candidates` - Loyalty-program nonreturners, lifetime paid amounts and recent visit descriptions; contacts opt-in, client ids unavailable
 - `analytics_get_group_event_performance` - Capacity, booked/attended/paid participants and appointment value; aggregate occupancy metrics
 - `analytics_get_product_sales` - Product or category sales, quantity and markup; permission-aware product costs, category costs withheld
 - `analytics_get_cash_flow_breakdown` - Signed movements by payment item, day and returned cash-account/type columns
 
-These ten temporary adapters read the same stable reports as the authenticated
-ERP web application while equivalent V3 endpoints are pending. They are
-read-only, stateless, location-scoped, inject the current request's user token
-without a cookie session, and keep contacts opt-in. They are available on the
-analytics, finance, read-only and stdio surfaces, not the default `/mcp` view.
+The curated legacy-report adapters read the same stable reports as the
+authenticated ERP web application while equivalent V3 endpoints are pending.
+They are read-only, stateless, location-scoped, inject the current request's
+user token without a cookie session, sanitize localized report content and cap
+pagination. The decision tools combine those reports only with documented
+read endpoints and expose provenance, formulas, completeness and unavailable
+fields. They are available on the analytics, finance, read-only and stdio
+surfaces, not the default `/mcp` view.
 
 **The report builder is switched off.** Six tools
 (`analytics_list_report_templates`, `analytics_list_report_fields`,
@@ -169,11 +176,13 @@ and only an hourly upstream sweep repairs it; and the delete route needs the
 `analytics_constructor_access` user right, which neither an owner's OAuth token
 nor the marketplace system user carries. The reasons, the evidence and the
 one-line re-enable step live in
-[`src/tools/disabled-tools.ts`](src/tools/disabled-tools.ts). The ten curated
-legacy-report tools above cover stable client, retention,
-service-profitability and team-member-sales reports without creating saved
-reports. Other custom tables and finance statements are declined through
-`altegio://analytics/coverage` instead of answered with unfiltered data.
+[`src/tools/disabled-tools.ts`](src/tools/disabled-tools.ts). The curated
+legacy-report and decision tools above cover stable client, retention,
+service-profitability, team-member-sales, capacity, reactivation, group-event,
+product, cash-flow, operating-ledger and inventory views without creating
+saved reports. Arbitrary custom tables and complete statutory statements are
+declined through `altegio://analytics/coverage` instead of answered with
+incomplete or unfiltered data.
 
 **Access rights.** Analytics needs the Analytics access right in the location;
 the day-end report needs the finance reporting right and occupancy needs access

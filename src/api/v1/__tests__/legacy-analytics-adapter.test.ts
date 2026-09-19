@@ -66,6 +66,52 @@ function fakeClient(responses: Response[]): {
 }
 
 describe('temporary legacy analytics adapter wire mapping', () => {
+  it('maps the canonical period to the authenticated P&L page', async () => {
+    const { client, requests } = fakeClient([
+      new Response(fixture('profit-loss-en.html'), { status: 200 }),
+    ]);
+    const report = await new V1LegacyAnalyticsAdapter(client).getProfitAndLoss({
+      location_id: 4564,
+      date_from: '2026-08-01',
+      date_to: '2026-08-31',
+    });
+    expect(requests[0]).toEqual({
+      locationId: 4564,
+      path: '/finances_reports/annual_report/4564/',
+      query: { date_from: '2026-08-01', date_to: '2026-08-31' },
+    });
+    expect(report.tracked_operating_result).toBe(4500);
+  });
+
+  it('maps bounded inventory turnover filters and pagination', async () => {
+    const { client, requests } = fakeClient([
+      searchResponse(fixture('inventory-turnover-en.html')),
+    ]);
+    const report = await new V1LegacyAnalyticsAdapter(
+      client
+    ).getInventoryTurnover({
+      location_id: 4564,
+      date_from: '2026-08-01',
+      date_to: '2026-08-31',
+      page: 2,
+      page_size: 50,
+      inventory_id: 11,
+      product_category_id: 22,
+      supplier_id: 33,
+    });
+    expect(requests[0]).toMatchObject({
+      path: '/storages/turnover/search/4564/',
+      query: {
+        storage_id: 11,
+        category_id: 22,
+        supplier_id: 33,
+        page: 2,
+        editable_length: 50,
+      },
+    });
+    expect(report.rows[0]?.product_id).toBe(501);
+  });
+
   it('maps canonical client-sales pagination to the legacy query', async () => {
     const { client, requests } = fakeClient([
       searchResponse(fixture('client-sales-en.html')),

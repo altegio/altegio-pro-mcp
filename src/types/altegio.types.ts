@@ -82,9 +82,14 @@ export interface AltegioBooking {
     id: number;
     title: string;
     cost: number;
+    /** Amount due after discounts and client-account application. */
+    cost_to_pay?: number;
     amount?: number;
     discount?: number;
     manual_cost?: number;
+    /** Catalog price before reductions. */
+    first_cost?: number;
+    cost_per_unit?: number;
     currency?: string;
   }>;
   client?: {
@@ -116,6 +121,7 @@ export interface AltegioBooking {
   payment_status?: string;
   prepaid?: boolean;
   prepaid_amount?: number;
+  finance_transactions?: unknown[];
   comment?: string;
   [key: string]: unknown;
 }
@@ -217,12 +223,22 @@ export interface AltegioBookingParams {
 }
 
 export interface AltegioScheduleEntry {
+  /** Canonical field returned by the batch schedule endpoint. */
+  team_member_id?: number;
+  /** Legacy single-member schedule variants may use this field. */
   staff_id?: number;
   date: string;
   time?: string;
   seance_length?: number;
   datetime?: string;
   slots?: Array<{ from: string; to: string }>;
+  busy_intervals?: Array<{
+    entity_type: 'record' | 'activity' | string;
+    entity_id: number;
+    from: string;
+    to: string;
+  }>;
+  off_day_type?: number | null;
   /** Legacy reads may encode this boolean as 0/1. */
   is_working?: boolean | 0 | 1;
   [key: string]: unknown;

@@ -739,6 +739,42 @@ export class AltegioClient {
     );
   }
 
+  /**
+   * Get several team-member schedules in one documented request, optionally
+   * with the backend's busy intervals. Analytics uses this instead of one
+   * request per person so capacity calculations stay bounded.
+   */
+  async getTeamMemberSchedules(
+    companyId: number,
+    params: {
+      start_date: string;
+      end_date: string;
+      team_member_ids?: number[];
+      include_busy_intervals?: boolean;
+    }
+  ): Promise<AltegioScheduleEntry[]> {
+    this.requireAuth();
+
+    const query = new URLSearchParams({
+      start_date: params.start_date,
+      end_date: params.end_date,
+    });
+    for (const id of params.team_member_ids ?? []) {
+      query.append('staff_ids[]', String(id));
+    }
+    if (params.include_busy_intervals) {
+      query.append('include[]', 'busy_intervals');
+    }
+
+    const response = await this.apiRequest(
+      `/company/${companyId}/staff/schedule?${query.toString()}`
+    );
+    return this.handleResponse<AltegioScheduleEntry[]>(
+      response,
+      'fetch team member schedules'
+    );
+  }
+
   // ========== Schedule CRUD Operations ==========
 
   /**
