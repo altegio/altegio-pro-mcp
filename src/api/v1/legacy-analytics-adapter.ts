@@ -21,6 +21,8 @@ import type {
   ServiceProfitabilityGroup,
   ServiceProfitabilityReport,
   TeamMemberSalesReport,
+  ProfitAndLossReport,
+  InventoryTurnoverReport,
 } from '../legacy-analytics-api.js';
 import {
   parseTeamMemberCapacityHtml,
@@ -34,6 +36,8 @@ import {
   parseSearchEnvelope,
   parseServiceProfitabilityHtml,
   parseTeamMemberSalesHtml,
+  parseProfitAndLossHtml,
+  parseInventoryTurnoverHtml,
 } from './legacy-analytics-parser.js';
 
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
@@ -153,6 +157,19 @@ async function readSearchEnvelope(
     }
   }
   return parseSearchEnvelope(body, report);
+}
+
+async function readHtmlPage(
+  response: Response,
+  report: string
+): Promise<string> {
+  if (response.headers.get('need_auth') === '1')
+    assertAuthenticatedBody('Need Auth');
+  const body = new TextDecoder().decode(
+    await readBounded(response, MAX_HTML_BYTES, report)
+  );
+  assertAuthenticatedBody(body);
+  return body;
 }
 
 async function readWorkbook(
@@ -341,6 +358,55 @@ export class V1LegacyAnalyticsAdapter {
     });
   }
 
+  async getProfitAndLoss(input: {
+    location_id: number;
+    date_from: string;
+    date_to: string;
+  }): Promise<ProfitAndLossReport> {
+    const [response, currency] = await Promise.all([
+      this.client.requestLegacyWebReport({
+        locationId: input.location_id,
+        path: `/finances_reports/annual_report/${input.location_id}/`,
+        query: { date_from: input.date_from, date_to: input.date_to },
+      }),
+      this.currency(input.location_id),
+    ]);
+    return parseProfitAndLossHtml({
+      html: await readHtmlPage(response, 'profit and loss'),
+      currency,
+    });
+  }
+
+  async getInventoryTurnover(input: {
+    location_id: number;
+    date_from: string;
+    date_to: string;
+    page: number;
+    page_size: number;
+    inventory_id?: number;
+    product_category_id?: number;
+    supplier_id?: number;
+  }): Promise<InventoryTurnoverReport> {
+    const response = await this.client.requestLegacyWebReport({
+      locationId: input.location_id,
+      path: `/storages/turnover/search/${input.location_id}/`,
+      query: {
+        start_date: input.date_from,
+        end_date: input.date_to,
+        page: input.page,
+        editable_length: input.page_size,
+        storage_id: input.inventory_id ?? 0,
+        category_id: input.product_category_id ?? 0,
+        supplier_id: input.supplier_id ?? 0,
+      },
+    });
+    return parseInventoryTurnoverHtml({
+      ...(await readSearchEnvelope(response, 'inventory turnover')),
+      page: input.page,
+      pageSize: input.page_size,
+    });
+  }
+
   async getTeamMemberCapacity(input: LegacyPeriodRequest) {
     const response = await this.client.requestLegacyWebReport({
       locationId: input.location_id,
@@ -403,7 +469,6 @@ export class V1LegacyAnalyticsAdapter {
       pageSize: input.page_size,
     });
   }
-
   async getProductSales(input: ProductSalesRequest) {
     const [response, currency] = await Promise.all([
       this.client.requestLegacyWebReport({

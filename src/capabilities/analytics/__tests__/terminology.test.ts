@@ -65,8 +65,8 @@ function schemaStrings(node: unknown, out: string[] = []): string[] {
 }
 
 describe('analytics terminology', () => {
-  it('finds all 25 analytics tools', () => {
-    expect(analyticsTools).toHaveLength(25);
+  it('finds all 30 analytics tools', () => {
+    expect(analyticsTools).toHaveLength(30);
   });
 
   it.each(analyticsTools.map((tool) => [tool.meta.name, tool] as const))(

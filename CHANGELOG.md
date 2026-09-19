@@ -17,6 +17,25 @@ counting. The source cash-only zero-row filter is replaced by filtering parsed
 movements so cashless-only items remain visible. See the
 [source semantics and migration notes](docs/architecture/2026-09-19-next-legacy-analytics.md).
 
+### Added — five decision-ready analytics tools
+
+Added read-only profit-and-loss, capacity heatmap, revenue-leakage,
+team-member × service matrix and inventory reorder-risk tools. Each tool is
+task-shaped rather than a raw endpoint wrapper: it uses stable identifiers,
+bounded source reads, deterministic formulas, explicit provenance and coverage,
+and returns `null` with a reason where the authorized sources cannot support a
+metric. Profit-and-loss labels the result as a tracked operating result instead
+of claiming unproven net profit; leakage keeps observed reductions and estimated
+opportunity separate; capacity unions overlapping appointments against actual
+scheduled time; inventory recommendations expose their lead-time and safety-stock
+assumptions.
+
+The two temporary ERP report sources (posted finance ledger and inventory
+turnover) are location-scoped, stateless and allowlisted alongside the existing
+legacy analytics routes. English, Russian and Brazilian-Portuguese golden
+fixtures pin their localized markup, and the source audit records every route,
+permission, filter, stable identifier, derived field and known gap.
+
 ### Added — five temporary read-only analytics reports
 
 Five curated tools expose stable authenticated ERP reports while equivalent V3

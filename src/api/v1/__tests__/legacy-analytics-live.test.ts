@@ -108,36 +108,47 @@ describeLive(
 
     it('parses every report into its canonical bounded contract', async () => {
       const period = recentPeriod();
-      const [clients, retention, forecast, services, team] = await Promise.all([
-        adapter.getClientSales({
-          location_id: DEMO_LOCATION_ID,
-          ...period,
-          page: 1,
-          page_size: 50,
-          include_contacts: false,
-        }),
-        adapter.getClientRetention({
-          location_id: DEMO_LOCATION_ID,
-          ...period,
-        }),
-        adapter.getClientForecast({
-          location_id: DEMO_LOCATION_ID,
-          page: 1,
-          page_size: 50,
-          include_contacts: false,
-        }),
-        adapter.getServiceProfitability({
-          location_id: DEMO_LOCATION_ID,
-          ...period,
-          page: 1,
-          page_size: 100,
-          group_by: 'service',
-        }),
-        adapter.getTeamMemberSales({
-          location_id: DEMO_LOCATION_ID,
-          ...period,
-        }),
-      ]);
+      const [clients, retention, forecast, services, team, finance, inventory] =
+        await Promise.all([
+          adapter.getClientSales({
+            location_id: DEMO_LOCATION_ID,
+            ...period,
+            page: 1,
+            page_size: 50,
+            include_contacts: false,
+          }),
+          adapter.getClientRetention({
+            location_id: DEMO_LOCATION_ID,
+            ...period,
+          }),
+          adapter.getClientForecast({
+            location_id: DEMO_LOCATION_ID,
+            page: 1,
+            page_size: 50,
+            include_contacts: false,
+          }),
+          adapter.getServiceProfitability({
+            location_id: DEMO_LOCATION_ID,
+            ...period,
+            page: 1,
+            page_size: 100,
+            group_by: 'service',
+          }),
+          adapter.getTeamMemberSales({
+            location_id: DEMO_LOCATION_ID,
+            ...period,
+          }),
+          adapter.getProfitAndLoss({
+            location_id: DEMO_LOCATION_ID,
+            ...period,
+          }),
+          adapter.getInventoryTurnover({
+            location_id: DEMO_LOCATION_ID,
+            ...period,
+            page: 1,
+            page_size: 50,
+          }),
+        ]);
 
       expect(clients.rows.length).toBeLessThanOrEqual(50);
       expect(clients.rows.every((row) => !('phone' in row))).toBe(true);
@@ -147,6 +158,11 @@ describeLive(
       expect(forecast.rows.every((row) => !('phone' in row))).toBe(true);
       expect(services.rows.length).toBeLessThanOrEqual(100);
       expect(team.rows.every((row) => row.team_member_id > 0)).toBe(true);
+      expect(finance.categories.every((row) => row.category_id !== null)).toBe(
+        true
+      );
+      expect(inventory.rows.length).toBeLessThanOrEqual(50);
+      expect(inventory.rows.every((row) => row.product_id > 0)).toBe(true);
     }, 120_000);
   }
 );

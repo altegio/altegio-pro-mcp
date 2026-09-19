@@ -23,6 +23,7 @@ import { DATASETS } from '../../capabilities/analytics/vocabulary.js';
 import { REPORT_ROW_CAP } from '../../capabilities/analytics/report-store.js';
 import * as analytics from '../../capabilities/analytics/use-cases.js';
 import * as legacyAnalytics from '../../capabilities/analytics/legacy-use-cases.js';
+import * as decisionAnalytics from '../../capabilities/analytics/decision-use-cases.js';
 import { includeContactsArg } from '../contacts.js';
 
 // ========== shared input pieces ==========
@@ -838,6 +839,331 @@ export const analyticsGetTeamMemberSalesTool = defineTool({
   }),
   handler: async ({ input, client }) =>
     legacyAnalytics.getTeamMemberSales(client, input),
+});
+
+// ========== task-oriented decision analytics ==========
+
+const boundedIds = (description: string, max = 25) =>
+  z
+    .array(z.number().int().positive())
+    .min(1)
+    .max(max)
+    .optional()
+    .describe(description);
+
+export const analyticsGetProfitAndLossStatementTool = defineTool({
+  name: 'analytics_get_profit_and_loss_statement',
+  category: 'Analytics',
+  description:
+    '[Analytics] Explain how much this location earned during a period without overstating accounting completeness. Returns sales streams, posted finance income and expense categories, service consumables, attributed team-member compensation, a service contribution result, and a tracked operating result. It never labels the result net profit when taxes, rent, external payroll, product cost or unposted expenses cannot be proven complete. Use analytics_get_day_end_report for one day’s till reconciliation and analytics_get_service_profitability for service-level detail.',
+  annotations: {
+    title: 'Analytics: profit and loss statement',
+    ...READ_ONLY,
+  },
+  input: z.object({
+    location_id: locationId,
+    ...periodFields,
+    include_comparison: z
+      .boolean()
+      .optional()
+      .describe(
+        'Include a comparison. With no explicit comparison dates, uses the immediately preceding period of equal length.'
+      ),
+    comparison_date_from: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional()
+      .describe(
+        'Optional first day of an explicit comparison period, YYYY-MM-DD. Supply together with comparison_date_to and set include_comparison=true.'
+      ),
+    comparison_date_to: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional()
+      .describe(
+        'Optional last day of an explicit comparison period, YYYY-MM-DD, inclusive.'
+      ),
+  }),
+  outputSchema: objectSchema({
+    location_id: { type: 'integer' as const },
+    period: periodSchema,
+    comparison_period: previousPeriodSchema,
+    currency: str,
+    sales_revenue_by_stream: { type: 'object' as const },
+    operating_ledger: { type: 'object' as const },
+    service_contribution: { type: 'object' as const },
+    cost_classification: { type: 'object' as const },
+    gross_result: num,
+    net_profit: num,
+    completeness: { type: 'object' as const },
+    provenance: { type: 'array' as const, items: { type: 'object' as const } },
+    untrusted_data_note: { type: 'string' as const },
+  }),
+  handler: async ({ input, client }) =>
+    decisionAnalytics.getProfitAndLossStatement(client, input),
+});
+
+export const analyticsGetCapacityHeatmapTool = defineTool({
+  name: 'analytics_get_capacity_heatmap',
+  category: 'Analytics',
+  description:
+    '[Analytics] Show when scheduled capacity is overloaded or underused. Buckets scheduled, booked, completed-utilized and idle hours, appointment outcomes, attributable completed revenue and revenue per scheduled hour. Schedule time is always the denominator; appointment and group-event busy intervals are unioned so overlaps count once, and unscheduled time is never called idle. Use hour_of_day for recurring daily patterns, weekday for weekly patterns, or date_hour for a detailed range of at most 31 days.',
+  annotations: { title: 'Analytics: capacity heatmap', ...READ_ONLY },
+  input: z.object({
+    location_id: locationId,
+    ...periodFields,
+    team_member_ids: boundedIds(
+      'Restrict to these team members. At most 25; leave out to use the bounded location roster.'
+    ),
+    position_ids: boundedIds(
+      'Restrict to team members in these positions. At most 20.'
+    ),
+    granularity: z
+      .enum(['hour_of_day', 'weekday', 'date_hour'])
+      .describe(
+        'hour_of_day combines the same hour across dates; weekday combines each weekday; date_hour returns each local date and hour and is limited to 31 days.'
+      ),
+  }),
+  outputSchema: objectSchema({
+    location_id: { type: 'integer' as const },
+    period: periodSchema,
+    granularity: { type: 'string' as const },
+    team_member_ids: {
+      type: 'array' as const,
+      items: { type: 'integer' as const },
+    },
+    buckets: { type: 'array' as const, items: { type: 'object' as const } },
+    peak_buckets: {
+      type: 'array' as const,
+      items: { type: 'object' as const },
+    },
+    underutilized_buckets: {
+      type: 'array' as const,
+      items: { type: 'object' as const },
+    },
+    coverage: { type: 'object' as const },
+    provenance: { type: 'array' as const, items: { type: 'object' as const } },
+  }),
+  handler: async ({ input, client }) =>
+    decisionAnalytics.getCapacityHeatmap(client, input),
+});
+
+export const analyticsGetRevenueLeakageTool = defineTool({
+  name: 'analytics_get_revenue_leakage',
+  category: 'Analytics',
+  description:
+    '[Analytics] Identify revenue reductions and opportunity risk without combining unlike concepts. Reports no-show and cancelled appointments, completed visits not marked paid, observed service discounts, and scheduled-but-unbooked capacity. Actual reductions stay separate from estimated opportunity; every category carries its own formula, denominator, source coverage and quality flag. Use analytics_get_appointments_breakdown for simple outcome shares and analytics_get_capacity_heatmap for detailed time buckets.',
+  annotations: { title: 'Analytics: revenue leakage', ...READ_ONLY },
+  input: z.object({
+    location_id: locationId,
+    ...periodFields,
+    team_member_ids: boundedIds(
+      'Restrict appointment and capacity signals to these team members.'
+    ),
+    service_ids: boundedIds(
+      'Keep appointments containing at least one of these services.'
+    ),
+    service_category_ids: boundedIds(
+      'Keep appointments containing a service in one of these categories.'
+    ),
+    visit_statuses: z
+      .array(
+        z.enum([
+          'waiting',
+          'confirmed',
+          'arrived',
+          'no_show',
+          'cancelled',
+          'unknown',
+        ])
+      )
+      .min(1)
+      .optional()
+      .describe(
+        'Restrict the analysis to these canonical appointment statuses. Leave out to report every leakage category.'
+      ),
+    include_capacity_opportunity: z
+      .boolean()
+      .optional()
+      .describe(
+        'Include scheduled-but-unbooked capacity and its optional low-confidence opportunity estimate. Defaults to true.'
+      ),
+  }),
+  outputSchema: objectSchema({
+    location_id: { type: 'integer' as const },
+    period: periodSchema,
+    currency: str,
+    categories: { type: 'array' as const, items: { type: 'object' as const } },
+    totals: { type: ['object', 'null'] as const },
+    totals_not_combined_reason: { type: 'string' as const },
+    coverage: { type: 'object' as const },
+    provenance: { type: 'array' as const, items: { type: 'object' as const } },
+  }),
+  handler: async ({ input, client }) =>
+    decisionAnalytics.getRevenueLeakage(client, input),
+});
+
+export const analyticsGetTeamMemberServiceMatrixTool = defineTool({
+  name: 'analytics_get_team_member_service_matrix',
+  category: 'Analytics',
+  description:
+    '[Analytics] Compare genuine team-member × service performance cells from a report grouped by both dimensions. Returns delivered service lines, cash-or-card revenue, average check, compensation, consumables, contribution result, shares within each team member and within each service, plus honest nulls for unavailable pair metrics. Rankings exclude statistically tiny cells by default while the paged canonical matrix keeps every cell. At most ten team members are evaluated per call.',
+  annotations: {
+    title: 'Analytics: team member service matrix',
+    ...READ_ONLY,
+  },
+  input: z.object({
+    location_id: locationId,
+    ...periodFields,
+    team_member_ids: boundedIds(
+      'Team members to compare, at most ten. Leave out to use the first bounded matching roster.',
+      10
+    ),
+    position_ids: boundedIds(
+      'Restrict the team-member roster to these positions.',
+      20
+    ),
+    service_ids: boundedIds(
+      'Keep only these stable service ids after reading the grouped source.',
+      50
+    ),
+    service_category_id: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Restrict the source report to one service category; the source supports one category at a time.'
+      ),
+    sort_by: z
+      .enum(['contribution_result', 'revenue', 'services_delivered'])
+      .optional()
+      .describe('Metric used to order matrix rows and compact summaries.'),
+    sort_order: z
+      .enum(['asc', 'desc'])
+      .optional()
+      .describe('Ascending or descending order. Defaults to descending.'),
+    minimum_sample_size: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe(
+        'Minimum delivered service lines for top and bottom summaries. Defaults to 3; canonical matrix rows are never dropped by this threshold.'
+      ),
+    page: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('1-based result page.'),
+    page_size: z
+      .number()
+      .int()
+      .positive()
+      .max(100)
+      .optional()
+      .describe('Matrix cells returned per page, at most 100.'),
+  }),
+  outputSchema: objectSchema({
+    location_id: { type: 'integer' as const },
+    period: periodSchema,
+    currency: str,
+    rows: { type: 'array' as const, items: { type: 'object' as const } },
+    page: { type: 'object' as const },
+    top_cells: { type: 'array' as const, items: { type: 'object' as const } },
+    bottom_cells: {
+      type: 'array' as const,
+      items: { type: 'object' as const },
+    },
+    ranking: { type: 'object' as const },
+    coverage: { type: 'object' as const },
+    formulae: { type: 'object' as const },
+    provenance: { type: 'array' as const, items: { type: 'object' as const } },
+    untrusted_data_note: { type: 'string' as const },
+  }),
+  handler: async ({ input, client }) =>
+    decisionAnalytics.getTeamMemberServiceMatrix(client, input),
+});
+
+export const analyticsGetInventoryReorderRisksTool = defineTool({
+  name: 'analytics_get_inventory_reorder_risks',
+  category: 'Analytics',
+  description:
+    '[Analytics] Show products likely to run out, need reordering, move slowly or be overstocked from the authenticated inventory-turnover report. Uses current stock and period sales velocity with bounded lead-time and safety-stock assumptions. Recommendations are analytical guidance only and never create purchase orders or change inventory. Zero sales, negative stock, fractional units and an all-inventories aggregate are handled explicitly; unavailable codes, reservations, costs and last-sale dates stay null with reasons.',
+  annotations: { title: 'Analytics: inventory reorder risks', ...READ_ONLY },
+  input: z.object({
+    location_id: locationId,
+    ...periodFields,
+    inventory_id: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Restrict to one inventory. Leave out for the source report’s aggregate across visible inventories.'
+      ),
+    product_category_id: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Restrict to one product category supported by the source.'),
+    supplier_id: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Restrict to one supplier supported by the source.'),
+    lead_time_days: z
+      .number()
+      .int()
+      .min(1)
+      .max(180)
+      .optional()
+      .describe('Supplier lead time in days. Defaults to 14; maximum 180.'),
+    safety_stock_days: z
+      .number()
+      .int()
+      .min(0)
+      .max(180)
+      .optional()
+      .describe('Additional safety-stock cover in days. Defaults to 7.'),
+    risks: z
+      .array(z.enum(decisionAnalytics.INVENTORY_RISKS))
+      .min(1)
+      .optional()
+      .describe(
+        'Return only these risk classes after reading the source page.'
+      ),
+    page: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('1-based source page.'),
+    page_size: z
+      .number()
+      .int()
+      .positive()
+      .max(100)
+      .optional()
+      .describe('Products requested from the source page, at most 100.'),
+  }),
+  outputSchema: objectSchema({
+    location_id: { type: 'integer' as const },
+    period: periodSchema,
+    assumptions: { type: 'object' as const },
+    rows: { type: 'array' as const, items: { type: 'object' as const } },
+    page: { type: 'object' as const },
+    formulae: { type: 'object' as const },
+    coverage: { type: 'object' as const },
+    provenance: { type: 'array' as const, items: { type: 'object' as const } },
+    untrusted_data_note: { type: 'string' as const },
+  }),
+  handler: async ({ input, client }) =>
+    decisionAnalytics.getInventoryReorderRisks(client, input),
 });
 
 // ========== report builder ==========

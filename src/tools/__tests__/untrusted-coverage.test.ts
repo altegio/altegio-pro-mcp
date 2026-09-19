@@ -397,6 +397,21 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     what: 'team-member names and position titles rendered by the location report',
     coveredBy: 'src/capabilities/analytics/__tests__/legacy-use-cases.test.ts',
   },
+  analytics_get_profit_and_loss_statement: {
+    what: 'finance-category titles typed in the location finance ledger',
+    coveredBy:
+      'src/capabilities/analytics/__tests__/decision-use-cases.test.ts',
+  },
+  analytics_get_team_member_service_matrix: {
+    what: 'team-member, position, service and service-category titles from location data',
+    coveredBy:
+      'src/capabilities/analytics/__tests__/decision-use-cases.test.ts',
+  },
+  analytics_get_inventory_reorder_risks: {
+    what: 'product, supplier and unit labels from the location inventory report',
+    coveredBy:
+      'src/capabilities/analytics/__tests__/decision-use-cases.test.ts',
+  },
   analytics_list_report_templates: {
     what: 'template names and descriptions from the location’s own builder',
     coveredBy: 'src/capabilities/analytics/__tests__/use-cases.test.ts',
@@ -499,6 +514,10 @@ const NO_FREE_TEXT: Record<string, string> = {
   analytics_get_team_member_occupancy: 'team-member ids and percentages',
   analytics_get_client_visit_stats:
     'counts, money and a date; the client is identified by id',
+  analytics_get_capacity_heatmap:
+    'team-member ids, dates, hours, counts and money; names are not returned',
+  analytics_get_revenue_leakage:
+    'canonical category keys, counts, money, hours and our own formula text',
   analytics_list_report_fields:
     'the report builder’s own field registry — platform vocabulary, not text anyone at the location typed',
 

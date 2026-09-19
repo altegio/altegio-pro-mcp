@@ -222,6 +222,54 @@ export const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
       'Share of appointments the client actually attended, the inverse of the no-show share.',
     tool: 'analytics_get_appointments_breakdown',
   },
+  {
+    key: 'tracked_operating_result',
+    name: 'Tracked operating result',
+    definition:
+      'Posted finance income less posted finance expenses for the period. It is deliberately not called net profit because external and unposted costs may be missing.',
+    formula: 'posted income total - posted expense total',
+    tool: 'analytics_get_profit_and_loss_statement',
+  },
+  {
+    key: 'contribution_result',
+    name: 'Service contribution result',
+    definition:
+      'Service revenue after source-attributed consumables and team-member compensation. It describes service economics, not whole-location profit.',
+    formula:
+      'cash-or-card service revenue + client-account payments - consumables cost - team-member compensation',
+    tool: 'analytics_get_profit_and_loss_statement',
+  },
+  {
+    key: 'scheduled_hours',
+    name: 'Scheduled hours',
+    definition:
+      'Work-schedule time available for booking. Time outside a schedule is never treated as idle capacity.',
+    tool: 'analytics_get_capacity_heatmap',
+  },
+  {
+    key: 'booked_hours',
+    name: 'Booked hours',
+    definition:
+      'The union of non-cancelled appointment intervals inside scheduled time, so overlapping appointments count once.',
+    tool: 'analytics_get_capacity_heatmap',
+  },
+  {
+    key: 'days_of_cover',
+    name: 'Inventory days of cover',
+    definition:
+      'How many days current stock would last at the observed period sales velocity. It is blank when velocity is zero.',
+    formula: 'current stock / (units sold / period days)',
+    tool: 'analytics_get_inventory_reorder_risks',
+  },
+  {
+    key: 'recommended_reorder_quantity',
+    name: 'Recommended reorder quantity',
+    definition:
+      'Units needed to cover the stated supplier lead time plus safety-stock days at the observed sales velocity.',
+    formula:
+      'max(0, average daily sales × (lead-time days + safety-stock days) - current stock)',
+    tool: 'analytics_get_inventory_reorder_risks',
+  },
 ] as const;
 
 /** Business rules that apply to every analytics answer. */
@@ -274,14 +322,14 @@ export const COVERAGE_GAPS: readonly {
     reason:
       'The Analytics Constructor is not switched on for Altegio: its report-data API fails for every report, and the one endpoint that answers ignores the requested period, so any table it produced would be all-time data under the wrong label.',
     alternative:
-      'Use analytics_get_client_sales, analytics_get_client_retention, analytics_get_service_profitability or analytics_get_team_member_sales for the stable curated reports; use the metric tools for other supported questions.',
+      'Use the stable curated reports, including the profit-and-loss statement, capacity heatmap, leakage analysis, team-member × service matrix and inventory reorder risks; use the metric tools for other supported questions.',
   },
   {
     topic: 'Custom report dimensions outside the curated stable reports',
     reason:
       'The ad-hoc Analytics Constructor is switched off and its available data route ignores requested periods.',
     alternative:
-      'Use analytics_get_client_sales, analytics_get_service_profitability or analytics_get_team_member_sales when their fixed dimensions fit; otherwise name the gap.',
+      'Use analytics_get_client_sales, analytics_get_service_profitability, analytics_get_team_member_sales or analytics_get_team_member_service_matrix when their fixed dimensions fit; otherwise name the gap.',
   },
   {
     topic: 'Team member dynamics over time',
@@ -311,19 +359,21 @@ export const COVERAGE_GAPS: readonly {
     topic: 'Finance dashboard and account balances',
     reason: 'Balances have no endpoint.',
     alternative:
-      'analytics_get_day_end_report shows takings per account for a day. analytics_get_cash_flow_breakdown shows signed period movements, not account balances. P&L remains unavailable.',
+      'analytics_get_day_end_report shows takings per account, analytics_get_cash_flow_breakdown shows signed period movements, and analytics_get_profit_and_loss_statement shows the posted operating ledger and service contribution; none is an account-balance statement.',
   },
   {
-    topic: 'Annual P&L reports',
-    reason: 'No curated P&L contract is available.',
+    topic: 'Complete statutory profit, tax and cash-flow statements',
+    reason:
+      'The sources cannot prove that taxes, rent, external payroll, retail product cost and unposted expenses are complete.',
     alternative:
-      'analytics_get_cash_flow_breakdown provides period cash movements; it is not accrual P&L.',
+      'analytics_get_profit_and_loss_statement labels the available result as tracked operating result, exposes included and missing cost classes, and never mislabels it as net profit.',
   },
   {
-    topic: 'Inventory turnover and write-off analysis',
-    reason: 'Web-only.',
+    topic: 'Inventory valuation, reservations and last-sale dates',
+    reason:
+      'The turnover source exposes stock and sales movement but not authorized unit cost, reserved stock, available stock or last-sale date.',
     alternative:
-      'None through this server; analytics_get_day_end_report shows a single day’s discounts and write-offs.',
+      'analytics_get_inventory_reorder_risks provides velocity, days of cover and reorder recommendations while marking unavailable turnover fields explicitly; analytics_get_product_sales provides authorized product-sale cost and code fields where available.',
   },
   {
     topic: 'Payroll period sheets',

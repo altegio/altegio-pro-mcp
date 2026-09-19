@@ -96,13 +96,14 @@ export const DIAGNOSTIC_PLAYS: readonly DiagnosticPlay[] = [
       'analytics_get_overview — read revenue_total, average_check and clients_active together, each against the previous period, to split the drop into traffic versus spend.',
       'analytics_get_daily_series with metric=revenue — was it one bad week or a steady decline? Name the worst days.',
       'analytics_get_appointments_breakdown by visit_status — did the no_show or cancelled share rise and eat the revenue that was booked?',
-      'analytics_get_overview again with position_id, then with team_member_id for the two or three people who carry the revenue — which part of the team moved the headline. There is no per-service table through this server; say so instead of guessing one.',
+      'analytics_get_team_member_service_matrix — identify the exact team-member × service cells that moved revenue and contribution; exclude cells below the requested minimum sample.',
     ],
     read: 'Attribute the change to one of: fewer clients (traffic), lower average check (spend), a worse attendance rate (leakage), or a shift in service mix. Report the absolute money next to the percentage — a 5% fall on the main service line matters more than a 40% fall on a tiny one.',
   },
   {
     symptom: 'The team looks busy but occupancy is low, or capacity is wasted',
     steps: [
+      'analytics_get_capacity_heatmap — identify peak and underused weekday/hour buckets from scheduled, booked and completed-utilized time.',
       'analytics_get_team_member_occupancy for the team, up to ten ids at once — scheduled, booked and idle hours per person, day by day.',
       'analytics_get_daily_series with metric=occupancy — the location-wide booked share and the no-show share of working time.',
     ],
@@ -139,7 +140,9 @@ export const DIAGNOSTIC_PLAYS: readonly DiagnosticPlay[] = [
       'analytics_get_overview for the period — the headline: revenue, average check, occupancy, appointment outcomes, client mix, each versus the previous period.',
       'analytics_get_daily_series with metric=revenue — the shape of the period and its weekly rhythm.',
       'analytics_get_appointments_breakdown by source, then by visit_status — where demand comes from and how much of it leaks.',
-      'analytics_get_overview once per position_id, and per team_member_id where it matters — the headline split across the team.',
+      'analytics_get_profit_and_loss_statement — reconcile posted income and expenses with the service contribution view; keep its tracked operating result separate from unproven net profit.',
+      'analytics_get_revenue_leakage — quantify no-shows, cancellations, unpaid-risk signals, discounts and optional unbooked-capacity opportunity without adding unlike estimates together.',
+      'analytics_get_team_member_service_matrix — find the team-member × service cells behind the headline.',
     ],
     read: 'Close with three to five sentences an owner can act on: what grew, what shrank, what is leaking (no-shows, cancellations, idle time), and the single change with the largest expected effect. Say plainly when a module is off or an access right is missing rather than guessing a number.',
   },
@@ -155,9 +158,9 @@ export interface QuestionRoute {
 }
 
 /*
- * A question with no route here — an arbitrary table, a P&L or an arbitrary financial
- * sheet — has no answer through this server: the ad-hoc report builder is
- * switched off (see `src/tools/disabled-tools.ts`).
+ * An arbitrary table or a complete statutory cash-flow statement still has no
+ * answer through this server: the ad-hoc report builder is switched off (see
+ * `src/tools/disabled-tools.ts`).
  */
 export const QUESTION_ROUTES: readonly QuestionRoute[] = [
   {
@@ -206,7 +209,7 @@ export const QUESTION_ROUTES: readonly QuestionRoute[] = [
   },
   {
     question: 'Who has free capacity this week / is anyone overloaded',
-    tool: 'analytics_get_team_member_occupancy',
+    tool: 'analytics_get_capacity_heatmap',
   },
   {
     question: 'Is this client reliable / how much have they spent',
@@ -252,6 +255,23 @@ export const QUESTION_ROUTES: readonly QuestionRoute[] = [
     question: 'Revenue by team member',
     tool: 'analytics_get_team_member_sales',
   },
+  {
+    question: 'What is our operating result / profit and loss for the period',
+    tool: 'analytics_get_profit_and_loss_statement',
+  },
+  {
+    question:
+      'How much revenue is leaking through no-shows, cancellations or discounts',
+    tool: 'analytics_get_revenue_leakage',
+  },
+  {
+    question: 'Which team-member and service combinations perform best',
+    tool: 'analytics_get_team_member_service_matrix',
+  },
+  {
+    question: 'What inventory should we reorder now',
+    tool: 'analytics_get_inventory_reorder_risks',
+  },
 ] as const;
 
 /**
@@ -283,7 +303,7 @@ export const SLICING_NOTES: readonly SlicingNote[] = [
   },
   {
     dimension: 'Group-by',
-    how: 'Curated grouped tables exist for client sales, client retention, service profitability and team-member sales. The ad-hoc report builder is switched off, so custom dimensions outside those tools must be declined rather than approximated.',
+    how: 'Curated grouped tables exist for client sales, client retention, service profitability, team-member sales and the team-member × service matrix. The ad-hoc report builder is switched off, so custom dimensions outside those tools must be declined rather than approximated.',
   },
   {
     dimension: 'Scope',
@@ -361,6 +381,6 @@ export const ANALYSIS_NOTES: readonly AnalysisNote[] = [
   },
   {
     title: 'Only curated report tables',
-    text: 'The ad-hoc report builder is switched off. Use the dedicated client-sales, retention, service-profitability and team-member-sales tools for their supported tables; name the gap for custom dimensions and P&L instead of improvising one. Use analytics_get_cash_flow_breakdown for signed cash movements.',
+    text: 'The ad-hoc report builder is switched off. Use the dedicated curated tools, including profit-and-loss, cash-flow, capacity, leakage, team-member × service, product-sales and inventory-risk views; name the gap for arbitrary dimensions or a complete statutory statement instead of improvising one.',
   },
 ] as const;

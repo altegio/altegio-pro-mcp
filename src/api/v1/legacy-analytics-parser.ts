@@ -22,6 +22,8 @@ import type {
   ServiceProfitabilityGroup,
   ServiceProfitabilityReport,
   TeamMemberSalesReport,
+  ProfitAndLossReport,
+  InventoryTurnoverReport,
 } from '../legacy-analytics-api.js';
 
 const MISSING = /^(?:-|—|–|n\/a|null)?$/i;
@@ -40,6 +42,12 @@ function cleanText(value: unknown): string {
     .replace(/[\u00a0\u202f]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function unitFromQuantity(value: unknown): string | null {
+  const text = cleanText(value);
+  const unit = text.replace(/[()\d\s.,'+\-\u00a0\u202f]/g, '').trim();
+  return unit || null;
 }
 
 /** Parse locale-formatted numbers from English, Russian and pt-BR reports. */
@@ -150,6 +158,122 @@ export function parseSearchEnvelope(
     throw new LegacyAnalyticsParseError(report, 'invalid result count');
   }
   return { html: envelope.content, count };
+}
+
+/**
+ * Parse the authenticated ERP P&L page. Category direction is structural:
+ * the backend emits the income aggregate, then income categories, then the
+ * expense aggregate and its categories. Position/person breakdown rows are
+ * excluded because they are children of compensation and would double count.
+ */
+export function parseProfitAndLossHtml(args: {
+  html: string;
+  currency: string | null;
+}): ProfitAndLossReport {
+  const $ = load(args.html);
+  const rows = $('table.table-report tbody tr').toArray();
+  let direction: 'income' | 'expense' | null = null;
+  let incomeTotal: number | null = null;
+  let expenseTotal: number | null = null;
+  let trackedResult: number | null = null;
+  const categories: ProfitAndLossReport['categories'] = [];
+  let aggregateIndex = 0;
+
+  for (const row of rows) {
+    const $row = $(row);
+    const values = cells($, row);
+    if (values.length < 2) continue;
+    const amount = parseLocaleNumber(values.at(-1));
+    if ($row.hasClass('row-aggregated')) {
+      aggregateIndex += 1;
+      if (aggregateIndex === 1) {
+        direction = 'income';
+        incomeTotal = amount;
+      } else if (aggregateIndex === 2) {
+        direction = 'expense';
+        expenseTotal = amount === null ? null : Math.abs(amount);
+      } else if (aggregateIndex === 3) {
+        trackedResult = amount;
+      }
+      continue;
+    }
+    if ($row.hasClass('row-position') || $row.hasClass('row-master')) continue;
+    if (!direction || aggregateIndex > 2) continue;
+    const href = $row.find('a[href*="type="]').first().attr('href') ?? '';
+    const categoryId = integer(href.match(/[?&]type=(\d+)/)?.[1]);
+    if (categoryId === null) continue;
+    categories.push({
+      category_id: categoryId,
+      title: cleanText(values[0]) || null,
+      direction,
+      amount:
+        amount === null
+          ? null
+          : direction === 'expense'
+            ? Math.abs(amount)
+            : amount,
+    });
+  }
+
+  if (aggregateIndex < 3) {
+    throw new LegacyAnalyticsParseError(
+      'profit and loss',
+      'income, expense or result rows not found'
+    );
+  }
+  return {
+    currency: args.currency,
+    income_total: incomeTotal,
+    expense_total: expenseTotal,
+    tracked_operating_result: trackedResult,
+    categories,
+  };
+}
+
+export function parseInventoryTurnoverHtml(args: {
+  html: string;
+  count: number;
+  page: number;
+  pageSize: number;
+}): InventoryTurnoverReport {
+  const $ = load(args.html);
+  const rows = $('a.table-turnover__good-link')
+    .map((_index, link) => {
+      const row = $(link).closest('tr');
+      const values = cells($, row);
+      const productId = integer($(link).attr('data-id'));
+      if (!productId || productId <= 0 || values.length < 10) {
+        throw new LegacyAnalyticsParseError(
+          'inventory turnover',
+          'partial product row'
+        );
+      }
+      return {
+        product_id: productId,
+        product_title: cleanText($(link).text()) || null,
+        supplier_title: values[1] || null,
+        unit: unitFromQuantity(values[4]),
+        units_received: parseLocaleNumber(values[2]),
+        opening_stock: parseLocaleNumber(values[3]),
+        current_stock: parseLocaleNumber(values[4]),
+        units_sold: parseLocaleNumber(values[5]),
+        average_stock: parseLocaleNumber(values[6]),
+        source_turnover_days: parseLocaleNumber(values[7]),
+        source_turnover_count: parseLocaleNumber(values[8]),
+        source_stock_level_days: parseLocaleNumber(values[9]),
+      };
+    })
+    .get();
+  if (args.count > 0 && rows.length === 0) {
+    throw new LegacyAnalyticsParseError(
+      'inventory turnover',
+      'product rows not found'
+    );
+  }
+  return {
+    rows,
+    page: pageMeta(args.page, args.pageSize, args.count, rows.length),
+  };
 }
 
 function cells($: CheerioAPI, row: unknown): string[] {

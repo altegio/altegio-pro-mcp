@@ -865,6 +865,42 @@ paths:
         - { name: "supplier_id", in: query, schema: { type: integer } }
       responses:
         '200': { description: JSON search envelope containing HTML; bounded parsing and explicit structural drift failures. }
+  /finances_reports/annual_report/{location_id}/:
+    get:
+      operationId: get_legacy_profit_and_loss_report
+      summary: Read the location profit-and-loss finance report
+      x-altegio-api-version: web
+      x-altegio-permission: finances_year_report_access
+      x-altegio-caveat: >-
+        Returns a localized HTML page. When the report-builder feature hides
+        system reports this route redirects and is treated as unavailable.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: date_from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: date_to, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200': { description: Localized HTML table with posted income, expense and result rows. }
+
+  /storages/turnover/search/{location_id}/:
+    get:
+      operationId: get_legacy_inventory_turnover_report
+      summary: Search the location inventory-turnover report
+      x-altegio-api-version: web
+      x-altegio-permission: storages_turnover_report_access
+      x-altegio-caveat: >-
+        Returns a JSON search envelope whose content field is a localized HTML
+        table. The route supports one inventory, category and supplier filter.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: start_date, in: query, required: true, schema: { type: string, format: date } }
+        - { name: end_date, in: query, required: true, schema: { type: string, format: date } }
+        - { name: storage_id, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: category_id, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: supplier_id, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: editable_length, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        '200': { description: JSON envelope containing inventory-turnover HTML and total row count. }
 
 components:
   schemas:
