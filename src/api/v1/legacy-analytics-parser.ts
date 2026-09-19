@@ -2,6 +2,15 @@
 import { load, type CheerioAPI } from 'cheerio';
 import * as XLSX from '@e965/xlsx';
 import type {
+  CashAccountType,
+  CashFlowBreakdownReport,
+  CashFlowColumn,
+  CashFlowRow,
+  ClientReactivationReport,
+  GroupEventPerformanceReport,
+  ProductSalesGroup,
+  ProductSalesReport,
+  TeamMemberCapacityReport,
   ClientForecastReport,
   ClientForecastRow,
   ClientForecastWindow,
@@ -538,33 +547,7 @@ export function parseClientForecastWorkbook(args: {
   pageSize: number;
   includeContacts: boolean;
 }): ClientForecastReport {
-  let workbook: XLSX.WorkBook;
-  try {
-    workbook = XLSX.read(args.bytes, {
-      type: 'array',
-      cellDates: true,
-      dense: true,
-    });
-  } catch {
-    throw new LegacyAnalyticsParseError(
-      'client forecast',
-      'malformed workbook'
-    );
-  }
-  const firstName = workbook.SheetNames[0];
-  const sheet = firstName ? workbook.Sheets[firstName] : undefined;
-  if (!sheet) {
-    throw new LegacyAnalyticsParseError(
-      'client forecast',
-      'workbook has no sheet'
-    );
-  }
-  const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-    header: 1,
-    raw: true,
-    defval: null,
-    blankrows: false,
-  });
+  const matrix = workbookMatrix(args.bytes, 'client forecast');
   const headerIndex = matrix.findIndex(
     (row) =>
       Array.isArray(row) && row.filter((cell) => cleanText(cell)).length >= 8
@@ -609,5 +592,577 @@ export function parseClientForecastWorkbook(args: {
     prediction_date: args.predictionDate,
     rows,
     page: pageMeta(args.page, args.pageSize, parsed.length, rows.length),
+  };
+}
+
+/** Strip decorative pie ratios before reading the displayed percentage. */
+export function parseTeamMemberCapacityHtml(args: {
+  html: string;
+  count: number;
+}): TeamMemberCapacityReport {
+  const $ = load(args.html);
+  const table = $('table.graphics-table');
+  if (table.length !== 1)
+    throw new LegacyAnalyticsParseError(
+      'team-member capacity',
+      'table missing'
+    );
+  table.find('.pie').remove();
+  const metrics = (row: unknown) => {
+    const v = cells($, row);
+    if (v.length !== 9)
+      throw new LegacyAnalyticsParseError(
+        'team-member capacity',
+        'partial row'
+      );
+    return {
+      worked_days: integer(v[2]),
+      working_hours: parseLocaleNumber(v[3]),
+      booked_hours: parseLocaleNumber(v[4]),
+      idle_hours: parseLocaleNumber(v[5]),
+      occupancy_percent: percent(v[6]),
+      upcoming_appointments_count: integer(v[7]),
+    };
+  };
+  const sourceRows = table
+    .find('tbody tr')
+    .filter(
+      (_i, r) => $(r).children('td').length > 1 && !$(r).hasClass('graph-row')
+    );
+  const rows = sourceRows.toArray().map((row) => {
+    const id = idFromGraphRow($, row);
+    if (!id || id <= 0)
+      throw new LegacyAnalyticsParseError(
+        'team-member capacity',
+        'stable id missing'
+      );
+    return {
+      ...metrics(row),
+      team_member_id: id,
+      team_member_name: cleanText($(row).find('b').text()) || null,
+      position_title: cleanText($(row).find('small').text()) || null,
+    };
+  });
+  if (rows.length !== args.count)
+    throw new LegacyAnalyticsParseError(
+      'team-member capacity',
+      'row count mismatch'
+    );
+  const total = table
+    .find('tbody tr')
+    .filter((_i, r) => $(r).children('th').length > 0);
+  return {
+    rows,
+    totals:
+      total.length === 1
+        ? metrics(total)
+        : args.count === 0
+          ? {
+              worked_days: null,
+              working_hours: null,
+              booked_hours: null,
+              idle_hours: null,
+              occupancy_percent: null,
+              upcoming_appointments_count: null,
+            }
+          : (() => {
+              throw new LegacyAnalyticsParseError(
+                'team-member capacity',
+                'totals missing'
+              );
+            })(),
+  };
+}
+
+export function parseProductSalesHtml(args: {
+  html: string;
+  count: number;
+  page: number;
+  pageSize: number;
+  currency: string | null;
+  groupBy: ProductSalesGroup;
+}): ProductSalesReport {
+  const $ = load(args.html);
+  const table = $('table.table-report');
+  const category = args.groupBy === 'product_category';
+  const width = table.find('thead tr').first().children('th').length;
+  if (table.length !== 1 || (category ? width !== 6 : ![5, 8].includes(width)))
+    throw new LegacyAnalyticsParseError('product sales', 'unexpected columns');
+  // Category HTML lacks the product route's cost permission gate. Never expose it.
+  const showCost = !category && width === 8;
+  const sourceRows = table
+    .find('tbody tr')
+    .filter(
+      (_i, r) =>
+        $(r).children('td').length > 1 && $(r).children('th').length === 0
+    );
+  const rows = sourceRows.toArray().map((row) => {
+    const v = cells($, row);
+    if (v.length !== width)
+      throw new LegacyAnalyticsParseError('product sales', 'partial row');
+    const link = $(row).find(
+      category ? 'a[href]' : 'a.table-sales-analysis__item-link'
+    );
+    const id = category
+      ? integer(
+          (link.attr('href') ?? '').match(
+            /storages\/goods\/list\/\d+\/(\d+)\/?$/
+          )?.[1]
+        )
+      : integer(link.attr('data-id'));
+    if (!id || id <= 0)
+      throw new LegacyAnalyticsParseError('product sales', 'stable id missing');
+    const quantityCell = v[category ? 1 : 3] ?? '';
+    const quantityMatch = quantityCell.match(/^([+-]?[\d\s.,]+)(.*)$/);
+    if (!quantityMatch)
+      throw new LegacyAnalyticsParseError('product sales', 'quantity missing');
+    return {
+      product_id: category ? null : id,
+      product_category_id: category ? id : null,
+      title: cleanText(link.text()) || null,
+      sku: category ? null : v[0] || null,
+      barcode: category ? null : v[1] || null,
+      quantity: parseLocaleNumber(quantityMatch[1]),
+      unit: category ? null : cleanText(quantityMatch[2]) || null,
+      cost: showCost ? parseLocaleNumber(v[4]) : null,
+      markup: showCost ? parseLocaleNumber(v[5]) : null,
+      markup_percent: showCost ? percent(v[6]) : null,
+      revenue: parseLocaleNumber(v[width - 1]),
+    };
+  });
+  const totalRows = table
+    .find('tbody tr')
+    .filter((_i, r) => $(r).children('th').length === 1);
+  const v = cells($, totalRows.first());
+  if (
+    args.count > 0 &&
+    (category || (args.page - 1) * args.pageSize < args.count) &&
+    (!rows.length ||
+      totalRows.length !== 1 ||
+      v.length !== (category ? 6 : showCost ? 6 : 3))
+  )
+    throw new LegacyAnalyticsParseError(
+      'product sales',
+      'rows or totals missing'
+    );
+  if (
+    rows.length !==
+    (category
+      ? args.count
+      : Math.max(
+          0,
+          Math.min(args.pageSize, args.count - (args.page - 1) * args.pageSize)
+        ))
+  )
+    throw new LegacyAnalyticsParseError(
+      'product sales',
+      'category count mismatch'
+    );
+  const selected = category
+    ? rows.slice((args.page - 1) * args.pageSize, args.page * args.pageSize)
+    : rows;
+  return {
+    currency: args.currency,
+    group_by: args.groupBy,
+    cost_fields_status: showCost ? 'available' : 'withheld',
+    rows: selected,
+    totals: {
+      quantity: parseLocaleNumber(v[1]),
+      cost: showCost ? parseLocaleNumber(v[2]) : null,
+      markup: showCost ? parseLocaleNumber(v[3]) : null,
+      markup_percent: null,
+      revenue: parseLocaleNumber(v.at(-1)),
+    },
+    page: pageMeta(args.page, args.pageSize, args.count, selected.length),
+    pagination_source: category ? 'local' : 'upstream',
+  };
+}
+
+function workbookMatrix(bytes: Uint8Array, report: string): unknown[][] {
+  let workbook: XLSX.WorkBook;
+  try {
+    workbook = XLSX.read(bytes, {
+      type: 'array',
+      cellDates: true,
+      dense: true,
+    });
+  } catch {
+    throw new LegacyAnalyticsParseError(report, 'malformed workbook');
+  }
+  const firstName = workbook.SheetNames[0];
+  const sheet = firstName ? workbook.Sheets[firstName] : undefined;
+  if (!sheet) {
+    throw new LegacyAnalyticsParseError(report, 'workbook has no sheet');
+  }
+  const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
+    raw: true,
+    defval: null,
+    blankrows: false,
+  });
+  return matrix;
+}
+
+export function parseClientReactivationWorkbook(args: {
+  bytes: Uint8Array;
+  currency: string | null;
+  page: number;
+  pageSize: number;
+  includeContacts: boolean;
+}): ClientReactivationReport {
+  const matrix = workbookMatrix(args.bytes, 'client reactivation');
+  // The source template has exactly eight columns; contacts can be blank or masked.
+  const headerIndex = matrix.findIndex(
+    (row) =>
+      row.length === 8 &&
+      row.filter((v) => cleanText(v)).length === 8 &&
+      cleanText(row[2]).toLowerCase() === 'email'
+  );
+  if (headerIndex < 0)
+    throw new LegacyAnalyticsParseError(
+      'client reactivation',
+      'header missing'
+    );
+  const parsed = matrix.slice(headerIndex + 1).map((row) => {
+    if (row.length !== 8 || !cleanText(row[0]))
+      throw new LegacyAnalyticsParseError(
+        'client reactivation',
+        'partial workbook row'
+      );
+    const visitText = cleanText(row[7]);
+    const parts = visitText ? visitText.split('; ') : [];
+    const visits = parts.map((part) =>
+      part.match(/^(\d{4}-\d{2}-\d{2}) \d{2}:\d{2} - (.*)$/)
+    );
+    const reliable = parts.length <= 3 && visits.every((v) => v !== null);
+    return {
+      client_id: null,
+      client_name: cleanText(row[0]) || null,
+      registration_date: dateValue(row[3]),
+      last_visit_date: dateValue(row[4]),
+      lifetime_paid_amount: parseLocaleNumber(row[5]),
+      client_account_balance: parseLocaleNumber(row[6]),
+      last_visits: reliable
+        ? visits.map((v) => ({ date: v![1]!, description: v![2]! }))
+        : [],
+      last_visits_parse_status: !parts.length
+        ? ('empty' as const)
+        : reliable
+          ? ('parsed' as const)
+          : ('unavailable' as const),
+      ...(args.includeContacts
+        ? {
+            phone: cleanText(row[1]) || null,
+            email: cleanText(row[2]) || null,
+            contacts_status: 'source_values_may_be_masked' as const,
+          }
+        : {}),
+    };
+  });
+  const rows = parsed.slice(
+    (args.page - 1) * args.pageSize,
+    args.page * args.pageSize
+  );
+  return {
+    currency: args.currency,
+    rows,
+    page: pageMeta(args.page, args.pageSize, parsed.length, rows.length),
+  };
+}
+
+export function parseGroupEventPerformanceHtml(args: {
+  html: string;
+  count: number;
+  page: number;
+  pageSize: number;
+  currency: string | null;
+  teamMembers: readonly LegacyTeamMemberIdentity[];
+}): GroupEventPerformanceReport {
+  const $ = load(args.html);
+  const table = $('table.activities-table');
+  if (
+    !table.length &&
+    (args.page - 1) * args.pageSize >= args.count &&
+    !cleanText(args.html)
+  )
+    return {
+      currency: args.currency,
+      rows: [],
+      metrics: null,
+      page: pageMeta(args.page, args.pageSize, args.count, 0),
+    };
+  if (table.length !== 1 || table.find('thead th').length !== 11)
+    throw new LegacyAnalyticsParseError(
+      'group-event performance',
+      'table missing or changed'
+    );
+  const rows = table
+    .find('tbody tr')
+    .toArray()
+    .map((row) => {
+      const v = cells($, row);
+      const id = integer(
+        $(row).find('[data-activity-id]').attr('data-activity-id')
+      );
+      if (v.length !== 11 || !id || id <= 0)
+        throw new LegacyAnalyticsParseError(
+          'group-event performance',
+          'partial event row'
+        );
+      const name = cleanText($(row).children('td').eq(1).find('b').text());
+      const position = cleanText(
+        $(row).children('td').eq(1).find('small').text()
+      );
+      const creatorCell = $(row).children('td').eq(9).clone();
+      const created = cleanText(creatorCell.find('small').text());
+      creatorCell.find('small,br').remove();
+      return {
+        group_event_id: id,
+        team_member_id: name
+          ? resolveTeamMember(
+              name,
+              position,
+              args.teamMembers,
+              'group-event performance'
+            )
+          : null,
+        team_member_name: name || null,
+        position_title: position || null,
+        service_id: null,
+        service_title:
+          cleanText($(row).find('[data-activity-id]').text()) || null,
+        date_display: v[3] || null,
+        capacity: integer(v[4]),
+        booked_participants: integer(v[5]),
+        attended_clients: integer(v[6]),
+        fully_paid_clients: integer(v[7]),
+        appointment_value: parseLocaleNumber(v[8]),
+        creator_display: cleanText(creatorCell.text()) || null,
+        created_at_display: created || null,
+        duration_minutes: parseLocaleNumber(v[10]),
+        is_deleted: $(row).hasClass('danger'),
+      };
+    });
+  if (
+    rows.length !==
+    Math.max(
+      0,
+      Math.min(args.pageSize, args.count - (args.page - 1) * args.pageSize)
+    )
+  )
+    throw new LegacyAnalyticsParseError(
+      'group-event performance',
+      'event row count mismatch'
+    );
+  const metric = (id: string) => {
+    const card = $(`[data-title-id="activity-stat-${id}"]`).closest(
+      '.activity-statistic-card'
+    );
+    const values = cleanText(
+      card.find('.activity-statistic-card-content__statistic').text()
+    ).split('/');
+    if (card.length !== 1 || values.length !== 2)
+      throw new LegacyAnalyticsParseError(
+        'group-event performance',
+        'dashboard metric missing'
+      );
+    return {
+      participants: parseLocaleNumber(values[0]),
+      capacity: parseLocaleNumber(values[1]),
+      percent: percent(
+        card.find('.activity-statistic-card-content-percentage__value').text()
+      ),
+    };
+  };
+  return {
+    currency: args.currency,
+    rows,
+    metrics: {
+      booked: metric('records-period'),
+      attended: metric('visits-period'),
+      paid: metric('paid-period'),
+      average_occupancy: metric('avg-filling'),
+    },
+    page: pageMeta(args.page, args.pageSize, args.count, rows.length),
+  };
+}
+
+export function parseCashFlowBreakdownHtml(args: {
+  html: string;
+  currency: string | null;
+  accountType: CashAccountType;
+  paymentItemId?: number;
+}): CashFlowBreakdownReport {
+  const $ = load(args.html);
+  const table = $('table.table-report');
+  const headers = table.find('thead tr').first().children('th.by-type');
+  if (table.length !== 1 || headers.length < 4)
+    throw new LegacyAnalyticsParseError(
+      'cash-flow breakdown',
+      'headers missing'
+    );
+  const periods = headers
+    .slice(1, -1)
+    .toArray()
+    .map((h) => cleanText($(h).text()));
+  const columns: CashFlowColumn[] = [];
+  const all = args.accountType === 'all';
+  const accountHeaders = table.find('thead tr.by-account td');
+  const accountCount = all ? accountHeaders.length / periods.length : 0;
+  if (!Number.isInteger(accountCount))
+    throw new LegacyAnalyticsParseError(
+      'cash-flow breakdown',
+      'inconsistent account columns'
+    );
+  if (
+    all &&
+    (table.find('thead tr.by-type td').length !== periods.length * 3 ||
+      headers
+        .slice(1, -1)
+        .toArray()
+        .some((h) => $(h).attr('colspan') !== '3'))
+  )
+    throw new LegacyAnalyticsParseError(
+      'cash-flow breakdown',
+      'account-type columns changed'
+    );
+  periods.forEach((label, i) => {
+    for (const type of all
+      ? (['cash', 'cashless'] as const)
+      : [args.accountType])
+      columns.push({
+        period_label: label,
+        period_kind: i === periods.length - 1 ? 'period_total' : 'day',
+        dimension: 'cash_account_type',
+        cash_account_type: type,
+        cash_account_id: null,
+        cash_account_title: null,
+      });
+  });
+  if (all)
+    periods.forEach((label, i) => {
+      for (let j = 0; j < accountCount; j++) {
+        const title = cleanText(accountHeaders.eq(i * accountCount + j).text());
+        if (title !== cleanText(accountHeaders.eq(j).text()))
+          throw new LegacyAnalyticsParseError(
+            'cash-flow breakdown',
+            'account ordering changed'
+          );
+        columns.push({
+          period_label: label,
+          period_kind: i === periods.length - 1 ? 'period_total' : 'day',
+          dimension: 'cash_account',
+          cash_account_type: null,
+          cash_account_id: null,
+          cash_account_title: title,
+        });
+      }
+    });
+  const bodyRows = table.find('tbody tr');
+  const continuations = bodyRows.filter(
+    (_i, r) => $(r).children('.report-title-cell').length === 0
+  );
+  if (
+    continuations.length > 1 ||
+    continuations.toArray().some(
+      (r) =>
+        !all ||
+        !$(r).hasClass('row-aggregated') ||
+        $(r).prev().children('.report-title-cell').attr('rowspan') !== '2' ||
+        $(r).children('td.by-type').length !== periods.length ||
+        $(r).children('td.by-account').length !== periods.length ||
+        $(r)
+          .children('td.by-type')
+          .toArray()
+          .some((c) => $(c).attr('colspan') !== '3')
+    )
+  )
+    throw new LegacyAnalyticsParseError(
+      'cash-flow breakdown',
+      'unexpected or partial continuation row'
+    );
+  const sourceRows = table
+    .find('tbody tr')
+    .filter((_i, r) => $(r).children('.report-title-cell').length === 1);
+  if (sourceRows.length * columns.length > 6000)
+    throw new LegacyAnalyticsParseError(
+      'cash-flow breakdown',
+      'result too wide; narrow the period or account filters'
+    );
+  let aggregateIndex = 0;
+  let direction: 'inflow' | 'outflow' | null = null;
+  const rows: CashFlowRow[] = sourceRows.toArray().map((row) => {
+    const aggregate = $(row).hasClass('row-aggregated');
+    const kind = aggregate
+      ? (['inflow', 'outflow', 'balance'] as const)[aggregateIndex++]
+      : 'payment_item';
+    if (!kind)
+      throw new LegacyAnalyticsParseError(
+        'cash-flow breakdown',
+        'unexpected aggregate'
+      );
+    if (kind === 'inflow' || kind === 'outflow') direction = kind;
+    const amounts: Array<number | null> = [];
+    if (all) {
+      const typeCells = $(row).children('td.by-type');
+      const accountCells = $(row).children('td.by-account');
+      if (
+        typeCells.length !== periods.length * 3 ||
+        accountCells.length !== periods.length * accountCount
+      )
+        throw new LegacyAnalyticsParseError(
+          'cash-flow breakdown',
+          'partial data row'
+        );
+      typeCells.each((i, c) => {
+        if (i % 3 !== 2) amounts.push(parseLocaleNumber($(c).text()));
+      });
+      accountCells.each((_i, c) => {
+        amounts.push(parseLocaleNumber($(c).text()));
+      });
+    } else {
+      const dataCells = $(row)
+        .children('td')
+        .not('.report-title-cell,.report-all-cell');
+      if (dataCells.length !== periods.length)
+        throw new LegacyAnalyticsParseError(
+          'cash-flow breakdown',
+          'partial single-type row'
+        );
+      dataCells.each((_i, c) => {
+        amounts.push(parseLocaleNumber($(c).text()));
+      });
+    }
+    const totalCell = $(row).children('.report-all-cell');
+    if (totalCell.length !== 1)
+      throw new LegacyAnalyticsParseError(
+        'cash-flow breakdown',
+        'total missing'
+      );
+    return {
+      payment_item_id: args.paymentItemId ?? null,
+      payment_item_title: cleanText(
+        $(row).children('.report-title-cell').text()
+      ),
+      kind,
+      direction: kind === 'balance' ? null : direction,
+      amounts,
+      total: parseLocaleNumber(totalCell.text()),
+    };
+  });
+  if (!args.paymentItemId && aggregateIndex !== 3)
+    throw new LegacyAnalyticsParseError(
+      'cash-flow breakdown',
+      'aggregates missing'
+    );
+  return {
+    currency: args.currency,
+    columns,
+    rows,
+    totals: {
+      inflow: rows.find((r) => r.kind === 'inflow')?.total ?? null,
+      outflow: rows.find((r) => r.kind === 'outflow')?.total ?? null,
+      balance: rows.find((r) => r.kind === 'balance')?.total ?? null,
+    },
   };
 }

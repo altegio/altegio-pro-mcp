@@ -24,6 +24,42 @@ export interface MetricDefinition {
 
 export const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
   {
+    key: 'team_capacity_hours',
+    name: 'Team capacity hours',
+    definition:
+      'Scheduled working hours, booked hours and idle hours with source totals; occupancy is booked hours divided by working hours.',
+    tool: 'analytics_get_team_member_capacity',
+  },
+  {
+    key: 'reactivation_lifetime_paid',
+    name: 'Reactivation lifetime paid',
+    definition:
+      'Lifetime paid amount for loyalty-program clients who did not return in the requested period; not period revenue. Client ids are unavailable.',
+    tool: 'analytics_get_client_reactivation_candidates',
+  },
+  {
+    key: 'group_event_appointment_value',
+    name: 'Group event appointment value',
+    definition:
+      'Full appointment value for event participants; not collected revenue. Booked, attended and fully paid participant counts are separate.',
+    tool: 'analytics_get_group_event_performance',
+  },
+  {
+    key: 'product_sales_cost',
+    name: 'Product sales cost',
+    definition:
+      'Current product cost multiplied by sold quantity; not unit cost. Revenue includes client-account payments. Category costs are withheld and hierarchical rows must not be summed.',
+    tool: 'analytics_get_product_sales',
+  },
+  {
+    key: 'cash_flow_net_movement',
+    name: 'Cash flow net movement',
+    definition:
+      'Signed inflow plus outflow over the period, not a closing account balance. Account and account-type columns overlap; do not sum both dimensions.',
+    tool: 'analytics_get_cash_flow_breakdown',
+  },
+
+  {
     key: 'revenue_total',
     name: 'Total revenue',
     definition:
@@ -275,12 +311,13 @@ export const COVERAGE_GAPS: readonly {
     topic: 'Finance dashboard and account balances',
     reason: 'Balances have no endpoint.',
     alternative:
-      'analytics_get_day_end_report shows takings per account for a day. There is no cash-flow or P&L table through this server.',
+      'analytics_get_day_end_report shows takings per account for a day. analytics_get_cash_flow_breakdown shows signed period movements, not account balances. P&L remains unavailable.',
   },
   {
-    topic: 'Account-period and annual finance reports',
-    reason: 'Web-only.',
-    alternative: 'None through this server.',
+    topic: 'Annual P&L reports',
+    reason: 'No curated P&L contract is available.',
+    alternative:
+      'analytics_get_cash_flow_breakdown provides period cash movements; it is not accrual P&L.',
   },
   {
     topic: 'Inventory turnover and write-off analysis',

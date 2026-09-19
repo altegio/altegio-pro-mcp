@@ -14,7 +14,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Features
 
-- **71 tools served (77 defined, 6 withheld from every view)** — including a 14-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
+- **76 tools served (82 defined, 6 withheld from every view)** — including a 19-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
 - **Administrative writes** for staff, services, appointments, schedules, clients, categories, booking forms, and location users
 - **Analytics**: key metrics with period comparison, daily series, client sales and retention, service profitability, team-member sales, forecasts, day-end report and occupancy (the ad-hoc report builder is switched off — see below)
 - **Location settings**: appointment calendar, online booking, booking forms, resources
@@ -28,7 +28,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Available Tools
 
-**71 tools served (77 defined, 6 withheld from every view)**, organized by category
+**76 tools served (82 defined, 6 withheld from every view)**, organized by category
 for complete business management. Which of them a given address serves, and why,
 is the generated table in
 [`docs/architecture/tool-surface.md`](docs/architecture/tool-surface.md).
@@ -143,7 +143,13 @@ the call, and amounts come back in major units with an ISO currency code.
 - `analytics_get_service_profitability` - Revenue, costs, compensation and profit by service or service category
 - `analytics_get_team_member_sales` - Services, products, revenue, future appointments and working-hour efficiency by team member
 
-These five temporary adapters read the same stable reports as the authenticated
+- `analytics_get_team_member_capacity` - Working, booked and idle hours, occupancy and upcoming appointments
+- `analytics_get_client_reactivation_candidates` - Loyalty-program nonreturners, lifetime paid amounts and recent visit descriptions; contacts opt-in, client ids unavailable
+- `analytics_get_group_event_performance` - Capacity, booked/attended/paid participants and appointment value; aggregate occupancy metrics
+- `analytics_get_product_sales` - Product or category sales, quantity and markup; permission-aware product costs, category costs withheld
+- `analytics_get_cash_flow_breakdown` - Signed movements by payment item, day and returned cash-account/type columns
+
+These ten temporary adapters read the same stable reports as the authenticated
 ERP web application while equivalent V3 endpoints are pending. They are
 read-only, stateless, location-scoped, inject the current request's user token
 without a cookie session, and keep contacts opt-in. They are available on the
@@ -163,7 +169,7 @@ and only an hourly upstream sweep repairs it; and the delete route needs the
 `analytics_constructor_access` user right, which neither an owner's OAuth token
 nor the marketplace system user carries. The reasons, the evidence and the
 one-line re-enable step live in
-[`src/tools/disabled-tools.ts`](src/tools/disabled-tools.ts). The five curated
+[`src/tools/disabled-tools.ts`](src/tools/disabled-tools.ts). The ten curated
 legacy-report tools above cover stable client, retention,
 service-profitability and team-member-sales reports without creating saved
 reports. Other custom tables and finance statements are declined through
@@ -787,7 +793,7 @@ npx jest analytics-live
   The partner token has its own variable here because the shared Jest setup pins
   `ALTEGIO_API_TOKEN` to a dummy value for every other suite. The suite is
   read-only and reuses a maintained assistant-owned report for builder checks.
-- **Opt-in legacy-report live suite** — reads and parses the five temporary ERP
+- **Opt-in legacy-report live suite** — reads and parses the temporary ERP
   reports without recording or printing client data:
 
 ```bash

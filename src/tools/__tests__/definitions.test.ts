@@ -8,9 +8,9 @@ const tools = (Object.values(defs) as unknown[]).filter(
 
 describe('factory tool definitions', () => {
   // 38 curated tools + 3 universal executor tools + 15 analytics tools +
-  // Includes the five temporary read-only legacy analytics reports.
+  // Includes the ten temporary read-only legacy analytics reports.
   it('exposes all factory-defined tools', () => {
-    expect(tools.length).toBe(65);
+    expect(tools.length).toBe(70);
   });
 
   it('every tool produces a valid MCP spec', () => {

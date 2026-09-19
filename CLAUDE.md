@@ -89,7 +89,7 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 
 ### Tools Available
 
-**71 tools served (77 defined, 6 withheld from every view).** The counts below are pinned by `src/tools/__tests__/tool-count.test.ts` — edit them only with the code. Which tool is served on which address, and why, is the generated table in [`docs/architecture/tool-surface.md`](docs/architecture/tool-surface.md) (`npm run surface:build`).
+**76 tools served (82 defined, 6 withheld from every view).** The counts below are pinned by `src/tools/__tests__/tool-count.test.ts` — edit them only with the code. Which tool is served on which address, and why, is the generated table in [`docs/architecture/tool-surface.md`](docs/architecture/tool-surface.md) (`npm run surface:build`).
 
 **Category-organized with [Prefix] tags for LLM navigation:**
 
@@ -105,7 +105,7 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 **[Settings] Location Settings (7):** get/update appointment settings, get/update online booking settings, get/create/delete booking forms
 **[Resources] Resources (1):** get (read-only; API has no create)
 **[Users] Location access (1):** `remove_location_user` — off the default `/mcp` view, served on `/mcp/catalog` and stdio
-**[Analytics] Analytics (14):** get_overview, get_daily_series, get_appointments_breakdown, get_receptionist_performance, get_loyalty_program_results, get_forecast, get_day_end_report, get_team_member_occupancy, get_client_visit_stats, get_client_sales, get_client_retention, get_client_forecast, get_service_profitability, get_team_member_sales
+**[Analytics] Analytics (19):** get_overview, get_daily_series, get_appointments_breakdown, get_receptionist_performance, get_loyalty_program_results, get_forecast, get_day_end_report, get_team_member_occupancy, get_client_visit_stats, get_client_sales, get_client_retention, get_client_forecast, get_service_profitability, get_team_member_sales, get_team_member_capacity, get_client_reactivation_candidates, get_group_event_performance, get_product_sales, get_cash_flow_breakdown
   - The 6 report-builder tools (list_report_templates, list_report_fields, run_report, list_saved_reports, run_saved_report, delete_assistant_report) are defined and tested but **served on no view** — the backend report-data API fails for every report in production. Never point guidance at them; read `src/tools/disabled-tools.ts` first.
 **[Onboarding] Wizard (12):** start, resume, status, batch imports (positions, staff, categories, services), set schedules, import clients, test appointments, preview, rollback
 **[API] Universal executor (3):** `altegio_search_operations`, `altegio_describe_operation`, `altegio_call_operation` - backed by `src/generated/catalog.json`; reads only (writes refused, see ADR-001 D2)
@@ -141,6 +141,11 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 - `src/utils/` - logging, errors, config, credential manager
 
 ### Change history
+
+**Five additional temporary analytics reports (2026-09-19)**
+- Added team-member capacity, loyalty-program reactivation candidates, group-event performance, product sales and cash-flow breakdown through the PR #55 seams.
+- Same analytics/finance/readonly/stdio surfaces, `analytics:read` scope and stateless per-request transport. Category costs are withheld because the source lacks its cost gate; reactivation contacts remain opt-in and ids are null.
+- Cash-flow balance is period net movement, group-event amount is appointment value, and reactivation paid amount is lifetime. Source semantics, filter caveats and V3 replacement boundary: `docs/architecture/2026-09-19-next-legacy-analytics.md`.
 
 **Temporary stable legacy analytics reports (2026-09-19)**
 - Added five read-only tools pending equivalent V3 operations: `analytics_get_client_sales`, `analytics_get_client_retention`, `analytics_get_client_forecast`, `analytics_get_service_profitability`, and `analytics_get_team_member_sales`.

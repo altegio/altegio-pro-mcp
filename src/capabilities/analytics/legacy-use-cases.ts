@@ -2,6 +2,12 @@
 import type { AltegioClient } from '../../providers/altegio-client.js';
 import { V1LegacyAnalyticsAdapter } from '../../api/v1/legacy-analytics-adapter.js';
 import type {
+  CashFlowBreakdownRequest,
+  ClientReactivationRequest,
+  GroupEventPerformanceRequest,
+  LegacyPeriodRequest,
+  ProductSalesGroup,
+  ProductSalesRequest,
   ClientForecastReport,
   ClientRetentionReport,
   ClientSalesReport,
@@ -310,4 +316,168 @@ export async function getTeamMemberSales(
       untrusted_data_note: UNTRUSTED_NOTE,
     },
   };
+}
+
+/** Canonical request shapes survive replacement of the temporary adapter by V3. */
+type WithPeriod<T> = Omit<T, 'date_from' | 'date_to'> & PeriodInput;
+export type TeamMemberCapacityInput = WithPeriod<LegacyPeriodRequest>;
+export type ClientReactivationInput = WithPeriod<
+  Omit<ClientReactivationRequest, 'page' | 'page_size' | 'include_contacts'>
+> & { page?: number; page_size?: number; include_contacts?: boolean };
+export type GroupEventPerformanceInput = WithPeriod<
+  Omit<GroupEventPerformanceRequest, 'page' | 'page_size'>
+> & { page?: number; page_size?: number };
+export type ProductSalesInput = WithPeriod<
+  Omit<ProductSalesRequest, 'page' | 'page_size' | 'group_by'>
+> & {
+  page?: number;
+  page_size?: number;
+  group_by?: ProductSalesGroup;
+};
+export type CashFlowBreakdownInput = WithPeriod<CashFlowBreakdownRequest>;
+
+function sanitizeReport(value: unknown): unknown {
+  if (typeof value === 'string') return safe(value, 200);
+  if (Array.isArray(value)) return value.map(sanitizeReport);
+  if (value && typeof value === 'object')
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, sanitizeReport(item)])
+    );
+  return value;
+}
+
+function nextReportResult(
+  locationId: number,
+  period: Period,
+  report: object,
+  text: string,
+  extra: object = {}
+): LegacyAnalyticsResult {
+  const structuredContent = {
+    location_id: locationId,
+    period,
+    ...(sanitizeReport(report) as object),
+    ...extra,
+    untrusted_data_note: UNTRUSTED_NOTE,
+  };
+  // Refuse an oversized answer rather than silently dropping rows or columns.
+  if (JSON.stringify(structuredContent).length > 24000)
+    throw new Error(
+      'This analytics result is too large. Narrow the period or filters, or reduce page_size.'
+    );
+  return { text, structuredContent };
+}
+
+export async function getTeamMemberCapacity(
+  client: AltegioClient,
+  input: TeamMemberCapacityInput
+): Promise<LegacyAnalyticsResult> {
+  const period = await periodFor(client, input.location_id, input);
+  const report = await adapter(client).getTeamMemberCapacity({
+    ...input,
+    date_from: period.date_from,
+    date_to: period.date_to,
+  });
+  return nextReportResult(
+    input.location_id,
+    period,
+    report,
+    `Capacity for ${report.rows.length} team member(s): ${report.totals.booked_hours ?? 'n/a'} booked hours of ${report.totals.working_hours ?? 'n/a'} working hours; occupancy ${report.totals.occupancy_percent ?? 'n/a'}%.`
+  );
+}
+export async function getClientReactivationCandidates(
+  client: AltegioClient,
+  input: ClientReactivationInput
+): Promise<LegacyAnalyticsResult> {
+  const period = await periodFor(client, input.location_id, input);
+  const includeContacts = input.include_contacts === true;
+  const report = await adapter(client).getClientReactivationCandidates({
+    ...input,
+    date_from: period.date_from,
+    date_to: period.date_to,
+    page: input.page ?? 1,
+    page_size: input.page_size ?? 25,
+    include_contacts: includeContacts,
+  });
+  return nextReportResult(
+    input.location_id,
+    period,
+    report,
+    `${report.page.total_count} reactivation candidate(s); showing ${report.page.returned}. Paid amounts are lifetime values. Client ids are unavailable; visit descriptions do not identify individual services or team members.${report.page.has_more ? ' Request the next page for more.' : ''}${includeContacts ? ' Source contacts may be masked.' : ` ${CONTACTS_WITHHELD_NOTICE}`}`,
+    {
+      loyalty_program_id: input.loyalty_program_id,
+      contacts_included: includeContacts,
+      client_identity_status: 'unavailable_from_legacy_export',
+    }
+  );
+}
+export async function getGroupEventPerformance(
+  client: AltegioClient,
+  input: GroupEventPerformanceInput
+): Promise<LegacyAnalyticsResult> {
+  const period = await periodFor(client, input.location_id, input);
+  const report = await adapter(client).getGroupEventPerformance({
+    ...input,
+    date_from: period.date_from,
+    date_to: period.date_to,
+    page: input.page ?? 1,
+    page_size: input.page_size ?? 25,
+  });
+  return nextReportResult(
+    input.location_id,
+    period,
+    report,
+    `${report.page.total_count} group event(s); showing ${report.page.returned}. Amounts are appointment value, not collected revenue. Dates retain the source display format; service ids are unavailable.${report.page.has_more ? ' Request the next page for more.' : ''}`
+  );
+}
+export async function getProductSales(
+  client: AltegioClient,
+  input: ProductSalesInput
+): Promise<LegacyAnalyticsResult> {
+  const period = await periodFor(client, input.location_id, input);
+  const report = await adapter(client).getProductSales({
+    ...input,
+    date_from: period.date_from,
+    date_to: period.date_to,
+    page: input.page ?? 1,
+    page_size: input.page_size ?? 25,
+    group_by: input.group_by ?? 'product',
+  });
+  return nextReportResult(
+    input.location_id,
+    period,
+    report,
+    `${report.page.total_count} product sales row(s); showing ${report.page.returned}. Total revenue ${report.totals.revenue ?? 'n/a'} ${report.currency ?? ''} includes client-account payments. Cost is total cost of sold quantity. Category costs are withheld; hierarchical category rows must not be summed.${report.page.has_more ? ' Request the next page for more.' : ''}`
+  );
+}
+export async function getCashFlowBreakdown(
+  client: AltegioClient,
+  input: CashFlowBreakdownInput
+): Promise<LegacyAnalyticsResult> {
+  const period = await periodFor(client, input.location_id, input);
+  const report = await adapter(client).getCashFlowBreakdown({
+    ...input,
+    date_from: period.date_from,
+    date_to: period.date_to,
+  });
+  return nextReportResult(
+    input.location_id,
+    period,
+    report,
+    `Cash flow: inflow ${report.totals.inflow ?? 'n/a'}, signed outflow ${report.totals.outflow ?? 'n/a'}, net movement ${report.totals.balance ?? 'n/a'} ${report.currency ?? ''}. Balance is period movement, not an opening or closing account balance. Amount arrays correspond to columns; account and account-type breakdowns overlap and must not be added together.`,
+    {
+      filters_applied: {
+        cash_account_ids: input.cash_account_ids ?? [],
+        team_member_id: input.team_member_id ?? null,
+        supplier_id: input.supplier_id ?? null,
+        transaction_type: input.transaction_type ?? null,
+        cash_account_type: input.cash_account_type ?? 'all',
+        service_ids: input.service_ids ?? [],
+        product_ids: input.product_ids ?? [],
+        service_category_ids: input.service_category_ids ?? [],
+        product_category_ids: input.product_category_ids ?? [],
+        include_zero_movement_rows: input.include_zero_movement_rows !== false,
+      },
+    }
+  );
 }

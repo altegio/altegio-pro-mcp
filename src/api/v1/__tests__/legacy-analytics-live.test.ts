@@ -1,5 +1,5 @@
 /**
- * Opt-in, read-only verification of the five temporary authenticated ERP
+ * Opt-in, read-only verification of the temporary authenticated ERP
  * reports. Skipped unless ALTEGIO_E2E=1; credentials stay in the environment
  * and no response containing client data is written to disk or printed.
  *
@@ -51,6 +51,60 @@ describeLive(
       }
       adapter = new V1LegacyAnalyticsAdapter(client);
     }, 60_000);
+
+    it('parses capacity, events, products, categories and cash flow', async () => {
+      const period = recentPeriod();
+      const base = { location_id: DEMO_LOCATION_ID, ...period };
+      const capacity = await adapter.getTeamMemberCapacity(base);
+      const events = await adapter.getGroupEventPerformance({
+        ...base,
+        page: 1,
+        page_size: 25,
+      });
+      const products = await adapter.getProductSales({
+        ...base,
+        page: 1,
+        page_size: 25,
+        group_by: 'product',
+      });
+      const categories = await adapter.getProductSales({
+        ...base,
+        page: 1,
+        page_size: 25,
+        group_by: 'product_category',
+      });
+      const cash = await adapter.getCashFlowBreakdown(base);
+      expect(capacity.rows.every((row) => row.team_member_id > 0)).toBe(true);
+      expect(events.rows.length).toBeLessThanOrEqual(25);
+      expect(products.rows.length).toBeLessThanOrEqual(25);
+      expect(categories.rows.every((row) => row.cost === null)).toBe(true);
+      expect(cash.columns.length).toBeGreaterThan(0);
+    }, 120_000);
+
+    const loyaltyProgramId = Number(
+      process.env.ALTEGIO_LIVE_LOYALTY_PROGRAM_ID
+    );
+    (loyaltyProgramId > 0 ? it : it.skip)(
+      'parses reactivation for an explicitly configured loyalty program',
+      async () => {
+        const report = await adapter.getClientReactivationCandidates({
+          location_id: DEMO_LOCATION_ID,
+          ...recentPeriod(),
+          loyalty_program_id: loyaltyProgramId,
+          page: 1,
+          page_size: 25,
+          include_contacts: false,
+        });
+        expect(report.rows.length).toBeLessThanOrEqual(25);
+        expect(
+          report.rows.every(
+            (row) =>
+              row.client_id === null && !('phone' in row) && !('email' in row)
+          )
+        ).toBe(true);
+      },
+      60_000
+    );
 
     it('parses every report into its canonical bounded contract', async () => {
       const period = recentPeriod();

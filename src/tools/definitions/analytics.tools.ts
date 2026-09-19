@@ -1104,3 +1104,288 @@ export const analyticsRunSavedReportTool = defineTool({
   outputSchema: reportTableOutput,
   handler: async ({ input, client }) => analytics.runSavedReport(client, input),
 });
+
+const nextPageFields = {
+  page: z
+    .number()
+    .int()
+    .min(1)
+    .max(100000)
+    .optional()
+    .describe('One-based page. Default 1.'),
+  page_size: z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe(
+      'Rows per page, default 25, maximum 100. Reduce if the result is too large.'
+    ),
+};
+const nextBaseOutput = {
+  location_id: { type: 'integer' as const },
+  period: periodSchema,
+  untrusted_data_note: { type: 'string' as const },
+};
+const capacityMetricsOutput = {
+  worked_days: num,
+  working_hours: num,
+  booked_hours: num,
+  idle_hours: num,
+  occupancy_percent: num,
+  upcoming_appointments_count: int,
+};
+export const analyticsGetTeamMemberCapacityTool = defineTool({
+  name: 'analytics_get_team_member_capacity',
+  category: 'Analytics',
+  description:
+    '[Analytics] Working days and hours, booked hours, idle hours, occupancy percentage and upcoming appointments by team member, with source totals. Use for capacity planning; analytics_get_team_member_occupancy gives daily occupancy. Temporary read-only report pending V3. Requires team occupancy report permission. Narrow the period if the result is too large.',
+  annotations: { title: 'Analytics: team-member capacity', ...READ_ONLY },
+  input: z.object({ location_id: locationId, ...periodFields }),
+  outputSchema: objectSchema({
+    ...nextBaseOutput,
+    rows: {
+      type: 'array' as const,
+      items: objectSchema({
+        team_member_id: int,
+        team_member_name: str,
+        position_title: str,
+        ...capacityMetricsOutput,
+      }),
+    },
+    totals: objectSchema(capacityMetricsOutput),
+  }),
+  handler: async ({ input, client }) =>
+    legacyAnalytics.getTeamMemberCapacity(client, input),
+});
+export const analyticsGetClientReactivationCandidatesTool = defineTool({
+  name: 'analytics_get_client_reactivation_candidates',
+  category: 'Analytics',
+  description:
+    '[Analytics] Clients who did not return under a loyalty program during a period, for reactivation planning. Includes registration and last-visit dates, lifetime paid amount, client-account balance and up to three visit descriptions. Client ids are unavailable and remain null; descriptions cannot reliably identify individual services or team members. Contacts are withheld unless include_contacts=true and source values may be masked. Requires loyalty analytics and client-contact access even with contacts omitted. Temporary read-only export pending V3; pagination is local after a bounded download.',
+  annotations: {
+    title: 'Analytics: client reactivation candidates',
+    ...READ_ONLY,
+  },
+  input: z.object({
+    location_id: locationId,
+    loyalty_program_id: z
+      .number()
+      .int()
+      .positive()
+      .describe('Loyalty program whose nonreturning clients to analyze.'),
+    ...periodFields,
+    ...nextPageFields,
+    include_contacts: includeContactsArg,
+  }),
+  outputSchema: objectSchema({
+    ...nextBaseOutput,
+    currency: str,
+    loyalty_program_id: int,
+    contacts_included: { type: 'boolean' as const },
+    client_identity_status: str,
+    page: legacyPageOutput,
+    rows: {
+      type: 'array' as const,
+      items: objectSchema({
+        client_id: { type: 'null' as const },
+        client_name: str,
+        registration_date: str,
+        last_visit_date: str,
+        lifetime_paid_amount: num,
+        client_account_balance: num,
+        last_visits: {
+          type: 'array' as const,
+          items: objectSchema({ date: str, description: str }),
+        },
+        last_visits_parse_status: str,
+        phone: str,
+        email: str,
+        contacts_status: str,
+      }),
+    },
+  }),
+  handler: async ({ input, client }) =>
+    legacyAnalytics.getClientReactivationCandidates(client, input),
+});
+const groupMetricOutput = objectSchema({
+  participants: num,
+  capacity: num,
+  percent: num,
+});
+export const analyticsGetGroupEventPerformanceTool = defineTool({
+  name: 'analytics_get_group_event_performance',
+  category: 'Analytics',
+  description:
+    '[Analytics] Group events with capacity, booked participants, attended and fully paid clients, appointment value and aggregate fill, attendance, payment and average occupancy metrics. Appointment value is not collected revenue. Source dates retain their display format; service ids are unavailable. Filter by team member, service, service category, label and active/deleted status; deleted does not imply cancelled. Requires group-event dashboard access. Temporary read-only report pending V3, paginated at source.',
+  annotations: { title: 'Analytics: group-event performance', ...READ_ONLY },
+  input: z.object({
+    location_id: locationId,
+    ...periodFields,
+    ...nextPageFields,
+    team_member_id: z.number().int().positive().optional(),
+    service_id: z.number().int().positive().optional(),
+    service_category_id: z.number().int().positive().optional(),
+    label_id: z.number().int().positive().optional(),
+    status: z
+      .enum(['all', 'active', 'deleted'])
+      .optional()
+      .describe(
+        'Default all; source distinguishes deleted events, not cancellation.'
+      ),
+  }),
+  outputSchema: objectSchema({
+    ...nextBaseOutput,
+    currency: str,
+    page: legacyPageOutput,
+    metrics: {
+      anyOf: [
+        objectSchema({
+          booked: groupMetricOutput,
+          attended: groupMetricOutput,
+          paid: groupMetricOutput,
+          average_occupancy: groupMetricOutput,
+        }),
+        { type: 'null' as const },
+      ],
+    },
+    rows: {
+      type: 'array' as const,
+      items: objectSchema({
+        group_event_id: int,
+        team_member_id: int,
+        team_member_name: str,
+        position_title: str,
+        service_id: { type: 'null' as const },
+        service_title: str,
+        date_display: str,
+        capacity: int,
+        booked_participants: int,
+        attended_clients: int,
+        fully_paid_clients: int,
+        appointment_value: num,
+        creator_display: str,
+        created_at_display: str,
+        duration_minutes: num,
+        is_deleted: { type: 'boolean' as const },
+      }),
+    },
+  }),
+  handler: async ({ input, client }) =>
+    legacyAnalytics.getGroupEventPerformance(client, input),
+});
+const productAmountsOutput = {
+  quantity: num,
+  cost: num,
+  markup: num,
+  markup_percent: num,
+  revenue: num,
+};
+export const analyticsGetProductSalesTool = defineTool({
+  name: 'analytics_get_product_sales',
+  category: 'Analytics',
+  description:
+    '[Analytics] Product sales by product or product category with quantity, SKU, barcode, unit, total cost, markup and revenue including client-account payments. Cost is for the sold quantity, not unit cost; missing cost permission produces nulls. Category costs are always withheld because the source category report does not enforce that permission. Category rows include hierarchy and must not be summed; use totals. Product pages come from source; category pagination is local. Requires inventory sales-report access, not export access. Temporary read-only report pending V3.',
+  annotations: { title: 'Analytics: product sales', ...READ_ONLY },
+  input: z.object({
+    location_id: locationId,
+    ...periodFields,
+    ...nextPageFields,
+    group_by: z.enum(['product', 'product_category']).optional(),
+    product_category_id: z.number().int().positive().optional(),
+    team_member_id: z.number().int().positive().optional(),
+    supplier_id: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe('Supplier id; 0 selects no supplier. Omit for all suppliers.'),
+  }),
+  outputSchema: objectSchema({
+    ...nextBaseOutput,
+    currency: str,
+    group_by: str,
+    cost_fields_status: str,
+    pagination_source: str,
+    page: legacyPageOutput,
+    rows: {
+      type: 'array' as const,
+      items: objectSchema({
+        product_id: int,
+        product_category_id: int,
+        title: str,
+        sku: str,
+        barcode: str,
+        unit: str,
+        ...productAmountsOutput,
+      }),
+    },
+    totals: objectSchema(productAmountsOutput),
+  }),
+  handler: async ({ input, client }) =>
+    legacyAnalytics.getProductSales(client, input),
+});
+export const analyticsGetCashFlowBreakdownTool = defineTool({
+  name: 'analytics_get_cash_flow_breakdown',
+  category: 'Analytics',
+  description:
+    '[Analytics] Period cash movement by payment item, day, cash-account type and returned account columns, with signed inflow/outflow and net movement totals. Balance is period movement, not account closing balance. Amount arrays align with columns; account and type views overlap and must not be summed. Source account ids are unavailable. Supports account, team-member, supplier, payment-item, service and product filters. Requires finance period-report access, not export access. Temporary read-only report pending V3; narrow the period or filters for large tables.',
+  annotations: { title: 'Analytics: cash-flow breakdown', ...READ_ONLY },
+  input: z.object({
+    location_id: locationId,
+    ...periodFields,
+    cash_account_ids: legacyIdList(
+      'Restrict to these cash accounts; upstream permissions still apply.'
+    ),
+    team_member_id: z.number().int().positive().optional(),
+    supplier_id: z.number().int().positive().optional(),
+    transaction_type: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Source payment-item id, including custom items; not an inflow/outflow enum. When selected, aggregate rows are unavailable.'
+      ),
+    cash_account_type: z.enum(['all', 'cash', 'cashless']).optional(),
+    service_ids: legacyIdList('Service ids.'),
+    product_ids: legacyIdList('Product ids.'),
+    service_category_ids: legacyIdList('Service category ids.'),
+    product_category_ids: legacyIdList('Product category ids.'),
+    include_zero_movement_rows: z
+      .boolean()
+      .optional()
+      .describe('Include zero-movement payment items. Default true.'),
+  }),
+  outputSchema: objectSchema({
+    ...nextBaseOutput,
+    currency: str,
+    filters_applied: { type: 'object' as const },
+    columns: {
+      type: 'array' as const,
+      items: objectSchema({
+        period_label: str,
+        period_kind: str,
+        dimension: str,
+        cash_account_type: str,
+        cash_account_id: { type: 'null' as const },
+        cash_account_title: str,
+      }),
+    },
+    rows: {
+      type: 'array' as const,
+      items: objectSchema({
+        payment_item_id: int,
+        payment_item_title: str,
+        kind: str,
+        direction: str,
+        amounts: { type: 'array' as const, items: num },
+        total: num,
+      }),
+    },
+    totals: objectSchema({ inflow: num, outflow: num, balance: num }),
+  }),
+  handler: async ({ input, client }) =>
+    legacyAnalytics.getCashFlowBreakdown(client, input),
+});

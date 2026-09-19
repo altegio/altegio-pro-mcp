@@ -373,6 +373,26 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     what: 'service and service-category titles rendered by the location report',
     coveredBy: 'src/capabilities/analytics/__tests__/legacy-use-cases.test.ts',
   },
+  analytics_get_team_member_capacity: {
+    what: 'team-member names and positions',
+    coveredBy: 'src/capabilities/analytics/__tests__/legacy-use-cases.test.ts',
+  },
+  analytics_get_client_reactivation_candidates: {
+    what: 'client names, contacts and visit descriptions',
+    coveredBy: 'src/capabilities/analytics/__tests__/legacy-use-cases.test.ts',
+  },
+  analytics_get_group_event_performance: {
+    what: 'team-member and service names, creator and date displays',
+    coveredBy: 'src/capabilities/analytics/__tests__/legacy-use-cases.test.ts',
+  },
+  analytics_get_product_sales: {
+    what: 'product and category titles, SKU, barcode and units',
+    coveredBy: 'src/capabilities/analytics/__tests__/legacy-use-cases.test.ts',
+  },
+  analytics_get_cash_flow_breakdown: {
+    what: 'payment-item titles and dynamic account/period labels',
+    coveredBy: 'src/capabilities/analytics/__tests__/legacy-use-cases.test.ts',
+  },
   analytics_get_team_member_sales: {
     what: 'team-member names and position titles rendered by the location report',
     coveredBy: 'src/capabilities/analytics/__tests__/legacy-use-cases.test.ts',

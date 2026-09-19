@@ -155,7 +155,7 @@ export interface QuestionRoute {
 }
 
 /*
- * A question with no route here — an arbitrary table, a P&L or a cash-flow
+ * A question with no route here — an arbitrary table, a P&L or an arbitrary financial
  * sheet — has no answer through this server: the ad-hoc report builder is
  * switched off (see `src/tools/disabled-tools.ts`).
  */
@@ -227,6 +227,26 @@ export const QUESTION_ROUTES: readonly QuestionRoute[] = [
   {
     question: 'Which services or categories are most profitable',
     tool: 'analytics_get_service_profitability',
+  },
+  {
+    question: 'Which team members have idle hours or spare capacity',
+    tool: 'analytics_get_team_member_capacity',
+  },
+  {
+    question: 'Which loyalty-program clients should we reactivate',
+    tool: 'analytics_get_client_reactivation_candidates',
+  },
+  {
+    question: 'Are group events filling and do participants attend and pay',
+    tool: 'analytics_get_group_event_performance',
+  },
+  {
+    question: 'Which products sell and what is their markup',
+    tool: 'analytics_get_product_sales',
+  },
+  {
+    question: 'Where did cash move by account and payment item',
+    tool: 'analytics_get_cash_flow_breakdown',
   },
   {
     question: 'Revenue by team member',
@@ -341,6 +361,6 @@ export const ANALYSIS_NOTES: readonly AnalysisNote[] = [
   },
   {
     title: 'Only curated report tables',
-    text: 'The ad-hoc report builder is switched off. Use the dedicated client-sales, retention, service-profitability and team-member-sales tools for their supported tables; name the gap for custom dimensions, P&L and cash-flow instead of improvising one.',
+    text: 'The ad-hoc report builder is switched off. Use the dedicated client-sales, retention, service-profitability and team-member-sales tools for their supported tables; name the gap for custom dimensions and P&L instead of improvising one. Use analytics_get_cash_flow_breakdown for signed cash movements.',
   },
 ] as const;

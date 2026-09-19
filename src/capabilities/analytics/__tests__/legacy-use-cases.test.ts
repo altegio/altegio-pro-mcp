@@ -220,3 +220,144 @@ describe('temporary legacy analytics use cases', () => {
     expect(result.text).toMatch(/withheld/i);
   });
 });
+
+import {
+  getTeamMemberCapacity,
+  getClientReactivationCandidates,
+  getGroupEventPerformance,
+  getProductSales,
+  getCashFlowBreakdown,
+} from '../legacy-use-cases.js';
+import {
+  parseTeamMemberCapacityHtml,
+  parseGroupEventPerformanceHtml,
+  parseProductSalesHtml,
+  parseCashFlowBreakdownHtml,
+} from '../../../api/v1/legacy-analytics-parser.js';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+const nextFixture = (name: string) =>
+  readFileSync(
+    join(
+      __dirname,
+      '../../../api/v1/__tests__/fixtures/legacy-analytics',
+      name
+    ),
+    'utf8'
+  );
+const periodInput = {
+  location_id: 4564,
+  date_from: '2026-09-01',
+  date_to: '2026-09-19',
+};
+describe('next analytics text boundary', () => {
+  beforeEach(() => clearTimezoneCache());
+  afterEach(() => jest.restoreAllMocks());
+  it('sanitizes names, descriptions, creator displays, product labels and dynamic account headers', async () => {
+    const capacity = parseTeamMemberCapacityHtml({
+      html: nextFixture('capacity-en.html'),
+      count: 1,
+    });
+    capacity.rows[0]!.team_member_name = CANARY;
+    capacity.rows[0]!.position_title = CANARY;
+    const events = parseGroupEventPerformanceHtml({
+      html: nextFixture('events-en.html'),
+      count: 1,
+      page: 1,
+      pageSize: 25,
+      currency: 'EUR',
+      teamMembers: [{ id: 77, name: 'Alice', position_title: 'Trainer' }],
+    });
+    Object.assign(events.rows[0]!, {
+      team_member_name: CANARY,
+      position_title: CANARY,
+      service_title: CANARY,
+      creator_display: CANARY,
+      date_display: CANARY,
+      created_at_display: CANARY,
+    });
+    const products = parseProductSalesHtml({
+      html: nextFixture('products-en.html'),
+      count: 1,
+      page: 1,
+      pageSize: 25,
+      currency: 'EUR',
+      groupBy: 'product',
+    });
+    Object.assign(products.rows[0]!, {
+      title: CANARY,
+      sku: CANARY,
+      barcode: CANARY,
+      unit: CANARY,
+    });
+    const cash = parseCashFlowBreakdownHtml({
+      html: nextFixture('cash-flow-en.html'),
+      currency: 'EUR',
+      accountType: 'all',
+    });
+    cash.rows[0]!.payment_item_title = CANARY;
+    cash.columns[0]!.period_label = CANARY;
+    cash.columns[4]!.cash_account_title = CANARY;
+    jest
+      .spyOn(V1LegacyAnalyticsAdapter.prototype, 'getTeamMemberCapacity')
+      .mockResolvedValue(capacity);
+    jest
+      .spyOn(V1LegacyAnalyticsAdapter.prototype, 'getGroupEventPerformance')
+      .mockResolvedValue(events);
+    jest
+      .spyOn(V1LegacyAnalyticsAdapter.prototype, 'getProductSales')
+      .mockResolvedValue(products);
+    jest
+      .spyOn(V1LegacyAnalyticsAdapter.prototype, 'getCashFlowBreakdown')
+      .mockResolvedValue(cash);
+    jest
+      .spyOn(
+        V1LegacyAnalyticsAdapter.prototype,
+        'getClientReactivationCandidates'
+      )
+      .mockResolvedValue({
+        currency: 'EUR',
+        page,
+        rows: [
+          {
+            client_id: null,
+            client_name: CANARY,
+            registration_date: null,
+            last_visit_date: null,
+            lifetime_paid_amount: 0,
+            client_account_balance: 0,
+            last_visits: [{ date: '2026-09-01', description: CANARY }],
+            last_visits_parse_status: 'parsed',
+            phone: CANARY,
+            email: CANARY,
+            contacts_status: 'source_values_may_be_masked',
+          },
+        ],
+      });
+    for (const result of await Promise.all([
+      getTeamMemberCapacity(client, periodInput),
+      getGroupEventPerformance(client, periodInput),
+      getProductSales(client, periodInput),
+      getCashFlowBreakdown(client, periodInput),
+      getClientReactivationCandidates(client, {
+        ...periodInput,
+        loyalty_program_id: 1,
+        include_contacts: true,
+      }),
+    ]))
+      expectSanitized(result);
+  });
+  it('rejects oversized answers instead of silently discarding rows', async () => {
+    const report = parseTeamMemberCapacityHtml({
+      html: nextFixture('capacity-en.html'),
+      count: 1,
+    });
+    report.rows = Array.from({ length: 500 }, () => ({ ...report.rows[0]! }));
+    jest
+      .spyOn(V1LegacyAnalyticsAdapter.prototype, 'getTeamMemberCapacity')
+      .mockResolvedValue(report);
+    await expect(getTeamMemberCapacity(client, periodInput)).rejects.toThrow(
+      'Narrow the period'
+    );
+  });
+});
