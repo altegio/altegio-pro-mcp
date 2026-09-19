@@ -50,7 +50,10 @@ const analyticsTools = (Object.values(definitions) as unknown[])
 /** Every string in a JSON Schema that an agent can read. */
 function schemaStrings(node: unknown, out: string[] = []): string[] {
   if (Array.isArray(node)) {
-    for (const item of node) schemaStrings(item, out);
+    for (const item of node) {
+      if (typeof item === 'string') out.push(item);
+      else schemaStrings(item, out);
+    }
     return out;
   }
   if (!node || typeof node !== 'object') return out;
@@ -156,6 +159,12 @@ describe('analytics terminology', () => {
 });
 
 describe('findForbiddenWords', () => {
+  it('scans primitive strings nested in schema arrays and enums', () => {
+    expect(
+      schemaStrings({ anyOf: [{ enum: ['canonical', 'cashless'] }] })
+    ).toContain('cashless');
+  });
+
   it('flags every forbidden word on its own', () => {
     for (const word of FORBIDDEN_WORDS) {
       expect(findForbiddenWords(`text ${word} text`)).toContain(word);

@@ -63,6 +63,7 @@ import {
 } from '../../capabilities/analytics/vocabulary.js';
 import {
   chartPointToDay,
+  resolvePreset,
   toDottedDate,
 } from '../../capabilities/analytics/periods.js';
 import { AnalyticsInputError } from '../../capabilities/analytics/errors.js';
@@ -682,6 +683,41 @@ export class V1AnalyticsAdapter implements AnalyticsApi {
     const stats = record(data.stats);
     const paid = record(data.paids);
     const totals = record(paid.total);
+    const today = resolvePreset('today', this.tz).date_from;
+    const detailDates = Object.keys(record(data.z_data))
+      .map((stamp) => {
+        const seconds = Number(stamp);
+        return Number.isFinite(seconds)
+          ? chartPointToDay(seconds * 1000, this.tz)
+          : /^\d{4}-\d{2}-\d{2}$/.test(stamp)
+            ? stamp
+            : null;
+      })
+      .filter((date): date is string => date !== null)
+      .sort();
+    const outsideRequestedPeriod = detailDates.some(
+      (date) => date < query.date_from || date > query.date_to
+    );
+    const exactToday = query.date_from === today && query.date_to === today;
+    const containsHistoricalEvidence = detailDates.some((date) => date < today);
+    const requestedExcludesToday =
+      today < query.date_from || today > query.date_to;
+    const periodStatus: DayEndReport['period_status'] = outsideRequestedPeriod
+      ? 'clamped'
+      : exactToday ||
+          (detailDates.length > 0 &&
+            (requestedExcludesToday || containsHistoricalEvidence))
+        ? 'verified'
+        : 'unverified';
+    const effectivePeriod =
+      periodStatus === 'verified'
+        ? { date_from: query.date_from, date_to: query.date_to }
+        : periodStatus === 'clamped' && detailDates.length > 0
+          ? {
+              date_from: detailDates[0]!,
+              date_to: detailDates[detailDates.length - 1]!,
+            }
+          : null;
 
     const named = (rows: unknown): NamedAmount[] =>
       list(rows).map((row) => {
@@ -693,8 +729,16 @@ export class V1AnalyticsAdapter implements AnalyticsApi {
       });
 
     const report: DayEndReport = {
-      date_from: query.date_from,
-      date_to: query.date_to,
+      period_status: periodStatus,
+      effective_period: effectivePeriod,
+      period_status_reason:
+        periodStatus === 'verified'
+          ? null
+          : periodStatus === 'clamped'
+            ? 'Returned detail dates fall outside the requested period, so the source applied a different effective period.'
+            : 'The source does not return an effective-period field, and the returned detail contains no date that proves historical-period access.',
+      date_from: effectivePeriod?.date_from ?? query.date_from,
+      date_to: effectivePeriod?.date_to ?? query.date_to,
       currency: toCurrencyCode(data.currency),
       totals: {
         clients_count: toNumber(stats.clients),
@@ -709,7 +753,7 @@ export class V1AnalyticsAdapter implements AnalyticsApi {
         average_per_appointment_without_client: toMoney(
           stats.non_visit_records_average
         ),
-        services_count: toNumber(stats.targets),
+        services_rendered_count: toNumber(stats.targets),
         services_revenue: toMoney(stats.targets_paid),
         products_count: toNumber(stats.goods),
         products_revenue: toMoney(stats.goods_paid),

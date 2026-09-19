@@ -27,7 +27,7 @@ export const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     key: 'team_capacity_hours',
     name: 'Team capacity hours',
     definition:
-      'Scheduled working hours, booked hours and idle hours with source totals; occupancy is booked hours divided by working hours.',
+      'Scheduled hours, booked hours and idle hours with source totals; occupancy is booked hours divided by scheduled hours.',
     tool: 'analytics_get_team_member_capacity',
   },
   {
@@ -45,10 +45,10 @@ export const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     tool: 'analytics_get_group_event_performance',
   },
   {
-    key: 'product_sales_cost',
-    name: 'Product sales cost',
+    key: 'product_sales_total_cost',
+    name: 'Product sales total cost',
     definition:
-      'Current product cost multiplied by sold quantity; not unit cost. Revenue includes client-account payments. Category costs are withheld and hierarchical rows must not be summed.',
+      'Current product unit cost multiplied by sold quantity; exposed as total_cost, never as a unit cost. Revenue includes client-account payments. Category costs are withheld and hierarchical rows must not be summed.',
     tool: 'analytics_get_product_sales',
   },
   {

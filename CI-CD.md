@@ -164,7 +164,7 @@ curl https://mcp.alteg.io/
 ## Security
 
 ### Secrets
-- **VM:** `ALTEGIO_API_TOKEN` in `~/.env` (chmod 600)
+- **VM:** `ALTEGIO_API_TOKEN` in `~/.env` (chmod 600). The compose default sets `ALTEGIO_LEGACY_WEB_BASE=https://app.alteg.io`; a YCLIENTS deployment must override it explicitly.
 - **Proxy:** No secrets needed (stateless reverse proxy)
 
 ### Network

@@ -79,6 +79,31 @@ describe('legacy ERP web transport', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  it.each([
+    [undefined, 'https://app.alteg.io'],
+    ['https://yclients.com', 'https://yclients.com'],
+  ])(
+    'uses the configured legacy origin %s',
+    async (legacyWebBase, expected) => {
+      let seen: URL | undefined;
+      global.fetch = jest.fn(async (input) => {
+        seen = new URL(String(input));
+        return new Response('ok');
+      }) as typeof fetch;
+      const client = new AltegioClient({
+        partnerToken: 'partner',
+        ...(legacyWebBase ? { legacyWebBase } : {}),
+      });
+      await runWithContext({ identity: null, userToken: credential() }, () =>
+        client.requestLegacyWebReport({
+          locationId: 10,
+          path: '/analytics_clients/clients_search/10/',
+        })
+      );
+      expect(seen?.origin).toBe(expected);
+    }
+  );
+
   it('redacts the credential from network and redirect errors', async () => {
     const current = credential();
     const client = new AltegioClient({ partnerToken: 'partner' });

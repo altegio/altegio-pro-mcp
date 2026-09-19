@@ -139,7 +139,7 @@ export class AltegioClient {
   ) {
     this.apiUrl = config.apiBase || 'https://api.alteg.io/api/v1';
     this.legacyWebUrl = (
-      config.legacyWebBase || 'https://yclients.com'
+      config.legacyWebBase || 'https://app.alteg.io'
     ).replace(/\/+$/, '');
     this.partnerToken = config.partnerToken;
     this.userToken = config.userToken;

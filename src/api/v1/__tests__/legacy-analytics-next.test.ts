@@ -10,7 +10,7 @@ describe('next temporary analytics reports', () => {
     const result = parseTeamMemberCapacityHtml({ html: capacity, count: 1 });
     expect(result.rows[0]).toMatchObject({
       team_member_id: 77,
-      working_hours: 16,
+      scheduled_hours: 16,
       booked_hours: 4,
       occupancy_percent: 25,
     });
@@ -41,8 +41,8 @@ describe('next temporary analytics reports', () => {
         sku: '0001',
         quantity: 2,
         unit: 'pcs',
-        cost: null,
-        markup: null,
+        total_cost: null,
+        total_markup: null,
         revenue: 1234.56,
       });
       expect(result.page).toMatchObject({
@@ -137,7 +137,7 @@ it('parses both dynamic account and account-type columns without double-counting
   });
   expect(result.columns).toHaveLength(6);
   expect(result.rows).toHaveLength(4);
-  expect(result.totals.balance).toBe(10);
+  expect(result.totals.net_movement).toBe(10);
   expect(result.columns[4]).toMatchObject({
     dimension: 'cash_account',
     cash_account_id: null,
@@ -170,6 +170,7 @@ describe.each(['en', 'ru', 'pt-BR'])(
       expect(event.rows[0]).toMatchObject({
         group_event_id: 10,
         team_member_id: 77,
+        team_member_identity_status: 'matched',
         service_id: null,
         appointment_value: 1234.56,
         is_deleted: true,
@@ -188,13 +189,13 @@ describe.each(['en', 'ru', 'pt-BR'])(
         parseProductSalesHtml({
           ...base,
           html: fixture(`products-${locale}-cost.html`),
-        }).rows[0]?.cost
+        }).rows[0]?.total_cost
       ).toBe(1234.56);
       expect(
         parseProductSalesHtml({
           ...base,
           html: fixture(`products-${locale}.html`),
-        }).rows[0]?.cost
+        }).rows[0]?.total_cost
       ).toBeNull();
       const category = parseProductSalesHtml({
         ...base,
@@ -203,8 +204,8 @@ describe.each(['en', 'ru', 'pt-BR'])(
       });
       expect(category.rows[0]).toMatchObject({
         product_category_id: 5,
-        cost: null,
-        markup: null,
+        total_cost: null,
+        total_markup: null,
         revenue: 1234.56,
       });
       const cash = parseCashFlowBreakdownHtml({
@@ -214,12 +215,12 @@ describe.each(['en', 'ru', 'pt-BR'])(
       });
       expect(cash.rows).toHaveLength(4);
       expect(cash.columns).toHaveLength(6);
-      expect(cash.totals.balance).toBe(1234.56);
+      expect(cash.totals.net_movement).toBe(1234.56);
       expect(cash.rows[0]?.amounts).toEqual([
         1234.56, 0, 1234.56, 0, 1234.56, 1234.56,
       ]);
     });
-    it('rejects partial or ambiguous event rows and cash-flow columns', () => {
+    it('keeps ambiguous event identities null and rejects partial rows and cash-flow columns', () => {
       const event = {
         html: fixture(`events-${locale}.html`),
         count: 1,
@@ -231,9 +232,16 @@ describe.each(['en', 'ru', 'pt-BR'])(
           { id: 2, name: 'Alice', position_title: 'Trainer' },
         ],
       };
-      expect(() => parseGroupEventPerformanceHtml(event)).toThrow(
-        LegacyAnalyticsParseError
-      );
+      expect(parseGroupEventPerformanceHtml(event).rows[0]).toMatchObject({
+        team_member_id: null,
+        team_member_identity_status: 'ambiguous',
+      });
+      expect(
+        parseGroupEventPerformanceHtml({ ...event, teamMembers: [] }).rows[0]
+      ).toMatchObject({
+        team_member_id: null,
+        team_member_identity_status: 'unavailable',
+      });
       expect(() =>
         parseGroupEventPerformanceHtml({
           ...event,
@@ -302,7 +310,7 @@ it('reads a single cash-account type and an isolated payment item without invent
   const result = parseCashFlowBreakdownHtml({
     html,
     currency: 'USD',
-    accountType: 'cashless',
+    accountType: 'non_cash',
     paymentItemId: 7,
   });
   expect(result.rows[0]).toMatchObject({
@@ -311,7 +319,11 @@ it('reads a single cash-account type and an isolated payment item without invent
     total: -100,
     direction: null,
   });
-  expect(result.totals).toEqual({ inflow: null, outflow: null, balance: null });
+  expect(result.totals).toEqual({
+    inflow: null,
+    outflow: null,
+    net_movement: null,
+  });
 });
 it.each([
   [

@@ -223,6 +223,26 @@ describe('temporary legacy analytics adapter wire mapping', () => {
     expect(report.rows[0]).not.toHaveProperty('phone');
   });
 
+  it('surfaces a forecast permission envelope instead of parsing it as a workbook', async () => {
+    const response = new Response(
+      JSON.stringify({
+        success: false,
+        data: null,
+        meta: { message: 'upstream detail is not reflected', status_code: 403 },
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } }
+    );
+    const { client } = fakeClient([response]);
+    await expect(
+      new V1LegacyAnalyticsAdapter(client).getClientForecast({
+        location_id: 4564,
+        page: 1,
+        page_size: 50,
+        include_contacts: false,
+      })
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
   it('detects Need Auth and oversized responses canonically', async () => {
     const auth = fakeClient([
       new Response('Need Auth', { status: 200, headers: { need_auth: '1' } }),
@@ -453,7 +473,7 @@ it('recognizes the cash-flow permission envelope without reflecting source diagn
     new V1LegacyAnalyticsAdapter(client).getCashFlowBreakdown(nextPeriod)
   ).rejects.toMatchObject({ statusCode: 403 });
 });
-it('keeps nonzero cashless-only items when zero movement rows are excluded', async () => {
+it('keeps nonzero non-cash-only items when zero movement rows are excluded', async () => {
   const html = fixture('cash-flow-en.html').replace(
     /<td class="by-type report-amount-cell">1,234.56<\/td><td class="by-type report-amount-cell">0<\/td>/g,
     '<td class="by-type report-amount-cell">0</td><td class="by-type report-amount-cell">1,234.56</td>'

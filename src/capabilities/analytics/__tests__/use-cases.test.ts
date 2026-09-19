@@ -329,9 +329,40 @@ describe('analytics_get_day_end_report', () => {
     const content = result.structuredContent as {
       clamped_by_access_right: boolean;
     };
-    // The adapter echoes the requested range, so nothing is clamped here; the
-    // flag exists and is false rather than missing.
-    expect(content.clamped_by_access_right).toBe(false);
+    expect(content.clamped_by_access_right).toBe(true);
+    expect(content).toMatchObject({
+      data_available: true,
+      effective_period: {
+        date_from: '2026-08-01',
+        date_to: '2026-08-01',
+      },
+    });
+  });
+
+  it('withholds historical values when the effective period cannot be verified', async () => {
+    const body = structuredClone(fixture('z-report')) as {
+      data: { z_data: Record<string, unknown> };
+    };
+    body.data.z_data = {};
+    const { result } = await call(
+      'analytics_get_day_end_report',
+      { location_id: 4564, date_from: '2026-08-01', date_to: '2026-08-03' },
+      [[/z_report/, body]]
+    );
+    const content = result.structuredContent as {
+      data_available: boolean;
+      takings_total: number | null;
+      takings_by_account: unknown[];
+      totals: { services_revenue: number | null };
+    };
+    expect(content).toMatchObject({
+      data_available: false,
+      takings_total: null,
+      takings_by_account: [],
+      totals: { services_revenue: null },
+    });
+    expect(result.content[0]!.text).toContain('is unavailable');
+    expect(result.content[0]!.text).not.toContain('1,352.5');
   });
 });
 

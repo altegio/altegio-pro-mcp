@@ -12,6 +12,7 @@ import { AnalyticsInputError } from './errors.js';
 import { previousPeriod, resolvePeriod, type PeriodInput } from './periods.js';
 import { resolveLocationTimezone } from './location-timezone.js';
 import { sanitizeUntrusted, UNTRUSTED_NOTE } from '../../tools/tool-result.js';
+import type { VisitStatus } from './vocabulary.js';
 
 export interface DecisionAnalyticsResult {
   text: string;
@@ -216,20 +217,61 @@ function intersection(
   return clipped.end > clipped.start ? clipped : null;
 }
 
-function appointmentInterval(
-  appointment: AltegioBooking
-): { date: string; interval: MinuteInterval } | null {
+function appointmentIntervalParts(appointment: AltegioBooking): Array<{
+  date: string;
+  interval: MinuteInterval;
+  starts_appointment: boolean;
+  total_duration_minutes: number;
+}> {
   const source = appointment.datetime ?? appointment.date;
   const match = source?.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
-  if (!match) return null;
+  if (!match) return [];
   const durationSeconds =
     appointment.seance_length ?? appointment.length ?? appointment.duration;
-  if (typeof durationSeconds !== 'number' || durationSeconds <= 0) return null;
+  if (typeof durationSeconds !== 'number' || durationSeconds <= 0) return [];
   const start = Number(match[2]) * 60 + Number(match[3]);
-  return {
-    date: match[1]!,
-    interval: { start, end: start + durationSeconds / 60 },
-  };
+  const duration = durationSeconds / 60;
+  const parts = [];
+  let date = match[1]!;
+  let cursor = start;
+  let remaining = duration;
+  let first = true;
+  while (remaining > 0) {
+    const available = 24 * 60 - cursor;
+    const partDuration = Math.min(remaining, available);
+    parts.push({
+      date,
+      interval: { start: cursor, end: cursor + partDuration },
+      starts_appointment: first,
+      total_duration_minutes: duration,
+    });
+    remaining -= partDuration;
+    date = nextDate(date);
+    cursor = 0;
+    first = false;
+  }
+  return parts;
+}
+
+function nextDate(date: string): string {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + 1);
+  return value.toISOString().slice(0, 10);
+}
+
+function datedIntervalParts(
+  date: string,
+  from: string,
+  to: string
+): Array<{ date: string; interval: MinuteInterval }> {
+  const start = minutes(from);
+  const end = minutes(to);
+  if (start === null || end === null || start === end) return [];
+  if (end > start) return [{ date, interval: { start, end } }];
+  return [
+    { date, interval: { start, end: 24 * 60 } },
+    { date: nextDate(date), interval: { start: 0, end } },
+  ];
 }
 
 interface CapacityBucket {
@@ -277,18 +319,28 @@ function calculateCapacity(args: {
   appointments: AltegioBooking[];
   selectedIds: Set<number>;
   granularity: 'hour_of_day' | 'weekday' | 'date_hour';
+  date_from: string;
+  date_to: string;
 }): { buckets: CapacityBucket[]; unscheduled_appointment_count: number } {
-  const appointmentsByMemberDate = new Map<string, AltegioBooking[]>();
-  let unscheduledAppointmentCount = 0;
+  const appointmentsByMemberDate = new Map<
+    string,
+    Array<{
+      appointment: AltegioBooking;
+      interval: MinuteInterval;
+      starts_appointment: boolean;
+      total_duration_minutes: number;
+    }>
+  >();
   for (const appointment of args.appointments) {
     const teamMemberId = appointment.staff_id ?? appointment.staff?.id;
-    const timed = appointmentInterval(appointment);
-    if (!teamMemberId || !timed || !args.selectedIds.has(teamMemberId))
-      continue;
-    const key = `${teamMemberId}|${timed.date}`;
-    const list = appointmentsByMemberDate.get(key) ?? [];
-    list.push(appointment);
-    appointmentsByMemberDate.set(key, list);
+    if (!teamMemberId || !args.selectedIds.has(teamMemberId)) continue;
+    for (const timed of appointmentIntervalParts(appointment)) {
+      if (timed.date < args.date_from || timed.date > args.date_to) continue;
+      const key = `${teamMemberId}|${timed.date}`;
+      const list = appointmentsByMemberDate.get(key) ?? [];
+      list.push({ appointment, ...timed });
+      appointmentsByMemberDate.set(key, list);
+    }
   }
 
   const sums = new Map<
@@ -299,21 +351,48 @@ function calculateCapacity(args: {
     >
   >();
   const scheduledMemberDates = new Set<string>();
+  const scheduleDays = new Map<
+    string,
+    {
+      team_member_id: number;
+      date: string;
+      schedule_intervals: MinuteInterval[];
+      busy_intervals: MinuteInterval[];
+    }
+  >();
   for (const schedule of args.schedules) {
     const teamMemberId = schedule.team_member_id ?? schedule.staff_id;
     if (!teamMemberId || !args.selectedIds.has(teamMemberId)) continue;
-    const slots = schedule.slots ?? [];
-    if (slots.length === 0) continue;
-    const memberDate = `${teamMemberId}|${schedule.date}`;
+    const add = (
+      date: string,
+      kind: 'schedule_intervals' | 'busy_intervals',
+      interval: MinuteInterval
+    ) => {
+      if (date < args.date_from || date > args.date_to) return;
+      const key = `${teamMemberId}|${date}`;
+      const value = scheduleDays.get(key) ?? {
+        team_member_id: teamMemberId,
+        date,
+        schedule_intervals: [],
+        busy_intervals: [],
+      };
+      value[kind].push(interval);
+      scheduleDays.set(key, value);
+    };
+    for (const slot of schedule.slots ?? []) {
+      for (const part of datedIntervalParts(schedule.date, slot.from, slot.to))
+        add(part.date, 'schedule_intervals', part.interval);
+    }
+    for (const busy of schedule.busy_intervals ?? []) {
+      for (const part of datedIntervalParts(schedule.date, busy.from, busy.to))
+        add(part.date, 'busy_intervals', part.interval);
+    }
+  }
+  for (const [memberDate, scheduleDay] of scheduleDays) {
+    const { date, schedule_intervals: scheduleIntervals } = scheduleDay;
+    if (scheduleIntervals.length === 0) continue;
     scheduledMemberDates.add(memberDate);
     const dayAppointments = appointmentsByMemberDate.get(memberDate) ?? [];
-    const scheduleIntervals = slots.flatMap((slot) => {
-      const start = minutes(slot.from);
-      const rawEnd = minutes(slot.to);
-      if (start === null || rawEnd === null) return [];
-      const end = rawEnd <= start ? rawEnd + 24 * 60 : rawEnd;
-      return [{ start, end }];
-    });
     for (let hour = 0; hour < 24; hour += 1) {
       const start = hour * 60;
       const end = start + 60;
@@ -324,37 +403,23 @@ function calculateCapacity(args: {
         })
       );
       if (scheduled === 0) continue;
-      const withinSchedule = (
-        appointment: AltegioBooking
-      ): MinuteInterval[] => {
-        const timed = appointmentInterval(appointment);
-        if (!timed) return [];
-        const hourPart = intersection(timed.interval, start, end);
+      const withinSchedule = (interval: MinuteInterval): MinuteInterval[] => {
+        const hourPart = intersection(interval, start, end);
         if (!hourPart) return [];
         return scheduleIntervals.flatMap((slot) => {
           const clipped = intersection(hourPart, slot.start, slot.end);
           return clipped ? [clipped] : [];
         });
       };
-      const bookedIntervals: MinuteInterval[] = (
-        schedule.busy_intervals ?? []
-      ).flatMap((busy) => {
-        const busyStart = minutes(busy.from);
-        const rawBusyEnd = minutes(busy.to);
-        if (busyStart === null || rawBusyEnd === null) return [];
-        const busyEnd =
-          rawBusyEnd <= busyStart ? rawBusyEnd + 24 * 60 : rawBusyEnd;
-        const hourPart = intersection(
-          { start: busyStart, end: busyEnd },
-          start,
-          end
-        );
-        if (!hourPart) return [];
-        return scheduleIntervals.flatMap((slot) => {
-          const clipped = intersection(hourPart, slot.start, slot.end);
-          return clipped ? [clipped] : [];
+      const bookedIntervals: MinuteInterval[] =
+        scheduleDay.busy_intervals.flatMap((busyInterval) => {
+          const hourPart = intersection(busyInterval, start, end);
+          if (!hourPart) return [];
+          return scheduleIntervals.flatMap((slot) => {
+            const clipped = intersection(hourPart, slot.start, slot.end);
+            return clipped ? [clipped] : [];
+          });
         });
-      });
       const completedIntervals: MinuteInterval[] = [];
       let completed = 0;
       let noShow = 0;
@@ -362,11 +427,12 @@ function calculateCapacity(args: {
       let pending = 0;
       let revenue = 0;
       let revenueKnown = false;
-      for (const appointment of dayAppointments) {
-        const timed = appointmentInterval(appointment);
-        if (!timed) continue;
+      for (const timed of dayAppointments) {
+        const appointment = timed.appointment;
         const startsHere =
-          timed.interval.start >= start && timed.interval.start < end;
+          timed.starts_appointment &&
+          timed.interval.start >= start &&
+          timed.interval.start < end;
         const status = statusOf(appointment);
         if (startsHere) {
           if (status === 'arrived') completed += 1;
@@ -374,13 +440,13 @@ function calculateCapacity(args: {
           else if (status === 'cancelled') cancelled += 1;
           else pending += 1;
         }
-        const clipped = withinSchedule(appointment);
+        const clipped = withinSchedule(timed.interval);
         if (clipped.length === 0 || status === 'cancelled') continue;
         bookedIntervals.push(...clipped);
         if (status === 'arrived') {
           completedIntervals.push(...clipped);
           const price = appointmentPrice(appointment);
-          const duration = timed.interval.end - timed.interval.start;
+          const duration = timed.total_duration_minutes;
           if (price !== null && duration > 0) {
             revenue +=
               price *
@@ -393,7 +459,7 @@ function calculateCapacity(args: {
           }
         }
       }
-      const key = capacityKey(args.granularity, schedule.date, hour);
+      const key = capacityKey(args.granularity, date, hour);
       const current = sums.get(key) ?? {
         scheduled_hours: 0,
         booked_hours: 0,
@@ -416,11 +482,13 @@ function calculateCapacity(args: {
     }
   }
 
+  const unscheduledAppointments = new Set<AltegioBooking>();
   for (const key of appointmentsByMemberDate.keys()) {
     if (!scheduledMemberDates.has(key)) {
-      unscheduledAppointmentCount += (
-        appointmentsByMemberDate.get(key) ?? []
-      ).filter((row) => statusOf(row) !== 'cancelled').length;
+      for (const row of appointmentsByMemberDate.get(key) ?? []) {
+        if (statusOf(row.appointment) !== 'cancelled')
+          unscheduledAppointments.add(row.appointment);
+      }
     }
   }
 
@@ -457,7 +525,7 @@ function calculateCapacity(args: {
     });
   return {
     buckets,
-    unscheduled_appointment_count: unscheduledAppointmentCount,
+    unscheduled_appointment_count: unscheduledAppointments.size,
   };
 }
 
@@ -501,6 +569,8 @@ export async function getCapacityHeatmap(
     appointments: appointments.rows,
     selectedIds: new Set(ids),
     granularity: input.granularity,
+    date_from: period.date_from,
+    date_to: period.date_to,
   });
   const ranked = calculated.buckets.filter(
     (row) => row.scheduled_hours > 0 && row.occupancy_percent !== null
@@ -536,22 +606,17 @@ export async function getCapacityHeatmap(
       },
       provenance: [
         {
-          source: 'GET /company/{location_id}/staff/schedule',
-          metrics: ['scheduled_hours'],
+          source_id: 'team_member_schedule',
+          metrics: ['scheduled_hours', 'booked_hours_from_busy_intervals'],
         },
         {
-          source: 'GET /records/{location_id}',
+          source_id: 'appointments',
           metrics: [
             'booked_hours_from_appointments',
             'completed_utilized_hours',
             'appointment_counts',
             'revenue',
           ],
-        },
-        {
-          source:
-            'GET /company/{location_id}/staff/schedule include=busy_intervals',
-          metrics: ['booked_hours_from_busy_intervals'],
         },
       ],
     },
@@ -667,7 +732,15 @@ export async function getProfitAndLossStatement(
       | 'products_revenue'
       | 'memberships_revenue'
       | 'gift_cards_revenue'
-  ) => compared(sales.totals[key], comparison?.sales.totals[key]);
+  ) =>
+    compared(
+      sales.period_status === 'verified' ? sales.totals[key] : null,
+      comparison
+        ? comparison.sales.period_status === 'verified'
+          ? comparison.sales.totals[key]
+          : null
+        : undefined
+    );
   const categoryKey = (row: (typeof ledger.categories)[number]): string =>
     `${row.direction}:${row.category_id ?? row.title ?? ''}`;
   const currentCategories = new Map(
@@ -702,19 +775,30 @@ export async function getProfitAndLossStatement(
     const revenue =
       (report.totals.cash_or_card_revenue ?? 0) +
       (report.totals.payments.client_accounts ?? 0);
-    return report.totals.profit === null || revenue === 0
+    return report.totals.contribution_result === null || revenue === 0
       ? null
-      : round((report.totals.profit / revenue) * 100, 1);
+      : round((report.totals.contribution_result / revenue) * 100, 1);
   };
   return {
-    text: `Tracked operating result for ${period.date_from}–${period.date_to}: ${ledger.tracked_operating_result ?? 'unavailable'} ${ledger.currency ?? ''}. This is not labelled net profit because external cost coverage cannot be proven.`,
+    text: `Tracked operating result for ${period.date_from}–${period.date_to}: ${ledger.tracked_operating_result ?? 'unavailable'} ${ledger.currency ?? ''}. This is not labelled net profit because external cost coverage cannot be proven.${sales.period_status === 'verified' ? '' : ' The sales-stream memo is unavailable because its effective period could not be verified.'}`,
     structuredContent: {
       location_id: input.location_id,
       period: { ...period, timezone },
       ...(comparison ? { comparison_period: comparison.period } : {}),
       currency:
-        ledger.currency ?? sales.currency ?? serviceContribution.currency,
+        ledger.currency ??
+        (sales.period_status === 'verified' ? sales.currency : null) ??
+        serviceContribution.currency,
       sales_revenue_by_stream: {
+        current_period_status: sales.period_status,
+        current_effective_period: sales.effective_period,
+        comparison_period_status: comparison?.sales.period_status ?? null,
+        comparison_effective_period: comparison?.sales.effective_period ?? null,
+        unavailable_reason:
+          sales.period_status === 'verified' &&
+          (!comparison || comparison.sales.period_status === 'verified')
+            ? null
+            : 'The day-end sales source does not return an authoritative effective-period field. Values are withheld whenever returned detail dates cannot prove the requested historical period.',
         services: stream('services_revenue'),
         products: stream('products_revenue'),
         memberships: stream('memberships_revenue'),
@@ -725,7 +809,7 @@ export async function getProfitAndLossStatement(
             'The stable sales source does not expose a non-overlapping other stream.',
         },
         formula:
-          'Each stream is read from the day-end report. These memo figures are not added to ledger income, which already contains posted sales transactions.',
+          'Each available stream is read from the day-end sales memo only after its effective period is verified. These memo figures are not added to ledger income, which already contains posted sales transactions.',
       },
       operating_ledger: {
         income_total: compared(
@@ -768,8 +852,8 @@ export async function getProfitAndLossStatement(
           comparison?.contribution.totals.team_member_compensation
         ),
         contribution_result: compared(
-          serviceContribution.totals.profit,
-          comparison?.contribution.totals.profit
+          serviceContribution.totals.contribution_result,
+          comparison?.contribution.totals.contribution_result
         ),
         contribution_margin_percent: compared(
           contributionMargin(serviceContribution),
@@ -821,17 +905,17 @@ export async function getProfitAndLossStatement(
       },
       provenance: [
         {
-          source: 'GET /finances_reports/annual_report/{location_id}/',
+          source_id: 'posted_finance_ledger',
           format: 'HTML',
           metrics: ['operating_ledger'],
         },
         {
-          source: 'GET /reports/z_report/{location_id}',
+          source_id: 'day_end_sales_memo',
           format: 'JSON',
           metrics: ['sales_revenue_by_stream'],
         },
         {
-          source: 'GET /analytics_services/services_search/{location_id}/',
+          source_id: 'service_contribution_report',
           format: 'JSON envelope with HTML table',
           metrics: ['service_contribution'],
         },
@@ -846,7 +930,7 @@ export interface RevenueLeakageInput extends PeriodInput {
   team_member_ids?: number[];
   service_ids?: number[];
   service_category_ids?: number[];
-  visit_statuses?: Array<ReturnType<typeof statusOf>>;
+  visit_statuses?: VisitStatus[];
   include_capacity_opportunity?: boolean;
 }
 
@@ -883,7 +967,9 @@ export async function getRevenueLeakage(
   const rows = appointments.rows.filter((appointment) => {
     const memberId = appointment.staff_id ?? appointment.staff?.id;
     if (members.size > 0 && (!memberId || !members.has(memberId))) return false;
-    if (statuses.size > 0 && !statuses.has(statusOf(appointment))) return false;
+    const status = statusOf(appointment);
+    if (statuses.size > 0 && (status === 'unknown' || !statuses.has(status)))
+      return false;
     if (
       (services.size > 0 || categories.size > 0) &&
       !(appointment.services ?? []).some(serviceMatches)
@@ -977,59 +1063,81 @@ export async function getRevenueLeakage(
     },
   ];
 
+  let capacitySourceUsed = false;
   if (input.include_capacity_opportunity !== false) {
-    const selection = await selectTeamMembers(client, {
-      location_id: input.location_id,
-      team_member_ids: input.team_member_ids,
-    });
-    const ids = selection.rows.map((row) => row.id);
-    const schedules =
-      ids.length === 0
-        ? []
-        : await client.getTeamMemberSchedules(input.location_id, {
-            start_date: period.date_from,
-            end_date: period.date_to,
-            team_member_ids: ids,
-            include_busy_intervals: true,
-          });
-    const capacity = calculateCapacity({
-      schedules,
-      appointments: rows,
-      selectedIds: new Set(ids),
-      granularity: 'date_hour',
-    });
-    const idleHours = capacity.buckets.reduce(
-      (sum, row) => sum + row.idle_hours,
-      0
-    );
-    const completedHours = capacity.buckets.reduce(
-      (sum, row) => sum + row.completed_utilized_hours,
-      0
-    );
-    const revenue = capacity.buckets.reduce(
-      (sum, row) => sum + (row.revenue ?? 0),
-      0
-    );
-    const rate = completedHours > 0 ? revenue / completedHours : null;
-    outputCategories.push({
-      key: 'scheduled_but_unbooked_capacity',
-      observed_count: null,
-      observed_amount: null,
-      opportunity_capacity_hours: round(idleHours),
-      estimated_opportunity_amount:
-        rate === null ? null : round(idleHours * rate),
-      formula:
-        'Opportunity capacity = scheduled hours - union of non-cancelled booked intervals. Optional estimate = opportunity capacity hours × completed-service revenue per completed utilized hour.',
-      denominator:
-        rate === null
-          ? 'No completed utilized hours with attributable prices.'
-          : `${round(completedHours)} completed utilized hour(s)`,
-      coverage: {
-        selected_team_members: ids.length,
-        available_team_members: selection.requested_count,
-      },
-      quality: rate === null ? 'insufficient_data' : 'low',
-    });
+    if (services.size > 0 || categories.size > 0) {
+      outputCategories.push({
+        key: 'scheduled_but_unbooked_capacity',
+        observed_count: null,
+        observed_amount: null,
+        opportunity_capacity_hours: null,
+        estimated_opportunity_amount: null,
+        formula: null,
+        denominator: null,
+        coverage: {
+          available: false,
+          reason:
+            'A service-filtered schedule denominator is unavailable. The team-member schedule covers all services, so all-service capacity is not presented as service-specific opportunity.',
+        },
+        quality: 'unavailable',
+      });
+    } else {
+      capacitySourceUsed = true;
+      const selection = await selectTeamMembers(client, {
+        location_id: input.location_id,
+        team_member_ids: input.team_member_ids,
+      });
+      const ids = selection.rows.map((row) => row.id);
+      const schedules =
+        ids.length === 0
+          ? []
+          : await client.getTeamMemberSchedules(input.location_id, {
+              start_date: period.date_from,
+              end_date: period.date_to,
+              team_member_ids: ids,
+              include_busy_intervals: true,
+            });
+      const capacity = calculateCapacity({
+        schedules,
+        appointments: rows,
+        selectedIds: new Set(ids),
+        granularity: 'date_hour',
+        date_from: period.date_from,
+        date_to: period.date_to,
+      });
+      const idleHours = capacity.buckets.reduce(
+        (sum, row) => sum + row.idle_hours,
+        0
+      );
+      const completedHours = capacity.buckets.reduce(
+        (sum, row) => sum + row.completed_utilized_hours,
+        0
+      );
+      const revenue = capacity.buckets.reduce(
+        (sum, row) => sum + (row.revenue ?? 0),
+        0
+      );
+      const rate = completedHours > 0 ? revenue / completedHours : null;
+      outputCategories.push({
+        key: 'scheduled_but_unbooked_capacity',
+        observed_count: null,
+        observed_amount: null,
+        opportunity_capacity_hours: round(idleHours),
+        estimated_opportunity_amount:
+          rate === null ? null : round(idleHours * rate),
+        formula:
+          'Opportunity capacity = scheduled hours - union of non-cancelled booked intervals. Optional estimate = opportunity capacity hours × completed-service revenue per completed utilized hour.',
+        denominator:
+          rate === null
+            ? 'No completed utilized hours with attributable prices.'
+            : `${round(completedHours)} completed utilized hour(s)`,
+        coverage: {
+          selected_team_members: ids.length,
+          available_team_members: selection.requested_count,
+        },
+        quality: rate === null ? 'insufficient_data' : 'low',
+      });
+    }
   }
 
   return {
@@ -1053,17 +1161,21 @@ export async function getRevenueLeakage(
       },
       provenance: [
         {
-          source: 'GET /records/{location_id}',
+          source_id: 'appointments',
           metrics: [
             'appointment outcomes',
             'booked prices',
             'discount reductions',
           ],
         },
-        {
-          source: 'GET /company/{location_id}/staff/schedule',
-          metrics: ['scheduled capacity'],
-        },
+        ...(capacitySourceUsed
+          ? [
+              {
+                source_id: 'team_member_schedule',
+                metrics: ['scheduled capacity'],
+              },
+            ]
+          : []),
       ],
     },
   };
@@ -1096,7 +1208,7 @@ export interface TeamMemberServiceMatrixInput extends PeriodInput {
   position_ids?: number[];
   service_ids?: number[];
   service_category_id?: number;
-  sort_by?: 'contribution_result' | 'revenue' | 'services_delivered';
+  sort_by?: 'contribution_result' | 'revenue' | 'services_rendered_count';
   sort_order?: 'asc' | 'desc';
   minimum_sample_size?: number;
   page?: number;
@@ -1157,21 +1269,21 @@ export async function getTeamMemberServiceMatrix(
             service_category_id: input.service_category_id ?? null,
             service_category_title: safe(row.service_category_title),
             completed_appointments_count: null,
-            services_delivered_count: row.services_count,
+            services_rendered_count: row.services_rendered_count,
             clients_count: null,
             revenue,
             average_check:
-              revenue === null || row.services_count === 0
+              revenue === null || row.services_rendered_count === 0
                 ? null
-                : round(revenue / row.services_count),
+                : round(revenue / row.services_rendered_count),
             booked_duration_hours: null,
             delivered_duration_hours: null,
             occupancy_contribution_percent: null,
             team_member_compensation: row.team_member_compensation,
             consumables_cost: row.consumables_cost,
-            contribution_result: row.profit,
+            contribution_result: row.contribution_result,
             repeat_or_rebooking_rate_percent: null,
-            sample_size: row.services_count,
+            sample_size: row.services_rendered_count,
           };
         })
     )
@@ -1206,12 +1318,12 @@ export async function getTeamMemberServiceMatrix(
   const direction = input.sort_order === 'asc' ? 1 : -1;
   withShares.sort((a, b) => {
     const left =
-      sortBy === 'services_delivered'
-        ? a.services_delivered_count
+      sortBy === 'services_rendered_count'
+        ? a.services_rendered_count
         : (a[sortBy] ?? Number.NEGATIVE_INFINITY);
     const right =
-      sortBy === 'services_delivered'
-        ? b.services_delivered_count
+      sortBy === 'services_rendered_count'
+        ? b.services_rendered_count
         : (b[sortBy] ?? Number.NEGATIVE_INFINITY);
     return (left - right) * direction;
   });
@@ -1273,7 +1385,7 @@ export async function getTeamMemberServiceMatrix(
       },
       provenance: [
         {
-          source: 'GET /analytics_services/services_search/{location_id}/',
+          source_id: 'service_contribution_report',
           format: 'JSON envelope with HTML table',
           grouping:
             'One source report call per selected team member, genuinely grouped by service.',
@@ -1482,7 +1594,7 @@ export async function getInventoryReorderRisks(
       },
       provenance: [
         {
-          source: 'GET /storages/turnover/search/{location_id}/',
+          source_id: 'inventory_turnover_report',
           format: 'JSON envelope with HTML table',
           permission: 'inventory turnover report access',
         },

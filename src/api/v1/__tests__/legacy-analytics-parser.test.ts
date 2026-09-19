@@ -157,12 +157,12 @@ describe('HTML reports', () => {
           service_id: 501,
           service_category_id: null,
           cash_or_card_revenue: 1234.56,
-          profit: 884.56,
+          contribution_result: 884.56,
           revenue_share_percent: 62.5,
           payments: { memberships: 20, client_accounts: 50 },
         },
       ],
-      totals: { profit: 884.56 },
+      totals: { contribution_result: 884.56 },
     });
   });
 
@@ -178,12 +178,12 @@ describe('HTML reports', () => {
         {
           team_member_id: 88,
           revenue: 2000,
-          services_count: 15,
+          services_rendered_count: 15,
           products_count: 4,
-          working_hours: 40.5,
+          worked_hours: 40.5,
         },
       ],
-      totals: { revenue: 2000, working_hours: 40.5 },
+      totals: { revenue: 2000, worked_hours: 40.5 },
     });
   });
 

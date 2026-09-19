@@ -6,6 +6,24 @@ is declared stable.
 
 ## [Unreleased]
 
+### Fixed — analytics semantic contracts and live legacy origin
+
+Normalized the temporary analytics contracts around rendered-service counts,
+contribution result, worked versus scheduled hours, product `total_cost` and
+`total_markup`, cash-flow `non_cash`, `net_movement` and `payment_item_id`.
+The five decision-ready tools now publish closed nested output schemas with
+canonical provenance ids. Day-end memo values are withheld unless their period
+is verified, overnight schedules split across local dates, and service-filtered
+leakage no longer applies whole-service capacity. Deleted or stale group-event
+members retain a null stable id with an explicit resolution status, and a JSON
+forecast permission response becomes a canonical 403 rather than a workbook
+parse error.
+
+Altegio deployments now default legacy report requests to
+`https://app.alteg.io` in runtime and Compose configuration; the origin remains
+configurable for YCLIENTS deployments. The opt-in live suite accepts
+`ALTEGIO_API_TOKEN` and honors `ALTEGIO_LEGACY_WEB_BASE`.
+
 ### Added — capacity, reactivation, group events, product sales and cash flow
 
 Five more read-only analytics tools extend the existing temporary report adapter.
@@ -14,7 +32,7 @@ default and category costs unconditionally, and distinguish appointment value,
 lifetime payments, product cost and signed cash movement. Cash-flow columns
 retain both authorized account and account-type breakdowns without double
 counting. The source cash-only zero-row filter is replaced by filtering parsed
-movements so cashless-only items remain visible. See the
+movements so non-cash-only items remain visible. See the
 [source semantics and migration notes](docs/architecture/2026-09-19-next-legacy-analytics.md).
 
 ### Added — five decision-ready analytics tools
@@ -66,7 +84,7 @@ their separate reasons for existing would be worse than six lists.
   confirmation, the executor's own read-only policy), listed in the order
   `tools/call` checks them.
 - **Not a second implementation.** `decideView` in `src/tools/facets.ts` now
-  decides *and explains*, and `buildFacetIndex` is a projection of it; a test
+  decides _and explains_, and `buildFacetIndex` is a projection of it; a test
   compares the two under every switch combination.
   `src/tools/inventory.ts` is the single enumeration of what exists, disabled
   tools included — "why is this tool nowhere?" cannot be answered about a tool
