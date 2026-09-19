@@ -19,6 +19,7 @@ MCP (Model Context Protocol) server for Altegio.Pro business management API.
 3. **NEVER modify `../biz.erp.api.docs/`** - separate repo, read-only for this project
 4. **Read Product logic** - `docs/*.md`
 5. **Read the architecture decision record** before adding or reshaping tools: `docs/architecture/2026-09-07-mcp-platform-architecture.md`
+6. **For undocumented or ERP-web sources, follow the discovery playbook:** `docs/architecture/legacy-endpoint-discovery.md`
 
 ## Quick Start
 
