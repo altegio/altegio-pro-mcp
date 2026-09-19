@@ -89,7 +89,7 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 
 ### Tools Available
 
-**66 tools served (72 defined, 6 withheld from every view).** The counts below are pinned by `src/tools/__tests__/tool-count.test.ts` — edit them only with the code. Which tool is served on which address, and why, is the generated table in [`docs/architecture/tool-surface.md`](docs/architecture/tool-surface.md) (`npm run surface:build`).
+**71 tools served (77 defined, 6 withheld from every view).** The counts below are pinned by `src/tools/__tests__/tool-count.test.ts` — edit them only with the code. Which tool is served on which address, and why, is the generated table in [`docs/architecture/tool-surface.md`](docs/architecture/tool-surface.md) (`npm run surface:build`).
 
 **Category-organized with [Prefix] tags for LLM navigation:**
 
@@ -105,7 +105,7 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 **[Settings] Location Settings (7):** get/update appointment settings, get/update online booking settings, get/create/delete booking forms
 **[Resources] Resources (1):** get (read-only; API has no create)
 **[Users] Location access (1):** `remove_location_user` — off the default `/mcp` view, served on `/mcp/catalog` and stdio
-**[Analytics] Analytics (9):** get_overview, get_daily_series, get_appointments_breakdown, get_receptionist_performance, get_loyalty_program_results, get_forecast, get_day_end_report, get_team_member_occupancy, get_client_visit_stats
+**[Analytics] Analytics (14):** get_overview, get_daily_series, get_appointments_breakdown, get_receptionist_performance, get_loyalty_program_results, get_forecast, get_day_end_report, get_team_member_occupancy, get_client_visit_stats, get_client_sales, get_client_retention, get_client_forecast, get_service_profitability, get_team_member_sales
   - The 6 report-builder tools (list_report_templates, list_report_fields, run_report, list_saved_reports, run_saved_report, delete_assistant_report) are defined and tested but **served on no view** — the backend report-data API fails for every report in production. Never point guidance at them; read `src/tools/disabled-tools.ts` first.
 **[Onboarding] Wizard (12):** start, resume, status, batch imports (positions, staff, categories, services), set schedules, import clients, test appointments, preview, rollback
 **[API] Universal executor (3):** `altegio_search_operations`, `altegio_describe_operation`, `altegio_call_operation` - backed by `src/generated/catalog.json`; reads only (writes refused, see ADR-001 D2)
@@ -141,6 +141,12 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 - `src/utils/` - logging, errors, config, credential manager
 
 ### Change history
+
+**Temporary stable legacy analytics reports (2026-09-19)**
+- Added five read-only tools pending equivalent V3 operations: `analytics_get_client_sales`, `analytics_get_client_retention`, `analytics_get_client_forecast`, `analytics_get_service_profitability`, and `analytics_get_team_member_sales`.
+- They call authenticated ERP web reports through a stateless, request-scoped transport. The current user token is injected only as the backend-required query credential; it is never a tool argument, response field, fixture value, log field, or error detail. No cookies or cross-owner sessions are used, and declared location scope is enforced before transport.
+- HTML and BIFF8 parsers normalize English, Russian, and Brazilian-Portuguese numbers, preserve source pagination, cap response sizes, withhold contacts by default, sanitize all free text, and refuse changed/partial markup or ambiguous team-member identity instead of guessing. The forecast workbook exposes no client id, so `client_id` is explicitly `null`.
+- The five tools join `/mcp/analytics`, `/mcp/finance`, `/mcp/readonly`, and stdio `all`; they stay off default `/mcp`. Routes are allowlisted in `catalog/extended/analytics.yaml`, with golden fixtures and an opt-in live suite.
 
 **One surface table, and counts that cannot lie (2026-09-17)**
 - **The problem, not the symptom.** Six mechanisms decide whether a tool reaches a given address (`disabled-tools.ts`, `DEFAULT_FACET_EXCLUDED_PREFIXES`, `DEFAULT_FACET_EXCLUDED_TOOLS`, `DEFAULT_FACET_EXTRA_TOOLS`, `PASSWORD_LOGIN_TOOLS` + its switch, `READONLY_VIEW`) and two more decide whether the call it receives runs (`scopes.ts`, `confirmation.ts`). Every one is justified; none of them answered "why is tool X not on address Y" — that took six lists held in your head, which is how a new pack lands in the wrong place without anyone seeing it in the diff.

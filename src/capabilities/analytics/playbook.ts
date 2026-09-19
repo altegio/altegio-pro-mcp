@@ -60,7 +60,7 @@ export const METRIC_RELATIONSHIPS: readonly MetricRelationship[] = [
     title: 'Active clients split into new and returning',
     identity:
       'clients_active = new_clients_count + returning_clients_count  ·  new_clients_share_percent = new_clients_count / clients_active × 100',
-    use: 'Growth from new clients and growth from returning clients need opposite actions. A high new share with flat revenue means poor retention — cross-check the returning trend and the "Client retention" template. lost_clients is measured against the whole client base, not against active clients, so it moves slowly.',
+    use: 'Growth from new clients and growth from returning clients need opposite actions. A high new share with flat revenue means poor retention — cross-check analytics_get_client_retention by team member. lost_clients is measured against the whole client base, not against active clients, so it moves slowly.',
   },
   {
     title: 'The front desk drives next period’s returning clients',
@@ -155,10 +155,9 @@ export interface QuestionRoute {
 }
 
 /*
- * A question with no route here — a table by service or by client, a P&L, a
- * cash-flow sheet — has no answer through this server: the report builder is
- * switched off (see `src/tools/disabled-tools.ts`). `altegio://analytics/coverage`
- * lists those gaps; name the gap instead of improvising a number.
+ * A question with no route here — an arbitrary table, a P&L or a cash-flow
+ * sheet — has no answer through this server: the ad-hoc report builder is
+ * switched off (see `src/tools/disabled-tools.ts`).
  */
 export const QUESTION_ROUTES: readonly QuestionRoute[] = [
   {
@@ -214,8 +213,24 @@ export const QUESTION_ROUTES: readonly QuestionRoute[] = [
     tool: 'analytics_get_client_visit_stats',
   },
   {
+    question: 'Who are our top clients / revenue by client',
+    tool: 'analytics_get_client_sales',
+  },
+  {
+    question: 'Which team members retain clients best',
+    tool: 'analytics_get_client_retention',
+  },
+  {
+    question: 'Which clients are forecast to return / predicted client revenue',
+    tool: 'analytics_get_client_forecast',
+  },
+  {
+    question: 'Which services or categories are most profitable',
+    tool: 'analytics_get_service_profitability',
+  },
+  {
     question: 'Revenue by team member',
-    tool: 'analytics_get_overview with team_member_id or position_id',
+    tool: 'analytics_get_team_member_sales',
   },
 ] as const;
 
@@ -248,7 +263,7 @@ export const SLICING_NOTES: readonly SlicingNote[] = [
   },
   {
     dimension: 'Group-by',
-    how: 'There is no grouped report table: the report builder is switched off. The available slices are the ones above — team member, position, receptionist and period — so a "by service" or "by client" table has to be declined rather than approximated.',
+    how: 'Curated grouped tables exist for client sales, client retention, service profitability and team-member sales. The ad-hoc report builder is switched off, so custom dimensions outside those tools must be declined rather than approximated.',
   },
   {
     dimension: 'Scope',
@@ -325,7 +340,7 @@ export const ANALYSIS_NOTES: readonly AnalysisNote[] = [
     text: 'A switched-off module (forecast), a missing access right (day-end report, Analytics), or an absent work schedule (occupancy) returns nothing or a clamped value, not a true zero. Say so plainly instead of reporting the empty result as a bad number.',
   },
   {
-    title: 'No report tables',
-    text: 'The report builder is switched off, so there is no way to produce a grouped table (by service, by client, a P&L). Answer with the metrics that exist and name the gap; never assemble a table that looks like a report and label it with a period.',
+    title: 'Only curated report tables',
+    text: 'The ad-hoc report builder is switched off. Use the dedicated client-sales, retention, service-profitability and team-member-sales tools for their supported tables; name the gap for custom dimensions, P&L and cash-flow instead of improvising one.',
   },
 ] as const;

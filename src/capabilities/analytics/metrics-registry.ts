@@ -238,14 +238,14 @@ export const COVERAGE_GAPS: readonly {
     reason:
       'The Analytics Constructor is not switched on for Altegio: its report-data API fails for every report, and the one endpoint that answers ignores the requested period, so any table it produced would be all-time data under the wrong label.',
     alternative:
-      'analytics_get_overview (optionally narrowed by team_member_id or position_id), analytics_get_daily_series, analytics_get_appointments_breakdown, analytics_get_team_member_occupancy and analytics_get_day_end_report cover the same questions at location and team-member level.',
+      'Use analytics_get_client_sales, analytics_get_client_retention, analytics_get_service_profitability or analytics_get_team_member_sales for the stable curated reports; use the metric tools for other supported questions.',
   },
   {
-    topic: 'Revenue by service or by client as a table',
+    topic: 'Custom report dimensions outside the curated stable reports',
     reason:
-      'Those pages exist only inside the web interface, and the report builder behind them is switched off.',
+      'The ad-hoc Analytics Constructor is switched off and its available data route ignores requested periods.',
     alternative:
-      'None through this server. Revenue per team member is available from analytics_get_overview with team_member_id or position_id.',
+      'Use analytics_get_client_sales, analytics_get_service_profitability or analytics_get_team_member_sales when their fixed dimensions fit; otherwise name the gap.',
   },
   {
     topic: 'Team member dynamics over time',
@@ -254,10 +254,10 @@ export const COVERAGE_GAPS: readonly {
       'analytics_get_daily_series for the location trend, plus analytics_get_overview per team member across the two periods.',
   },
   {
-    topic: 'Client retention cohorts',
-    reason: 'The cohort page is web-only.',
+    topic: 'Custom client retention cohorts',
+    reason: 'Only the fixed team-member retention report is available.',
     alternative:
-      'analytics_get_overview reports new, returning, active and lost clients for the period, and analytics_get_receptionist_performance the rebooking rate that drives them.',
+      'analytics_get_client_retention reports new, returning and eligible clients by team member, optionally for one service.',
   },
   {
     topic: 'Reviews and ratings analytics',
@@ -265,10 +265,11 @@ export const COVERAGE_GAPS: readonly {
     alternative: 'None through this server.',
   },
   {
-    topic: 'Per-client forecast factors',
-    reason: 'Only an in-browser export exposes them.',
+    topic: 'Stable identity in the per-client forecast export',
+    reason:
+      'The source workbook contains names and optional contacts but no client id; the server never guesses one.',
     alternative:
-      'analytics_get_forecast gives the location-level forecast versus actuals.',
+      'analytics_get_client_forecast returns the factors with client_id=null; analytics_get_forecast gives aggregate forecast versus actuals.',
   },
   {
     topic: 'Finance dashboard and account balances',

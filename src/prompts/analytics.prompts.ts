@@ -143,7 +143,7 @@ export function getAnalyticsPrompt(
         '2. For every headline metric that moved by more than ten percent, decompose it before concluding: was revenue traffic (clients_active, visits) or spend (average_check)? Is the appointment count healthy but the attendance rate weak?',
         `3. analytics_get_daily_series with metric=revenue — the shape of the period, the best and worst days, any weekly rhythm.`,
         '4. analytics_get_appointments_breakdown by source, then by visit_status — where demand comes from and how much of it leaks to no-shows and cancellations. Call out the no-show share explicitly.',
-        '5. analytics_get_overview again with position_id, and with team_member_id for the people who carry the revenue — the headline split across the team; analytics_get_team_member_occupancy if capacity looks off. There are no report tables (by service, by client, a P&L): name that gap rather than approximating one.',
+        '5. analytics_get_team_member_sales for the team revenue split, analytics_get_service_profitability for the service mix, and analytics_get_team_member_occupancy if capacity looks off. Use analytics_get_client_sales only when the review needs a client ranking. The ad-hoc report builder and P&L remain unavailable: name that gap rather than approximating one.',
         '',
         'Finish with three to five sentences an owner can act on: what grew, what shrank, what is leaking (no-shows, cancellations, idle time), and the single change with the largest expected effect. Report absolute money next to every percentage. If a tool reports a missing access right or a switched-off module, say so plainly instead of guessing the number — missing is not zero.',
       ].join('\n');
@@ -157,7 +157,7 @@ export function getAnalyticsPrompt(
         `1. analytics_get_overview for location_id=${locationId}, period=${period}. Report revenue, average check, occupancy, appointments and the client mix, each against the previous period.`,
         `2. analytics_get_daily_series with metric=revenue for the same period. Name the best and worst days and any obvious weekly rhythm.`,
         `3. analytics_get_appointments_breakdown with group_by=source, then again with group_by=visit_status. Call out the no-show share explicitly.`,
-        `4. analytics_get_overview again with position_id, and with team_member_id where it matters, for the same period — who moved the headline. A by-service table is not available; say so instead of building one.`,
+        `4. analytics_get_team_member_sales for who moved the headline, then analytics_get_service_profitability for the service mix. Use analytics_get_client_retention when the client mix points to a retention issue.`,
         '',
         'Finish with three to five sentences an owner can act on: what grew, what shrank, what is leaking (no-shows, cancellations, idle time), and the single change with the largest expected effect. If a tool reports a missing access right or a switched-off module, say so plainly instead of guessing the number.',
       ].join('\n');
@@ -168,7 +168,7 @@ export function getAnalyticsPrompt(
       text = [
         `Review the team of location ${locationId} for the period "${period}".`,
         '',
-        `1. List the team with this location’s team-member listing tool, then analytics_get_overview with team_member_id for each person who takes appointments, period=${period}. Rank the team by revenue and note each average check.`,
+        `1. Call analytics_get_team_member_sales for period=${period}. Rank the team by revenue, service/product mix and revenue per working hour. Use analytics_get_client_retention for the same period when repeat business matters.`,
         ids
           ? `2. analytics_get_team_member_occupancy for team_member_ids=[${ids}] — scheduled, booked and idle hours, day by day.`
           : '2. Pick the two or three team members whose revenue looks unusual and call analytics_get_team_member_occupancy for them — scheduled, booked and idle hours, day by day.',

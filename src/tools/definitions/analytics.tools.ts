@@ -22,6 +22,8 @@ import { PERIOD_PRESETS } from '../../capabilities/analytics/periods.js';
 import { DATASETS } from '../../capabilities/analytics/vocabulary.js';
 import { REPORT_ROW_CAP } from '../../capabilities/analytics/report-store.js';
 import * as analytics from '../../capabilities/analytics/use-cases.js';
+import * as legacyAnalytics from '../../capabilities/analytics/legacy-use-cases.js';
+import { includeContactsArg } from '../contacts.js';
 
 // ========== shared input pieces ==========
 
@@ -514,6 +516,328 @@ export const analyticsGetClientVisitStatsTool = defineTool({
   }),
   handler: async ({ input, client }) =>
     analytics.getClientVisitStats(client, input),
+});
+
+// ========== temporary stable legacy reports ===============================
+
+const legacyPageOutput = objectSchema({
+  page: { type: 'integer' as const },
+  page_size: { type: 'integer' as const },
+  total_count: { type: 'integer' as const },
+  returned: { type: 'integer' as const },
+  has_more: { type: 'boolean' as const },
+});
+
+const paymentBreakdownOutput = objectSchema({
+  discount: num,
+  loyalty_points: num,
+  memberships: num,
+  gift_cards: num,
+  client_accounts: num,
+});
+
+const retentionMetricsOutput = {
+  clients_count: { type: 'integer' as const },
+  new_clients_count: { type: 'integer' as const },
+  new_clients_percent: num,
+  returning_clients_count: { type: 'integer' as const },
+  returning_clients_percent: num,
+  clients_eligible_for_return_count: { type: 'integer' as const },
+  clients_returned_count: { type: 'integer' as const },
+  retention_percent: num,
+};
+
+const legacyIdList = (description: string) =>
+  z
+    .array(z.number().int().positive())
+    .max(100)
+    .optional()
+    .describe(description);
+
+export const analyticsGetClientSalesTool = defineTool({
+  name: 'analytics_get_client_sales',
+  category: 'Analytics',
+  description:
+    '[Analytics] Revenue and visit totals by client from the stable sales-by-client report: client id, revenue, share of location revenue, average check and visit count. Use it for “top clients this month” and per-client sales analysis; use clients_search for lifetime segmentation instead. Results are source-paginated. Client phone and email are withheld unless include_contacts=true. Temporary legacy-report adapter pending V3; it never creates a saved report. Needs the Sales by clients report permission.',
+  annotations: { title: 'Analytics: sales by client', ...READ_ONLY },
+  input: z.object({
+    location_id: locationId,
+    ...periodFields,
+    page: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Page, starting at 1.'),
+    page_size: z
+      .number()
+      .int()
+      .min(1)
+      .max(250)
+      .optional()
+      .describe('Rows per page, at most 250. Default 50.'),
+    include_contacts: includeContactsArg,
+  }),
+  outputSchema: objectSchema({
+    location_id: { type: 'integer' as const },
+    period: periodSchema,
+    currency: str,
+    rows: {
+      type: 'array' as const,
+      items: objectSchema({
+        client_id: { type: 'integer' as const },
+        client_name: str,
+        revenue: num,
+        revenue_share_percent: num,
+        average_check: num,
+        visits_count: int,
+        phone: str,
+        email: str,
+      }),
+    },
+    totals: objectSchema({ revenue: num }),
+    page: legacyPageOutput,
+    contacts_included: { type: 'boolean' as const },
+    untrusted_data_note: { type: 'string' as const },
+  }),
+  handler: async ({ input, client }) =>
+    legacyAnalytics.getClientSales(client, input),
+});
+
+export const analyticsGetClientRetentionTool = defineTool({
+  name: 'analytics_get_client_retention',
+  category: 'Analytics',
+  description:
+    '[Analytics] Client retention by team member for a period: unique, new and returning clients, the clients considered lost before the period, how many returned, and the retention percentage. Optionally restrict to one service. Use it for “which team members bring clients back”; use analytics_get_client_sales for revenue by client. Temporary stable legacy-report adapter pending V3; it never creates a saved report. Needs the Client retention report permission.',
+  annotations: { title: 'Analytics: client retention', ...READ_ONLY },
+  input: z.object({
+    location_id: locationId,
+    ...periodFields,
+    service_id: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Restrict retention to one service.'),
+  }),
+  outputSchema: objectSchema({
+    location_id: { type: 'integer' as const },
+    period: periodSchema,
+    service_id: int,
+    rows: {
+      type: 'array' as const,
+      items: objectSchema({
+        team_member_id: { type: 'integer' as const },
+        team_member_name: str,
+        position_title: str,
+        ...retentionMetricsOutput,
+      }),
+    },
+    totals: objectSchema(retentionMetricsOutput),
+    lost_threshold_days: int,
+    untrusted_data_note: { type: 'string' as const },
+  }),
+  handler: async ({ input, client }) =>
+    legacyAnalytics.getClientRetention(client, input),
+});
+
+export const analyticsGetClientForecastTool = defineTool({
+  name: 'analytics_get_client_forecast',
+  category: 'Analytics',
+  description:
+    '[Analytics] Per-client RFM forecast from the location’s stable forecast export: average check, predicted visits and revenue, expected return window, prior return visits and last visit date. Use analytics_get_forecast for aggregate location forecast versus actuals. The legacy workbook does not expose client ids, so client_id is explicitly null and never guessed. Results are paginated after a size-bounded workbook read; contacts are withheld unless include_contacts=true. Temporary adapter pending V3; it never creates a saved report. Needs Analytics, client-export and forecast-module access.',
+  annotations: { title: 'Analytics: client forecast', ...READ_ONLY },
+  input: z.object({
+    location_id: locationId,
+    prediction_date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional()
+      .describe(
+        'Forecast snapshot date, YYYY-MM-DD. Leave out for the latest.'
+      ),
+    page: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Page, starting at 1.'),
+    page_size: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe('Rows per page, at most 100. Default 50.'),
+    include_contacts: includeContactsArg,
+  }),
+  outputSchema: objectSchema({
+    location_id: { type: 'integer' as const },
+    prediction_date: str,
+    currency: str,
+    rows: {
+      type: 'array' as const,
+      items: objectSchema({
+        client_id: { type: 'null' as const },
+        client_name: str,
+        average_check: num,
+        predicted_visits_count: int,
+        predicted_visit_window: { type: 'string' as const },
+        predicted_revenue: num,
+        return_visits_count: int,
+        last_visit_date: str,
+        phone: str,
+        email: str,
+      }),
+    },
+    page: legacyPageOutput,
+    contacts_included: { type: 'boolean' as const },
+    client_identity_status: { type: 'string' as const },
+    untrusted_data_note: { type: 'string' as const },
+  }),
+  handler: async ({ input, client }) =>
+    legacyAnalytics.getClientForecast(client, input),
+});
+
+export const analyticsGetServiceProfitabilityTool = defineTool({
+  name: 'analytics_get_service_profitability',
+  category: 'Analytics',
+  description:
+    '[Analytics] Service profitability by service or service category: quantity, discounts and loyalty write-offs, client-account and cash/card revenue, consumables cost, team-member compensation, resulting profit and share of revenue. Filter by one team member or service category and paginate at source. Temporary stable legacy-report adapter pending V3; it never creates a saved report. Needs the Sales by services report permission.',
+  annotations: { title: 'Analytics: service profitability', ...READ_ONLY },
+  input: z.object({
+    location_id: locationId,
+    ...periodFields,
+    group_by: z.enum(['service', 'service_category']).optional(),
+    team_member_id: z.number().int().positive().optional(),
+    service_category_id: z.number().int().positive().optional(),
+    page: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Page, starting at 1.'),
+    page_size: z
+      .number()
+      .int()
+      .min(1)
+      .max(500)
+      .optional()
+      .describe('Rows per page, at most 500. Default 100.'),
+  }),
+  outputSchema: objectSchema({
+    location_id: { type: 'integer' as const },
+    period: periodSchema,
+    currency: str,
+    group_by: { type: 'string' as const },
+    rows: {
+      type: 'array' as const,
+      items: objectSchema({
+        service_id: int,
+        service_category_id: int,
+        title: str,
+        service_category_title: str,
+        services_count: { type: 'integer' as const },
+        payments: paymentBreakdownOutput,
+        cash_or_card_revenue: num,
+        consumables_cost: num,
+        team_member_compensation: num,
+        profit: num,
+        revenue_share_percent: num,
+      }),
+    },
+    totals: objectSchema({
+      services_count: { type: 'integer' as const },
+      payments: paymentBreakdownOutput,
+      cash_or_card_revenue: num,
+      consumables_cost: num,
+      team_member_compensation: num,
+      profit: num,
+    }),
+    page: legacyPageOutput,
+    untrusted_data_note: { type: 'string' as const },
+  }),
+  handler: async ({ input, client }) =>
+    legacyAnalytics.getServiceProfitability(client, input),
+});
+
+export const analyticsGetTeamMemberSalesTool = defineTool({
+  name: 'analytics_get_team_member_sales',
+  category: 'Analytics',
+  description:
+    '[Analytics] Sales by team member: total revenue, service and product revenue and quantities, discounts and loyalty write-offs, client-account payments, upcoming-appointment revenue, working hours, revenue per working hour and share of location revenue. Supports the source report’s filters for positions, services, service categories, products and product categories. Temporary stable legacy-report adapter pending V3; it never creates a saved report. Needs the Sales by team members report permission.',
+  annotations: { title: 'Analytics: sales by team member', ...READ_ONLY },
+  input: z.object({
+    location_id: locationId,
+    ...periodFields,
+    position_ids: legacyIdList('Restrict to these positions.'),
+    service_ids: legacyIdList('Include sales of these services only.'),
+    service_category_ids: legacyIdList(
+      'Include sales in these service categories only.'
+    ),
+    product_ids: legacyIdList('Include sales of these products only.'),
+    product_category_ids: legacyIdList(
+      'Include sales in these product categories only.'
+    ),
+  }),
+  outputSchema: objectSchema({
+    location_id: { type: 'integer' as const },
+    period: periodSchema,
+    currency: str,
+    filters_applied: objectSchema({
+      position_ids: {
+        type: 'array' as const,
+        items: { type: 'integer' as const },
+      },
+      service_ids: {
+        type: 'array' as const,
+        items: { type: 'integer' as const },
+      },
+      service_category_ids: {
+        type: 'array' as const,
+        items: { type: 'integer' as const },
+      },
+      product_ids: {
+        type: 'array' as const,
+        items: { type: 'integer' as const },
+      },
+      product_category_ids: {
+        type: 'array' as const,
+        items: { type: 'integer' as const },
+      },
+    }),
+    rows: {
+      type: 'array' as const,
+      items: objectSchema({
+        team_member_id: { type: 'integer' as const },
+        team_member_name: str,
+        position_title: str,
+        revenue: num,
+        services_revenue: num,
+        services_count: int,
+        products_revenue: num,
+        products_count: int,
+        payments: paymentBreakdownOutput,
+        upcoming_appointments_revenue: num,
+        working_hours: num,
+        revenue_per_working_hour: num,
+        revenue_share_percent: num,
+      }),
+    },
+    totals: objectSchema({
+      revenue: num,
+      services_revenue: num,
+      services_count: int,
+      products_revenue: num,
+      products_count: int,
+      payments: paymentBreakdownOutput,
+      upcoming_appointments_revenue: num,
+      working_hours: num,
+    }),
+    untrusted_data_note: { type: 'string' as const },
+  }),
+  handler: async ({ input, client }) =>
+    legacyAnalytics.getTeamMemberSales(client, input),
 });
 
 // ========== report builder ==========

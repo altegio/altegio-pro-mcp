@@ -357,6 +357,26 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     what: 'the names staff gave their payment accounts',
     coveredBy: 'src/capabilities/analytics/__tests__/use-cases.test.ts',
   },
+  analytics_get_client_sales: {
+    what: 'client names and optional contacts rendered by the location report',
+    coveredBy: 'src/capabilities/analytics/__tests__/legacy-use-cases.test.ts',
+  },
+  analytics_get_client_retention: {
+    what: 'team-member names and position titles rendered by the location report',
+    coveredBy: 'src/capabilities/analytics/__tests__/legacy-use-cases.test.ts',
+  },
+  analytics_get_client_forecast: {
+    what: 'client names and optional contacts from the location forecast export',
+    coveredBy: 'src/capabilities/analytics/__tests__/legacy-use-cases.test.ts',
+  },
+  analytics_get_service_profitability: {
+    what: 'service and service-category titles rendered by the location report',
+    coveredBy: 'src/capabilities/analytics/__tests__/legacy-use-cases.test.ts',
+  },
+  analytics_get_team_member_sales: {
+    what: 'team-member names and position titles rendered by the location report',
+    coveredBy: 'src/capabilities/analytics/__tests__/legacy-use-cases.test.ts',
+  },
   analytics_list_report_templates: {
     what: 'template names and descriptions from the location’s own builder',
     coveredBy: 'src/capabilities/analytics/__tests__/use-cases.test.ts',

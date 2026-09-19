@@ -128,9 +128,9 @@ to you.
 - One client's visit/purchase history (and unpaid visits): \`clients_get_visit_history\`.
 - Resolve a name to an id fast: \`clients_lookup\`.
 - Per-client attended/missed counts and lifetime money: \`analytics_get_client_visit_stats\`.
-- Predicted revenue and visits from the base (the RFM model): \`analytics_get_forecast\`
-  (the endpoint is named "rfm/overall" but returns a forecast-vs-actual, not RFM
-  segments — there is no RFM-segment API).
+- Revenue, average check and visits ranked by client: \`analytics_get_client_sales\`.
+- Per-client predicted revenue, visits and return window: \`analytics_get_client_forecast\`.
+- Aggregate predicted revenue and visits versus actuals: \`analytics_get_forecast\`.
 `;
 
 export const clientsResources: ResourceModule = {
