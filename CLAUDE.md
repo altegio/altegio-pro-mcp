@@ -143,10 +143,15 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 
 ### Change history
 
-**Five additional temporary analytics reports (2026-09-19)**
-- Added team-member capacity, loyalty-program reactivation candidates, group-event performance, product sales and cash-flow breakdown through the PR #55 seams.
-- Same analytics/finance/readonly/stdio surfaces, `analytics:read` scope and stateless per-request transport. Category costs are withheld because the source lacks its cost gate; reactivation contacts remain opt-in and ids are null.
-- Cash-flow balance is period net movement, group-event amount is appointment value, and reactivation paid amount is lifetime. Source semantics, filter caveats and V3 replacement boundary: `docs/architecture/2026-09-19-next-legacy-analytics.md`.
+**Universal client reactivation (2026-09-19)**
+- `analytics_get_client_reactivation_candidates` now composes the documented client-base search rather than an ERP loyalty report. It requires no program id and has no compatibility alias.
+- The cutoff is an inclusive calendar date in the location timezone. Candidates have prior arrived visits through that day and no arrived visit from the following day onward; minimum visits defaults to one, lifetime spend is optional, and the remaining filters reuse the canonical `clients_search` vocabulary.
+- Results have stable client ids, first/last visit dates, lifetime visit count and spend, deterministic id ordering, bounded paging, exact totals and opt-in contacts.
+
+**Four additional temporary analytics reports (2026-09-19)**
+- Added team-member capacity, group-event performance, product sales and cash-flow breakdown through the PR #55 seams.
+- Same analytics/finance/readonly/stdio surfaces, `analytics:read` scope and stateless per-request transport. Category costs are withheld because the source lacks its cost gate.
+- Cash-flow balance is period net movement and group-event amount is appointment value. Source semantics, filter caveats and V3 replacement boundary: `docs/architecture/2026-09-19-next-legacy-analytics.md`.
 
 **Temporary stable legacy analytics reports (2026-09-19)**
 - Added five read-only tools pending equivalent V3 operations: `analytics_get_client_sales`, `analytics_get_client_retention`, `analytics_get_client_forecast`, `analytics_get_service_profitability`, and `analytics_get_team_member_sales`.

@@ -95,31 +95,6 @@ describeLive(
       expect(cash.columns.length).toBeGreaterThan(0);
     }, 120_000);
 
-    const loyaltyProgramId = Number(
-      process.env.ALTEGIO_LIVE_LOYALTY_PROGRAM_ID
-    );
-    (loyaltyProgramId > 0 ? it : it.skip)(
-      'parses reactivation for an explicitly configured loyalty program',
-      async () => {
-        const report = await adapter.getClientReactivationCandidates({
-          location_id: DEMO_LOCATION_ID,
-          ...recentPeriod(),
-          loyalty_program_id: loyaltyProgramId,
-          page: 1,
-          page_size: 25,
-          include_contacts: false,
-        });
-        expect(report.rows.length).toBeLessThanOrEqual(25);
-        expect(
-          report.rows.every(
-            (row) =>
-              row.client_id === null && !('phone' in row) && !('email' in row)
-          )
-        ).toBe(true);
-      },
-      60_000
-    );
-
     it('parses every report into its canonical bounded contract', async () => {
       const period = recentPeriod();
       const [clients, retention, services, team, finance, inventory] =

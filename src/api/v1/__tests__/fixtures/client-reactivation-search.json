@@ -1,0 +1,16 @@
+{
+  "success": true,
+  "data": [
+    {
+      "id": 41,
+      "name": "Alex",
+      "first_visit_date": "2024-01-10 10:00:00",
+      "last_visit_date": "2026-06-30 17:00:00",
+      "visits_count": "5",
+      "sold_amount": "1250.50"
+    }
+  ],
+  "meta": {
+    "total_count": 12
+  }
+}

@@ -15,6 +15,7 @@ import {
   IMPORTANCE_FROM_CODE,
   OUTCOME_FROM_ATTENDANCE_CODE,
   OUTCOME_TO_ATTENDANCE_CODE,
+  OUTCOME_TO_RECORD_CODE,
   PAYMENT_STATUS_FROM_WIRE,
   PAYMENT_STATUS_TO_WIRE,
   SORT_FIELD_TO_WIRE,
@@ -23,6 +24,8 @@ import type {
   ClientCard,
   ClientLookupQuery,
   ClientLookupRow,
+  ClientReactivationQuery,
+  ClientReactivationSegment,
   ClientSegment,
   ClientSegmentRow,
   ClientsApi,
@@ -50,6 +53,13 @@ function asString(value: unknown): string | null {
   if (typeof value === 'string') return value;
   if (typeof value === 'number') return String(value);
   return null;
+}
+
+/** Read the local calendar date prefix from a v1 date/time value. */
+function asLocalDate(value: unknown): string | null {
+  const text = asString(value);
+  const match = text?.match(/^(\d{4}-\d{2}-\d{2})(?:\D|$)/);
+  return match?.[1] ?? null;
 }
 
 /** Read a v1 boolean flag stored as 0/1 (or a real boolean). */
@@ -114,6 +124,106 @@ export class V1ClientsAdapter implements ClientsApi {
       page: query.page,
       page_size: query.page_size,
       rows,
+    };
+  }
+
+  async searchReactivationCandidates(
+    query: ClientReactivationQuery
+  ): Promise<ClientReactivationSegment> {
+    const optional = buildFilterPayload(query.filters, 'all');
+    if (query.minimum_total_spent !== undefined) {
+      const existing = query.filters.total_spent;
+      optional.filters = optional.filters.filter(
+        (filter) => filter.type !== 'sold_amount'
+      );
+      optional.filters.push({
+        type: 'sold_amount',
+        state: {
+          from: Math.max(
+            query.minimum_total_spent,
+            typeof existing?.from === 'number'
+              ? existing.from
+              : query.minimum_total_spent
+          ),
+          ...(existing?.to !== undefined ? { to: existing.to } : {}),
+        },
+      });
+    }
+
+    const body = {
+      page: query.page,
+      page_size: query.page_size,
+      operation: 'AND',
+      filters: [
+        ...optional.filters,
+        {
+          type: 'record',
+          state: {
+            status: { value: [OUTCOME_TO_RECORD_CODE.arrived] },
+            created: { to: query.last_visit_on_or_before },
+            records_count: { from: query.minimum_historical_visits },
+          },
+        },
+        {
+          type: 'record',
+          state: {
+            status: { value: [OUTCOME_TO_RECORD_CODE.arrived] },
+            created: { from: query.inactive_from },
+            invert: true,
+          },
+        },
+      ],
+      fields: [
+        'name',
+        'first_visit_date',
+        'last_visit_date',
+        'visits_count',
+        'sold_amount',
+        ...(query.include_contacts ? ['phone', 'email'] : []),
+      ],
+      // Client id is unique, so this remains stable across pages even when
+      // several clients share the same last-visit date.
+      order_by: 'id',
+      order_by_direction: 'ASC',
+    };
+
+    const { data, meta } = await callEnveloped<unknown>(
+      this.http,
+      `/company/${query.location_id}/clients/search`,
+      {
+        method: 'POST',
+        body,
+        context: 'analyze client reactivation candidates',
+      }
+    );
+
+    const candidates = Array.isArray(data)
+      ? data
+          .filter(
+            (row): row is Record<string, unknown> =>
+              !!row && typeof row === 'object' && asNumber(row.id) !== null
+          )
+          .map((row) => ({
+            client_id: asNumber(row.id)!,
+            client_name: asString(row.name),
+            first_visit_date: asLocalDate(row.first_visit_date),
+            last_visit_date: asLocalDate(row.last_visit_date),
+            visit_count: asNumber(row.visits_count),
+            total_spent: asNumber(row.sold_amount),
+            ...(query.include_contacts
+              ? {
+                  phone: asString(row.phone),
+                  email: asString(row.email),
+                }
+              : {}),
+          }))
+      : [];
+
+    return {
+      total_count: asNumber(meta.total_count) ?? candidates.length,
+      page: query.page,
+      page_size: query.page_size,
+      candidates,
     };
   }
 

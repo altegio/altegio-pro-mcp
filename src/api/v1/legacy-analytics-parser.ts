@@ -6,7 +6,6 @@ import type {
   CashFlowBreakdownReport,
   CashFlowColumn,
   CashFlowRow,
-  ClientReactivationReport,
   GroupEventPerformanceReport,
   ProductSalesGroup,
   ProductSalesReport,
@@ -951,73 +950,6 @@ function workbookMatrix(bytes: Uint8Array, report: string): unknown[][] {
     blankrows: false,
   });
   return matrix;
-}
-
-export function parseClientReactivationWorkbook(args: {
-  bytes: Uint8Array;
-  currency: string | null;
-  page: number;
-  pageSize: number;
-  includeContacts: boolean;
-}): ClientReactivationReport {
-  const matrix = workbookMatrix(args.bytes, 'client reactivation');
-  // The source template has exactly eight columns; contacts can be blank or masked.
-  const headerIndex = matrix.findIndex(
-    (row) =>
-      row.length === 8 &&
-      row.filter((v) => cleanText(v)).length === 8 &&
-      cleanText(row[2]).toLowerCase() === 'email'
-  );
-  if (headerIndex < 0)
-    throw new LegacyAnalyticsParseError(
-      'client reactivation',
-      'header missing'
-    );
-  const parsed = matrix.slice(headerIndex + 1).map((row) => {
-    if (row.length !== 8 || !cleanText(row[0]))
-      throw new LegacyAnalyticsParseError(
-        'client reactivation',
-        'partial workbook row'
-      );
-    const visitText = cleanText(row[7]);
-    const parts = visitText ? visitText.split('; ') : [];
-    const visits = parts.map((part) =>
-      part.match(/^(\d{4}-\d{2}-\d{2}) \d{2}:\d{2} - (.*)$/)
-    );
-    const reliable = parts.length <= 3 && visits.every((v) => v !== null);
-    return {
-      client_id: null,
-      client_name: cleanText(row[0]) || null,
-      registration_date: dateValue(row[3]),
-      last_visit_date: dateValue(row[4]),
-      lifetime_paid_amount: parseLocaleNumber(row[5]),
-      client_account_balance: parseLocaleNumber(row[6]),
-      last_visits: reliable
-        ? visits.map((v) => ({ date: v![1]!, description: v![2]! }))
-        : [],
-      last_visits_parse_status: !parts.length
-        ? ('empty' as const)
-        : reliable
-          ? ('parsed' as const)
-          : ('unavailable' as const),
-      ...(args.includeContacts
-        ? {
-            phone: cleanText(row[1]) || null,
-            email: cleanText(row[2]) || null,
-            contacts_status: 'source_values_may_be_masked' as const,
-          }
-        : {}),
-    };
-  });
-  const rows = parsed.slice(
-    (args.page - 1) * args.pageSize,
-    args.page * args.pageSize
-  );
-  return {
-    currency: args.currency,
-    rows,
-    page: pageMeta(args.page, args.pageSize, parsed.length, rows.length),
-  };
 }
 
 export function parseGroupEventPerformanceHtml(args: {

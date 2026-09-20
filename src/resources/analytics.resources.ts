@@ -279,7 +279,7 @@ export function renderCoverage(): string {
     '- Revenue, costs and contribution result by service or service category.',
     '- Sales and worked-hour efficiency by team member.',
     '- Scheduled, booked and idle hours by team member with capacity totals.',
-    '- Loyalty-program reactivation candidates with lifetime paid amounts and recent visit descriptions; ids unavailable and contacts opt-in.',
+    '- Universal client reactivation audiences from the client base, with an inclusive last-visit cutoff, prior-visit/spend qualification, stable ids, canonical client filters and contacts opt-in.',
     '- Group-event capacity and booked, attended and paid participants; appointment value is not collected revenue.',
     '- Product and category sales; product costs require permission and category costs are withheld.',
     '- Cash-flow movements by payment item, day and returned account/type columns; not opening or closing balances.',

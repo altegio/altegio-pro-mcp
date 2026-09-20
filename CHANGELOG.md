@@ -6,6 +6,16 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — universal client reactivation candidates
+
+`analytics_get_client_reactivation_candidates` now finds any inactive client,
+without requiring a loyalty-program membership or using the temporary ERP
+loyalty export. Its public contract takes an inclusive last-visit cutoff, a
+minimum historical-visit count, an optional minimum lifetime spend and the
+canonical client filters; results use stable client ids, deterministic paging
+and opt-in contacts. The implementation composes documented client-search
+filters and evaluates calendar boundaries in the location's timezone.
+
 ### Fixed — analytics semantic contracts and live legacy origin
 
 Normalized the temporary analytics contracts around rendered-service counts,
@@ -24,15 +34,14 @@ Altegio deployments now default legacy report requests to
 configurable for YCLIENTS deployments. The opt-in live suite accepts
 `ALTEGIO_API_TOKEN` and honors `ALTEGIO_LEGACY_WEB_BASE`.
 
-### Added — capacity, reactivation, group events, product sales and cash flow
+### Added — capacity, group events, product sales and cash flow
 
-Five more read-only analytics tools extend the existing temporary report adapter.
-They preserve source pagination and permissions, withhold client contacts by
-default and category costs unconditionally, and distinguish appointment value,
-lifetime payments, product cost and signed cash movement. Cash-flow columns
-retain both authorized account and account-type breakdowns without double
-counting. The source cash-only zero-row filter is replaced by filtering parsed
-movements so non-cash-only items remain visible. See the
+Four more read-only analytics tools extend the existing temporary report adapter.
+They preserve source pagination and permissions, withhold category costs, and
+distinguish appointment value, product cost and signed cash movement. Cash-flow
+columns retain both authorized account and account-type breakdowns without
+double counting. The source cash-only zero-row filter is replaced by filtering
+parsed movements so non-cash-only items remain visible. See the
 [source semantics and migration notes](docs/architecture/2026-09-19-next-legacy-analytics.md).
 
 ### Added — five decision-ready analytics tools

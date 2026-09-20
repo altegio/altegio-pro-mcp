@@ -223,7 +223,6 @@ describe('temporary legacy analytics use cases', () => {
 
 import {
   getTeamMemberCapacity,
-  getClientReactivationCandidates,
   getGroupEventPerformance,
   getProductSales,
   getCashFlowBreakdown,
@@ -310,40 +309,11 @@ describe('next analytics text boundary', () => {
     jest
       .spyOn(V1LegacyAnalyticsAdapter.prototype, 'getCashFlowBreakdown')
       .mockResolvedValue(cash);
-    jest
-      .spyOn(
-        V1LegacyAnalyticsAdapter.prototype,
-        'getClientReactivationCandidates'
-      )
-      .mockResolvedValue({
-        currency: 'EUR',
-        page,
-        rows: [
-          {
-            client_id: null,
-            client_name: CANARY,
-            registration_date: null,
-            last_visit_date: null,
-            lifetime_paid_amount: 0,
-            client_account_balance: 0,
-            last_visits: [{ date: '2026-09-01', description: CANARY }],
-            last_visits_parse_status: 'parsed',
-            phone: CANARY,
-            email: CANARY,
-            contacts_status: 'source_values_may_be_masked',
-          },
-        ],
-      });
     for (const result of await Promise.all([
       getTeamMemberCapacity(client, periodInput),
       getGroupEventPerformance(client, periodInput),
       getProductSales(client, periodInput),
       getCashFlowBreakdown(client, periodInput),
-      getClientReactivationCandidates(client, {
-        ...periodInput,
-        loyalty_program_id: 1,
-        include_contacts: true,
-      }),
     ]))
       expectSanitized(result);
   });

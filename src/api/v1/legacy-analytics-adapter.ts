@@ -10,7 +10,6 @@ import type { AltegioClient } from '../../providers/altegio-client.js';
 import { AltegioApiError } from '../../utils/errors.js';
 import type {
   LegacyPeriodRequest,
-  ClientReactivationRequest,
   GroupEventPerformanceRequest,
   ProductSalesRequest,
   CashFlowBreakdownRequest,
@@ -26,7 +25,6 @@ import type {
 } from '../legacy-analytics-api.js';
 import {
   parseTeamMemberCapacityHtml,
-  parseClientReactivationWorkbook,
   parseGroupEventPerformanceHtml,
   parseProductSalesHtml,
   parseCashFlowBreakdownHtml,
@@ -441,28 +439,6 @@ export class V1LegacyAnalyticsAdapter {
     return parseTeamMemberCapacityHtml(
       await readSearchEnvelope(response, 'team-member capacity')
     );
-  }
-
-  async getClientReactivationCandidates(input: ClientReactivationRequest) {
-    const [response, currency] = await Promise.all([
-      this.client.requestLegacyWebReport({
-        locationId: input.location_id,
-        path: `/analytics/loyalty_programs/${input.location_id}/excel/lost_clients`,
-        query: {
-          loyalty_program_id: input.loyalty_program_id,
-          date_from: input.date_from,
-          date_to: input.date_to,
-        },
-      }),
-      this.currency(input.location_id),
-    ]);
-    return parseClientReactivationWorkbook({
-      bytes: await readWorkbook(response, 'client reactivation'),
-      currency,
-      page: input.page,
-      pageSize: input.page_size,
-      includeContacts: input.include_contacts,
-    });
   }
 
   async getGroupEventPerformance(input: GroupEventPerformanceRequest) {

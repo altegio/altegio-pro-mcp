@@ -31,10 +31,10 @@ export const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     tool: 'analytics_get_team_member_capacity',
   },
   {
-    key: 'reactivation_lifetime_paid',
-    name: 'Reactivation lifetime paid',
+    key: 'reactivation_total_spent',
+    name: 'Reactivation candidate lifetime spend',
     definition:
-      'Lifetime paid amount for loyalty-program clients who did not return in the requested period; not period revenue. Client ids are unavailable.',
+      'Lifetime money sold to a client whose latest arrived visit is on or before the chosen local-date cutoff. It is not period revenue; every candidate has a stable client id.',
     tool: 'analytics_get_client_reactivation_candidates',
   },
   {

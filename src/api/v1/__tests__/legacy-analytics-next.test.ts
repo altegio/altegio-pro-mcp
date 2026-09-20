@@ -54,57 +54,10 @@ describe('next temporary analytics reports', () => {
   );
 });
 
-import * as XLSX from '@e965/xlsx';
 import {
-  parseClientReactivationWorkbook,
   parseGroupEventPerformanceHtml,
   parseCashFlowBreakdownHtml,
 } from '../legacy-analytics-parser.js';
-
-it('reads lifetime amounts, null identity and ambiguous visit text without guessing names', () => {
-  const sheet = XLSX.utils.aoa_to_sheet([
-    [
-      'Name',
-      'Phone',
-      'Email',
-      'Registration date',
-      'Last visit',
-      'Paid',
-      'Balance',
-      'Last visits',
-    ],
-    [
-      'Alice',
-      '***12',
-      'a***@example.test',
-      '2020-01-02 13:00',
-      '2026-01-02 12:00',
-      '1.234,56',
-      '12,50',
-      '2026-01-02 12:00 - Alice, Trainer, Yoga',
-    ],
-  ]);
-  const book = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(book, sheet, 'Clients');
-  const bytes = XLSX.write(book, {
-    type: 'buffer',
-    bookType: 'biff8',
-  }) as Uint8Array;
-  const result = parseClientReactivationWorkbook({
-    bytes,
-    currency: 'BRL',
-    page: 1,
-    pageSize: 25,
-    includeContacts: false,
-  });
-  expect(result.rows[0]).toMatchObject({
-    client_id: null,
-    lifetime_paid_amount: 1234.56,
-    client_account_balance: 12.5,
-    last_visits: [{ date: '2026-01-02', description: 'Alice, Trainer, Yoga' }],
-  });
-  expect(result.rows[0]).not.toHaveProperty('phone');
-});
 it('does not treat an empty group-event page as zero dashboard metrics', () => {
   expect(
     parseGroupEventPerformanceHtml({
@@ -261,17 +214,6 @@ describe.each(['en', 'ru', 'pt-BR'])(
     });
   }
 );
-it('rejects a changed reactivation workbook without reflecting cell text', () => {
-  expect(() =>
-    parseClientReactivationWorkbook({
-      bytes: Buffer.from('user_hash=secret'),
-      currency: 'USD',
-      page: 1,
-      pageSize: 25,
-      includeContacts: false,
-    })
-  ).toThrow(LegacyAnalyticsParseError);
-});
 it('preserves total count on an empty out-of-range event page', () => {
   const result = parseGroupEventPerformanceHtml({
     html: '',
@@ -325,78 +267,6 @@ it('reads a single cash-account type and an isolated payment item without invent
     net_movement: null,
   });
 });
-it.each([
-  [
-    'Name',
-    'Phone',
-    'Email',
-    'Registration date',
-    'Last visit',
-    'Paid',
-    'Balance',
-    'Last visits',
-  ],
-  [
-    'Имя',
-    'Телефон',
-    'Email',
-    'Дата регистрации',
-    'Последний визит',
-    'Оплачено',
-    'Баланс',
-    'Последние визиты',
-  ],
-  [
-    'Nome',
-    'Telefone',
-    'Email',
-    'Registro',
-    'Última visita',
-    'Pago',
-    'Saldo',
-    'Últimas visitas',
-  ],
-])(
-  'handles localized reactivation headers and masked or blank contacts (%s)',
-  (...headers) => {
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.aoa_to_sheet([
-        headers,
-        [
-          'A',
-          '***12',
-          '',
-          '2020-01-01',
-          '2026-09-01',
-          '1.234,56',
-          '0',
-          'unstructured description',
-        ],
-      ]),
-      'Clients'
-    );
-    const bytes = XLSX.write(workbook, {
-      bookType: 'biff8',
-      type: 'buffer',
-    }) as Uint8Array;
-    const result = parseClientReactivationWorkbook({
-      bytes,
-      currency: 'BRL',
-      page: 1,
-      pageSize: 25,
-      includeContacts: true,
-    });
-    expect(result.rows[0]).toMatchObject({
-      phone: '***12',
-      email: null,
-      contacts_status: 'source_values_may_be_masked',
-      last_visits: [],
-      last_visits_parse_status: 'unavailable',
-    });
-  }
-);
 it('refuses a partially missing page rather than claiming it is complete', () => {
   expect(() =>
     parseProductSalesHtml({

@@ -378,8 +378,8 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     coveredBy: 'src/capabilities/analytics/__tests__/legacy-use-cases.test.ts',
   },
   analytics_get_client_reactivation_candidates: {
-    what: 'client names, contacts and visit descriptions',
-    coveredBy: 'src/capabilities/analytics/__tests__/legacy-use-cases.test.ts',
+    what: 'client names and optional contacts from the client base',
+    coveredBy: 'src/capabilities/analytics/__tests__/reactivation.test.ts',
   },
   analytics_get_group_event_performance: {
     what: 'team-member and service names, creator and date displays',

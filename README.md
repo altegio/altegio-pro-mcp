@@ -148,7 +148,7 @@ the call, and amounts come back in major units with an ISO currency code.
 - `analytics_get_team_member_service_matrix` - Genuine team-member × service cells with revenue, contribution and share metrics, bounded ranking and explicit unavailable dimensions
 - `analytics_get_inventory_reorder_risks` - Stock velocity, days of cover, deterministic reorder risk and quantity from configurable lead-time and safety-stock assumptions
 - `analytics_get_team_member_capacity` - Working, booked and idle hours, occupancy and upcoming appointments
-- `analytics_get_client_reactivation_candidates` - Loyalty-program nonreturners, lifetime paid amounts and recent visit descriptions; contacts opt-in, client ids unavailable
+- `analytics_get_client_reactivation_candidates` - Universal inactive-client audience with an inclusive last-visit cutoff, prior visits/spend qualification, stable client ids and canonical client filters; contacts opt-in
 - `analytics_get_group_event_performance` - Capacity, booked/attended/paid participants and appointment value; aggregate occupancy metrics
 - `analytics_get_product_sales` - Product or category sales, quantity, total cost and total markup; permission-aware product costs, category costs withheld
 - `analytics_get_cash_flow_breakdown` - Signed movements by payment item, day and returned cash-account/type columns
@@ -178,9 +178,10 @@ nor the marketplace system user carries. The reasons, the evidence and the
 one-line re-enable step live in
 [`src/tools/disabled-tools.ts`](src/tools/disabled-tools.ts). The curated
 legacy-report and decision tools above cover stable client, retention,
-service-profitability, team-member-sales, capacity, reactivation, group-event,
-product, cash-flow, operating-ledger and inventory views without creating
-saved reports. Arbitrary custom tables and complete statutory statements are
+service-profitability, team-member-sales, capacity, group-event, product,
+cash-flow, operating-ledger and inventory views without creating saved reports;
+reactivation instead composes the documented client-base search. Arbitrary
+custom tables and complete statutory statements are
 declined through `altegio://analytics/coverage` instead of answered with
 incomplete or unfiltered data.
 

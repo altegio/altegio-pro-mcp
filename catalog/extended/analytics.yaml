@@ -770,21 +770,6 @@ paths:
       responses:
         '200': { description: JSON search envelope containing HTML; bounded parsing and explicit structural drift failures. }
 
-  /analytics/loyalty_programs/{location_id}/excel/lost_clients:
-    get:
-      operationId: get_legacy_client_reactivation_candidates_report
-      summary: Read temporary client reactivation candidates report
-      x-altegio-api-version: web
-      x-altegio-permission: Loyalty analytics and client contacts access
-      x-altegio-caveat: Temporary until equivalent V3; golden contracts in legacy-analytics-next.test.ts and legacy-analytics-adapter.test.ts.
-      parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: "loyalty_program_id", in: query, schema: { type: integer } }
-        - { name: "date_from", in: query, schema: { type: string, format: date } }
-        - { name: "date_to", in: query, schema: { type: string, format: date } }
-      responses:
-        '200': { description: BIFF8 workbook; no stable client ids. }
-
   /dashboard/activities/{location_id}/search:
     get:
       operationId: get_legacy_group_event_performance_report
