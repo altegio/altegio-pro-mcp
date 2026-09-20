@@ -1,11 +1,11 @@
 /**
- * Opt-in live suite: calls the real client endpoints against the demo location
+ * Opt-in live suite: calls the real client endpoints against the configured or
+ * first accessible location
  * and records sanitized reference payloads under `fixtures/live/`.
  *
- * Skipped unless `ALTEGIO_E2E=1`. It needs a partner token in
- * `ALTEGIO_PARTNER_TOKEN` (or `ALTEGIO_LIVE_API_TOKEN`) and the demo credentials
- * in `ALTEGIO_TEST_LOGIN` / `ALTEGIO_TEST_PASSWORD` — from the environment, never
- * from a file in this public repository.
+ * Skipped unless `ALTEGIO_E2E=1`. It needs `ALTEGIO_API_TOKEN` (or a live-test
+ * alias) and either `ALTEGIO_USER_TOKEN` or the demo login/password — from the
+ * environment, never from a file in this public repository.
  *
  *   ALTEGIO_E2E=1 CREDENTIALS_DIR=/tmp/altegio-mcp-live npx jest clients-live
  *
@@ -21,7 +21,7 @@ import { callClients } from '../clients-http.js';
 import { V1ClientsAdapter } from '../clients-adapter.js';
 
 const LIVE = process.env.ALTEGIO_E2E === '1';
-const DEMO_LOCATION_ID = 4564;
+let liveLocationId = 4564;
 const FIXTURES = path.join(__dirname, 'fixtures', 'live');
 const CREDENTIALS_DIR = process.env.CREDENTIALS_DIR ?? '/tmp/altegio-mcp-live';
 
@@ -80,23 +80,38 @@ function record(name: string, payload: unknown): void {
 
 const describeLive = LIVE ? describe : describe.skip;
 
-describeLive('client endpoints against the demo location', () => {
+describeLive('client endpoints against an accessible location', () => {
   let client: AltegioClient;
 
   beforeAll(async () => {
     const login = process.env.ALTEGIO_TEST_LOGIN;
     const password = process.env.ALTEGIO_TEST_PASSWORD;
+    const userToken = process.env.ALTEGIO_USER_TOKEN;
     const partnerToken =
-      process.env.ALTEGIO_PARTNER_TOKEN ?? process.env.ALTEGIO_LIVE_API_TOKEN;
-    if (!login || !password || !partnerToken) {
+      process.env.ALTEGIO_API_TOKEN ??
+      process.env.ALTEGIO_PARTNER_TOKEN ??
+      process.env.ALTEGIO_LIVE_API_TOKEN;
+    if (!partnerToken || (!userToken && (!login || !password))) {
       throw new Error(
-        'The live suite needs ALTEGIO_PARTNER_TOKEN (or ALTEGIO_LIVE_API_TOKEN), ALTEGIO_TEST_LOGIN and ALTEGIO_TEST_PASSWORD in the environment.'
+        'The live suite needs ALTEGIO_API_TOKEN (or a live-test alias) and either ALTEGIO_USER_TOKEN or ALTEGIO_TEST_LOGIN plus ALTEGIO_TEST_PASSWORD.'
       );
     }
-    client = new AltegioClient({ partnerToken }, CREDENTIALS_DIR);
+    client = new AltegioClient({ partnerToken, userToken }, CREDENTIALS_DIR);
     if (!client.isAuthenticated()) {
-      const result = await client.login(login, password);
+      const result = await client.login(login!, password!);
       expect(result.success).toBe(true);
+    }
+    const configured = process.env.ALTEGIO_COMPANY_ID;
+    if (configured && /^\d+$/.test(configured) && Number(configured) > 0) {
+      liveLocationId = Number(configured);
+    } else {
+      const locations = await client.getCompanies({ my: 1 });
+      if (!locations[0]?.id) {
+        throw new Error(
+          'The live token has no accessible location and ALTEGIO_COMPANY_ID is not a positive integer.'
+        );
+      }
+      liveLocationId = locations[0].id;
     }
   }, 60_000);
 
@@ -106,7 +121,7 @@ describeLive('client endpoints against the demo location', () => {
     // A raw recording of the endpoint's own shape…
     const raw = await callClients(
       httpFromClient(client),
-      `/company/${DEMO_LOCATION_ID}/clients/search`,
+      `/company/${liveLocationId}/clients/search`,
       {
         method: 'POST',
         body: { page: 1, page_size: 5, operation: 'AND', filters: [] },
@@ -118,7 +133,7 @@ describeLive('client endpoints against the demo location', () => {
     // …and the canonical DTO the adapter derives from it.
     const api = new V1ClientsAdapter(httpFromClient(client));
     const segment = await api.searchClients({
-      location_id: DEMO_LOCATION_ID,
+      location_id: liveLocationId,
       filters: {},
       match: 'all',
       page: 1,
@@ -133,14 +148,14 @@ describeLive('client endpoints against the demo location', () => {
 
       const card = await callClients(
         httpFromClient(client),
-        `/client/${DEMO_LOCATION_ID}/${clientId}`,
+        `/client/${liveLocationId}/${clientId}`,
         { context: 'record the client card' }
       );
       record('client-card', card);
 
       const visits = await callClients(
         httpFromClient(client),
-        `/company/${DEMO_LOCATION_ID}/clients/visits/search`,
+        `/company/${liveLocationId}/clients/visits/search`,
         {
           method: 'POST',
           body: {
@@ -157,7 +172,7 @@ describeLive('client endpoints against the demo location', () => {
       record('client-visits', visits);
 
       const cardDto = await api.getClientCard({
-        location_id: DEMO_LOCATION_ID,
+        location_id: liveLocationId,
         client_id: clientId,
       });
       expect(cardDto.id).toBe(clientId);
@@ -167,10 +182,49 @@ describeLive('client endpoints against the demo location', () => {
   it('records the autocomplete lookup', async () => {
     const raw = await callClients(
       httpFromClient(client),
-      `/company/${DEMO_LOCATION_ID}/clients/autocomplete?name=a&limit=5`,
+      `/company/${liveLocationId}/clients/autocomplete?name=a&limit=5`,
       { context: 'record the autocomplete lookup' }
     );
     record('clients-autocomplete', raw);
-    expect(Array.isArray(raw)).toBe(true);
+    const rows = Array.isArray(raw)
+      ? raw
+      : (raw as { data?: unknown } | null)?.data;
+    expect(Array.isArray(rows)).toBe(true);
+  }, 60_000);
+
+  it('reads a universal reactivation audience without a loyalty program', async () => {
+    const cutoff = new Date();
+    cutoff.setUTCDate(cutoff.getUTCDate() - 90);
+    const threshold = cutoff.toISOString().slice(0, 10);
+    const inactiveFrom = new Date(cutoff.getTime() + 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    const api = new V1ClientsAdapter(httpFromClient(client));
+    const segment = await api.searchReactivationCandidates({
+      location_id: liveLocationId,
+      last_visit_on_or_before: threshold,
+      inactive_from: inactiveFrom,
+      minimum_historical_visits: 1,
+      filters: {},
+      page: 1,
+      page_size: 5,
+      include_contacts: false,
+    });
+
+    expect(typeof segment.total_count).toBe('number');
+    expect(segment.candidates.length).toBeLessThanOrEqual(5);
+    expect(segment.candidates.every((row) => row.client_id > 0)).toBe(true);
+    expect(
+      segment.candidates.every(
+        (row) =>
+          row.last_visit_date !== null &&
+          row.last_visit_date <= threshold &&
+          row.visit_count !== null &&
+          row.visit_count >= 1
+      )
+    ).toBe(true);
+    expect(
+      segment.candidates.every((row) => !('phone' in row) && !('email' in row))
+    ).toBe(true);
   }, 60_000);
 });

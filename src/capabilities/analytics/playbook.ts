@@ -236,7 +236,7 @@ export const QUESTION_ROUTES: readonly QuestionRoute[] = [
     tool: 'analytics_get_team_member_capacity',
   },
   {
-    question: 'Which loyalty-program clients should we reactivate',
+    question: 'Which inactive clients should we reactivate',
     tool: 'analytics_get_client_reactivation_candidates',
   },
   {

@@ -397,45 +397,6 @@ describe('next temporary report adapter contracts', () => {
       });
     }
   );
-  it('uses the bounded workbook reader and exact reactivation filters', async () => {
-    const sheet = XLSX.utils.aoa_to_sheet([
-      [
-        'Name',
-        'Phone',
-        'Email',
-        'Registration',
-        'Visit',
-        'Paid',
-        'Balance',
-        'Visits',
-      ],
-      ['A', '', '', '2020-01-01', '2026-01-01', 100, 0, ''],
-    ]);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, sheet, 'Clients');
-    const { client, requests } = fakeClient([
-      new Response(XLSX.write(workbook, { type: 'buffer', bookType: 'biff8' })),
-    ]);
-    const report = await new V1LegacyAnalyticsAdapter(
-      client
-    ).getClientReactivationCandidates({
-      ...nextPeriod,
-      loyalty_program_id: 2,
-      page: 1,
-      page_size: 25,
-      include_contacts: false,
-    });
-    expect(report.rows[0]?.client_id).toBeNull();
-    expect(requests[0]).toEqual({
-      locationId: 4564,
-      path: '/analytics/loyalty_programs/4564/excel/lost_clients',
-      query: {
-        loyalty_program_id: 2,
-        date_from: '2026-09-01',
-        date_to: '2026-09-19',
-      },
-    });
-  });
   it.each(['Need Auth', '{"success":false,"error":"user_hash=secret"}'])(
     'does not reflect authentication or permission response content',
     async (body) => {
@@ -445,25 +406,6 @@ describe('next temporary report adapter contracts', () => {
       ).rejects.not.toThrow('user_hash');
     }
   );
-  it('caps reactivation exports before parsing and rejects body-level authentication', async () => {
-    for (const response of [
-      new Response('x', {
-        headers: { 'content-length': String(13 * 1024 * 1024) },
-      }),
-      new Response('Need Auth'),
-    ]) {
-      const { client } = fakeClient([response]);
-      await expect(
-        new V1LegacyAnalyticsAdapter(client).getClientReactivationCandidates({
-          ...nextPeriod,
-          loyalty_program_id: 2,
-          page: 1,
-          page_size: 25,
-          include_contacts: false,
-        })
-      ).rejects.toThrow();
-    }
-  });
 });
 it('recognizes the cash-flow permission envelope without reflecting source diagnostics', async () => {
   const { client } = fakeClient([

@@ -127,6 +127,8 @@ to you.
 - One client's full card: \`clients_get_card\`.
 - One client's visit/purchase history (and unpaid visits): \`clients_get_visit_history\`.
 - Resolve a name to an id fast: \`clients_lookup\`.
+- A complete, deterministically paged win-back audience with an inclusive
+  location-local last-visit cutoff: \`analytics_get_client_reactivation_candidates\`.
 - Per-client attended/missed counts and lifetime money: \`analytics_get_client_visit_stats\`.
 - Revenue, average check and visits ranked by client: \`analytics_get_client_sales\`.
 - Per-client predicted revenue, visits and return window: \`analytics_get_client_forecast\`.

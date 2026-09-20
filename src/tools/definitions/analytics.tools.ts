@@ -27,7 +27,9 @@ import { REPORT_ROW_CAP } from '../../capabilities/analytics/report-store.js';
 import * as analytics from '../../capabilities/analytics/use-cases.js';
 import * as legacyAnalytics from '../../capabilities/analytics/legacy-use-cases.js';
 import * as decisionAnalytics from '../../capabilities/analytics/decision-use-cases.js';
+import * as reactivationAnalytics from '../../capabilities/analytics/reactivation.js';
 import { includeContactsArg } from '../contacts.js';
+import { clientFiltersSchema } from './client-filters.schema.js';
 
 // ========== shared input pieces ==========
 
@@ -94,6 +96,7 @@ const segmentFields = {
 const num = { type: ['number', 'null'] as const };
 const str = { type: ['string', 'null'] as const };
 const int = { type: ['integer', 'null'] as const };
+const date = { type: ['string', 'null'] as const, format: 'date' as const };
 
 const compared = {
   type: 'object' as const,
@@ -1963,51 +1966,86 @@ export const analyticsGetClientReactivationCandidatesTool = defineTool({
   name: 'analytics_get_client_reactivation_candidates',
   category: 'Analytics',
   description:
-    '[Analytics] Clients who did not return under a loyalty program during a period, for reactivation planning. Includes registration and last-visit dates, lifetime paid amount, client-account balance and up to three visit descriptions. Client ids are unavailable and remain null; descriptions cannot reliably identify individual services or team members. Contacts are withheld unless include_contacts=true and source values may be masked. Requires loyalty analytics and client-contact access even with contacts omitted. Temporary read-only export pending V3; pagination is local after a bounded download.',
+    '[Analytics] Build a universal client-reactivation audience from the location client base. A candidate has prior arrived visits on or before an inclusive last-visit cutoff and no arrived visit after it. Qualify by minimum historical visits and optional lifetime spend, then narrow with the same canonical client filters as clients_search (tags, importance, age, birthday, memberships, gift cards, balances, app use and consent). Returns stable client ids, first/last visit dates, lifetime visit count and spend. Results are ordered by client_id ascending for deterministic bounded pagination. Contacts are withheld unless include_contacts=true. Needs access to clients in this location.',
   annotations: {
     title: 'Analytics: client reactivation candidates',
     ...READ_ONLY,
   },
   input: z.object({
     location_id: locationId,
-    loyalty_program_id: z
+    last_visit_on_or_before: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .describe(
+        'Inclusive last-arrived-visit threshold, YYYY-MM-DD, interpreted as a calendar day in the location timezone. A client whose last arrived visit is exactly this date qualifies; any arrived visit on the following day or later excludes them.'
+      ),
+    minimum_historical_visits: z
       .number()
       .int()
-      .positive()
-      .describe('Loyalty program whose nonreturning clients to analyze.'),
-    ...periodFields,
+      .min(1)
+      .max(100000)
+      .optional()
+      .describe(
+        'Minimum arrived visits on or before the cutoff. Default 1, which excludes clients who never visited.'
+      ),
+    minimum_total_spent: z
+      .number()
+      .nonnegative()
+      .optional()
+      .describe(
+        'Optional minimum lifetime spend in major currency units. This is lifetime spend, not spend before the cutoff.'
+      ),
+    filters: clientFiltersSchema
+      .omit({ appointments: true })
+      .optional()
+      .describe(
+        'Optional canonical clients_search filters, combined with the reactivation rules by AND. Appointment-history filters are intentionally owned by this tool.'
+      ),
     ...nextPageFields,
     include_contacts: includeContactsArg,
   }),
   outputSchema: objectSchema({
-    ...nextBaseOutput,
-    currency: str,
-    loyalty_program_id: int,
+    location_id: { type: 'integer' as const },
+    inactivity: objectSchema({
+      last_visit_on_or_before: { type: 'string' as const },
+      inactive_from: { type: 'string' as const },
+      timezone: { type: 'string' as const },
+      boundary: { type: 'string' as const },
+      qualifying_outcome: { type: 'string' as const },
+    }),
+    qualification: objectSchema({
+      minimum_historical_visits: { type: 'integer' as const },
+      minimum_total_spent: { type: 'number' as const },
+    }),
+    filters_applied: { type: 'object' as const },
+    order: objectSchema({
+      field: { type: 'string' as const },
+      direction: { type: 'string' as const },
+    }),
+    total_count: { type: 'integer' as const },
+    page: { type: 'integer' as const },
+    page_size: { type: 'integer' as const },
+    returned: { type: 'integer' as const },
+    has_more: { type: 'boolean' as const },
+    next_page: { type: ['integer', 'null'] as const },
     contacts_included: { type: 'boolean' as const },
-    client_identity_status: str,
-    page: legacyPageOutput,
-    rows: {
+    untrusted_data_note: { type: 'string' as const },
+    candidates: {
       type: 'array' as const,
       items: objectSchema({
-        client_id: { type: 'null' as const },
+        client_id: { type: 'integer' as const },
         client_name: str,
-        registration_date: str,
-        last_visit_date: str,
-        lifetime_paid_amount: num,
-        client_account_balance: num,
-        last_visits: {
-          type: 'array' as const,
-          items: objectSchema({ date: str, description: str }),
-        },
-        last_visits_parse_status: str,
+        first_visit_date: date,
+        last_visit_date: date,
+        visit_count: int,
+        total_spent: num,
         phone: str,
         email: str,
-        contacts_status: str,
       }),
     },
   }),
   handler: async ({ input, client }) =>
-    legacyAnalytics.getClientReactivationCandidates(client, input),
+    reactivationAnalytics.getClientReactivationCandidates(client, input),
 });
 const groupMetricOutput = objectSchema({
   participants: num,

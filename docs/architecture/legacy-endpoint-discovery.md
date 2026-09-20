@@ -244,8 +244,8 @@ persist credentials or client data.
 
 ## 9. Proven examples
 
-- `2026-09-19-next-legacy-analytics.md` documents capacity, client
-  reactivation, group events, product sales and cash flow.
+- `2026-09-19-next-legacy-analytics.md` documents capacity, group events,
+  product sales and cash flow.
 - `analytics-decision-tools-sources.md` documents the composite P&L, capacity
   heatmap, revenue leakage, team-member/service matrix and inventory reorder
   tools.

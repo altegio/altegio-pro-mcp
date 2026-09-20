@@ -117,6 +117,115 @@ describe('V1ClientsAdapter.searchClients', () => {
   });
 });
 
+describe('V1ClientsAdapter.searchReactivationCandidates', () => {
+  it('composes canonical filters with inclusive inactivity and engagement predicates', async () => {
+    const { api, calls } = adapter([
+      [/\/clients\/search/, 'client-reactivation-search'],
+    ]);
+
+    const result = await api.searchReactivationCandidates({
+      location_id: 4564,
+      last_visit_on_or_before: '2026-06-30',
+      inactive_from: '2026-07-01',
+      minimum_historical_visits: 3,
+      minimum_total_spent: 500,
+      filters: {
+        total_spent: { from: 100, to: 5000 },
+        importance: ['gold'],
+        tag_ids: [7],
+        mass_notification_allowed: true,
+      },
+      page: 2,
+      page_size: 20,
+      include_contacts: false,
+    });
+
+    expect(result).toEqual({
+      total_count: 12,
+      page: 2,
+      page_size: 20,
+      candidates: [
+        {
+          client_id: 41,
+          client_name: 'Alex',
+          first_visit_date: '2024-01-10',
+          last_visit_date: '2026-06-30',
+          visit_count: 5,
+          total_spent: 1250.5,
+        },
+      ],
+    });
+
+    const body = JSON.parse(calls[0]!.body!);
+    expect(body).toMatchObject({
+      page: 2,
+      page_size: 20,
+      operation: 'AND',
+      order_by: 'id',
+      order_by_direction: 'ASC',
+      fields: [
+        'name',
+        'first_visit_date',
+        'last_visit_date',
+        'visits_count',
+        'sold_amount',
+      ],
+    });
+    expect(body.filters).toEqual([
+      { type: 'importance', state: { value: [3] } },
+      { type: 'category', state: { value: [7] } },
+      {
+        type: 'is_mass_notification_allowed',
+        state: { value: true },
+      },
+      { type: 'sold_amount', state: { from: 500, to: 5000 } },
+      {
+        type: 'record',
+        state: {
+          status: { value: [3] },
+          created: { to: '2026-06-30' },
+          records_count: { from: 3 },
+        },
+      },
+      {
+        type: 'record',
+        state: {
+          status: { value: [3] },
+          created: { from: '2026-07-01' },
+          invert: true,
+        },
+      },
+    ]);
+  });
+
+  it('requests contacts only when explicitly enabled and preserves an empty result', async () => {
+    const { api, calls } = adapter([
+      [
+        /\/clients\/search/,
+        {
+          status: 200,
+          body: { success: true, data: [], meta: { total_count: 0 } },
+        },
+      ],
+    ]);
+    const result = await api.searchReactivationCandidates({
+      location_id: 1,
+      last_visit_on_or_before: '2026-02-28',
+      inactive_from: '2026-03-01',
+      minimum_historical_visits: 1,
+      filters: {},
+      page: 1,
+      page_size: 25,
+      include_contacts: true,
+    });
+
+    expect(result.total_count).toBe(0);
+    expect(result.candidates).toEqual([]);
+    const body = JSON.parse(calls[0]!.body!);
+    expect(body.fields).toEqual(expect.arrayContaining(['phone', 'email']));
+  });
+});
+
 describe('V1ClientsAdapter.getClientCard', () => {
   it('maps the legacy card fields to canonical ones', async () => {
     const { api } = adapter([[/\/client\/4564\/16/, 'client-card']]);

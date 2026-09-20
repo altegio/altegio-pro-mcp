@@ -135,6 +135,50 @@ export interface ClientSegment {
   rows: ClientSegmentRow[];
 }
 
+// ========== client reactivation audience ==========
+
+/**
+ * The optional client-base filters accepted by reactivation analysis.
+ * Appointment history is owned by the analysis itself so callers cannot
+ * replace its last-visit and prior-engagement predicates.
+ */
+export type ReactivationClientFilters = Omit<
+  ClientSearchFilters,
+  'appointments'
+>;
+
+export interface ClientReactivationQuery {
+  location_id: number;
+  /** Inclusive local calendar date of the latest allowed arrived visit. */
+  last_visit_on_or_before: string;
+  /** First local calendar date that must contain no arrived visit. */
+  inactive_from: string;
+  minimum_historical_visits: number;
+  minimum_total_spent?: number;
+  filters: ReactivationClientFilters;
+  page: number;
+  page_size: number;
+  include_contacts: boolean;
+}
+
+export interface ClientReactivationCandidate {
+  client_id: number;
+  client_name: string | null;
+  first_visit_date: string | null;
+  last_visit_date: string | null;
+  visit_count: number | null;
+  total_spent: number | null;
+  phone?: string | null;
+  email?: string | null;
+}
+
+export interface ClientReactivationSegment {
+  total_count: number;
+  page: number;
+  page_size: number;
+  candidates: ClientReactivationCandidate[];
+}
+
 // ========== client card ==========
 
 export interface ClientTag {
@@ -237,6 +281,9 @@ export interface ClientLookupRow {
 
 export interface ClientsApi {
   searchClients(query: ClientSearchQuery): Promise<ClientSegment>;
+  searchReactivationCandidates(
+    query: ClientReactivationQuery
+  ): Promise<ClientReactivationSegment>;
   getClientCard(query: {
     location_id: number;
     client_id: number;

@@ -177,24 +177,6 @@ export interface TeamMemberCapacityReport {
   >;
   totals: TeamMemberCapacityMetrics;
 }
-export interface ReactivationCandidate {
-  client_id: null;
-  client_name: string | null;
-  registration_date: string | null;
-  last_visit_date: string | null;
-  lifetime_paid_amount: number | null;
-  client_account_balance: number | null;
-  last_visits: Array<{ date: string; description: string }>;
-  last_visits_parse_status: 'parsed' | 'empty' | 'unavailable';
-  phone?: string | null;
-  email?: string | null;
-  contacts_status?: 'source_values_may_be_masked';
-}
-export interface ClientReactivationReport {
-  currency: string | null;
-  rows: ReactivationCandidate[];
-  page: PageMeta;
-}
 export interface GroupEventMetric {
   participants: number | null;
   capacity: number | null;
@@ -294,11 +276,6 @@ export interface LegacyPeriodRequest {
 export interface LegacyPageRequest {
   page: number;
   page_size: number;
-}
-export interface ClientReactivationRequest
-  extends LegacyPeriodRequest, LegacyPageRequest {
-  loyalty_program_id: number;
-  include_contacts: boolean;
 }
 export interface GroupEventPerformanceRequest
   extends LegacyPeriodRequest, LegacyPageRequest {

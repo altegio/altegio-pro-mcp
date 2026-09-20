@@ -3,7 +3,6 @@ import type { AltegioClient } from '../../providers/altegio-client.js';
 import { V1LegacyAnalyticsAdapter } from '../../api/v1/legacy-analytics-adapter.js';
 import type {
   CashFlowBreakdownRequest,
-  ClientReactivationRequest,
   GroupEventPerformanceRequest,
   LegacyPeriodRequest,
   ProductSalesGroup,
@@ -321,9 +320,6 @@ export async function getTeamMemberSales(
 /** Canonical request shapes survive replacement of the temporary adapter by V3. */
 type WithPeriod<T> = Omit<T, 'date_from' | 'date_to'> & PeriodInput;
 export type TeamMemberCapacityInput = WithPeriod<LegacyPeriodRequest>;
-export type ClientReactivationInput = WithPeriod<
-  Omit<ClientReactivationRequest, 'page' | 'page_size' | 'include_contacts'>
-> & { page?: number; page_size?: number; include_contacts?: boolean };
 export type GroupEventPerformanceInput = WithPeriod<
   Omit<GroupEventPerformanceRequest, 'page' | 'page_size'>
 > & { page?: number; page_size?: number };
@@ -383,32 +379,6 @@ export async function getTeamMemberCapacity(
     period,
     report,
     `Capacity for ${report.rows.length} team member(s): ${report.totals.booked_hours ?? 'n/a'} booked hours of ${report.totals.scheduled_hours ?? 'n/a'} scheduled hours; occupancy ${report.totals.occupancy_percent ?? 'n/a'}%.`
-  );
-}
-export async function getClientReactivationCandidates(
-  client: AltegioClient,
-  input: ClientReactivationInput
-): Promise<LegacyAnalyticsResult> {
-  const period = await periodFor(client, input.location_id, input);
-  const includeContacts = input.include_contacts === true;
-  const report = await adapter(client).getClientReactivationCandidates({
-    ...input,
-    date_from: period.date_from,
-    date_to: period.date_to,
-    page: input.page ?? 1,
-    page_size: input.page_size ?? 25,
-    include_contacts: includeContacts,
-  });
-  return nextReportResult(
-    input.location_id,
-    period,
-    report,
-    `${report.page.total_count} reactivation candidate(s); showing ${report.page.returned}. Paid amounts are lifetime values. Client ids are unavailable; visit descriptions do not identify individual services or team members.${report.page.has_more ? ' Request the next page for more.' : ''}${includeContacts ? ' Source contacts may be masked.' : ` ${CONTACTS_WITHHELD_NOTICE}`}`,
-    {
-      loyalty_program_id: input.loyalty_program_id,
-      contacts_included: includeContacts,
-      client_identity_status: 'unavailable_from_legacy_export',
-    }
   );
 }
 export async function getGroupEventPerformance(
