@@ -105,6 +105,23 @@ describe('Configuration Schema', () => {
     });
   });
 
+  describe('REQUIRE_DELEGATED_IDENTITY', () => {
+    it('uses the same explicit boolean spellings as the other HTTP flags', () => {
+      const parse = (value: unknown) =>
+        EnvSchema.parse({
+          ALTEGIO_API_TOKEN: 'test-token',
+          REQUIRE_DELEGATED_IDENTITY: value,
+        }).REQUIRE_DELEGATED_IDENTITY;
+
+      expect(parse('true')).toBe(true);
+      expect(parse('1')).toBe(true);
+      expect(parse(true)).toBe(true);
+      expect(parse('false')).toBe(false);
+      expect(parse('0')).toBe(false);
+      expect(parse('')).toBe(false);
+    });
+  });
+
   describe('MCP_PUBLIC_BASE_URL', () => {
     // It only ever appears in text a model reads — the read-only view's
     // refusal and its instructions — so a wrong value misdirects a user.

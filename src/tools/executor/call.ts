@@ -28,6 +28,10 @@ import {
   UNTRUSTED_NOTE,
 } from '../tool-result.js';
 import { exposedParamName } from './describe.js';
+import {
+  assertCompanyAllowed,
+  getRequestCompanyIds,
+} from '../../request-context.js';
 
 /** Characters of payload kept in `structuredContent` (the rest of the budget is the text summary). */
 export const PAYLOAD_BUDGET_CHARS = 10000;
@@ -327,6 +331,53 @@ export function assertCallable(op: CatalogOperation): void {
   }
 }
 
+const LOCATION_PARAMETER_NAMES = new Set([
+  'location_id',
+  'company_id',
+  'salon_id',
+]);
+
+/**
+ * Resolve and enforce the location dimension from catalog metadata.
+ *
+ * A URL-number heuristic cannot distinguish a location id from a visit,
+ * chain, document or category id. Scoped executor calls therefore need an
+ * explicit location/company/salon parameter; entity-only and chain-level reads
+ * are refused because their result cannot be proven to stay inside the scope.
+ */
+function enforceCatalogCompanyScope(
+  op: CatalogOperation,
+  params: Record<string, unknown>
+): number | null {
+  const declaredScope = getRequestCompanyIds();
+  const locationParameters = op.parameters.filter((parameter) =>
+    LOCATION_PARAMETER_NAMES.has(parameter.name.toLowerCase())
+  );
+
+  for (const parameter of locationParameters) {
+    const usedName = lookupOrder(op, parameter.name).find(
+      (name) =>
+        Object.prototype.hasOwnProperty.call(params, name) &&
+        params[name] !== undefined
+    );
+    if (usedName === undefined) continue;
+    const value = Number(params[usedName]);
+    assertCompanyAllowed(value);
+    return value;
+  }
+
+  if (declaredScope !== undefined) {
+    throw new ExecutorRefusalError(
+      `\`${op.operationId}\` cannot be confined to the declared location scope ` +
+        'because this API operation has no explicit location parameter. Use a ' +
+        'curated location-scoped tool, or reconnect without a declared location scope.',
+      { operationId: op.operationId, reason: 'unscoped_catalog_operation' }
+    );
+  }
+
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Execution
 // ---------------------------------------------------------------------------
@@ -362,7 +413,13 @@ export async function callOperation(
 
   assertCallable(op);
   const { path, query, warnings } = buildRequest(op, params);
-  const { data, meta } = await client.request('GET', path, query);
+  const scopedCompany = enforceCatalogCompanyScope(op, params);
+  const { data, meta } = await client.request(
+    'GET',
+    path,
+    query,
+    scopedCompany
+  );
 
   const projection = op.curation?.projection;
   const projected =

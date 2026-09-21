@@ -6,6 +6,26 @@ is declared stable.
 
 ## [Unreleased]
 
+### Fixed — authorization boundaries and legacy team-member identity
+
+The universal read executor now resolves location scope from catalog parameter
+metadata instead of treating the first number in every URL as a location id.
+When a request declares a location scope, chain-level, entity-only and otherwise
+unscoped operations are refused; optional location filters become mandatory and
+are checked before transport. Empty or malformed company/scope headers fail
+closed, public-lane scopes can be enforced without a delegated identity header,
+and `REQUIRE_DELEGATED_IDENTITY=false` is parsed as false.
+
+Onboarding checkpoints are partitioned by the effective request principal as
+well as location. Starting a wizard verifies the credential and location access
+upstream before creating or resetting local state. Local stdio keeps its existing
+on-disk path.
+
+Client-retention and team-member-sales reports no longer fail wholesale when
+two team members share the same name and position. The affected row retains a
+null `team_member_id` plus an explicit `ambiguous` or `unavailable` identity
+status; a unique match remains `matched`.
+
 ### Changed — universal client reactivation candidates
 
 `analytics_get_client_reactivation_candidates` now finds any inactive client,

@@ -124,7 +124,10 @@ tool already owns.
   the curated tool that may already do the job, and the canonical-alias notes.
 - `call.ts` — binds canonical parameter names onto the spec's spelling, validates
   against the catalog, builds path and query, and refuses anything that is not a
-  documented V1 `GET`.
+  documented V1 `GET`. Under a declared location scope it also requires and
+  validates an explicit `location_id`, `company_id` or `salon_id`; chain-level,
+  entity-only and company-less reads are refused because a numeric URL segment
+  is not proof of location ownership.
 - `budget.ts` — the overlay `projection` allowlist and the result size budget.
 
 `src/tools/definitions/executor.tools.ts` wraps those in three `defineTool`

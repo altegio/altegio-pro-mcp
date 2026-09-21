@@ -12,6 +12,8 @@ import {
   getRequestCompanyIds,
   isCompanyAllowed,
   assertCompanyAllowed,
+  requestContextFromHeaders,
+  getRequestScopes,
   identityKey,
   type RequestIdentity,
 } from '../request-context.js';
@@ -228,6 +230,19 @@ describe('request-context', () => {
     });
   });
 
+  describe('proxy-forwarded scopes', () => {
+    it('binds trusted scopes even when the public lane has no identity headers', () => {
+      const context = requestContextFromHeaders({
+        'x-altegio-user-token': 'tok',
+        'x-mcp-auth-scope': 'mcp:pro:read',
+      });
+      expect(context.identity).toBeNull();
+      expect(
+        runWithContext(context, () => [...(getRequestScopes() ?? [])])
+      ).toEqual(['mcp:pro:read']);
+    });
+  });
+
   describe('parsePartnerToken (UC2 fork selector)', () => {
     it('reads the X-Altegio-Partner-Token header', () => {
       expect(
@@ -290,12 +305,16 @@ describe('request-context', () => {
       expect(set && [...set].sort((a, b) => a - b)).toEqual([4564, 720441]);
     });
 
-    it('returns undefined when absent, blank, or wholly invalid', () => {
+    it('returns undefined only when absent and fails closed when declared without valid ids', () => {
       expect(parseCompanyIds({})).toBeUndefined();
-      expect(parseCompanyIds({ 'x-altegio-company-id': '  ' })).toBeUndefined();
+      expect(parseCompanyIds({ 'x-altegio-company-id': '  ' })).toEqual(
+        new Set()
+      );
       expect(
-        parseCompanyIds({ 'x-altegio-company-id': 'abc, 0, -1' })
-      ).toBeUndefined();
+        parseCompanyIds({
+          'x-altegio-company-id': 'abc, 0, -1',
+        })
+      ).toEqual(new Set());
     });
   });
 
@@ -397,6 +416,18 @@ describe('request-context', () => {
           expect(() => assertCompanyAllowed(999)).toThrow(/4564, 720441/);
         }
       );
+    });
+
+    it('rejects every company when a declared scope contains no valid id', () => {
+      const companyIds = parseCompanyIds({
+        'x-altegio-company-id': 'invalid',
+      });
+      expect(companyIds).toEqual(new Set());
+      expect(() =>
+        runWithContext({ identity: null, companyIds }, () =>
+          assertCompanyAllowed(4564)
+        )
+      ).toThrow(/scoped to no valid companies/);
     });
   });
 });

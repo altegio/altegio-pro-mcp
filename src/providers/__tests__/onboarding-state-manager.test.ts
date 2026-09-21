@@ -2,6 +2,7 @@ import { OnboardingStateManager } from '../onboarding-state-manager';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { runWithContext } from '../../request-context';
 
 describe('OnboardingStateManager', () => {
   let manager: OnboardingStateManager;
@@ -48,5 +49,35 @@ describe('OnboardingStateManager', () => {
 
     const state = await manager.load(123);
     expect(state?.phase).toBe('staff');
+  });
+
+  it('isolates HTTP state by direct user token for the same company', async () => {
+    const first = { identity: null, userToken: 'token-one' } as const;
+    const second = { identity: null, userToken: 'token-two' } as const;
+
+    await runWithContext(first, () => manager.start(123));
+    await runWithContext(first, () => manager.checkpoint(123, 'staff', [1]));
+    await runWithContext(second, () => manager.start(123));
+    await runWithContext(second, () =>
+      manager.checkpoint(123, 'services', [2])
+    );
+
+    expect(
+      (await runWithContext(first, () => manager.load(123)))?.checkpoints
+    ).toHaveProperty('staff');
+    expect(
+      (await runWithContext(first, () => manager.load(123)))?.checkpoints
+    ).not.toHaveProperty('services');
+    expect(
+      (await runWithContext(second, () => manager.load(123)))?.checkpoints
+    ).toHaveProperty('services');
+  });
+
+  it('isolates HTTP state by delegated identity when no direct token is present', async () => {
+    const first = { identity: { kind: 'user' as const, sub: 'user-one' } };
+    const second = { identity: { kind: 'user' as const, sub: 'user-two' } };
+
+    await runWithContext(first, () => manager.start(123));
+    expect(await runWithContext(second, () => manager.load(123))).toBeNull();
   });
 });

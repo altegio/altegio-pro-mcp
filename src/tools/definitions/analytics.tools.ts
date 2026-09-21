@@ -665,7 +665,7 @@ export const analyticsGetClientRetentionTool = defineTool({
   name: 'analytics_get_client_retention',
   category: 'Analytics',
   description:
-    '[Analytics] Client retention by team member for a period: unique, new and returning clients, the clients considered lost before the period, how many returned, and the retention percentage. Optionally restrict to one service. Use it for “which team members bring clients back”; use analytics_get_client_sales for revenue by client. Temporary stable legacy-report adapter pending V3; it never creates a saved report. Needs the Client retention report permission.',
+    '[Analytics] Client retention by team member for a period: unique, new and returning clients, the clients considered lost before the period, how many returned, and the retention percentage. Optionally restrict to one service. Legacy rows are matched to a current team-member id only when name and position identify exactly one member; stale or ambiguous identities return a null id and explicit status. Use it for “which team members bring clients back”; use analytics_get_client_sales for revenue by client. Temporary stable legacy-report adapter pending V3; it never creates a saved report. Needs the Client retention report permission.',
   annotations: { title: 'Analytics: client retention', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -684,7 +684,11 @@ export const analyticsGetClientRetentionTool = defineTool({
     rows: {
       type: 'array' as const,
       items: objectSchema({
-        team_member_id: { type: 'integer' as const },
+        team_member_id: int,
+        team_member_identity_status: {
+          type: 'string' as const,
+          enum: ['matched', 'unavailable', 'ambiguous'],
+        },
         team_member_name: str,
         position_title: str,
         ...retentionMetricsOutput,
@@ -822,7 +826,7 @@ export const analyticsGetTeamMemberSalesTool = defineTool({
   name: 'analytics_get_team_member_sales',
   category: 'Analytics',
   description:
-    '[Analytics] Sales by team member: total revenue, service and product revenue and quantities, discounts and loyalty write-offs, client-account payments, upcoming-appointment revenue, worked hours, revenue per worked hour and share of location revenue. Supports the source report’s filters for positions, services, service categories, products and product categories. Temporary stable legacy-report adapter pending V3; it never creates a saved report. Needs the Sales by team members report permission.',
+    '[Analytics] Sales by team member: total revenue, service and product revenue and quantities, discounts and loyalty write-offs, client-account payments, upcoming-appointment revenue, worked hours, revenue per worked hour and share of location revenue. Legacy rows are matched to a current team-member id only when name and position identify exactly one member; stale or ambiguous identities return a null id and explicit status. Supports the source report’s filters for positions, services, service categories, products and product categories. Temporary stable legacy-report adapter pending V3; it never creates a saved report. Needs the Sales by team members report permission.',
   annotations: { title: 'Analytics: sales by team member', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -866,7 +870,11 @@ export const analyticsGetTeamMemberSalesTool = defineTool({
     rows: {
       type: 'array' as const,
       items: objectSchema({
-        team_member_id: { type: 'integer' as const },
+        team_member_id: int,
+        team_member_identity_status: {
+          type: 'string' as const,
+          enum: ['matched', 'unavailable', 'ambiguous'],
+        },
         team_member_name: str,
         position_title: str,
         revenue: num,

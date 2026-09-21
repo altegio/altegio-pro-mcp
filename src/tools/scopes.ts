@@ -29,12 +29,10 @@
  *    `tools/list` must stay identical for every connection to one path
  *    (ADR-001 D7), so the tool list is never filtered by the caller's scopes.
  *    A tool a caller cannot execute is still listed, and says why when called.
- * 2. *A vocabulary this server does not know restricts nothing.* A caller that
- *    declares no scopes at all — stdio, an anonymous HTTP request — passes
- *    straight through, and so does one whose token carries only names this
- *    file cannot map onto a requirement. Failing closed on an unrecognised
- *    name would turn any vocabulary change upstream into a total outage of
- *    this server; see `grantIsRecognised`.
+ * 2. *Declared scopes fail closed.* A caller that declares no scopes at all —
+ *    local stdio — passes through for compatibility. Once the trusted proxy
+ *    sends a scope header, an empty, malformed or unknown grant authorises
+ *    nothing; vocabulary drift is an operator error, never wider access.
  * 3. *The refusal is in-band.* It is an `isError` tool result, the same
  *    channel as the confirmation gate and `ExecutorRefusalError` — never an
  *    HTTP 403, which would drop the session, and never a protocol error the
@@ -428,28 +426,10 @@ function isRecognisedScope(scope: string): boolean {
 /**
  * Whether the granted set speaks a vocabulary this server can act on.
  *
- * `false` means the token does carry scopes, but not one of them can be
- * mapped onto a requirement here: names from a platform release this build
- * predates, from another service, or from a proxy this deployment has never
- * seen. The gate then imposes **nothing**, which is the original intent of the
- * scope work — an unrecognised name must never become a refusal.
- *
- * This is not caution for its own sake. The first version of this file assumed
- * no proxy sent `x-mcp-auth-scope` at all; the proxy had in fact been sending
- * `mcp:pro:read mcp:pro:write` on every `forward_identity` route since the
- * platform shipped, every one of those names failed to match a v3 requirement,
- * and the gate refused every gated tool on the closed endpoint. Failing closed
- * on a vocabulary this file does not know turns any rename upstream into a
- * total outage here; failing open costs exactly the restrictions that could
- * not have been evaluated anyway.
- *
- * The trade this accepts, stated plainly: a token holding *only* scopes from
- * another service (`mcp:bi-data:read`) or from an unmapped v3 domain
- * (`visits:read` alone) passes unrestricted. Neither can arrive through the
- * platform — the proxy's resource server rejects a token whose audience is not
- * this route and whose scopes do not intersect the route's declared list — and
- * closing that hypothesis would reintroduce the outage above. When v3 lands,
- * widen `KNOWN_SCOPES` before relying on any of its other domains.
+ * `false` means the token carries no scope this build can map. The execution
+ * gate refuses such a grant. The proxy already enforces audience and strips
+ * client-supplied identity headers, so an unknown vocabulary indicates
+ * deployment drift; operators must update this map before rollout.
  */
 export function grantIsRecognised(granted: ReadonlySet<string>): boolean {
   for (const scope of granted) {
@@ -535,17 +515,16 @@ function warnUnrecognisedGrantOnce(granted: ReadonlySet<string>): void {
   logger.warn(
     { grantedCount: granted.size },
     'x-mcp-auth-scope carries no vocabulary this build knows; ' +
-      'scope enforcement stands aside for these calls'
+      'scope enforcement will refuse gated calls'
   );
 }
 
 /**
  * Enforce one tool's scope requirement for the current request.
  *
- * Returns `undefined` when the call may proceed — which includes every caller
- * that declares no scopes at all, and every caller whose grant is in a
- * vocabulary this build cannot map (rule 2 at the top of this file) — or the
- * `isError` result to return instead of executing the tool.
+ * Returns `undefined` when the call may proceed. An absent grant remains the
+ * local/stdio compatibility path; once a proxy declares a grant, an empty,
+ * malformed or unknown vocabulary fails closed.
  */
 export function checkToolScopes(options: {
   readonly toolName: string;
@@ -556,11 +535,12 @@ export function checkToolScopes(options: {
   const { toolName, required, granted } = options;
   if (granted === undefined || required.length === 0) return undefined;
 
-  // A grant this build cannot read is not an empty grant. Stand aside, and say
-  // so once — an operator seeing this has a vocabulary mismatch to fix.
-  if (!grantIsRecognised(granted)) {
+  // Warn once for diagnostics, but fail closed below. The proxy strips
+  // client-supplied auth headers and forwards a vocabulary this build knows;
+  // an unknown non-empty grant is therefore configuration drift, not a caller
+  // that should silently become unrestricted.
+  if (granted.size > 0 && !grantIsRecognised(granted)) {
     warnUnrecognisedGrantOnce(granted);
-    return undefined;
   }
 
   const missing = missingScopes(granted, required);

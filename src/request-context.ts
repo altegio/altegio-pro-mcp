@@ -179,11 +179,9 @@ const COMPANY_ID_HEADER = 'x-altegio-company-id';
  * the caller's responsibility. Every operation is then confined to this set
  * (`assertCompanyAllowed`, and the `list_locations` filter).
  *
- * Returns `undefined` when the header is absent or carries no positive integer,
- * meaning "no scope declared" — no confinement is applied (today's behaviour for
- * every other caller). Non-integer fragments are ignored and logged; a bad
- * fragment never silently widens scope. When at least one valid ID is present,
- * a set of exactly the valid IDs is returned.
+ * Returns `undefined` only when the header is absent, meaning "no scope
+ * declared". A present but blank or wholly invalid header returns an empty set,
+ * so every company is refused instead of silently widening the request.
  */
 export function parseCompanyIds(
   headers: HeaderBag
@@ -208,7 +206,7 @@ export function parseCompanyIds(
     ids.add(id);
   }
 
-  return ids.size > 0 ? ids : undefined;
+  return ids;
 }
 
 /**
@@ -228,6 +226,8 @@ export interface RequestContext {
   userToken?: string;
   partnerToken?: string;
   companyIds?: ReadonlySet<number>;
+  /** Trusted OAuth grants forwarded by the proxy, independent of identity. */
+  scopes?: ReadonlySet<string>;
 }
 
 /** Build the complete request context from HTTP headers in one place. */
@@ -237,6 +237,7 @@ export function requestContextFromHeaders(headers: HeaderBag): RequestContext {
     userToken: parseUserToken(headers),
     partnerToken: parsePartnerToken(headers),
     companyIds: parseCompanyIds(headers),
+    scopes: parseScopes(headerValue(headers, 'x-mcp-auth-scope')),
   };
 }
 
@@ -258,7 +259,7 @@ export function runWithIdentity<T>(
   identity: RequestIdentity | null,
   fn: () => T
 ): T {
-  return storage.run({ identity }, fn);
+  return storage.run({ identity, scopes: parseScopes(identity?.scope) }, fn);
 }
 
 /**
@@ -325,6 +326,12 @@ export function isCompanyAllowed(companyId: number): boolean {
 export function assertCompanyAllowed(companyId: number): void {
   const scope = getRequestCompanyIds();
   if (scope !== undefined && !scope.has(companyId)) {
+    if (scope.size === 0) {
+      throw new AltegioApiError(
+        'This request is scoped to no valid companies because the declared company header was empty or invalid.',
+        403
+      );
+    }
     const allowed = [...scope].sort((a, b) => a - b).join(', ');
     throw new AltegioApiError(
       `This request is scoped to compan${scope.size === 1 ? 'y' : 'ies'} ` +
@@ -345,12 +352,11 @@ const SCOPE_TOKEN = /^[\x21\x23-\x5B\x5D-\x7E]+$/;
 /**
  * Parse the proxy's `x-mcp-auth-scope` value into the set of granted scopes.
  *
- * Returns `undefined` for "no scopes declared" — an absent, blank, or
- * entirely unparseable header — which downstream means "no scope restriction
- * applies" (see `src/tools/scopes.ts`). Treating a malformed header as an
- * EMPTY grant instead would refuse every call on what is indistinguishable
- * from a proxy bug; a header that carries at least one well-formed token is
- * taken at face value, and the bad fragments are dropped with a warning.
+ * Returns `undefined` only when the trusted proxy did not declare a scope
+ * header. Once the header is present, blank or entirely malformed input is an
+ * empty grant and therefore fails closed in `src/tools/scopes.ts`. A header
+ * that carries at least one well-formed token is taken at face value, while
+ * malformed fragments are dropped with a warning.
  *
  * Parsing says nothing about whether the names mean anything here. The proxy
  * sends its own vocabulary (`mcp:pro:read mcp:pro:write`), which is
@@ -360,7 +366,7 @@ const SCOPE_TOKEN = /^[\x21\x23-\x5B\x5D-\x7E]+$/;
 export function parseScopes(
   value: string | undefined
 ): ReadonlySet<string> | undefined {
-  if (!value) return undefined;
+  if (value === undefined) return undefined;
 
   const scopes = new Set<string>();
   let dropped = 0;
@@ -379,24 +385,41 @@ export function parseScopes(
     );
   }
 
-  return scopes.size > 0 ? scopes : undefined;
+  return scopes;
 }
 
 /**
- * The scopes granted to the current request's token, or `undefined` when the
- * caller declared none — stdio, an anonymous HTTP request, or a route the
- * OAuth proxy does not forward identity on (`/public/pro` today, which has no
- * `forward_identity` flag).
- *
- * The closed `/pro` route DOES forward it, and has since the platform shipped:
- * `x-mcp-auth-scope: "mcp:pro:read mcp:pro:write"`. Anyone reasoning about
- * this function should assume a real value arrives, not an absent header.
- *
- * `undefined` is not "no permissions": it is "this caller is not scoped", and
- * the execution gate lets such a call through unchanged.
+ * The scopes granted to the current request's token, or `undefined` only when
+ * no request scope was declared (principally local stdio compatibility).
+ * Trusted HTTP proxy routes forward this header independently of delegated
+ * identity, including public Pro routes authenticated with an Altegio token.
+ * Declared empty or unknown grants remain a Set and fail closed.
  */
 export function getRequestScopes(): ReadonlySet<string> | undefined {
-  return parseScopes(storage.getStore()?.identity?.scope);
+  const context = storage.getStore();
+  if (context === undefined) return undefined;
+  return context.scopes ?? parseScopes(context.identity?.scope);
+}
+
+/**
+ * Non-reversible namespace for request-local persisted state.
+ *
+ * A direct Altegio token names the effective upstream principal, so it wins
+ * over the proxy identity. Delegated-login requests use the verified identity.
+ * Local stdio has no request context and deliberately keeps the legacy path.
+ */
+export function requestPrincipalKey(): string | undefined {
+  const context = storage.getStore();
+  if (context === undefined) return undefined;
+  if (context.userToken) {
+    return `token-${crypto
+      .createHash('sha256')
+      .update(context.userToken)
+      .digest('hex')
+      .slice(0, 16)}`;
+  }
+  if (context.identity) return `identity-${identityKey(context.identity)}`;
+  return 'anonymous';
 }
 
 /**

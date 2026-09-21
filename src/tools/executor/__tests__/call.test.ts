@@ -3,6 +3,7 @@ import type { AltegioConfig } from '../../../types/altegio.types.js';
 import { buildRequest, callOperation, PAYLOAD_BUDGET_CHARS } from '../call.js';
 import { getOperation } from '../catalog.js';
 import { ExecutorRefusalError } from '../../../utils/errors.js';
+import { runWithContext } from '../../../request-context.js';
 
 const config: AltegioConfig = {
   partnerToken: 'test-token',
@@ -303,6 +304,58 @@ describe('altegio_call_operation', () => {
       await expect(
         callOperation(client, 'no_such_operation', {})
       ).rejects.toThrow(/altegio_search_operations/);
+    });
+  });
+
+  describe('declared company scope', () => {
+    const scoped = <T>(fn: () => T) =>
+      runWithContext({ identity: null, companyIds: new Set([4564]) }, fn);
+
+    it('refuses a company-less operation before transport', async () => {
+      await expect(
+        scoped(() => callOperation(client, 'get_partner_appointment_list', {}))
+      ).rejects.toThrow(/cannot be confined to the declared location scope/);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('refuses an entity-only operation before transport', async () => {
+      await expect(
+        scoped(() => callOperation(client, 'get_visit', { visit_id: 4564 }))
+      ).rejects.toThrow(/cannot be confined to the declared location scope/);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('finds and enforces a location id even when it is not the first path parameter', async () => {
+      await expect(
+        scoped(() =>
+          callOperation(client, 'get_custom_field_list', {
+            field_category: 1,
+            location_id: 999,
+          })
+        )
+      ).rejects.toThrow(/company 999 is not in scope/);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('requires an optional location query parameter on a scoped operation', async () => {
+      await expect(
+        scoped(() =>
+          callOperation(client, 'get_partner_appointment_list', {
+            start_date: '2026-09-01',
+          })
+        )
+      ).rejects.toThrow(/cannot be confined to the declared location scope/);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('allows a scoped operation when its explicit location is allowed', async () => {
+      mockOk({ success: true, data: [] });
+      await scoped(() =>
+        callOperation(client, 'get_partner_appointment_list', {
+          salon_id: 4564,
+        })
+      );
+      expect(fetchedUrl()).toContain('salon_id=4564');
     });
   });
 

@@ -33,7 +33,9 @@ export interface ClientSalesReport {
 }
 
 export interface ClientRetentionRow {
-  team_member_id: number;
+  team_member_id: number | null;
+  /** Stable-id resolution is explicit; duplicate or stale rows are never guessed. */
+  team_member_identity_status: 'matched' | 'unavailable' | 'ambiguous';
   team_member_name: string | null;
   position_title: string | null;
   clients_count: number;
@@ -50,7 +52,10 @@ export interface ClientRetentionReport {
   rows: ClientRetentionRow[];
   totals: Omit<
     ClientRetentionRow,
-    'team_member_id' | 'team_member_name' | 'position_title'
+    | 'team_member_id'
+    | 'team_member_identity_status'
+    | 'team_member_name'
+    | 'position_title'
   >;
   lost_threshold_days: number | null;
 }
@@ -125,7 +130,9 @@ export interface ServiceProfitabilityReport {
 }
 
 export interface TeamMemberSalesRow {
-  team_member_id: number;
+  team_member_id: number | null;
+  /** Stable-id resolution is explicit; duplicate or stale rows are never guessed. */
+  team_member_identity_status: 'matched' | 'unavailable' | 'ambiguous';
   team_member_name: string | null;
   position_title: string | null;
   revenue: number | null;
@@ -146,6 +153,7 @@ export interface TeamMemberSalesReport {
   totals: Omit<
     TeamMemberSalesRow,
     | 'team_member_id'
+    | 'team_member_identity_status'
     | 'team_member_name'
     | 'position_title'
     | 'revenue_per_worked_hour'

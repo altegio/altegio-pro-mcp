@@ -124,6 +124,11 @@ export class OnboardingHandlers {
       this.requireAuth();
 
       const { location_id } = LocationIdSchema.parse(args);
+      // `isAuthenticated` only proves that a credential is present. Resolve
+      // the requested location upstream before writing local state so an
+      // expired/invalid token, or a valid user without access to this location,
+      // cannot create or reset a checkpoint.
+      await this.client.getLocation(location_id, { my: 1 });
       const state = await this.stateManager.start(location_id);
 
       return {

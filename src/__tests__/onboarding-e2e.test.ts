@@ -18,6 +18,11 @@ describe('Onboarding E2E Flow', () => {
     // Create comprehensive mock client with all CRUD methods
     mockClient = {
       isAuthenticated: jest.fn().mockReturnValue(true),
+      getLocation: jest
+        .fn()
+        .mockImplementation((locationId: number) =>
+          Promise.resolve({ id: locationId })
+        ),
       createStaff: jest.fn(),
       createServiceCategory: jest.fn(),
       createService: jest.fn(),
