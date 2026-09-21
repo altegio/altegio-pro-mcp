@@ -6,6 +6,7 @@ import {
   Checkpoint,
 } from '../types/onboarding.types.js';
 import { logger } from '../utils/logger.js';
+import { requestPrincipalKey } from '../request-context.js';
 
 export class OnboardingStateManager {
   private baseDir: string;
@@ -21,7 +22,16 @@ export class OnboardingStateManager {
   }
 
   private getStatePath(companyId: number): string {
-    return path.join(this.baseDir, companyId.toString(), 'state.json');
+    const principal = requestPrincipalKey();
+    return principal
+      ? path.join(
+          this.baseDir,
+          'principals',
+          principal,
+          companyId.toString(),
+          'state.json'
+        )
+      : path.join(this.baseDir, companyId.toString(), 'state.json');
   }
 
   async start(companyId: number): Promise<OnboardingState> {

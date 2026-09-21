@@ -135,9 +135,21 @@ describeLive(
 
       expect(clients.rows.length).toBeLessThanOrEqual(50);
       expect(clients.rows.every((row) => !('phone' in row))).toBe(true);
-      expect(retention.rows.every((row) => row.team_member_id > 0)).toBe(true);
+      expect(
+        retention.rows.every((row) =>
+          row.team_member_identity_status === 'matched'
+            ? row.team_member_id !== null && row.team_member_id > 0
+            : row.team_member_id === null
+        )
+      ).toBe(true);
       expect(services.rows.length).toBeLessThanOrEqual(100);
-      expect(team.rows.every((row) => row.team_member_id > 0)).toBe(true);
+      expect(
+        team.rows.every((row) =>
+          row.team_member_identity_status === 'matched'
+            ? row.team_member_id !== null && row.team_member_id > 0
+            : row.team_member_id === null
+        )
+      ).toBe(true);
       expect(finance.categories.every((row) => row.category_id !== null)).toBe(
         true
       );

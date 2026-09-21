@@ -249,17 +249,15 @@ describe('token scopes gate execution, end to end', () => {
     expect(upstreamCalls).toHaveLength(1);
   });
 
-  it('imposes nothing when the grant is in a vocabulary this build cannot read', async () => {
-    // A rename upstream, or another service's names: the gate stands aside
-    // rather than refusing everything, which is the failure mode this suite
-    // exists to prevent.
+  it('fails closed when the grant is in a vocabulary this build cannot read', async () => {
     const session = await openSession('openid email profile');
     const payload = await parseSse<JsonRpcToolResult>(
       await session.call('list_locations', { my: 1, count: 1 })
     );
 
-    expect(payload.result.isError).not.toBe(true);
-    expect(upstreamCalls).toHaveLength(1);
+    expect(payload.result.isError).toBe(true);
+    expect(payload.result.content[0]!.text).toContain('locations:read');
+    expect(upstreamCalls).toHaveLength(0);
   });
 
   it('lets a caller that declares no scopes through unchanged', async () => {

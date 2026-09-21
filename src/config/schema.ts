@@ -148,7 +148,7 @@ export const EnvSchema = z.object({
 
   // HTTP deployment: require a proxy-verified delegated identity for every
   // request. Anonymous requests get no user token and cannot login.
-  REQUIRE_DELEGATED_IDENTITY: z.coerce.boolean().default(false),
+  REQUIRE_DELEGATED_IDENTITY: BooleanFlagSchema,
 
   // Serve altegio_login / altegio_logout on the HTTP views. Off by default:
   // the public endpoint authenticates through OAuth, so a tool that tells the

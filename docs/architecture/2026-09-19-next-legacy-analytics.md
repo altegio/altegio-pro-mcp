@@ -53,6 +53,12 @@ flow, client sales, retention, service contribution, team-member sales, posted
 finance and inventory turnover. Client forecast returned the live permission
 envelope and was reported as a canonical 403 instead of an XLS header error.
 
+**2026-09-20 resilience update.** Duplicate same-name/same-position team
+members are valid location data, so retention and team-member-sales rows now
+follow the group-event identity contract: a unique join is `matched`; duplicate
+matches keep `team_member_id=null` with `ambiguous`; stale or mismatched rows
+keep null with `unavailable`. Structural row damage still fails the whole report.
+
 Client reactivation is intentionally outside this legacy-report adapter. The
 public tool composes the documented client-base search and has no legacy export,
 program parameter, special environment variable or compatibility path.

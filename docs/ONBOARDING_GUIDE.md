@@ -65,7 +65,7 @@ onboarding_start({
   location_id: 123456
 })
 // Response: "Onboarding session initialized for location 123456
-//           State saved to ~/.altegio-mcp/onboarding/123456/
+//           State saved under the current principal and location
 //           Next steps: Add service categories, then staff and services"
 ```
 
@@ -409,8 +409,17 @@ Built-in handling for API rate limits (200 req/min):
 
 ### State File Location
 
+Local stdio:
+
 ```
 ~/.altegio-mcp/onboarding/{company_id}/state.json
+```
+
+HTTP deployments use a non-reversible principal key so two authenticated
+callers onboarding the same location never share checkpoints:
+
+```
+~/.altegio-mcp/onboarding/principals/{principal_key}/{company_id}/state.json
 ```
 
 **Example state file:**
@@ -439,9 +448,10 @@ Built-in handling for API rate limits (200 req/min):
 }
 ```
 
-### Multi-Location Isolation
+### Principal and Multi-Location Isolation
 
-Each location has isolated state directory, allowing parallel onboarding:
+Each authenticated principal and location has an isolated state directory,
+allowing parallel onboarding without cross-user checkpoint reads or resets:
 
 ```typescript
 // Location A onboarding
@@ -452,7 +462,7 @@ onboarding_add_staff_batch({ location_id: 111111, ... })
 onboarding_start({ location_id: 222222 })
 onboarding_add_staff_batch({ location_id: 222222, ... })
 
-// States saved separately:
+// Local stdio states are saved separately:
 // ~/.altegio-mcp/onboarding/111111/state.json
 // ~/.altegio-mcp/onboarding/222222/state.json
 ```

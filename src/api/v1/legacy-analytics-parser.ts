@@ -354,33 +354,6 @@ function normalizedIdentity(value: string | null | undefined): string {
   return cleanText(value).normalize('NFKC').toLocaleLowerCase('en-US');
 }
 
-function resolveTeamMember(
-  name: string,
-  position: string,
-  identities: readonly LegacyTeamMemberIdentity[],
-  report: string
-): number {
-  const expectedName = normalizedIdentity(name);
-  const expectedPosition = normalizedIdentity(position);
-  const named = identities.filter(
-    (item) => normalizedIdentity(item.name) === expectedName
-  );
-  const exact = named.filter(
-    (item) => normalizedIdentity(item.position_title) === expectedPosition
-  );
-  // A position printed by the report is part of the join key. Falling back to
-  // the only same-named person when that position disagrees would turn a
-  // changed/stale report row into the wrong stable id.
-  const candidates = expectedPosition ? exact : named;
-  if (candidates.length !== 1) {
-    throw new LegacyAnalyticsParseError(
-      report,
-      'a team-member row could not be matched to one stable id'
-    );
-  }
-  return candidates[0]!.id;
-}
-
 function resolveOptionalTeamMember(
   name: string,
   position: string,
@@ -432,13 +405,14 @@ export function parseClientRetentionHtml(args: {
       const position = cleanText($(row).find('td').eq(1).find('small').text());
       const [newCount, newPercent] = countAndPercent(values[3]);
       const [returningCount, returningPercent] = countAndPercent(values[4]);
+      const identity = resolveOptionalTeamMember(
+        name,
+        position,
+        args.teamMembers
+      );
       return {
-        team_member_id: resolveTeamMember(
-          name,
-          position,
-          args.teamMembers,
-          'client retention'
-        ),
+        team_member_id: identity.id,
+        team_member_identity_status: identity.status,
         team_member_name: name || null,
         position_title: position || null,
         clients_count: integer(values[2]) ?? 0,
@@ -595,13 +569,14 @@ export function parseTeamMemberSalesHtml(args: {
       const values = cells($, row);
       const name = cleanText($(row).find('td').eq(1).find('b').text());
       const position = cleanText($(row).find('td').eq(1).find('small').text());
+      const identity = resolveOptionalTeamMember(
+        name,
+        position,
+        args.teamMembers
+      );
       return {
-        team_member_id: resolveTeamMember(
-          name,
-          position,
-          args.teamMembers,
-          'team-member sales'
-        ),
+        team_member_id: identity.id,
+        team_member_identity_status: identity.status,
         team_member_name: name || null,
         position_title: position || null,
         revenue: parseLocaleNumber(values[2]),

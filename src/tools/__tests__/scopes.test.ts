@@ -151,10 +151,10 @@ describe('scopeSatisfied', () => {
 });
 
 describe('parseScopes', () => {
-  it('returns undefined when nothing is declared', () => {
+  it('returns undefined only when the header is absent', () => {
     expect(parseScopes(undefined)).toBeUndefined();
-    expect(parseScopes('')).toBeUndefined();
-    expect(parseScopes('   ')).toBeUndefined();
+    expect(parseScopes('')).toEqual(new Set());
+    expect(parseScopes('   ')).toEqual(new Set());
   });
 
   it('splits an OAuth space-delimited list', () => {
@@ -170,9 +170,8 @@ describe('parseScopes', () => {
     expect([...(parsed ?? [])]).toEqual(['clients:read']);
   });
 
-  it('treats an entirely malformed header as "not declared", not "empty"', () => {
-    // Indistinguishable from a proxy bug; refusing every call would be worse.
-    expect(parseScopes('" \\')).toBeUndefined();
+  it('treats an entirely malformed header as an empty grant', () => {
+    expect(parseScopes('" \\')).toEqual(new Set());
   });
 });
 
@@ -199,6 +198,18 @@ describe('checkToolScopes', () => {
         granted: grants('team_members:write', 'clients:read'),
       })
     ).toBeUndefined();
+  });
+
+  it('fails closed for an explicitly empty or unknown grant', () => {
+    for (const granted of [grants(), grants('future:unknown')]) {
+      expect(
+        checkToolScopes({
+          toolName: 'delete_staff',
+          required,
+          granted,
+        })
+      ).toMatchObject({ isError: true });
+    }
   });
 
   it('passes an ungated tool whatever the caller holds', () => {
@@ -404,7 +415,7 @@ describe('the platform vocabulary (mcp:pro:*)', () => {
   });
 });
 
-describe('an unrecognised vocabulary restricts nothing', () => {
+describe('an unrecognised vocabulary fails closed', () => {
   it('recognises the two vocabularies this build knows', () => {
     expect(grantIsRecognised(grants('mcp:pro:read'))).toBe(true);
     expect(grantIsRecognised(grants('clients:read'))).toBe(true);
@@ -419,10 +430,7 @@ describe('an unrecognised vocabulary restricts nothing', () => {
     expect(grantIsRecognised(grants('visits:read'))).toBe(false);
   });
 
-  it('stands aside entirely when nothing in the grant is recognised', () => {
-    // The rule the original design intended and the wrong premise broke: a
-    // vocabulary this build cannot map must never become a refusal, or any
-    // rename upstream takes the whole server down.
+  it('refuses when nothing in the grant is recognised', () => {
     for (const granted of [
       grants('openid', 'email'),
       grants('mcp:bi-data:read', 'mcp:bi-data:write'),
@@ -434,7 +442,7 @@ describe('an unrecognised vocabulary restricts nothing', () => {
           required: requiredScopesFor('delete_staff'),
           granted,
         })
-      ).toBeUndefined();
+      ).toMatchObject({ isError: true });
     }
   });
 

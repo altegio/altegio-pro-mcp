@@ -17,6 +17,7 @@ describe('Onboarding Handlers', () => {
 
     mockClient = {
       isAuthenticated: jest.fn().mockReturnValue(true),
+      getLocation: jest.fn().mockResolvedValue({ id: 123 }),
     } as any;
 
     handlers = new OnboardingHandlers(mockClient, stateManager);
@@ -35,6 +36,7 @@ describe('Onboarding Handlers', () => {
       const textContent = result.content[0]?.text;
       expect(textContent).toContain('Onboarding session started');
       expect(textContent).toContain('location 123');
+      expect(mockClient.getLocation).toHaveBeenCalledWith(123, { my: 1 });
     });
 
     it('should return error if not authenticated', async () => {
@@ -43,6 +45,14 @@ describe('Onboarding Handlers', () => {
       const result = await handlers.start({ location_id: 123 });
       expect(result.isError).toBe(true);
       expect(result.content[0]?.text).toContain('Authentication required');
+    });
+
+    it('does not create local state when upstream rejects the credential or location', async () => {
+      mockClient.getLocation.mockRejectedValueOnce(new Error('Access denied'));
+
+      const result = await handlers.start({ location_id: 123 });
+      expect(result.isError).toBe(true);
+      expect(await stateManager.load(123)).toBeNull();
     });
   });
 

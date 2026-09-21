@@ -71,6 +71,7 @@ describe('temporary legacy analytics use cases', () => {
         rows: [
           {
             team_member_id: 2,
+            team_member_identity_status: 'matched',
             team_member_name: CANARY,
             position_title: CANARY,
             clients_count: 1,
@@ -153,6 +154,7 @@ describe('temporary legacy analytics use cases', () => {
         rows: [
           {
             team_member_id: 2,
+            team_member_identity_status: 'matched',
             team_member_name: CANARY,
             position_title: CANARY,
             revenue: 10,

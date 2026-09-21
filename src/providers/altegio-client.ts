@@ -35,18 +35,17 @@ import {
 /**
  * The company (location) ID an Altegio request path targets, if any.
  *
- * Every location-scoped endpoint in this API carries the company/location ID as
- * the FIRST purely-numeric path segment, whatever the resource is named:
+ * Curated location-scoped methods supported by this client carry the
+ * company/location ID as the first purely-numeric path segment:
  * `/records/{id}`, `/staff/{id}/{staffId}`, `/company/{id}/analytics/…`,
  * `/client/{id}/{clientId}`, even the v2 `/../v2/locations/{id}/clients/{cid}/…`
- * bridge — the location ID always comes before any other id in the path. The
- * only company-less paths are `/companies` (the list, filtered separately) and
- * `/auth` (login), which carry no numeric segment and so return `undefined`.
+ * bridge. Company-less curated paths such as `/companies` and `/auth` carry no
+ * numeric segment and return `undefined`.
  *
- * This is what lets `apiRequest` confine EVERY request — curated CRUD tools, the
- * analytics and clients ports, and the universal executor all funnel through it
- * — to the declared company scope from one place. The query string is dropped
- * first so a numeric query value (e.g. `page=2`) is never mistaken for the id.
+ * The universal executor does not rely on this heuristic: its catalog metadata
+ * supplies the explicit company override, including routes whose first numeric
+ * segment is an entity id. The query string is dropped first so a numeric query
+ * value (e.g. `page=2`) is never mistaken for the id.
  */
 function companyIdFromPath(endpoint: string): number | undefined {
   const path = endpoint.split('?')[0] ?? endpoint;
@@ -217,14 +216,18 @@ export class AltegioClient {
    */
   private async apiRequest(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    scopedCompanyOverride?: number | null
   ): Promise<Response> {
     // Confine the request to the caller's declared company scope, if any. This
     // is the one choke point every upstream call funnels through — curated
     // tools, the analytics/clients ports, and the executor — so an out-of-scope
     // company is rejected here regardless of which tool asked (a no-op when no
     // scope was declared).
-    const targetCompany = companyIdFromPath(endpoint);
+    const targetCompany =
+      scopedCompanyOverride === undefined
+        ? companyIdFromPath(endpoint)
+        : (scopedCompanyOverride ?? undefined);
     if (targetCompany !== undefined) {
       assertCompanyAllowed(targetCompany);
     }
@@ -538,9 +541,9 @@ export class AltegioClient {
     if (params?.my === 1 && declaredCompanyIds) {
       // A UC2 application's technical user can successfully access a declared
       // location directly while `/companies?my=1` still returns an empty list.
-      // The declaration is already the authoritative isolation boundary, so
-      // resolve only those exact IDs through the documented single-location
-      // read instead of trusting an unrelated account-enumeration result.
+      // The trusted proxy has already bound this request to the declared
+      // location set. Resolve only those exact IDs through the documented
+      // single-location read instead of trusting an unrelated account listing.
       const ids = [...declaredCompanyIds];
       const page = params.page ?? 1;
       const count = params.count ?? ids.length;
@@ -1387,7 +1390,8 @@ export class AltegioClient {
   async request<T = unknown>(
     method: 'GET',
     path: string,
-    query?: Record<string, string | number | boolean>
+    query?: Record<string, string | number | boolean>,
+    scopedCompanyOverride?: number | null
   ): Promise<{ data: T; meta?: Record<string, unknown> }> {
     this.requireAuth();
 
@@ -1401,7 +1405,11 @@ export class AltegioClient {
       (queryString ? `?${queryString}` : '');
     const context = `call ${method} ${path}`;
 
-    const response = await this.apiRequest(endpoint, { method });
+    const response = await this.apiRequest(
+      endpoint,
+      { method },
+      scopedCompanyOverride
+    );
     if (!response.ok) {
       await this.throwApiError(response, context);
     }

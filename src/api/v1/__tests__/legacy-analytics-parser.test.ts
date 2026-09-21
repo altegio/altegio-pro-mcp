@@ -227,29 +227,33 @@ describe('HTML reports', () => {
     ).toThrow(/markup may have changed/);
   });
 
-  it('rejects ambiguous team-member identity instead of guessing', () => {
-    expect(() =>
-      parseClientRetentionHtml({
-        html: fixture('client-retention-ru.html'),
-        count: 1,
-        teamMembers: [
-          { id: 1, name: 'Иван Петров', position_title: 'Стилист' },
-          { id: 2, name: 'Иван Петров', position_title: 'Стилист' },
-        ],
-      })
-    ).toThrow(/stable id/);
+  it('keeps ambiguous team-member rows without guessing an id', () => {
+    const report = parseClientRetentionHtml({
+      html: fixture('client-retention-ru.html'),
+      count: 1,
+      teamMembers: [
+        { id: 1, name: 'Иван Петров', position_title: 'Стилист' },
+        { id: 2, name: 'Иван Петров', position_title: 'Стилист' },
+      ],
+    });
+    expect(report.rows[0]).toMatchObject({
+      team_member_id: null,
+      team_member_identity_status: 'ambiguous',
+    });
   });
 
-  it('rejects a position mismatch and partial team-member rows', () => {
-    expect(() =>
-      parseClientRetentionHtml({
-        html: fixture('client-retention-ru.html'),
-        count: 1,
-        teamMembers: [
-          { id: 1, name: 'Иван Петров', position_title: 'Administrator' },
-        ],
-      })
-    ).toThrow(/stable id/);
+  it('marks a position mismatch unavailable and still rejects partial rows', () => {
+    const report = parseClientRetentionHtml({
+      html: fixture('client-retention-ru.html'),
+      count: 1,
+      teamMembers: [
+        { id: 1, name: 'Иван Петров', position_title: 'Administrator' },
+      ],
+    });
+    expect(report.rows[0]).toMatchObject({
+      team_member_id: null,
+      team_member_identity_status: 'unavailable',
+    });
 
     expect(() =>
       parseTeamMemberSalesHtml({
@@ -259,6 +263,23 @@ describe('HTML reports', () => {
         teamMembers: [],
       })
     ).toThrow(/partial team-member row/);
+  });
+
+  it('keeps ambiguous team-member sales rows without guessing an id', () => {
+    const report = parseTeamMemberSalesHtml({
+      html: fixture('team-member-sales-en.html'),
+      count: 1,
+      currency: 'USD',
+      teamMembers: [
+        { id: 1, name: 'Sam Smith', position_title: 'Barber' },
+        { id: 2, name: 'Sam Smith', position_title: 'Barber' },
+      ],
+    });
+    expect(report.rows[0]).toMatchObject({
+      team_member_id: null,
+      team_member_identity_status: 'ambiguous',
+      revenue: 2000,
+    });
   });
 });
 
