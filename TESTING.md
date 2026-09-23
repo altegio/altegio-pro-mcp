@@ -180,12 +180,11 @@ print('Done!')
 After deployment to the VM (see [CI-CD.md](CI-CD.md)).
 
 > **The staff lane is OAuth-protected.** Every request to
-> `https://mcp.alteg.io/pro/mcp…` or `https://mcp.altegio.dev/pro/…` — including
-> the health check — needs an `Authorization: Bearer <token>` header with a token
-> carrying the `mcp:pro:read` scope; without it the endpoint returns
-> `401 invalid_token`. The short `https://mcp.alteg.io/pro…` addresses are the
-> customer lane: they take an Altegio sign-in and refuse a staff bearer.
-> Export one first:
+> `https://mcp.altegio.dev/pro/…` — including the health check — needs an
+> `Authorization: Bearer <token>` header with a token carrying the
+> `mcp:pro:read` scope; without it the endpoint returns `401 invalid_token`.
+> The short `https://mcp.alteg.io/pro…` addresses are the customer lane: they
+> take an Altegio sign-in and refuse a staff bearer. Export one first:
 >
 > ```bash
 > export MCP_TOKEN="<your mcp:pro:read bearer>"
@@ -197,7 +196,7 @@ curl https://mcp.altegio.dev/pro/health \
   -H "Authorization: Bearer $MCP_TOKEN"
 
 # MCP Streamable HTTP — initialize a session
-curl -s -X POST https://mcp.alteg.io/pro/mcp \
+curl -s -X POST https://mcp.altegio.dev/pro/mcp \
   -H "Authorization: Bearer $MCP_TOKEN" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
