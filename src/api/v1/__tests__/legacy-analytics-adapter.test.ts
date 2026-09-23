@@ -5,6 +5,7 @@ import type {
   AltegioClient,
   LegacyWebRequest,
 } from '../../../providers/altegio-client.js';
+import { AltegioApiError } from '../../../utils/errors.js';
 import { V1LegacyAnalyticsAdapter } from '../legacy-analytics-adapter.js';
 
 const FIXTURES = join(__dirname, 'fixtures/legacy-analytics');
@@ -406,6 +407,93 @@ describe('next temporary report adapter contracts', () => {
       ).rejects.not.toThrow('user_hash');
     }
   );
+});
+describe('ERP refusal envelope on search reports', () => {
+  const refusal = (status_code: number): Response =>
+    new Response(
+      JSON.stringify({
+        success: false,
+        data: null,
+        meta: { message: 'Insufficient rights', status_code },
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } }
+    );
+  const period = { ...nextPeriod, page: 1, page_size: 50 };
+  const reports: [
+    string,
+    string,
+    (adapter: V1LegacyAnalyticsAdapter) => Promise<unknown>,
+  ][] = [
+    [
+      'service profitability',
+      '/analytics_services/services_search/4564/',
+      (adapter) =>
+        adapter.getServiceProfitability({ ...period, group_by: 'service' }),
+    ],
+    [
+      'client sales',
+      '/analytics_clients/clients_search/4564/',
+      (adapter) =>
+        adapter.getClientSales({ ...period, include_contacts: false }),
+    ],
+    [
+      'product sales',
+      '/storages/sales_analysis/search/4564/',
+      (adapter) => adapter.getProductSales({ ...period, group_by: 'product' }),
+    ],
+  ];
+
+  it.each(reports)(
+    'surfaces insufficient rights on %s as a 403 access error',
+    async (report, path, call) => {
+      const { client, requests } = fakeClient([refusal(403)]);
+      const error = await call(new V1LegacyAnalyticsAdapter(client)).then(
+        () => null,
+        (e: unknown) => e
+      );
+      expect(requests[0]?.path).toBe(path);
+      expect(error).toBeInstanceOf(AltegioApiError);
+      expect(error).toMatchObject({ statusCode: 403 });
+      expect((error as Error).message).toBe(
+        `Access to the ${report} report is denied for the current Altegio user. Ask a location owner to grant the required analytics permission.`
+      );
+      expect((error as Error).message).not.toMatch(
+        /unexpected structure|retry|Insufficient rights/i
+      );
+    }
+  );
+
+  it.each(reports)(
+    'surfaces a 401 refusal on %s as rejected authentication',
+    async (_report, _path, call) => {
+      const { client } = fakeClient([refusal(401)]);
+      await expect(
+        call(new V1LegacyAnalyticsAdapter(client))
+      ).rejects.toMatchObject({
+        statusCode: 401,
+        message: expect.stringMatching(/authentication was not accepted/),
+      });
+    }
+  );
+
+  it('surfaces the refusal on cash flow ahead of its legacy error shape', async () => {
+    const { client } = fakeClient([refusal(403)]);
+    await expect(
+      new V1LegacyAnalyticsAdapter(client).getCashFlowBreakdown(nextPeriod)
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it('surfaces a 401 refusal instead of a workbook', async () => {
+    const { client } = fakeClient([refusal(401)]);
+    await expect(
+      new V1LegacyAnalyticsAdapter(client).getClientForecast({
+        location_id: 4564,
+        page: 1,
+        page_size: 50,
+        include_contacts: false,
+      })
+    ).rejects.toMatchObject({ statusCode: 401 });
+  });
 });
 it('recognizes the cash-flow permission envelope without reflecting source diagnostics', async () => {
   const { client } = fakeClient([

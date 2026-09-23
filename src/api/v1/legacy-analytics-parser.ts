@@ -123,6 +123,26 @@ export interface SearchEnvelope {
   count: number;
 }
 
+/**
+ * The ERP answers a refused legacy report with HTTP 200 and
+ * `{success: false, data: null, meta: {message, status_code}}` — e.g. an
+ * application system user without the report right gets
+ * `{"message": "Insufficient rights", "status_code": 403}`. Returns the
+ * refusal status (401 or 403) so the transport can surface an access error
+ * instead of a structural one; `null` for anything else. The message is never
+ * read: it is source diagnostics, not a contract.
+ */
+export function legacyEnvelopeDenial(value: unknown): 401 | 403 | null {
+  if (!value || typeof value !== 'object') return null;
+  const envelope = value as { success?: unknown; meta?: unknown };
+  if (envelope.success !== false) return null;
+  if (!envelope.meta || typeof envelope.meta !== 'object') return null;
+  const status = Number(
+    (envelope.meta as { status_code?: unknown }).status_code
+  );
+  return status === 401 || status === 403 ? status : null;
+}
+
 export function parseSearchEnvelope(
   body: string,
   report: string

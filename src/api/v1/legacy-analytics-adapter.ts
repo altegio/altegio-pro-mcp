@@ -36,6 +36,7 @@ import {
   parseTeamMemberSalesHtml,
   parseProfitAndLossHtml,
   parseInventoryTurnoverHtml,
+  legacyEnvelopeDenial,
 } from './legacy-analytics-parser.js';
 
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
@@ -114,11 +115,23 @@ async function readBounded(
   return bytes;
 }
 
+const AUTHENTICATION_REJECTED =
+  'The delegated Altegio authentication was not accepted by the legacy analytics report. Refresh it and retry.';
+
 function assertAuthenticatedBody(body: string): void {
   if (body.trim() === 'Need Auth') {
+    throw new AltegioApiError(AUTHENTICATION_REJECTED, 401);
+  }
+}
+
+/** Surface the ERP's `success:false` 401/403 envelope as an access error. */
+function assertPermittedEnvelope(envelope: unknown, report: string): void {
+  const denial = legacyEnvelopeDenial(envelope);
+  if (denial === 401) throw new AltegioApiError(AUTHENTICATION_REJECTED, 401);
+  if (denial === 403) {
     throw new AltegioApiError(
-      'The delegated Altegio authentication was not accepted by the legacy analytics report. Refresh it and retry.',
-      401
+      `Access to the ${report} report is denied for the current Altegio user. Ask a location owner to grant the required analytics permission.`,
+      403
     );
   }
 }
@@ -134,13 +147,14 @@ async function readSearchEnvelope(
     await readBounded(response, MAX_HTML_BYTES, report)
   );
   assertAuthenticatedBody(body);
+  let envelope: unknown;
+  try {
+    envelope = JSON.parse(body);
+  } catch {
+    /* The structural parser reports malformed JSON below. */
+  }
+  assertPermittedEnvelope(envelope, report);
   if (permissionErrorEnvelope) {
-    let envelope: unknown;
-    try {
-      envelope = JSON.parse(body);
-    } catch {
-      /* The structural parser reports malformed JSON below. */
-    }
     if (
       envelope &&
       typeof envelope === 'object' &&
@@ -189,16 +203,7 @@ async function readWorkbook(
         502
       );
     }
-    const value = envelope as {
-      success?: unknown;
-      meta?: { status_code?: unknown };
-    };
-    if (value.success === false && Number(value.meta?.status_code) === 403) {
-      throw new AltegioApiError(
-        `Access to the ${report} report is denied for the current Altegio user. Ask a location owner to grant the required analytics permission.`,
-        403
-      );
-    }
+    assertPermittedEnvelope(envelope, report);
     throw new AltegioApiError(
       `The temporary ${report} report rejected the export request.`,
       502
