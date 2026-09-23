@@ -6,6 +6,7 @@ import {
   parseClientForecastWorkbook,
   parseClientRetentionHtml,
   parseClientSalesHtml,
+  legacyEnvelopeDenial,
   parseLocaleNumber,
   parseSearchEnvelope,
   parseServiceProfitabilityHtml,
@@ -48,6 +49,49 @@ describe('legacy search envelope', () => {
       );
     }
   );
+});
+
+describe('legacy refusal envelope', () => {
+  // Verbatim ERP answer (HTTP 200) to the marketplace system-user token on
+  // services_search, clients_search and sales_analysis/search for 4564.
+  const INSUFFICIENT_RIGHTS = {
+    success: false,
+    data: null,
+    meta: { message: 'Insufficient rights', status_code: 403 },
+  };
+
+  it('recognizes the exact insufficient-rights envelope as a 403', () => {
+    expect(legacyEnvelopeDenial(INSUFFICIENT_RIGHTS)).toBe(403);
+    expect(
+      legacyEnvelopeDenial(JSON.parse(JSON.stringify(INSUFFICIENT_RIGHTS)))
+    ).toBe(403);
+  });
+
+  it.each([
+    [{ ...INSUFFICIENT_RIGHTS, meta: { status_code: 401 } }, 401],
+    [{ ...INSUFFICIENT_RIGHTS, meta: { status_code: '403' } }, 403],
+  ])('recognizes a refusal status %j', (envelope, status) => {
+    expect(legacyEnvelopeDenial(envelope)).toBe(status);
+  });
+
+  it.each([
+    [{ success: true, content: '<table/>', count: 0 }],
+    [{ ...INSUFFICIENT_RIGHTS, success: true }],
+    [{ ...INSUFFICIENT_RIGHTS, meta: { status_code: 422 } }],
+    [{ ...INSUFFICIENT_RIGHTS, meta: null }],
+    [{ success: false }],
+    [{ error: 'user_hash=secret' }],
+    [null],
+    ['Insufficient rights'],
+  ])('leaves a non-refusal to the structural parser: %j', (envelope) => {
+    expect(legacyEnvelopeDenial(envelope)).toBeNull();
+  });
+
+  it('is still a structural failure for the search parser alone', () => {
+    expect(() =>
+      parseSearchEnvelope(JSON.stringify(INSUFFICIENT_RIGHTS), 'test')
+    ).toThrow(LegacyAnalyticsParseError);
+  });
 });
 
 describe('HTML reports', () => {
