@@ -508,7 +508,7 @@ describe('the read-only view', () => {
   });
 
   describe('the refusal a writing tool gets here', () => {
-    const base = 'https://mcp.alteg.io/public/pro';
+    const base = 'https://mcp.alteg.io/pro';
     const message = readOnlyRefusalMessage('delete_staff', base);
 
     it('names the tool and the full address of the complete surface', () => {
@@ -516,16 +516,22 @@ describe('the read-only view', () => {
       expect(message).toContain(viewUrl(base, READONLY_VIEW));
       expect(message).toContain(viewUrl(base, DEFAULT_FACET));
       expect(viewUrl(base, READONLY_VIEW)).toBe(
-        'https://mcp.alteg.io/public/pro/mcp/readonly'
+        'https://mcp.alteg.io/pro/readonly'
       );
-      expect(viewUrl(base, DEFAULT_FACET)).toBe(
-        'https://mcp.alteg.io/public/pro/mcp'
+      expect(viewUrl(base, DEFAULT_FACET)).toBe('https://mcp.alteg.io/pro');
+    });
+
+    it('keeps a /mcp segment the base already carries (internal lane)', () => {
+      const internal = 'https://mcp.altegio.dev/pro/mcp';
+      expect(viewUrl(internal, READONLY_VIEW)).toBe(
+        'https://mcp.altegio.dev/pro/mcp/readonly'
       );
+      expect(viewUrl(internal, DEFAULT_FACET)).toBe(internal);
     });
 
     it('tolerates a base URL with a trailing slash', () => {
       expect(viewUrl('https://example.test/pro/', DEFAULT_FACET)).toBe(
-        'https://example.test/pro/mcp'
+        'https://example.test/pro'
       );
     });
 

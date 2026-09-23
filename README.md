@@ -273,9 +273,10 @@ Rules:
   available facets.
 - **stdio exposes everything** — `src/index.ts` uses the unfiltered `all` view,
   which has no HTTP route. Facets are an HTTP concern only.
-- Public client-facing paths are `https://mcp.alteg.io/public/pro/mcp` and
-  `https://mcp.alteg.io/public/pro/mcp/<facet>`. The internal delegated route
-  remains under `/pro/mcp`.
+- Customer addresses are `https://mcp.alteg.io/pro` and
+  `https://mcp.alteg.io/pro/<facet>` — the proxy maps them onto `/mcp` and
+  `/mcp/<facet>`. The earlier `https://mcp.alteg.io/public/pro/mcp…` forms
+  still work as aliases. Staff use `https://mcp.altegio.dev/pro/mcp…`.
 
 Set `MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING=true` to drop the onboarding
 walkthrough from `/mcp` and serve it only on `/mcp/onboarding`. It is off by
@@ -291,7 +292,7 @@ variable says.
 ## The read-only address (`/mcp/readonly`)
 
 ```
-https://mcp.alteg.io/public/pro/mcp/readonly
+https://mcp.alteg.io/pro/readonly
 ```
 
 The same server, the same credential, the same protocol — a surface that only
@@ -670,11 +671,11 @@ The MCP endpoint is available at `http://localhost:8080/mcp` (Streamable HTTP tr
 
 Automatic deployment to `mcp-servers` VM on PR merge to `main`. A cron job pulls latest `main` every 2 minutes and rebuilds if changed.
 
-Public endpoint: `https://mcp.alteg.io/public/pro/mcp`
+Public endpoint: `https://mcp.alteg.io/pro`
 
 Users authorize with their own Altegio account during connection. For richer
 product answers, add the public Knowledge MCP alongside it:
-`https://mcp.alteg.io/public/knowledge/mcp`.
+`https://mcp.alteg.io/knowledge`.
 
 See [CI-CD.md](CI-CD.md) for details.
 
@@ -691,7 +692,7 @@ See [CI-CD.md](CI-CD.md) for details.
 | `ALTEGIO_EXPOSE_PASSWORD_LOGIN` | No | `false` | HTTP mode: serve `altegio_login`/`altegio_logout`. Closed staff deployments only — never the public endpoint. stdio always serves them |
 | `MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING` | No | `false` | Drop `onboarding_*` from the default `/mcp` facet |
 | `MCP_SERVER_INSTRUCTIONS` | No | built-in | Override the `initialize` instructions paragraph |
-| `MCP_PUBLIC_BASE_URL` | No | `https://mcp.alteg.io/public/pro` | Public prefix this deployment answers on; only used to name addresses in the read-only view's refusal and instructions |
+| `MCP_PUBLIC_BASE_URL` | No | `https://mcp.alteg.io/pro` | Public address of the complete surface; views are this plus `/<view>` (`/readonly`, `/ops`, …). Only used to name addresses in text a model reads: instructions, the read-only refusal and the out-of-facet hint. Behind a proxy that keeps `/mcp`, set e.g. `https://mcp.altegio.dev/pro/mcp` |
 | `ALTEGIO_DOCS_DIR` | No | `<pkg>/docs` | Where the `altegio://docs/*` markdown documents are read from |
 | `LOG_LEVEL` | No | `info` | `debug\|info\|warn\|error` |
 | `NODE_ENV` | No | `development` | `development\|production` |
@@ -704,11 +705,11 @@ How the user token behind `altegio_login` is stored depends on the transport:
 - **stdio (Claude Desktop, `npm start`) — single user.** `altegio_login` writes
   one token to `<CREDENTIALS_DIR>/credentials.json` and every tool call uses it.
   This is unchanged from previous releases.
-- **Public HTTP (`mcp.alteg.io/public/pro`) — Altegio OAuth.** The platform
+- **Public HTTP (`mcp.alteg.io/pro`, formerly `/public/pro`) — Altegio OAuth.** The platform
   authorizes the user with their own Altegio account and forwards only that
   user's delegated token and allowed location scope. No `altegio_login` call or
   server-side password storage is involved.
-- **Internal HTTP (`mcp.alteg.io/pro`) — per delegated identity.** The deployment sits
+- **Internal HTTP (`mcp.altegio.dev/pro/mcp`) — per delegated identity.** The deployment sits
   behind the platform's OAuth 2.1 proxy, which forwards the verified caller as
   `x-mcp-auth-*` headers. Each request acts strictly as *its own* identity: the
   token from `altegio_login` is stored per identity

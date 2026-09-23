@@ -499,16 +499,13 @@ export function buildFacetIndex(
   };
 }
 
-/** MCP sub-path of a view, appended to a deployment's public base URL. */
-function viewPath(view: typeof DEFAULT_FACET | typeof READONLY_VIEW): string {
-  return view === DEFAULT_FACET ? '/mcp' : `/mcp/${view}`;
+/** Sub-path of a view, appended to the public address of the complete surface. */
+function viewPath(view: FacetKey): string {
+  return view === DEFAULT_FACET ? '' : `/${view}`;
 }
 
-/** Absolute address of a view, from the deployment's public base URL. */
-export function viewUrl(
-  publicBaseUrl: string,
-  view: typeof DEFAULT_FACET | typeof READONLY_VIEW
-): string {
+/** Absolute address of a view, from the public address of the complete surface. */
+export function viewUrl(publicBaseUrl: string, view: FacetKey): string {
   return `${publicBaseUrl.replace(/\/+$/, '')}${viewPath(view)}`;
 }
 

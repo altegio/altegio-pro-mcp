@@ -15,6 +15,7 @@ import {
   buildFacetIndex,
   facetToolsFromSpecs,
   readOnlyRefusalMessage,
+  viewUrl,
   DEFAULT_FACET,
   READONLY_VIEW,
   type FacetKey,
@@ -88,13 +89,17 @@ function outOfFacetError(
     );
   }
 
+  // Absolute addresses: a relative /mcp/<view> is wrong on the short customer
+  // address, where /pro/mcp/… is the internal lane.
   const elsewhere = index.facetsProviding(name);
   const paths = [
-    ...elsewhere.map((f) => `/mcp/${f}`),
-    // Only offer /mcp when /mcp actually serves it: a tool withheld from the
-    // default view (access management, password login) must not be advertised
-    // back to the caller as available one path up.
-    ...(index.includes(DEFAULT_FACET, name) ? ['/mcp'] : []),
+    ...elsewhere.map((f) => viewUrl(publicBaseUrl, f)),
+    // Only offer the complete surface when it actually serves the tool: a tool
+    // withheld from the default view (access management, password login) must
+    // not be advertised back to the caller as available one path up.
+    ...(index.includes(DEFAULT_FACET, name)
+      ? [viewUrl(publicBaseUrl, DEFAULT_FACET)]
+      : []),
   ];
   const where =
     paths.length > 0

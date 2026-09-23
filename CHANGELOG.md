@@ -6,6 +6,20 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — addresses named to models use the short customer form
+
+`MCP_PUBLIC_BASE_URL` is now the public address of the complete surface and
+defaults to `https://mcp.alteg.io/pro`; every other view is that address plus
+`/<view>`. The read-only instructions and refusal therefore name
+`https://mcp.alteg.io/pro/readonly` and `https://mcp.alteg.io/pro` instead of
+the `/public/pro/mcp…` aliases. The out-of-facet error names absolute view
+addresses (`https://mcp.alteg.io/pro/catalog`) rather than `/mcp/<view>`, and
+the server instructions describe the narrower views as this server's address
+plus `/ops`, `/catalog`, … — a relative `/mcp/<view>` pointed customers at
+`/pro/mcp/…`, which is the staff lane on the customer domain. A deployment
+behind a proxy that keeps `/mcp` sets the base to e.g.
+`https://mcp.altegio.dev/pro/mcp`.
+
 ### Fixed — authorization boundaries and legacy team-member identity
 
 The universal read executor now resolves location scope from catalog parameter

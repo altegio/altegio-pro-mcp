@@ -128,7 +128,7 @@ describe('Configuration Schema', () => {
     it('defaults to the published public endpoint', () => {
       const result = EnvSchema.parse({ ALTEGIO_API_TOKEN: 'test-token' });
       expect(result.MCP_PUBLIC_BASE_URL).toBe(DEFAULT_PUBLIC_BASE_URL);
-      expect(DEFAULT_PUBLIC_BASE_URL).toBe('https://mcp.alteg.io/public/pro');
+      expect(DEFAULT_PUBLIC_BASE_URL).toBe('https://mcp.alteg.io/pro');
     });
 
     it('accepts an override and strips a trailing slash', () => {
@@ -150,8 +150,8 @@ describe('Configuration Schema', () => {
 
     it('is what the read-only instructions name', () => {
       const text = readOnlyViewInstructions('https://mcp.alteg.io/pro');
-      expect(text).toContain('https://mcp.alteg.io/pro/mcp/readonly');
-      expect(text).toContain('https://mcp.alteg.io/pro/mcp,');
+      expect(text).toContain('https://mcp.alteg.io/pro/readonly');
+      expect(text).toContain('https://mcp.alteg.io/pro,');
     });
   });
 
