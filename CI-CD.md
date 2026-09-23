@@ -5,7 +5,8 @@
 ```
 PR merged to main → VM cron (2 min) → git pull → docker compose rebuild
 VM: mcp-servers (10.132.0.3, europe-west1-b, e2-small)
-Proxy: mcp-proxy (Cloud Run) → mcp.alteg.io
+Proxy: mcp-proxy (Cloud Run) → mcp.alteg.io (customers)
+       mcp-proxy-internal (Cloud Run) → mcp.altegio.dev (staff)
 ```
 
 ### Production Endpoints
@@ -14,13 +15,14 @@ Proxy: mcp-proxy (Cloud Run) → mcp.alteg.io
 |---------|---------|------------|
 | altegio-pro-mcp (customers, Altegio sign-in) | 3000 | `https://mcp.alteg.io/pro` |
 | altegio-pro-mcp (customer views) | 3000 | `https://mcp.alteg.io/pro/<facet>`, `https://mcp.alteg.io/pro/readonly` |
-| altegio-pro-mcp (staff, Google sign-in) | 3000 | `https://mcp.alteg.io/pro/mcp`, `https://mcp.alteg.io/pro/mcp/<facet>` |
-| bi-data | 8080 | `https://mcp.alteg.io/bi-data/mcp` |
+| altegio-pro-mcp (staff, Google sign-in) | 3000 | `https://mcp.altegio.dev/pro/mcp`, `https://mcp.altegio.dev/pro/mcp/<facet>` |
+| bi-data (staff) | 8080 | `https://mcp.altegio.dev/bi-data/mcp` |
 
 The customer addresses are canonical. `https://mcp.alteg.io/public/pro/mcp…`
-still works as an alias of them. The `/pro/mcp…` forms on `mcp.alteg.io` are
-the staff lane, which is moving to `https://mcp.altegio.dev/pro/mcp`; never
-rewrite a customer `/public/pro/mcp` address to `/pro/mcp`.
+still works as an alias of them. Staff routes live on `mcp.altegio.dev`; their
+old `mcp.alteg.io/pro/mcp…` and `mcp.alteg.io/bi-data/…` forms stop answering at
+the domain cut on 2026-09-28. Never rewrite a customer `/public/pro/mcp` address
+to `https://mcp.alteg.io/pro/mcp`.
 
 ## Quick Start
 
@@ -66,21 +68,22 @@ gh pr merge --merge
 
 ### 3. Proxy (Cloud Run)
 
-**Service:** `mcp-proxy` on Cloud Run (`mcp.alteg.io`)
+**Services:** `mcp-proxy` on Cloud Run (`mcp.alteg.io`, customers) and
+`mcp-proxy-internal` (`mcp.altegio.dev`, staff). Both route to the VM internal
+IP:
+- `mcp.alteg.io/pro`, `/pro/<facet>`, `/pro/readonly` → Altegio sign-in (OAuth
+  or the caller's own Altegio user token) → `10.132.0.3:3000`, mapped onto
+  `/mcp`, `/mcp/<facet>` and `/mcp/readonly`. `/public/pro/…` is a kept alias of
+  this lane, forwarded with `/public/pro` stripped.
+- `mcp.altegio.dev/pro/*` → Google sign-in or a machine token (staff lane) →
+  the same backend, `/pro` stripped.
+- `mcp.altegio.dev/bi-data/*` → `10.132.0.3:8080`
 
-Routes external traffic to VM internal IP. On `mcp.alteg.io` the `/mcp`
-segment decides the lane:
-- `/pro`, `/pro/<facet>`, `/pro/readonly` → Altegio sign-in (OAuth or the
-  caller's own Altegio user token) → `10.132.0.3:3000`, mapped onto `/mcp`,
-  `/mcp/<facet>` and `/mcp/readonly`. `/public/pro/…` is a kept alias of this
-  lane, forwarded with `/public/pro` stripped.
-- `/pro/mcp…` → Google sign-in or a machine token (staff lane) → the same
-  backend, `/pro` stripped. Staff are moving to `mcp.altegio.dev/pro/…`, which
-  serves the same backend.
-- `/bi-data/*` → `10.132.0.3:8080`
+Until the cut on 2026-09-28 `mcp.alteg.io` also still answers the staff forms
+(`/pro/mcp…`, `/bi-data/*`); the `/mcp` segment tells the two Pro lanes apart.
 
 **Facets need no proxy change.** A customer `https://mcp.alteg.io/pro/<facet>`
-and a staff `https://mcp.alteg.io/pro/mcp/<facet>` both arrive at the service
+and a staff `https://mcp.altegio.dev/pro/mcp/<facet>` both arrive at the service
 as `/mcp/<facet>`, which the app already serves (see
 [README → Facets](README.md#facets)). Adding or removing a facet is a change in
 this repository only — no route, audience or scope in
@@ -114,7 +117,7 @@ gcloud compute ssh mcp-servers --project=altegio-mcp --zone=europe-west1-b --tun
 PROBE_TOKEN=$(gcloud secrets versions access latest \
   --secret=MACHINE_TOKEN_smoke-probe --project=altegio-mcp)
 curl -H "Authorization: Bearer $PROBE_TOKEN" https://mcp.altegio.dev/pro/health
-curl -H "Authorization: Bearer $PROBE_TOKEN" https://mcp.alteg.io/bi-data/health
+curl -H "Authorization: Bearer $PROBE_TOKEN" https://mcp.altegio.dev/bi-data/health
 # Not https://mcp.alteg.io/pro/health: that is the customer lane now. It wants
 # an Altegio sign-in and lands under /mcp, so it never reaches /health.
 
