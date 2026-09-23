@@ -150,7 +150,7 @@ describe('the read-only view', () => {
         arguments: { location_id: 1, staff_id: 2 },
       })
     ).rejects.toThrow(
-      /delete_staff.*read operations only.*https:\/\/[^\s]+\/mcp\b/s
+      /delete_staff.*read operations only.*https:\/\/mcp\.alteg\.io\/pro\b/s
     );
     await expect(
       client.callTool({
@@ -203,7 +203,9 @@ describe('tools/call outside the facet', () => {
     const client = await connect('ops');
     await expect(
       client.callTool({ name: 'get_staff', arguments: { location_id: 1 } })
-    ).rejects.toThrow(/not served by the "ops" view.*\/mcp\/catalog/s);
+    ).rejects.toThrow(
+      /not served by the "ops" view.*https:\/\/mcp\.alteg\.io\/pro\/catalog/s
+    );
     await client.close();
   });
 
@@ -230,7 +232,9 @@ describe('tools/call outside the facet', () => {
         name: 'remove_location_user',
         arguments: { location_id: 1, user_id: 2, confirm_user_id: 2 },
       })
-    ).rejects.toThrow(/not served by the "default" view.*\/mcp\/catalog/s);
+    ).rejects.toThrow(
+      /not served by the "default" view.*https:\/\/mcp\.alteg\.io\/pro\/catalog/s
+    );
     await client.close();
   });
 
@@ -271,8 +275,12 @@ describe('server instructions', () => {
 
     expect(instructions).toContain('Altegio Pro');
     expect(instructions).toContain('altegio_login');
-    expect(instructions).toContain('/mcp/analytics');
-    expect(instructions).toContain('/mcp/onboarding');
+    // Views are named relative to the server's own address, so the text is
+    // right on the short customer address and on the internal /mcp lane.
+    expect(instructions).toContain('same address plus');
+    expect(instructions).toContain('/analytics and');
+    expect(instructions).toContain('/onboarding for hosts');
+    expect(instructions).not.toContain('/mcp/');
     // The report builder is withheld until the backend works, so the
     // instructions must not point at it (src/tools/disabled-tools.ts).
     expect(instructions).toContain('no ad-hoc report builder');

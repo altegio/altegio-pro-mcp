@@ -12,14 +12,16 @@ import {
 import { DEFAULT_FACET, READONLY_VIEW, viewUrl } from '../tools/facets.js';
 
 /**
- * Public base URL this deployment is reached at — the prefix the platform proxy
- * serves this server under, without a trailing slash. It is only ever used to
- * name an address in text a model reads: the read-only view's refusal and its
- * `initialize` instructions. Override with `MCP_PUBLIC_BASE_URL` when the
- * deployment sits behind another prefix (the internal delegated lane is
- * `https://mcp.alteg.io/pro`).
+ * Public address of the complete surface — the URL a customer pastes, without a
+ * trailing slash. Every other view is this address plus `/<view>`
+ * (`/readonly`, `/ops`, …), which is how the platform proxy maps its short
+ * customer addresses onto this server's `/mcp` and `/mcp/<view>`. It is only
+ * ever used to name an address in text a model reads: the read-only view's
+ * refusal and its `initialize` instructions. Override with
+ * `MCP_PUBLIC_BASE_URL` behind a proxy that keeps the `/mcp` segment (the
+ * internal lane is `https://mcp.altegio.dev/pro/mcp`).
  */
-export const DEFAULT_PUBLIC_BASE_URL = 'https://mcp.alteg.io/public/pro';
+export const DEFAULT_PUBLIC_BASE_URL = 'https://mcp.alteg.io/pro';
 export const DEFAULT_LEGACY_WEB_BASE = 'https://app.alteg.io';
 
 /**
@@ -43,11 +45,11 @@ export const DEFAULT_SERVER_INSTRUCTIONS = [
   'report — there is no ad-hoc report builder), location settings,',
   'resources, and a guided onboarding walkthrough. Use the delegated Altegio identity or direct user token already',
   'provided by the host; in local stdio mode call altegio_login if needed. Then',
-  'call list_locations for a location_id. The default /mcp endpoint serves the',
+  'call list_locations for a location_id. This server’s address serves the',
   'general surface plus analytics entry points; the complete analytics pack and',
-  'other narrower static views live',
-  'on /mcp/ops, /mcp/catalog, /mcp/finance, /mcp/marketing, /mcp/analytics and',
-  '/mcp/onboarding for hosts that cap active tools. The universal operation',
+  'other narrower static views live at the same address plus',
+  '/ops, /catalog, /finance, /marketing, /analytics and',
+  '/onboarding for hosts that cap active tools. The universal operation',
   'executor searches, describes and calls documented read operations. Read',
   'altegio://docs/product-logic, altegio://docs/glossary and',
   'altegio://docs/clients-segmentation for the product model, vocabulary and client',
@@ -128,8 +130,9 @@ export const EnvSchema = z.object({
   // Override the `initialize` instructions paragraph without a rebuild.
   MCP_SERVER_INSTRUCTIONS: z.string().min(1).optional(),
 
-  // Public base URL this deployment answers on, used only to name the complete
-  // surface and the read-only address in text the model reads.
+  // Public address of the complete surface (views append /<view>), used only
+  // to name the complete surface and the read-only address in text the model
+  // reads.
   MCP_PUBLIC_BASE_URL: z
     .string()
     .url()
