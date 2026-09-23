@@ -115,7 +115,7 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 
 **Transports:**
 - **stdio** (default) → `dist/index.js` → Claude Desktop integration
-- **HTTP** → `dist/http-server.js` → Production on VM (port 3000), public via `https://mcp.alteg.io/pro/mcp`
+- **HTTP** → `dist/http-server.js` → Production on VM (port 3000). Customers: `https://mcp.alteg.io/pro` (+ `/pro/<facet>`, `/pro/readonly`; Altegio sign-in; `/public/pro/mcp…` is a kept alias). Staff: `https://mcp.alteg.io/pro/mcp…` (Google sign-in), moving to `https://mcp.altegio.dev/pro/mcp`. Never rewrite a `/public/pro/mcp` address to `https://mcp.alteg.io/pro/mcp` — that is the staff lane
   - `/health` - health check
   - `/mcp` - MCP Streamable HTTP (POST for messages, GET for SSE stream, DELETE for session termination)
   - `/mcp/<facet>` - the same protocol on a static filtered tool list; facets: `ops`, `catalog`, `finance`, `marketing`, `analytics`, `onboarding` (ADR-001 D3). stdio uses the unfiltered `all` view and always exposes everything.
@@ -142,6 +142,13 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 - `src/utils/` - logging, errors, config, credential manager
 
 ### Change history
+
+**Short customer addresses (2026-09-23)**
+- **Customer addresses are canonical** (altegio-mcp-platform#213): `https://mcp.alteg.io/pro`, `/pro/<facet>` and `/pro/readonly` (Altegio sign-in) map onto `/mcp`, `/mcp/<facet>` and `/mcp/readonly`; `/public/pro/mcp…` stays a working alias. On `mcp.alteg.io` the `/pro/mcp…` forms are the staff lane (Google sign-in, machine tokens), which is moving to `https://mcp.altegio.dev/pro/mcp`.
+- **`MCP_PUBLIC_BASE_URL` is the address of the complete surface** (#63), default `https://mcp.alteg.io/pro`; each view is that address plus `/<view>`. A deployment behind a proxy that keeps `/mcp` sets e.g. `https://mcp.altegio.dev/pro/mcp`. The read-only instructions and refusal, the out-of-facet hint and the server instructions name these absolute addresses.
+- **Health through the proxy:** a short customer address lands under `/mcp`, so it never reaches the backend's `/health`. Ops use `https://mcp.altegio.dev/pro/health` with the `MACHINE_TOKEN_smoke-probe` bearer (`CI-CD.md`).
+- **Reading the older entries below:** they call the staff route `/pro` and the customer route `/public/pro`; since #213 those are `/pro/mcp…` and `/pro`. Both lanes now send `x-mcp-auth-scope` — the customer lane since platform `cdf7389` (2026-09-20) forwards its OAuth grant, or the route's own list for a raw Altegio token — so only local stdio is unscoped. Since #61 a declared grant this build cannot read fails closed; the "unrecognised vocabulary restricts nothing" rule below no longer holds.
+- **Files:** `src/config/schema.ts`, `src/tools/{facets,registry}.ts` (#63); `CI-CD.md`, `TESTING.md`, `README.md`, `CLAUDE.md` and the `src/tools/scopes.ts` platform-vocabulary comment (docs follow-up).
 
 **Universal client reactivation (2026-09-19)**
 - `analytics_get_client_reactivation_candidates` now composes the documented client-base search rather than an ERP loyalty report. It requires no program id and has no compatibility alias.
@@ -198,7 +205,7 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 - **Its own `initialize` instructions** (prefixed to the product text, so an `MCP_SERVER_INSTRUCTIONS` override still gets them): the surface only reads, nothing unlocks it, and suggest the full address only if the user actually wants an agent that can change their data.
 - **`WWW-Authenticate` (RFC 9728): nothing to do here.** This server emits only 400/404/500; authentication is entirely the mcp-proxy's, which forwards an already-verified identity as `x-mcp-auth-*`. The header belongs on whoever returns the 401.
 - **Honest scope:** while v3 issues one full token, this is a **guardrail, not a security boundary** — the same token can write, and a person can drive the API around MCP. Its value today is letting the consent screen stay all-or-nothing. Documented for developers/enterprise only; not in onboarding or the marketplace.
-- **New env `MCP_PUBLIC_BASE_URL`** (default `https://mcp.alteg.io/public/pro`), used only to name addresses in that refusal and those instructions.
+- **New env `MCP_PUBLIC_BASE_URL`** (default `https://mcp.alteg.io/public/pro`), used only to name addresses in that refusal and those instructions. **Superseded 2026-09-23 (#63):** it is now the address of the complete surface, default `https://mcp.alteg.io/pro` — see the entry above.
 - **Files:** `src/tools/facets.ts`, `src/tools/registry.ts`, `src/config/schema.ts`, `src/server.ts`, `src/http-server.ts` (route registered before the `/mcp/:facet` catch-all), `README.md`. Tests: `src/tools/__tests__/facets.test.ts`, `src/__tests__/{mcp-surface,http-server,config}.test.ts`.
 
 **Public HTTP surface hardening (2026-09-17)**
@@ -367,6 +374,11 @@ ALTEGIO_EXPOSE_PASSWORD_LOGIN=false   # HTTP: serve altegio_login/altegio_logout
                                       # password. On only for the closed staff
                                       # deployment (Google OIDC). stdio always
                                       # serves them.
+MCP_PUBLIC_BASE_URL=https://mcp.alteg.io/pro   # Address of the complete
+                                      # surface; views are this plus /<view>.
+                                      # Only names addresses in text models
+                                      # read. Staff lane (keeps /mcp):
+                                      # https://mcp.altegio.dev/pro/mcp
 NODE_ENV=development|production
 LOG_LEVEL=debug|info|warn|error
 PORT=3000

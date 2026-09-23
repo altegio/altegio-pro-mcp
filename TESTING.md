@@ -179,18 +179,21 @@ print('Done!')
 
 After deployment to the VM (see [CI-CD.md](CI-CD.md)).
 
-> **`/pro/*` is OAuth-protected.** Every request to `https://mcp.alteg.io/pro/*`
-> — including `/pro/health` — needs an `Authorization: Bearer <token>` header with
-> a token carrying the `mcp:pro:read` scope; without it the endpoint returns
-> `401 invalid_token`. Export one first:
+> **The staff lane is OAuth-protected.** Every request to
+> `https://mcp.alteg.io/pro/mcp…` or `https://mcp.altegio.dev/pro/…` — including
+> the health check — needs an `Authorization: Bearer <token>` header with a token
+> carrying the `mcp:pro:read` scope; without it the endpoint returns
+> `401 invalid_token`. The short `https://mcp.alteg.io/pro…` addresses are the
+> customer lane: they take an Altegio sign-in and refuse a staff bearer.
+> Export one first:
 >
 > ```bash
 > export MCP_TOKEN="<your mcp:pro:read bearer>"
 > ```
 
 ```bash
-# Health check via proxy
-curl https://mcp.alteg.io/pro/health \
+# Health check via proxy (staff lane)
+curl https://mcp.altegio.dev/pro/health \
   -H "Authorization: Bearer $MCP_TOKEN"
 
 # MCP Streamable HTTP — initialize a session
@@ -206,7 +209,7 @@ The MCP protocol flow is the same as local — POST requests to `/mcp` with the 
 ### Known limitation — live verification from cloud sessions
 
 Reading the authenticated `tools/list` schema from production **cannot be done
-from a cloud Claude Code session**: `/pro/*` needs an `mcp:pro:read` bearer the
+from a cloud Claude Code session**: the staff lane needs an `mcp:pro:read` bearer the
 session does not hold, the session is scope-locked to this repository (so it
 cannot reach the `altegio-analytics-agent` project that holds one), and `gcloud`
 is not available to inspect the VM. Until this is resolved, verify a deployed
@@ -222,7 +225,9 @@ Native stdio transport. See [CLAUDE_DESKTOP_SETUP.md](CLAUDE_DESKTOP_SETUP.md).
 
 ### Other MCP Clients
 
-Streamable HTTP transport via `https://mcp.alteg.io/pro/mcp`. Any MCP-compatible client can connect using this endpoint.
+Streamable HTTP transport via `https://mcp.alteg.io/pro`, signed in with an
+Altegio account (`https://mcp.alteg.io/pro/readonly` for a surface that only
+reads). Any MCP-compatible client can connect using this address.
 
 ## Security Notes
 

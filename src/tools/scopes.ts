@@ -110,13 +110,17 @@ export const PLACEHOLDER_ONLY_SCOPES: readonly ToolScope[] =
  *
  * Traced end to end in `altegio-mcp-platform/mcp-proxy`: `routes.json`
  * declares `scopes: ["mcp:pro:read", "mcp:pro:write"]` on both routes that
- * reach this backend — `/pro` (closed, Google OIDC, `forward_identity: true`)
- * and `/public/pro` (Altegio-IdP) — `lib/as.js` filters a token's requested
- * scope down to the resolved route's declared list, `lib/rs.js` puts the
- * surviving value on `req.auth.scope`, and `lib/identity-headers.js` forwards
- * it verbatim as `x-mcp-auth-scope`. The literal string arriving at
- * `tools/call` on the closed route is therefore `"mcp:pro:read mcp:pro:write"`
- * — or `"mcp:pro:read"` alone when the token was granted read only.
+ * reach this backend — the staff `/pro/mcp` (Google OIDC,
+ * `forward_identity: true`) and the customer `/pro` (Altegio-IdP, alias
+ * `/public/pro`); the read-only views declare `mcp:pro:read` alone.
+ * `lib/as.js` filters a token's requested scope down to the resolved route's
+ * declared list and `lib/rs.js` puts the surviving value on `req.auth.scope`;
+ * the staff lane forwards it verbatim as `x-mcp-auth-scope`
+ * (`lib/identity-headers.js`), and the customer lane forwards the OAuth
+ * session's grant, or the route's own list for a raw Altegio user token. The
+ * literal string arriving at `tools/call` is therefore
+ * `"mcp:pro:read mcp:pro:write"` — or `"mcp:pro:read"` alone when the token
+ * was granted read only.
  *
  * This vocabulary is coarse by construction: one pair of grades per *service*,
  * because a route's scope list is service-wide and the consent screen is

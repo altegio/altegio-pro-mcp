@@ -363,8 +363,9 @@ that the surface only reads and that asking the user to switch to the full
 address makes sense only if the user actually wants an agent that can change
 their data — never as a way around a refusal the model has just hit.
 
-Set `MCP_PUBLIC_BASE_URL` if the deployment is reached under a different prefix
-(the internal delegated lane is `https://mcp.alteg.io/pro`). It is used only to
+Set `MCP_PUBLIC_BASE_URL` if the deployment is reached at a different address
+(the default is the customer address `https://mcp.alteg.io/pro`; the staff lane
+keeps `/mcp` and sets `https://mcp.altegio.dev/pro/mcp`). It is used only to
 name addresses in the refusal and in the instructions.
 
 ## Destructive operations require a human
@@ -426,7 +427,7 @@ file, [`src/tools/scopes.ts`](src/tools/scopes.ts):
 
 | Vocabulary | Who writes it | Status |
 | --- | --- | --- |
-| `mcp:pro:read`, `mcp:pro:write` | the OAuth proxy — `routes.json` declares these on `/pro` and `/public/pro`, and forwards the granted subset as `x-mcp-auth-scope` | **live today**, temporary |
+| `mcp:pro:read`, `mcp:pro:write` | the OAuth proxy — `routes.json` declares these on the customer `/pro` route (alias `/public/pro`) and the staff `/pro/mcp` route, and forwards the granted subset as `x-mcp-auth-scope` | **live today**, temporary |
 | `locations:read`, `clients:write`, … | this server's tool requirements, in the v3 `domain:action` convention | the target; no token carries them yet |
 
 `mcp:pro:write` satisfies every requirement — the platform vocabulary has two
@@ -443,14 +444,16 @@ Four properties are deliberate:
 - **Execution only.** `tools/list` is never filtered by the caller's scopes —
   one path, one tool list, for every connection (ADR-001 D7). A tool a caller
   cannot run is still listed, and explains itself when called.
-- **No declared scopes means no restriction.** stdio and `/public/pro` (which
-  the proxy does not forward identity on) send no `x-mcp-auth-scope`, and the
-  gate is a no-op for them.
-- **An unknown vocabulary also means no restriction.** If a grant carries only
-  names this build cannot map — another service's scopes, or a rename upstream
-  — the gate stands aside and logs once, rather than refusing every call. A
-  vocabulary mismatch must never be able to take the server down; that is
-  exactly the failure this rule was written after.
+- **No declared scopes means no restriction.** Local stdio sends no
+  `x-mcp-auth-scope`, and the gate is a no-op for it. Both proxy lanes do send
+  one: the staff lane forwards the token's granted subset, and the customer lane
+  (`/pro`, alias `/public/pro`) forwards the Altegio OAuth session's grant, or
+  the route's own list (`/pro/readonly`: `mcp:pro:read`) for a caller that
+  connects with a raw Altegio user token.
+- **A declared but unusable grant fails closed.** Once the proxy sends the
+  header, an empty or malformed grant, or one carrying only names this build
+  cannot map, authorises nothing; the gate logs the unrecognised grant once.
+  Vocabulary drift is an operator error to fix, never wider access.
 - **The refusal is in band.** It is an `isError` tool result naming the missing
   permission and what a person has to do about it — never an HTTP 403, which
   would drop the session. Hosts do not re-authorise on a mid-session denial, so
@@ -705,7 +708,7 @@ How the user token behind `altegio_login` is stored depends on the transport:
 - **stdio (Claude Desktop, `npm start`) — single user.** `altegio_login` writes
   one token to `<CREDENTIALS_DIR>/credentials.json` and every tool call uses it.
   This is unchanged from previous releases.
-- **Public HTTP (`mcp.alteg.io/pro`, formerly `/public/pro`) — Altegio OAuth.** The platform
+- **Public HTTP (`mcp.alteg.io/pro`, alias `/public/pro`) — Altegio OAuth.** The platform
   authorizes the user with their own Altegio account and forwards only that
   user's delegated token and allowed location scope. No `altegio_login` call or
   server-side password storage is involved.
