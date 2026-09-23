@@ -11,7 +11,7 @@ Build a coherent, usable demo business rather than a collection of sample rows. 
 
 - Read the repository `AGENTS.md` or `CLAUDE.md`, `/Users/ypetrou/.config/agent-workstation/WORKSTATION.md`, the current OpenAPI spec, product-logic docs, and ADR-001 before changing live data.
 - Pull `../biz.erp.api.docs` as required by the repository workflow, but never edit it from this project.
-- Prefer the hosted MCP at `https://mcp.alteg.io/public/pro/mcp`; use `https://mcp.alteg.io/public/pro/mcp/analytics` for the full analytics facet.
+- Prefer the hosted MCP at `https://mcp.alteg.io/pro`; use `https://mcp.alteg.io/pro/analytics` for the full analytics facet. The client passes the endpoint through unchanged and appends `/analytics` for that facet — never compose `https://mcp.alteg.io/pro/mcp…`, which is the staff lane.
 - Treat each `X-Altegio-Company-Id` scope as a separate session. Do not reuse a session scoped to one location for another location.
 - Prove authentication with a real noninteractive read before mutation. Never print tokens or leave them in temporary scripts.
 - Snapshot the target location before cleanup. Record IDs, names, active state, ownership, staff links, schedules, forms, clients, appointments, users, and resources.

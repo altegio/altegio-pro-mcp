@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const DEFAULT_ENDPOINT = 'https://mcp.alteg.io/public/pro/mcp';
+const DEFAULT_ENDPOINT = 'https://mcp.alteg.io/pro';
 
 function parseSse(text) {
   const messages = text
