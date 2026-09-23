@@ -12,10 +12,15 @@ Proxy: mcp-proxy (Cloud Run) → mcp.alteg.io
 
 | Service | VM Port | Public URL |
 |---------|---------|------------|
-| altegio-pro-mcp | 3000 | `https://mcp.alteg.io/pro/mcp` |
-| altegio-pro-mcp (facets) | 3000 | `https://mcp.alteg.io/pro/mcp/<facet>` |
-| altegio-pro-mcp (public OAuth) | 3000 | `https://mcp.alteg.io/public/pro/mcp` |
+| altegio-pro-mcp (customers, Altegio sign-in) | 3000 | `https://mcp.alteg.io/pro` |
+| altegio-pro-mcp (customer views) | 3000 | `https://mcp.alteg.io/pro/<facet>`, `https://mcp.alteg.io/pro/readonly` |
+| altegio-pro-mcp (staff, Google sign-in) | 3000 | `https://mcp.alteg.io/pro/mcp`, `https://mcp.alteg.io/pro/mcp/<facet>` |
 | bi-data | 8080 | `https://mcp.alteg.io/bi-data/mcp` |
+
+The customer addresses are canonical. `https://mcp.alteg.io/public/pro/mcp…`
+still works as an alias of them. The `/pro/mcp…` forms on `mcp.alteg.io` are
+the staff lane, which is moving to `https://mcp.altegio.dev/pro/mcp`; never
+rewrite a customer `/public/pro/mcp` address to `/pro/mcp`.
 
 ## Quick Start
 
@@ -63,14 +68,20 @@ gh pr merge --merge
 
 **Service:** `mcp-proxy` on Cloud Run (`mcp.alteg.io`)
 
-Routes external traffic to VM internal IP:
-- `/pro/*` → `10.132.0.3:3000`
-- `/public/pro/*` → Altegio OAuth/token gateway → the same Pro backend
+Routes external traffic to VM internal IP. On `mcp.alteg.io` the `/mcp`
+segment decides the lane:
+- `/pro`, `/pro/<facet>`, `/pro/readonly` → Altegio sign-in (OAuth or the
+  caller's own Altegio user token) → `10.132.0.3:3000`, mapped onto `/mcp`,
+  `/mcp/<facet>` and `/mcp/readonly`. `/public/pro/…` is a kept alias of this
+  lane, forwarded with `/public/pro` stripped.
+- `/pro/mcp…` → Google sign-in or a machine token (staff lane) → the same
+  backend, `/pro` stripped. Staff are moving to `mcp.altegio.dev/pro/…`, which
+  serves the same backend.
 - `/bi-data/*` → `10.132.0.3:8080`
 
-**Facets need no proxy change.** The proxy forwards everything under `/pro/*`
-with the `/pro` prefix stripped, so `https://mcp.alteg.io/pro/mcp/<facet>`
-arrives at the service as `/mcp/<facet>`, which the app already serves (see
+**Facets need no proxy change.** A customer `https://mcp.alteg.io/pro/<facet>`
+and a staff `https://mcp.alteg.io/pro/mcp/<facet>` both arrive at the service
+as `/mcp/<facet>`, which the app already serves (see
 [README → Facets](README.md#facets)). Adding or removing a facet is a change in
 this repository only — no route, audience or scope in
 `altegio-mcp-platform/mcp-proxy/routes.json` is touched. An unknown facet is
@@ -98,10 +109,14 @@ gcloud compute ssh mcp-servers --project=altegio-mcp --zone=europe-west1-b --tun
 
 ### Health Checks
 ```bash
-# Via proxy (public)
-curl https://mcp.alteg.io/pro/health
-curl https://mcp.alteg.io/public/pro/health
-curl https://mcp.alteg.io/bi-data/health
+# Via proxy: every proxied path needs a Bearer (only the proxy's own /health
+# is public). Use the read-only smoke-probe machine token on the staff lane.
+PROBE_TOKEN=$(gcloud secrets versions access latest \
+  --secret=MACHINE_TOKEN_smoke-probe --project=altegio-mcp)
+curl -H "Authorization: Bearer $PROBE_TOKEN" https://mcp.altegio.dev/pro/health
+curl -H "Authorization: Bearer $PROBE_TOKEN" https://mcp.alteg.io/bi-data/health
+# Not https://mcp.alteg.io/pro/health: that is the customer lane now. It wants
+# an Altegio sign-in and lands under /mcp, so it never reaches /health.
 
 # Direct (from internal network)
 curl http://10.132.0.3:3000/health
