@@ -110,7 +110,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_add_staff_batch',
     description:
-      'Bulk add staff members from JSON array or CSV string. Accepts name, specialization, phone, email, position_id, api_id. Creates checkpoint for rollback.',
+      'Bulk add staff members from JSON array or CSV string. Accepts name, specialization, phone, email, position_id, api_id. Team members are created without user accounts: phone and email are not used to link or invite a user (use create_staff for that). Creates checkpoint for rollback.',
     annotations: {
       title: 'Batch Add Staff',
       destructiveHint: false,

@@ -93,7 +93,7 @@ export const createStaffTool = defineTool({
   name: 'create_staff',
   category: 'Staff',
   description:
-    '[Staff] Create a new staff member. AUTHENTICATION REQUIRED. Required fields: name, specialization, position_id, phone_number, user_email, user_phone, is_user_invite. Set is_paid_staff=false to create test/demo staff without consuming a paid-staff license seat.',
+    '[Staff] Create a new staff member. AUTHENTICATION REQUIRED. Required fields: name, specialization, position_id, phone_number. Omit user_email and user_phone to create a team member without a user account. Pass them to link an existing Altegio user, or add is_user_invite=true to invite that person; the API refuses an email or phone of an unknown user without an invitation. Set is_paid_staff=false to create test/demo staff without consuming a paid-staff license seat. To schedule and book the member, set has_timetable_access=true.',
   annotations: {
     title: 'Create Staff Member',
     destructiveHint: false,
@@ -109,20 +109,51 @@ export const createStaffTool = defineTool({
       .string()
       .nullable()
       .describe('Phone number (without +, 9-15 digits)'),
-    user_email: z.string().email().describe('User email address'),
-    user_phone: z.string().min(1).describe('User phone number'),
-    is_user_invite: z.boolean().describe('User invitation flag'),
+    user_email: z
+      .string()
+      .email()
+      .nullable()
+      .optional()
+      .describe(
+        'Email of an existing Altegio user to link, or of the person to invite with is_user_invite=true. Omit for a team member without a user account.'
+      ),
+    user_phone: z
+      .string()
+      .min(1)
+      .nullable()
+      .optional()
+      .describe(
+        'Phone of an existing Altegio user to link (without +, 9-15 digits), or of the person to invite. Omit for a team member without a user account.'
+      ),
+    is_user_invite: z
+      .boolean()
+      .optional()
+      .describe(
+        'Invite user_email/user_phone to create their user account (default false). Without it, they must belong to an existing Altegio user.'
+      ),
+    has_timetable_access: z
+      .boolean()
+      .optional()
+      .describe(
+        'Add the team member to the work schedule. Locations on the new team-member model refuse a schedule or appointments for a member without it; per-seat licensing allows it only with is_paid_staff=true.'
+      ),
     is_paid_staff: z
       .boolean()
       .optional()
       .describe(
-        'Whether this team member counts against the paid-staff license cap. Omit or set false to create test/demo staff without consuming a seat.'
+        'Whether this team member counts against the paid-staff license cap. Set false to create test/demo staff without consuming a seat; locations on per-seat licensing require a value for active team members.'
       ),
   }),
   outputSchema: staffEntityOutput,
   handler: async ({ input, client }) => {
     const { location_id, ...staffData } = input;
-    const staff = await client.createStaff(location_id, staffData);
+    // The API expects both user keys, null when no user is linked or invited.
+    const staff = await client.createStaff(location_id, {
+      ...staffData,
+      user_email: staffData.user_email ?? null,
+      user_phone: staffData.user_phone ?? null,
+      is_user_invite: staffData.is_user_invite ?? false,
+    });
     return {
       text: `Successfully created staff member:\nID: ${staff.id}\nName: ${staff.name}\nSpecialization: ${staff.specialization}`,
       structuredContent: {

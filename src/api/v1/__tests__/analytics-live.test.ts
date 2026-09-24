@@ -3,12 +3,12 @@
  * location and re-records the golden fixtures.
  *
  * Skipped unless `ALTEGIO_E2E=1`. It needs a partner token in
- * `ALTEGIO_PARTNER_TOKEN` (or `ALTEGIO_LIVE_API_TOKEN`) and the demo
- * credentials in `ALTEGIO_TEST_LOGIN` / `ALTEGIO_TEST_PASSWORD`, or an
- * existing technical-user token in `ALTEGIO_USER_TOKEN` — from the
- * environment, never from a file in this repository, which is public. The
- * partner token is read from its own variable because the shared Jest setup
- * pins `ALTEGIO_API_TOKEN` to a dummy value for every other suite.
+ * `ALTEGIO_API_TOKEN` (or `ALTEGIO_PARTNER_TOKEN` / `ALTEGIO_LIVE_API_TOKEN`,
+ * like the other live suites) and the demo credentials in
+ * `ALTEGIO_TEST_LOGIN` / `ALTEGIO_TEST_PASSWORD`, or an existing
+ * technical-user token in `ALTEGIO_USER_TOKEN` — from the environment, never
+ * from a file in this repository, which is public. The shared Jest setup pins
+ * `ALTEGIO_API_TOKEN` to a dummy value only when `ALTEGIO_E2E` is not `1`.
  *
  *   ALTEGIO_E2E=1 CREDENTIALS_DIR=/tmp/altegio-mcp-live npx jest analytics-live
  *
@@ -207,10 +207,12 @@ describeLive('analytics endpoints against the demo location', () => {
     const password = process.env.ALTEGIO_TEST_PASSWORD;
     const userToken = process.env.ALTEGIO_USER_TOKEN;
     const partnerToken =
-      process.env.ALTEGIO_PARTNER_TOKEN ?? process.env.ALTEGIO_LIVE_API_TOKEN;
+      process.env.ALTEGIO_API_TOKEN ??
+      process.env.ALTEGIO_PARTNER_TOKEN ??
+      process.env.ALTEGIO_LIVE_API_TOKEN;
     if (!partnerToken || (!userToken && (!login || !password))) {
       throw new Error(
-        'The live suite needs ALTEGIO_PARTNER_TOKEN (or ALTEGIO_LIVE_API_TOKEN) and either ALTEGIO_USER_TOKEN or ALTEGIO_TEST_LOGIN plus ALTEGIO_TEST_PASSWORD.'
+        'The live suite needs ALTEGIO_API_TOKEN (or a live-test alias) and either ALTEGIO_USER_TOKEN or ALTEGIO_TEST_LOGIN plus ALTEGIO_TEST_PASSWORD.'
       );
     }
     client = new AltegioClient({ partnerToken, userToken }, CREDENTIALS_DIR);

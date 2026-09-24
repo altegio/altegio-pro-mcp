@@ -71,16 +71,23 @@ describeLive('appointments end-to-end against the demo location', () => {
     };
 
     try {
-      // --- Test staff (unpaid so it does not consume a license seat) ----------
+      // --- Test staff in the work schedule -----------------------------------
+      // The new team-member model refuses a schedule for a member outside the
+      // work schedule, and per-seat licensing (the demo location) admits only
+      // paid staff to it — so this member holds a paid seat until cleanup
+      // deletes it a few seconds later.
       const staff = await client.createStaff(DEMO_LOCATION_ID, {
         name: `E2E Staff ${stamp}`,
         specialization: 'E2E Testing',
         position_id: null,
         phone_number: null,
-        user_email: `e2e-staff-${stamp}@example.com`,
-        user_phone: `1${String(stamp).slice(-10)}`,
+        // No user account: an unknown email or phone without an invitation
+        // is refused by the API.
+        user_email: null,
+        user_phone: null,
         is_user_invite: false,
-        is_paid_staff: false,
+        has_timetable_access: true,
+        is_paid_staff: true,
       });
       expect(staff.id).toBeGreaterThan(0);
       cleanup.push(() => client.deleteStaff(DEMO_LOCATION_ID, staff.id));

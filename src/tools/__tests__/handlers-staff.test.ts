@@ -48,6 +48,36 @@ describe('ToolHandlers - Staff CRUD', () => {
       });
     });
 
+    it('creates a team member without a user account when no user is named', async () => {
+      mockClient.createStaff.mockResolvedValue({
+        id: 124,
+        name: 'Demo Stylist',
+      } as Awaited<ReturnType<AltegioClient['createStaff']>>);
+
+      const result = await handlers.createStaff({
+        location_id: 456,
+        name: 'Demo Stylist',
+        specialization: 'Stylist',
+        position_id: null,
+        phone_number: null,
+        is_paid_staff: false,
+      });
+
+      expect(result.isError).toBeUndefined();
+      // Both user keys go out as null: the API refuses an unknown user
+      // without an invitation, and treats null as "no user account".
+      expect(mockClient.createStaff).toHaveBeenCalledWith(456, {
+        name: 'Demo Stylist',
+        specialization: 'Stylist',
+        position_id: null,
+        phone_number: null,
+        user_email: null,
+        user_phone: null,
+        is_user_invite: false,
+        is_paid_staff: false,
+      });
+    });
+
     it('should handle errors', async () => {
       mockClient.createStaff.mockRejectedValue(
         new AuthenticationError('Not authenticated. Call altegio_login first.')

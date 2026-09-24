@@ -6,6 +6,24 @@ is declared stable.
 
 ## [Unreleased]
 
+### Fixed — team-member creation found by the live suites
+
+- **`create_staff`:** `user_email` and `user_phone` are optional. Quick-create
+  treats them as a link to an existing Altegio user and refuses an unknown one
+  without an invitation, so the tool could not create a team member without a
+  user account. Omitted fields now go out as `null` (no user account);
+  `is_user_invite` defaults to false.
+- **`create_staff`:** new optional `has_timetable_access`. On the new
+  team-member model a member outside the work schedule cannot get a schedule
+  or appointments, and per-seat licensing admits only paid staff to it.
+- **`onboarding_add_staff_batch`:** rows no longer send the staff email or
+  phone as a user link (an empty string failed validation, an unknown user was
+  refused), so every row creates a team member without a user account.
+- **Live suites:** `analytics-live` accepts `ALTEGIO_API_TOKEN` like the other
+  suites; `appointments-e2e-live` creates its temporary member without a user
+  account, in the work schedule and as paid staff (the demo location uses
+  per-seat licensing), and deletes it at cleanup.
+
 ### Fixed — client profile paid filters and payer-cohort dates
 
 - **`clients_list_profiles`:** the paid-amount inputs are now

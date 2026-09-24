@@ -292,9 +292,21 @@ export interface CreateStaffRequest {
   specialization: string;
   position_id: number | null;
   phone_number: string | null;
-  user_email: string;
-  user_phone: string;
+  /**
+   * Links an existing Altegio user found by this email or `user_phone`, or
+   * names the person to invite when `is_user_invite` is true. `null` for both
+   * creates a team member without a user account; an unknown user without an
+   * invitation is refused by the API. Always sent, `null` when unused.
+   */
+  user_email: string | null;
+  user_phone: string | null;
   is_user_invite: boolean;
+  /**
+   * Adds the team member to the work schedule. With the new team-member model
+   * only such members can get a schedule and appointments; per-seat licensing
+   * allows it for paid staff only.
+   */
+  has_timetable_access?: boolean;
   /**
    * Whether the team member counts against the paid-staff license cap.
    * Omit or set false to create test/demo staff without consuming a seat.

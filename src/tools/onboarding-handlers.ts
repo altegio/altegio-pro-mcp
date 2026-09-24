@@ -299,8 +299,11 @@ export class OnboardingHandlers {
             specialization: staff.specialization || '',
             position_id: staff.position_id || null,
             phone_number: staff.phone || null,
-            user_email: staff.email || '',
-            user_phone: staff.phone || '',
+            // Quick-create treats these as a link to an existing user and
+            // refuses an unknown one without an invitation (an empty string
+            // fails validation), so batch rows create team members only.
+            user_email: null,
+            user_phone: null,
             is_user_invite: false,
           };
           const result = await this.client.createStaff(

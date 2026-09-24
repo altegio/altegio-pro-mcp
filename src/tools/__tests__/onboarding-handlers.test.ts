@@ -128,6 +128,38 @@ describe('Onboarding Handlers', () => {
         })
       );
     });
+
+    it('creates team members without linking a user account', async () => {
+      await handlers.start({ location_id: 123 });
+
+      mockClient.createStaff = jest
+        .fn()
+        .mockResolvedValue({ id: 1, name: 'Alice' });
+
+      await handlers.addStaffBatch({
+        location_id: 123,
+        staff_data: [
+          {
+            name: 'Alice',
+            specialization: 'Hairdresser',
+            phone: '420777000111',
+            email: 'alice@example.com',
+          },
+          { name: 'Bob', specialization: 'Nail Tech' },
+        ],
+      });
+
+      // An unknown user without an invitation is refused upstream, and an
+      // empty string fails validation, so neither row may send one.
+      for (const [, request] of (mockClient.createStaff as jest.Mock).mock
+        .calls) {
+        expect(request).toMatchObject({
+          user_email: null,
+          user_phone: null,
+          is_user_invite: false,
+        });
+      }
+    });
   });
 
   describe('addCategories', () => {

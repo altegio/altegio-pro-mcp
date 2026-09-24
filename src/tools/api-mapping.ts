@@ -175,6 +175,8 @@ export const apiMapping: Record<string, ApiMapping> = {
       'user_email',
       'user_phone',
       'is_user_invite',
+      // Accepted by MasterCreateQuickDto; not yet in the public spec.
+      'has_timetable_access',
       'is_paid_staff',
     ],
   },
