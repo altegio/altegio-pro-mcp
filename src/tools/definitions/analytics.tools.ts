@@ -827,7 +827,7 @@ export const analyticsGetServiceMixTrendTool = defineTool({
   name: 'analytics_get_service_mix_trend',
   category: 'Analytics',
   description:
-    '[Analytics] Monthly delivered service value from attended appointment service lines, grouped by service, current category, team member, assigned resource, or assigned device versus current category with service drilldown. Scans every source page or refuses the call. manual_cost is a line total before loyalty deductions, not cash receipts or accounting revenue. A device is assigned only for one line and one known appointment instance; this does not prove actual use. Ambiguous assignments remain unattributed. Product sales and account top-ups are excluded.',
+    '[Analytics] Monthly delivered service value from attended appointment service lines, grouped by service, current category, team member, assigned resource, or assigned device versus current category with service drilldown. Scans every source page or refuses the call. manual_cost is a line total before loyalty deductions, not cash receipts or accounting revenue. All lines on a visit with one known resource type are attributed to it. When several resource types are assigned, their IDs are reported but line value remains unattributed; it is never duplicated across devices. Product sales and account top-ups are excluded.',
   annotations: { title: 'Analytics: service mix trend', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -860,6 +860,11 @@ export const analyticsGetServiceMixTrendTool = defineTool({
         group_type: str,
         service_id: int,
         service_title: str,
+        associated_resource_ids: { type: 'array', items: { type: 'integer' } },
+        unmapped_resource_instance_ids: {
+          type: 'array',
+          items: { type: 'integer' },
+        },
         line_count: { type: 'integer' },
         appointment_count: { type: 'integer' },
         client_count: { type: 'integer' },
@@ -881,7 +886,7 @@ export const analyticsGetClientServicePenetrationTool = defineTool({
   name: 'analytics_get_client_service_penetration',
   category: 'Analytics',
   description:
-    '[Analytics] Distinct attended clients who used target services, current categories or unambiguously assigned appointment resources over up to 365 days. Returns top service SKU adoption, device/category group adoption, confirmed mono-group clients, group co-occurrence, delivered-value cohort gaps and paged stable source-without-target client IDs. Every percentage uses the identified active attended-client denominator. Current categories and appointment assignments are not historical device-use proof. Cohorts rank delivered manual_cost, not cash spending; no contacts or causal uplift.',
+    '[Analytics] Distinct attended clients who used target services, current categories or resources assigned to appointments over up to 365 days. Every recorded resource type on an attended service visit counts for resource adoption, including visits with multiple resources; delivered value is not duplicated across them. Returns top SKU/group adoption, confirmed mono-group clients, co-occurrence, delivered-value cohort gaps and paged non-adopter IDs. Every percentage uses the identified active attended-client denominator. Resource assignment is an operational usage proxy, not an immutable usage audit; cohorts rank delivered manual_cost, not cash spending.',
   annotations: { title: 'Analytics: client service penetration', ...READ_ONLY },
   input: z.object({
     location_id: locationId,

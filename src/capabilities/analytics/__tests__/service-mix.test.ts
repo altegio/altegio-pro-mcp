@@ -84,7 +84,19 @@ function fakeClient(
       { id: 200, title: 'Category B' },
     ],
     getResources: async () => [
-      { id: 50, title: 'Device', instances: [{ id: 501, resource_id: 50 }] },
+      {
+        id: 50,
+        title: 'Device',
+        instances: [
+          { id: 501, resource_id: 50 },
+          { id: 503, resource_id: 50 },
+        ],
+      },
+      {
+        id: 60,
+        title: 'Second device',
+        instances: [{ id: 502, resource_id: 60 }],
+      },
     ],
     apiRequest: async () =>
       Response.json({ success: true, data, meta: { total_count: total } }),
@@ -100,7 +112,7 @@ const period = {
 beforeEach(clearTimezoneCache);
 
 describe('service analytics from appointment pages', () => {
-  it('uses manual_cost once per line and attributes only an unambiguous resource', async () => {
+  it('uses manual_cost once per line and attributes a shared appointment resource', async () => {
     const result = await getServiceMixTrend(fakeClient(), {
       ...period,
       group_by: 'assigned_resource',
@@ -109,21 +121,20 @@ describe('service analytics from appointment pages', () => {
     expect(content.totals).toEqual({
       attended_appointments: 4,
       delivered_service_value: 590,
-      unattributed_service_lines: 4,
+      unattributed_service_lines: 2,
     });
     expect(content.rows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           group_id: 50,
-          delivered_service_value: 300,
-          line_count: 1,
-          attribution: 'single_appointment_resource',
+          delivered_service_value: 530,
+          line_count: 3,
+          attribution: 'mixed_appointment_resource',
         }),
         expect.objectContaining({
           group_id: null,
-          delivered_service_value: 290,
-          line_count: 4,
-          attribution: 'unattributed',
+          delivered_service_value: 60,
+          line_count: 2,
         }),
       ])
     );
@@ -150,7 +161,7 @@ describe('service analytics from appointment pages', () => {
     );
   });
 
-  it('groups a single assigned device by service and keeps ambiguous lines unattributed', async () => {
+  it('groups all service lines when one resource type is assigned', async () => {
     const result = await getServiceMixTrend(fakeClient(), {
       ...period,
       group_by: 'assigned_device_or_current_category',
@@ -163,7 +174,8 @@ describe('service analytics from appointment pages', () => {
           group_type: 'assigned_resource',
           group_id: 50,
           service_id: 10,
-          delivered_service_value: 300,
+          delivered_service_value: 380,
+          attribution: 'mixed_appointment_resource',
         }),
         expect.objectContaining({
           group_type: 'current_category',
@@ -172,10 +184,11 @@ describe('service analytics from appointment pages', () => {
           delivered_service_value: 40,
         }),
         expect.objectContaining({
-          group_type: 'unattributed',
-          group_id: null,
+          group_type: 'assigned_resource',
+          group_id: 50,
           service_id: 20,
           delivered_service_value: 150,
+          attribution: 'shared_appointment_resource',
         }),
       ])
     );
@@ -184,7 +197,7 @@ describe('service analytics from appointment pages', () => {
     ).toBe(590);
   });
 
-  it('does not duplicate a line assigned to several resource instances', async () => {
+  it('keeps two different resource types on an unallocated line without doubling value', async () => {
     const ambiguous = { ...rows[0], resource_instance_ids: [501, 502] };
     const result = await getServiceMixTrend(fakeClient([ambiguous]), {
       ...period,
@@ -195,8 +208,84 @@ describe('service analytics from appointment pages', () => {
         group_type: 'unattributed',
         delivered_service_value: 300,
         line_count: 1,
+        associated_resource_ids: [50, 60],
+        unmapped_resource_instance_ids: [],
       }),
     ]);
+  });
+
+  it('groups two instances of one parent resource once', async () => {
+    const sharedType = { ...rows[0], resource_instance_ids: [501, 503] };
+    const result = await getServiceMixTrend(fakeClient([sharedType]), {
+      ...period,
+      group_by: 'assigned_device_or_current_category',
+    });
+    expect(result.structuredContent.rows).toEqual([
+      expect.objectContaining({
+        group_type: 'assigned_resource',
+        group_id: 50,
+        delivered_service_value: 300,
+        associated_resource_ids: [50],
+      }),
+    ]);
+  });
+
+  it('retains an unmapped historical instance beside a known resource', async () => {
+    const oldInstance = { ...rows[0], resource_instance_ids: [501, 999] };
+    const result = await getServiceMixTrend(fakeClient([oldInstance]), {
+      ...period,
+      group_by: 'assigned_device_or_current_category',
+    });
+    expect(result.structuredContent.rows).toEqual([
+      expect.objectContaining({
+        group_type: 'unattributed',
+        associated_resource_ids: [50],
+        unmapped_resource_instance_ids: [999],
+        delivered_service_value: 300,
+      }),
+    ]);
+  });
+
+  it('counts both assigned resources for adoption without allocating line value twice', async () => {
+    const twoResources = { ...rows[1], resource_instance_ids: [501, 502] };
+    const result = await getClientServicePenetration(
+      fakeClient([twoResources]),
+      {
+        ...period,
+        source_resource_ids: [50],
+        target_resource_ids: [60],
+      }
+    );
+    const content = result.structuredContent;
+    expect(content.target_adopters).toBe(1);
+    expect(content.source_target_overlap).toBe(1);
+    expect(content.group_insights.top_groups).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ group_id: 50, active_clients: 1 }),
+        expect.objectContaining({ group_id: 60, active_clients: 1 }),
+      ])
+    );
+    expect(content.group_insights.top_group_cooccurrence).toEqual([
+      expect.objectContaining({ active_clients: 1 }),
+    ]);
+    expect(content.group_insights.confirmed_mono_group_clients).toBe(0);
+    const mix = await getServiceMixTrend(fakeClient([twoResources]), {
+      ...period,
+      group_by: 'assigned_device_or_current_category',
+    });
+    expect(
+      mix.structuredContent.rows.reduce(
+        (sum, row) => sum + row.delivered_service_value,
+        0
+      )
+    ).toBe(230);
+    expect(
+      mix.structuredContent.rows.every(
+        (row) =>
+          row.group_type === 'unattributed' &&
+          row.associated_resource_ids.join(',') === '50,60'
+      )
+    ).toBe(true);
   });
 
   it('counts distinct identified clients and pages source-only candidate IDs', async () => {
@@ -270,7 +359,7 @@ describe('service analytics from appointment pages', () => {
       expect.arrayContaining([expect.objectContaining({ active_clients: 1 })])
     );
     expect(content.group_insights.confirmed_mono_group_clients).toBe(2);
-    expect(content.group_insights.clients_with_unattributed_lines).toBe(1);
+    expect(content.group_insights.clients_with_unattributed_lines).toBe(0);
     expect(content.cohort_penetration_gap_percentage_points).toBeNull();
   });
 
