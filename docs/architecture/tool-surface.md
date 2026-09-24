@@ -16,20 +16,20 @@ the code disagree, which is how a surface change reaches a reviewer’s diff
 
 ## Counts
 
-**90 tools served (96 defined, 6 withheld from every view).**
+**92 tools served (98 defined, 6 withheld from every view).**
 
 | What | Count | Where |
 | --- | --- | --- |
-| Defined | 96 | 84 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
+| Defined | 98 | 86 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
 | Withheld from every view | 6 | `src/tools/disabled-tools.ts` (the report builder) |
-| **Served** | **90** | what `stdio` lists; every HTTP view is a subset |
+| **Served** | **92** | what `stdio` lists; every HTTP view is a subset |
 
 Served tools per category, in `tools/list` order:
 
 | Category | Served |
 | --- | --- |
 | API | 3 |
-| Analytics | 24 |
+| Analytics | 26 |
 | Appointments | 6 |
 | Auth | 2 |
 | Categories | 2 |
@@ -46,17 +46,17 @@ Served tools per category, in `tools/list` order:
 
 ## Views
 
-| View | Address | Serves (of 96 defined) | Reasons |
+| View | Address | Serves (of 98 defined) | Reasons |
 | --- | --- | --- | --- |
-| `all` | stdio (no HTTP route) | 90 | all ×90, -off ×6 |
-| `default` | `/mcp` | 64 | dflt ×62, -pack ×23, -off ×6, -pwd ×2, -name ×1, xtra ×1, base ×1 |
-| `readonly` | `/mcp/readonly` | 52 | ro ×52, -write ×36, -off ×6, -pwd ×2 |
-| `ops` | `/mcp/ops` | 18 | - ×70, pfx ×11, -off ×6, rule ×6, -pwd ×2, base ×1 |
-| `catalog` | `/mcp/catalog` | 32 | - ×56, rule ×31, -off ×6, -pwd ×2, base ×1 |
-| `finance` | `/mcp/finance` | 26 | - ×62, pfx ×24, -off ×6, -pwd ×2, base ×1, rule ×1 |
-| `marketing` | `/mcp/marketing` | 2 | - ×86, -off ×6, -pwd ×2, base ×1, rule ×1 |
-| `analytics` | `/mcp/analytics` | 25 | - ×63, pfx ×24, -off ×6, -pwd ×2, base ×1 |
-| `onboarding` | `/mcp/onboarding` | 13 | - ×75, pfx ×12, -off ×6, -pwd ×2, base ×1 |
+| `all` | stdio (no HTTP route) | 92 | all ×92, -off ×6 |
+| `default` | `/mcp` | 64 | dflt ×62, -pack ×25, -off ×6, -pwd ×2, -name ×1, xtra ×1, base ×1 |
+| `readonly` | `/mcp/readonly` | 54 | ro ×54, -write ×36, -off ×6, -pwd ×2 |
+| `ops` | `/mcp/ops` | 18 | - ×72, pfx ×11, -off ×6, rule ×6, -pwd ×2, base ×1 |
+| `catalog` | `/mcp/catalog` | 32 | - ×58, rule ×31, -off ×6, -pwd ×2, base ×1 |
+| `finance` | `/mcp/finance` | 28 | - ×62, pfx ×26, -off ×6, -pwd ×2, base ×1, rule ×1 |
+| `marketing` | `/mcp/marketing` | 2 | - ×88, -off ×6, -pwd ×2, base ×1, rule ×1 |
+| `analytics` | `/mcp/analytics` | 27 | - ×63, pfx ×26, -off ×6, -pwd ×2, base ×1 |
+| `onboarding` | `/mcp/onboarding` | 13 | - ×77, pfx ×12, -off ×6, -pwd ×2, base ×1 |
 
 A facet answers *how many tools fit in this host’s context*; `readonly`
 answers *what may this agent do at all*. They are different kinds of view —
@@ -124,6 +124,7 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | `analytics_get_client_reactivation_candidates` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
 | `analytics_get_client_retention` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
 | `analytics_get_client_sales` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_client_service_penetration` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
 | `analytics_get_client_visit_stats` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
 | `analytics_get_daily_series` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
 | `analytics_get_day_end_report` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
@@ -136,6 +137,7 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | `analytics_get_profit_and_loss_statement` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
 | `analytics_get_receptionist_performance` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
 | `analytics_get_revenue_leakage` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_service_mix_trend` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
 | `analytics_get_service_profitability` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
 | `analytics_get_team_member_capacity` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
 | `analytics_get_team_member_occupancy` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |

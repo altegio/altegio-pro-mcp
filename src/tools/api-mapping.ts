@@ -704,6 +704,66 @@ export const apiMapping: Record<string, ApiMapping> = {
  * or in `catalog/extended/*.yaml`, so the compliance test walks both maps.
  */
 export const multiApiMapping: Record<string, ApiMapping[]> = {
+  analytics_get_service_mix_trend: [
+    {
+      path: '/records/{location_id}',
+      method: 'get',
+      operationId: 'get_appointment_list',
+      pathParams: ['location_id'],
+      queryParams: ['start_date', 'end_date', 'page', 'count'],
+    },
+    {
+      path: '/company/{location_id}',
+      method: 'get',
+      operationId: 'get_location',
+      pathParams: ['location_id'],
+    },
+    {
+      path: '/services/{location_id}',
+      method: 'get',
+      operationId: 'get_service_list',
+      pathParams: ['location_id'],
+    },
+    {
+      path: '/service_categories/{location_id}/{id}',
+      method: 'get',
+      operationId: 'deprecated_get_service_category_list',
+      pathParams: ['location_id', 'id'],
+    },
+    {
+      path: '/resources/{location_id}',
+      method: 'get',
+      operationId: 'get_resource_list',
+      pathParams: ['location_id'],
+    },
+  ],
+  analytics_get_client_service_penetration: [
+    {
+      path: '/records/{location_id}',
+      method: 'get',
+      operationId: 'get_appointment_list',
+      pathParams: ['location_id'],
+      queryParams: ['start_date', 'end_date', 'page', 'count'],
+    },
+    {
+      path: '/company/{location_id}',
+      method: 'get',
+      operationId: 'get_location',
+      pathParams: ['location_id'],
+    },
+    {
+      path: '/services/{location_id}',
+      method: 'get',
+      operationId: 'get_service_list',
+      pathParams: ['location_id'],
+    },
+    {
+      path: '/service_categories/{location_id}/{id}',
+      method: 'get',
+      operationId: 'deprecated_get_service_category_list',
+      pathParams: ['location_id', 'id'],
+    },
+  ],
   diagnose_location_access: [
     {
       path: '/company/{location_id}',

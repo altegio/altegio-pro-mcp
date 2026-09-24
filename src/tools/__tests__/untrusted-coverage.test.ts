@@ -424,6 +424,10 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     what: 'service and service-category titles rendered by the location report',
     coveredBy: 'src/capabilities/analytics/__tests__/legacy-use-cases.test.ts',
   },
+  analytics_get_service_mix_trend: {
+    what: 'service, team-member and resource titles from location records',
+    coveredBy: 'src/capabilities/analytics/__tests__/service-mix.test.ts',
+  },
   analytics_get_team_member_capacity: {
     what: 'team-member names and positions',
     coveredBy: 'src/capabilities/analytics/__tests__/legacy-use-cases.test.ts',
@@ -577,6 +581,8 @@ const NO_FREE_TEXT: Record<string, string> = {
     'team-member ids, dates, hours, counts and money; names are not returned',
   analytics_get_revenue_leakage:
     'canonical category keys, counts, money, hours and our own formula text',
+  analytics_get_client_service_penetration:
+    'stable client and service ids, fixed cohort labels, counts and percentages; no names or contacts',
   analytics_list_report_fields:
     'the report builder’s own field registry — platform vocabulary, not text anyone at the location typed',
 

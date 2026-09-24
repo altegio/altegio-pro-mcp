@@ -6,6 +6,15 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — service mix and client service penetration
+
+Two read-only analytics tools compose the documented V1 appointment list into
+monthly delivered service-line value and distinct-client service adoption.
+They require an exact complete page scan (at most 30,000 appointments), preserve
+resource ambiguity as unattributed, return stable client IDs without contacts,
+and label delivered-value cohorts separately from cash receipts. Source and
+metric limits are documented in the service analytics source audit.
+
 ### Changed — addresses named to models use the short customer form
 
 `MCP_PUBLIC_BASE_URL` is now the public address of the complete surface and

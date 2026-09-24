@@ -302,6 +302,8 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   analytics_get_client_retention: 'analytics:read',
   analytics_get_client_forecast: 'analytics:read',
   analytics_get_service_profitability: 'analytics:read',
+  analytics_get_service_mix_trend: 'analytics:read',
+  analytics_get_client_service_penetration: 'analytics:read',
   analytics_get_team_member_sales: 'analytics:read',
   analytics_get_team_member_capacity: 'analytics:read',
   analytics_get_client_reactivation_candidates: 'analytics:read',
