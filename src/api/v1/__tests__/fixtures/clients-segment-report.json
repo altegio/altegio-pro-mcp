@@ -1,0 +1,27 @@
+{
+  "success": true,
+  "data": [
+    {
+      "id": 2,
+      "name": "James Smith",
+      "first_visit_date": "2025-02-02",
+      "last_visit_date": "2026-08-07",
+      "sold_amount": 1240.5,
+      "visits_count": 9,
+      "discount": 10,
+      "deposit_balance": 55,
+      "phone": "13155550177"
+    },
+    {
+      "id": 3,
+      "name": "Taylor Reed",
+      "first_visit_date": null,
+      "last_visit_date": null,
+      "sold_amount": 0,
+      "visits_count": 0,
+      "discount": 0,
+      "deposit_balance": null
+    }
+  ],
+  "meta": { "total_count": 908 }
+}

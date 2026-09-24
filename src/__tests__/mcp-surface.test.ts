@@ -90,6 +90,7 @@ describe('tools/list per facet', () => {
     expect(tools.map((tool) => tool.name).sort()).toEqual([
       'clients_delete',
       'clients_get_card',
+      'clients_get_segment_report',
       'clients_get_visit_history',
       'clients_lookup',
       'clients_search',

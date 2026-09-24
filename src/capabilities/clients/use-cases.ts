@@ -137,6 +137,51 @@ export async function searchClients(
   };
 }
 
+/** One-page client value/engagement report without per-client card requests. */
+export async function getClientSegmentReport(
+  client: AltegioClient,
+  input: Omit<SearchInput, 'fields' | 'include_contacts'>
+): Promise<ClientsResult> {
+  const page = Math.max(1, input.page ?? 1);
+  const pageSize = Math.max(
+    1,
+    Math.min(input.page_size ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE)
+  );
+  const report = await adapter(client).searchClientReport({
+    location_id: input.location_id,
+    filters: input.filters ?? {},
+    match: input.match ?? 'all',
+    page,
+    page_size: pageSize,
+    ...(input.order_by ? { order_by: input.order_by } : {}),
+    ...(input.order_direction
+      ? { order_direction: input.order_direction }
+      : {}),
+  });
+  return {
+    text: segmentSummary(
+      {
+        ...report,
+        rows: report.rows.map(({ id, name }) => ({ id, name })),
+      },
+      input.order_by,
+      ROWS_IN_SUMMARY
+    ),
+    structuredContent: {
+      location_id: input.location_id,
+      filters_applied: input.filters ?? {},
+      match: input.match ?? 'all',
+      total_count: report.total_count,
+      page: report.page,
+      page_size: report.page_size,
+      returned: report.rows.length,
+      has_more: report.total_count > page * pageSize,
+      contacts_included: false,
+      rows: report.rows,
+    },
+  };
+}
+
 // ========== client card ==========
 
 export async function getClientCard(

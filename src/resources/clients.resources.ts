@@ -19,6 +19,13 @@ the **total match count** across all pages plus one page of clients (id and
 name). Order it by \`total_spent\`, \`visit_count\` or \`last_visit_date\` to get
 top or lapsing clients first.
 
+For a paged report with lifetime sold amount, arrived visits, first/last arrived-visit dates,
+discount and client-account balance per client, use
+\`clients_get_segment_report\`. It uses the same filters and one search request
+per page, without contact fields or per-client card requests. Its money and
+visit columns describe the client's lifetime history, even when a filter uses
+an appointment date window.
+
 - **match**: \`all\` (every filter must hold, the default) or \`any\` (any filter).
 - **paging**: \`page\` (1-based) and \`page_size\` (max 200, default 25).
 - **fields**: advanced — extra columns per row. Leave unset for a reliable
@@ -125,6 +132,7 @@ to you.
 ## Neighbours
 
 - One client's full card: \`clients_get_card\`.
+- Paged client value and engagement rows: \`clients_get_segment_report\`.
 - One client's visit/purchase history (and unpaid visits): \`clients_get_visit_history\`.
 - Resolve a name to an id fast: \`clients_lookup\`.
 - A complete, deterministically paged win-back audience with an inclusive

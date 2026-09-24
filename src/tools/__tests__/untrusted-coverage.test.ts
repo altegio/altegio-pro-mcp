@@ -287,6 +287,19 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     },
   },
 
+  clients_get_segment_report: {
+    what: 'client names on the report page',
+    canary: {
+      args: { location_id: 1, filters: {} },
+      routes: [
+        {
+          match: /\/company\/1\/clients\/search/,
+          body: ok(envelope([{ id: 9, name: CANARY }], { total_count: 1 })),
+        },
+      ],
+    },
+  },
+
   clients_get_card: {
     what: 'client name, tags and the comment staff wrote on the card',
     canary: {

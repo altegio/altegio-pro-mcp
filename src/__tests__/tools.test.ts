@@ -125,8 +125,8 @@ describe('Tool Registration', () => {
       expect(toolNames).not.toContain(withheld);
     }
 
-    // Total: 69 served factory-defined + 12 onboarding = 81 tools
-    expect(toolNames.length).toBe(81);
+    // Total: 70 served factory-defined + 12 onboarding = 82 tools
+    expect(toolNames.length).toBe(82);
   });
 
   it('should create server with tools', () => {
