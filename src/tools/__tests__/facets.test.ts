@@ -296,8 +296,8 @@ describe('static views', () => {
     ).length;
 
     it('has the whole served pack registered', () => {
-      // 33 defined, 6 withheld — see src/tools/disabled-tools.ts.
-      expect(analyticsCount).toBe(27);
+      // 34 defined, 6 withheld — see src/tools/disabled-tools.ts.
+      expect(analyticsCount).toBe(28);
     });
 
     it('admits only the named entry points to the default view', () => {

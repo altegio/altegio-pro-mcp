@@ -914,6 +914,42 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       source: 'extended',
     },
   ],
+  analytics_get_client_payer_cohorts: [
+    {
+      path: '/user/permissions/{location_id}',
+      method: 'get',
+      operationId: 'get_permission_list',
+      pathParams: ['location_id'],
+    },
+    {
+      path: '/finances_reports/annual_report/{location_id}/',
+      method: 'get',
+      operationId: 'get_legacy_profit_and_loss_report',
+      pathParams: ['location_id'],
+      queryParams: ['date_from', 'date_to'],
+      source: 'extended',
+    },
+    {
+      path: '/finances/transactions_search/{location_id}/',
+      method: 'get',
+      operationId: 'get_legacy_finance_transaction_list',
+      pathParams: ['location_id'],
+      queryParams: [
+        'start_date',
+        'end_date',
+        'type',
+        'page',
+        'editable_length',
+      ],
+      source: 'extended',
+    },
+    {
+      path: '/finance_transactions/{location_id}/{transaction_id}',
+      method: 'get',
+      operationId: 'get_financial_transaction',
+      pathParams: ['location_id', 'transaction_id'],
+    },
+  ],
   analytics_get_capacity_heatmap: [
     {
       path: '/company/{location_id}/staff/schedule',

@@ -7,6 +7,7 @@
  * owners.
  */
 import type { AltegioClient } from '../../providers/altegio-client.js';
+import { load } from 'cheerio';
 import { AltegioApiError } from '../../utils/errors.js';
 import {
   parseCashReceiptsHtml,
@@ -30,6 +31,7 @@ import type {
 } from '../legacy-analytics-api.js';
 import {
   parseTeamMemberCapacityHtml,
+  LegacyAnalyticsParseError,
   parseGroupEventPerformanceHtml,
   parseProductSalesHtml,
   parseCashFlowBreakdownHtml,
@@ -260,6 +262,91 @@ export class V1LegacyAnalyticsAdapter {
         input.date_to
       ),
     };
+  }
+
+  /** Ordered active finance transaction IDs and local dates from one ERP page. */
+  async getFinanceTransactionIdsPage(input: {
+    location_id: number;
+    date_from: string;
+    date_to: string;
+    page: number;
+    page_size: number;
+    type_id: number;
+  }): Promise<{
+    rows: Array<{ id: number; local_date: string }>;
+    count: number;
+  }> {
+    const response = await this.client.requestLegacyWebReport({
+      locationId: input.location_id,
+      path: `/finances/transactions_search/${input.location_id}/`,
+      query: {
+        start_date: input.date_from,
+        end_date: input.date_to,
+        page: input.page,
+        editable_length: input.page_size,
+        type: input.type_id,
+      },
+    });
+    const { html, count } = await readSearchEnvelope(response, 'payer cohorts');
+    const $ = load(html);
+    const rows = $('tr[data-locator^="transactions_table_row_"]');
+    const parsed = rows.toArray().map((row) => {
+      const item = $(row);
+      const locator = item.attr('data-locator') ?? '';
+      const match = /^transactions_table_row_([1-9]\d*)$/.exec(locator);
+      const id = match ? Number(match[1]) : NaN;
+      if (!Number.isSafeInteger(id))
+        throw new LegacyAnalyticsParseError(
+          'payer cohorts',
+          'invalid transaction ID'
+        );
+      const shown = /\b(\d{2})\.(\d{2})\.(\d{2})\b/.exec(
+        item.find('td.transactions-table__date').first().text()
+      );
+      if (!shown)
+        throw new LegacyAnalyticsParseError(
+          'payer cohorts',
+          'missing local transaction date'
+        );
+      const years = [
+        Number(input.date_from.slice(0, 4)),
+        Number(input.date_to.slice(0, 4)),
+      ];
+      const year = years.find(
+        (candidate) => candidate % 100 === Number(shown[3])
+      );
+      if (year === undefined)
+        throw new LegacyAnalyticsParseError(
+          'payer cohorts',
+          'ambiguous local transaction year'
+        );
+      const localDate = `${year}-${shown[2]}-${shown[1]}`;
+      const parsedDate = new Date(`${localDate}T00:00:00Z`);
+      if (
+        !Number.isFinite(parsedDate.getTime()) ||
+        parsedDate.toISOString().slice(0, 10) !== localDate ||
+        localDate < input.date_from ||
+        localDate > input.date_to
+      )
+        throw new LegacyAnalyticsParseError(
+          'payer cohorts',
+          'transaction outside requested local dates'
+        );
+      return { id, local_date: localDate };
+    });
+    const expected = Math.max(
+      0,
+      Math.min(input.page_size, count - (input.page - 1) * input.page_size)
+    );
+    if (
+      parsed.length !== expected ||
+      new Set(parsed.map((row) => row.id)).size !== parsed.length
+    )
+      throw new LegacyAnalyticsParseError(
+        'payer cohorts',
+        'a finance page was missing or duplicated'
+      );
+    return { rows: parsed, count };
   }
 
   private async teamMembers(

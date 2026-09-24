@@ -6,6 +6,15 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — bounded cash-basis payer cohorts
+
+`analytics_get_client_payer_cohorts` joins the permission-filtered finance
+transaction list to documented V1 transaction detail, reconciles the four
+selected cash streams to the monthly finance report, and returns payer deciles
+with paged client IDs. It requires unrestricted finance history and refuses a
+changed, oversized or incomplete source. The source audit records the exact
+cash basis and remaining snapshot and scale limits.
+
 ### Added — service mix and client service penetration
 
 Two read-only analytics tools compose the documented V1 appointment list into

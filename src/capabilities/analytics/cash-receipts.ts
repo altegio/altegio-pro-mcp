@@ -24,7 +24,7 @@ const STREAM_IDS = {
 type Stream = keyof typeof STREAM_IDS;
 const STREAMS = Object.keys(STREAM_IDS) as Stream[];
 
-function validatePeriod(from: string, to: string): void {
+export function validatePeriod(from: string, to: string): void {
   const start = new Date(`${from}T00:00:00Z`);
   const end = new Date(`${to}T00:00:00Z`);
   if (
@@ -56,10 +56,10 @@ function validatePeriod(from: string, to: string): void {
 
 const money = (cents: number): number => cents / 100;
 
-async function assertFinanceReportAccess(
+export async function assertFinanceReportAccess(
   client: AltegioClient,
   locationId: number
-): Promise<void> {
+): Promise<Record<string, unknown>> {
   const response = await client.request<Record<string, unknown>>(
     'GET',
     `/user/permissions/${locationId}`
@@ -97,6 +97,7 @@ async function assertFinanceReportAccess(
       );
     }
   }
+  return rights;
 }
 
 export async function getCustomerCashReceipts(

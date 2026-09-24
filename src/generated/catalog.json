@@ -8123,8 +8123,8 @@
       "method": "GET",
       "path": "/clients/{location_id}",
       "displayPath": "/clients/{location_id}",
-      "summary": "Deprecated. Get a list of clients",
-      "description": "+ Parameter\r\n    + company_id (required, number, `1`) - location ID\r\n    + page (number, `1`) - Page number\r\n    + count (number, `20`) - Number of clients per page\r\n\r\n\r\n#### Client filtering\r\n+ fullname:Joh (optional, string) - Name (part of name) to filter clients\r\n+ phone:1315 (optional, string) - Phone (part of the number) for filtering clients\r\n+ email:test@ (optional, string) - Email (part) for client filtering\r\n+ card:5663rt (optional, string) - Card (part) for filtering customers by loyalty card number\r\n+ paid_min:100 (optional, number) - Minimum amount paid, to filter customers by the amount of payments\r\n+ paid_max:0 (optional, number) - Maximum amount paid, to filter customers by the amount of payments\r\n+ paid_max:0 (optional, number) - Maximum amount paid, to filter customers by the amount of payments\r\n+ id:66 (optional, number) - ID of one client for filtering clients\r\n+ id[]: 66 (optional, array) - IDs of multiple clients to filter\r\n+ changed_after: '2000-01-01T00:00:00' (optional, string) - Filtering clients changed/created since a specific date and time\r\n+ changed_before: '2020-12-31T23:59:59' (optional, string) - Filtering clients changed/created before a specific date and time",
+      "summary": "Deprecated. Get full client profiles in a location",
+      "description": "Returns full client cards (including categories, custom fields, lifetime spent and paid amounts) in ascending client ID order. The default page is 1 and the default count is 20; count is limited to 300. The response includes meta.total_count for pagination. Requires both location edit access and client-base access. Phone, email and comments can be masked or omitted according to the user permissions. This legacy route has only the filters listed below. For richer segmentation and sorting, use POST /company/{location_id}/clients/search; that endpoint returns a selected field projection rather than full cards.",
       "tags": [
         "Clients"
       ],
@@ -8147,12 +8147,44 @@
           }
         },
         {
+          "description": "Loyalty card number fragment",
+          "name": "card",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "Include clients changed after this ISO 8601 date-time",
+          "name": "changed_after",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        {
+          "description": "Include clients changed before this ISO 8601 date-time",
+          "name": "changed_before",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        {
           "description": "Number of customers per page",
           "name": "count",
           "in": "query",
           "required": false,
           "schema": {
-            "type": "number"
+            "default": 20,
+            "maximum": 300,
+            "minimum": 1,
+            "type": "integer"
           }
         },
         {
@@ -8174,12 +8206,24 @@
           }
         },
         {
-          "description": "ID of one or more clients to filter clients",
-          "name": "location_id",
+          "description": "Client ID (for several IDs, use the repeated id[] parameter)",
+          "name": "id",
           "in": "query",
           "required": false,
           "schema": {
-            "type": "number"
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Repeat this parameter for each client ID to include",
+          "name": "id[]",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
           }
         },
         {
@@ -8188,7 +8232,9 @@
           "in": "query",
           "required": false,
           "schema": {
-            "type": "number"
+            "default": 1,
+            "minimum": 1,
+            "type": "integer"
           }
         },
         {
@@ -8197,7 +8243,8 @@
           "in": "query",
           "required": false,
           "schema": {
-            "type": "number"
+            "minimum": 1,
+            "type": "integer"
           }
         },
         {
@@ -8206,7 +8253,8 @@
           "in": "query",
           "required": false,
           "schema": {
-            "type": "number"
+            "minimum": 1,
+            "type": "integer"
           }
         },
         {
@@ -8232,13 +8280,12 @@
                 "type": "number"
               },
               "birth_date": {
-                "description": "Client's date of birth",
-                "format": "date",
+                "description": "Client date of birth (YYYY-MM-DD, or an empty string when unset)",
                 "type": "string"
               },
               "card": {
                 "description": "Client card number",
-                "type": "number"
+                "type": "string"
               },
               "categories": {
                 "description": "Client categories",
@@ -8253,25 +8300,21 @@
                 "type": "string"
               },
               "custom_fields": {
+                "additionalProperties": true,
                 "description": "Additional client fields",
-                "properties": {},
                 "type": "object"
               },
               "discount": {
                 "description": "Discount",
                 "type": "number"
               },
+              "display_name": {
+                "description": "Formatted client name",
+                "type": "string"
+              },
               "email": {
                 "description": "Client Email",
                 "type": "string"
-              },
-              "gender": {
-                "description": "Gender name",
-                "type": "string"
-              },
-              "gender_id": {
-                "description": "Gender identifier, 0 - unknown, 1 - male, 2 - female",
-                "type": "number"
               },
               "id": {
                 "description": "Client ID",
@@ -8294,9 +8337,25 @@
                 "description": "Client name",
                 "type": "string"
               },
+              "paid": {
+                "description": "Lifetime amount paid by the client in this location, in major currency units",
+                "type": "number"
+              },
+              "patronymic": {
+                "description": "Client patronymic",
+                "type": "string"
+              },
               "phone": {
                 "description": "Customer phone",
                 "type": "string"
+              },
+              "sex": {
+                "description": "Gender name",
+                "type": "string"
+              },
+              "sex_id": {
+                "description": "Gender identifier, 0 - unknown, 1 - male, 2 - female",
+                "type": "integer"
               },
               "sms_check": {
                 "description": "1 - Happy Birthday by SMS, 0 - do not congratulate",
@@ -8307,8 +8366,12 @@
                 "type": "number"
               },
               "spent": {
-                "description": "How much money spent in the location at the time of adding",
+                "description": "Lifetime amount sold to the client in this location, in major currency units",
                 "type": "number"
+              },
+              "surname": {
+                "description": "Client surname",
+                "type": "string"
               },
               "visits": {
                 "description": "Number of visits",
@@ -13391,6 +13454,7 @@
       "path": "/company/{location_id}/clients/search",
       "displayPath": "/company/{location_id}/clients/search",
       "summary": "Get a list of clients",
+      "description": "Filter and sort the client base, returning meta.total_count and only the requested fields for one page. If fields is omitted, each row contains only id. This endpoint cannot return tags/categories, custom fields, birth date, loyalty card or comments; use the deprecated GET /clients/{location_id} for full profile pages or GET /client/{location_id}/{id} for one card.",
       "tags": [
         "Clients"
       ],
@@ -13420,8 +13484,24 @@
           "description": "Get a list of clients",
           "properties": {
             "fields": {
-              "description": "Fields to be returned in the response",
+              "description": "Fields to return in each row. id is always included; without this property, only id is returned. Categories/tags and custom fields are unavailable here.",
               "items": {
+                "enum": [
+                  "id",
+                  "name",
+                  "surname",
+                  "patronymic",
+                  "phone",
+                  "email",
+                  "discount",
+                  "first_visit_date",
+                  "last_visit_date",
+                  "sold_amount",
+                  "visits_count",
+                  "tips_count",
+                  "deposit_balance",
+                  "reserved_deposit_balance"
+                ],
                 "type": "string"
               },
               "type": "array"
@@ -13463,7 +13543,7 @@
                 "first_visit_date",
                 "last_visit_date",
                 "sold_amount",
-                "visit_count"
+                "visits_count"
               ],
               "type": "string"
             },
