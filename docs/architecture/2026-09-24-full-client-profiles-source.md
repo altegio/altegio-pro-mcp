@@ -30,3 +30,9 @@ search because it loads labels, custom fields and financial totals per page.
 Use the summary search for broad segmentation and this endpoint for bounded
 full-card retrieval. Replace the adapter when V3 provides an equivalent
 documented profile-list contract; keep the MCP shape and permission behavior.
+
+A read-only live call against demo location 4564 on 2026-09-24 returned a valid
+total count and one full profile with tags, custom fields and paid amount. A
+second call through the MCP use case verified that its default projection
+omitted standard phone, email and custom-field keys. No client values were
+printed or recorded.
