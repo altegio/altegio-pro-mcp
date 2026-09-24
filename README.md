@@ -14,7 +14,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Features
 
-- **83 tools served (89 defined, 6 withheld from every view)** — including a 24-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
+- **90 tools served (96 defined, 6 withheld from every view)** — including a 24-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
 - **Administrative writes** for staff, services, appointments, schedules, clients, categories, booking forms, and location users
 - **Analytics**: key metrics, profit-and-loss and cash-flow views, capacity heatmaps, revenue leakage, team-member × service analysis, product/inventory decisions, retention, forecasts and day-end reporting
 - **Location settings**: appointment calendar, online booking, booking forms, resources
@@ -28,7 +28,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Available Tools
 
-**83 tools served (89 defined, 6 withheld from every view)**, organized by category
+**90 tools served (96 defined, 6 withheld from every view)**, organized by category
 for complete business management. Which of them a given address serves, and why,
 is the generated table in
 [`docs/architecture/tool-surface.md`](docs/architecture/tool-surface.md).
@@ -40,6 +40,7 @@ is the generated table in
 ### 🏢 Location Management
 - `list_locations` - Get managed locations (requires auth)
 - `update_location` - Rename or change a location's address, city, contacts, coordinates, or business type
+- `diagnose_location_access` - Diagnose the current user's location access and effective rights after a 403
 
 ### 👥 Staff Management
 - `get_staff` - View staff members with admin details
@@ -77,6 +78,7 @@ update/delete are intentionally not exposed; internal V2 routes are out of scope
 - `create_appointment` - Create client appointment
 - `update_appointment` - Modify existing appointment
 - `delete_appointment` - Cancel appointment
+- `appointments_attendance_preview` / `appointments_attendance_apply` - Preview up to 20 attendance changes, then apply by visit group with human confirmation; linked appointments may change and earlier groups cannot be rolled back after failure
 
 ### ⚙️ Location Settings
 - `get_appointment_settings` / `update_appointment_settings` - Appointment calendar defaults (record type, group capacity)
@@ -86,6 +88,9 @@ update/delete are intentionally not exposed; internal V2 routes are out of scope
 ### 👤 Clients and Location Access
 - `clients_search`, `clients_get_segment_report`, `clients_list_profiles`, `clients_get_card`, `clients_get_visit_history`, `clients_lookup` - Search, report on and inspect the client base
 - `clients_delete` - Permanently delete a client
+- `clients_get_membership_purchases` - Verify membership identity and linked sale evidence; sale date and nominal value are conditional, paid amount is null without item attribution
+- `clients_list_comments` / `clients_add_comment` - Read or add client card text comments, including form URLs as text
+- `clients_list_files` - Read uploaded file metadata and download links (completed-file upload is not offered by the hosted MCP transport)
 - `remove_location_user` - Revoke a user's access to one location; requires the user ID twice as an explicit safeguard
 
 ### 🪑 Resources
@@ -93,7 +98,7 @@ update/delete are intentionally not exposed; internal V2 routes are out of scope
 
 ### 🧭 API Explorer (universal executor)
 
-Three tools cover the **whole documented Altegio API** — 317 operations — so a
+Three tools cover the **whole documented Altegio API** — 320 operations — so a
 question that no dedicated tool answers is still answerable, the day the spec
 changes and before anyone curates a tool for it. They are backed by
 [`src/generated/catalog.json`](docs/architecture/catalog.md), built from the
@@ -467,18 +472,19 @@ Four properties are deliberate:
 
 | Tools                                                                                                                             | Required scope                                                            |
 | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `list_locations`, `get_resources`, `get_*_settings`, `get_booking_forms`                                                          | `locations:read`                                                          |
+| `list_locations`, `diagnose_location_access`, `get_resources`, `get_*_settings`, `get_booking_forms`                                                          | `locations:read`                                                          |
 | `update_location`, `update_*_settings`, `create_booking_form`, `delete_booking_form`                                              | `locations:write`                                                         |
 | `get_staff`, `get_positions`, `get_schedule`                                                                                      | `team_members:read`                                                       |
 | `create_staff`, `update_staff`, `delete_staff`, `create_position`, `create_schedule`, `update_schedule`, `delete_schedule`        | `team_members:write`                                                      |
 | `remove_location_user`                                                                                                            | `team_members:manage_access`                                              |
 | `get_services`, `get_service_categories`                                                                                          | `services:read`                                                           |
 | `create_service`, `update_service`, `delete_service`, `delete_service_category`, the four service ↔ team-member link tools        | `services:write`                                                          |
-| `get_appointments`                                                                                                                | `appointments:read`                                                       |
+| `get_appointments`, `appointments_attendance_preview`                                                                                                                | `appointments:read`                                                       |
 | `create_appointment`                                                                                                              | `appointments:create`                                                     |
-| `update_appointment`, `delete_appointment`                                                                                        | `appointments:write`                                                      |
-| `clients_search`, `clients_get_segment_report`, `clients_list_profiles`, `clients_get_card`, `clients_get_visit_history`, `clients_lookup`                | `clients:read`                                                            |
-| `clients_delete`                                                                                                                  | `clients:write`                                                           |
+| `update_appointment`, `delete_appointment`, `appointments_attendance_apply`                                                                                        | `appointments:write`                                                      |
+| `clients_search`, `clients_get_segment_report`, `clients_list_profiles`, `clients_get_card`, `clients_get_visit_history`, `clients_lookup`, `clients_list_comments`, `clients_list_files` | `clients:read`                                                            |
+| `clients_get_membership_purchases` | `clients:read` + `loyalty:read` + `products:read` |
+| `clients_delete`, `clients_add_comment`                                                                                                                  | `clients:write`                                                           |
 | `analytics_*` reads                                                                                                               | `analytics:read` _(placeholder domain — no v3 scope exists yet)_          |
 | `altegio_call_operation`                                                                                                          | `api:read` _(placeholder — one tool reaches every documented GET)_        |
 | `altegio_login`, `altegio_logout`, `altegio_search_operations`, `altegio_describe_operation`, the wizard's local-state tools      | none                                                                      |

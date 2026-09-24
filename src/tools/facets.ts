@@ -172,6 +172,8 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
       'create_appointment',
       'update_appointment',
       'delete_appointment',
+      'appointments_attendance_preview',
+      'appointments_attendance_apply',
     ],
     prefixes: ['clients_'],
   },
@@ -182,6 +184,7 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
    */
   catalog: {
     tools: [
+      'diagnose_location_access',
       'update_location',
       'get_services',
       'create_service',
@@ -222,17 +225,16 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
    * is partial on purpose.
    */
   finance: {
-    tools: [],
+    tools: ['clients_get_membership_purchases'],
     prefixes: ['analytics_'],
   },
 
   /**
-   * Reaching clients. Intended membership (ADR-001 D3): loyalty programs,
-   * notifications and chain-level tools. None exist yet, so the facet carries
-   * only the base tools.
+   * Reaching clients. Membership purchase evidence is the first loyalty
+   * workflow here; notifications and chain-level tools remain future work.
    */
   marketing: {
-    tools: [],
+    tools: ['clients_get_membership_purchases'],
     prefixes: [],
   },
 

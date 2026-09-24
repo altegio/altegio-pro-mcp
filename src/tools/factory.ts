@@ -40,6 +40,8 @@ export interface ToolAnnotations {
 export interface HandlerOutput {
   text: string;
   structuredContent?: unknown;
+  /** A partial workflow or refused mutation did not finish its requested work. */
+  isError?: boolean;
   /**
    * Content blocks appended after the text summary — a `resource_link` to
    * output that does not fit in the result's size budget (ADR-001 D8).
@@ -159,16 +161,18 @@ export function defineTool<T extends ZodType>(
     createHandler: (client: AltegioClient) => (args: unknown) =>
       withErrorHandling(def.name, async () => {
         const input = def.input.parse(args ?? {}) as z.infer<T>;
-        const { text, structuredContent, extraContent } = await def.handler({
-          input,
-          client,
-        });
+        const { text, structuredContent, extraContent, isError } =
+          await def.handler({
+            input,
+            client,
+          });
         const result: ToolResult = {
           content: [{ type: 'text' as const, text }, ...(extraContent ?? [])],
         };
         if (structuredContent !== undefined) {
           result.structuredContent = structuredContent;
         }
+        if (isError === true) result.isError = true;
         return result;
       }),
 

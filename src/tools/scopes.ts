@@ -50,7 +50,7 @@ import type { ToolResult } from './tool-result.js';
  * (`biz.erp/docs/research/api-standardization/v3-plan/scope-catalog.md`,
  * status "обновлено 2026-09-01, не финал"). Only the ones this server's tools
  * actually need are listed; the catalog carries more (`visits:*`,
- * `payments:*`, `finance:read`, `loyalty:read`, `products:read`,
+ * `payments:*`, `finance:read`,
  * `availability:read`, `locations:create`, the four `chain_*` names) and they
  * are deliberately absent until a tool needs one.
  */
@@ -67,6 +67,8 @@ const V3_CATALOG_SCOPES = [
   'appointments:read',
   'appointments:create',
   'appointments:write',
+  'loyalty:read',
+  'products:read',
 ] as const;
 
 /**
@@ -223,6 +225,7 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
 
   // --- Location and its settings -------------------------------------------
   list_locations: 'locations:read',
+  diagnose_location_access: 'locations:read',
   update_location: 'locations:write',
   get_appointment_settings: 'locations:read',
   update_appointment_settings: 'locations:write',
@@ -262,12 +265,22 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
 
   // --- Appointments ---------------------------------------------------------
   get_appointments: 'appointments:read',
+  appointments_attendance_preview: 'appointments:read',
+  appointments_attendance_apply: 'appointments:write',
   create_appointment: 'appointments:create',
   update_appointment: 'appointments:write',
   delete_appointment: 'appointments:write',
 
   // --- Client base ----------------------------------------------------------
   clients_search: 'clients:read',
+  clients_get_membership_purchases: [
+    'clients:read',
+    'loyalty:read',
+    'products:read',
+  ],
+  clients_list_comments: 'clients:read',
+  clients_add_comment: 'clients:write',
+  clients_list_files: 'clients:read',
   clients_get_segment_report: 'clients:read',
   clients_list_profiles: 'clients:read',
   clients_get_card: 'clients:read',

@@ -27,10 +27,12 @@ const KNOWN_DISCREPANCIES: Record<string, string> = {};
  * Run after pulling latest spec: git -C ../biz.erp.api.docs pull origin master
  */
 
-const SPEC_PATH = path.resolve(
-  __dirname,
-  '../../../../biz.erp.api.docs/docs/en/b2b-v1/openapi.yaml'
-);
+const SPEC_PATH = process.env.ALTEGIO_API_DOCS
+  ? path.resolve(process.env.ALTEGIO_API_DOCS, 'docs/en/b2b-v1/openapi.yaml')
+  : path.resolve(
+      __dirname,
+      '../../../../biz.erp.api.docs/docs/en/b2b-v1/openapi.yaml'
+    );
 
 // Resolved OpenAPI spec (all $refs dereferenced)
 let spec: any;
