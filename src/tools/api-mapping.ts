@@ -898,6 +898,22 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       source: 'extended',
     },
   ],
+  analytics_get_customer_cash_receipts: [
+    {
+      path: '/user/permissions/{location_id}',
+      method: 'get',
+      operationId: 'get_permission_list',
+      pathParams: ['location_id'],
+    },
+    {
+      path: '/finances_reports/annual_report/{location_id}/',
+      method: 'get',
+      operationId: 'get_legacy_profit_and_loss_report',
+      pathParams: ['location_id'],
+      queryParams: ['date_from', 'date_to'],
+      source: 'extended',
+    },
+  ],
   analytics_get_capacity_heatmap: [
     {
       path: '/company/{location_id}/staff/schedule',

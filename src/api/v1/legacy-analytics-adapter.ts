@@ -8,6 +8,11 @@
  */
 import type { AltegioClient } from '../../providers/altegio-client.js';
 import { AltegioApiError } from '../../utils/errors.js';
+import {
+  parseCashReceiptsHtml,
+  type PostedIncomeMonth,
+} from './cash-receipts-parser.js';
+import { isValidTimezone } from '../../capabilities/analytics/periods.js';
 import type {
   LegacyPeriodRequest,
   GroupEventPerformanceRequest,
@@ -220,6 +225,41 @@ export class V1LegacyAnalyticsAdapter {
     return canonicalCurrency(
       location.currency_short_title ?? location.currency ?? null
     );
+  }
+
+  /** Posted income by local calendar month, using the same ledger as P&L. */
+  async getPostedIncomeMonths(input: {
+    location_id: number;
+    date_from: string;
+    date_to: string;
+  }): Promise<{
+    currency: string | null;
+    timezone: string | null;
+    months: PostedIncomeMonth[];
+  }> {
+    const [response, location] = await Promise.all([
+      this.client.requestLegacyWebReport({
+        locationId: input.location_id,
+        path: `/finances_reports/annual_report/${input.location_id}/`,
+        query: { date_from: input.date_from, date_to: input.date_to },
+      }),
+      this.client.getLocation(input.location_id, { my: 1 }),
+    ]);
+    return {
+      currency: canonicalCurrency(
+        location.currency_short_title ?? location.currency ?? null
+      ),
+      timezone:
+        typeof location.timezone_name === 'string' &&
+        isValidTimezone(location.timezone_name)
+          ? location.timezone_name
+          : null,
+      months: parseCashReceiptsHtml(
+        await readHtmlPage(response, 'cash receipts'),
+        input.date_from,
+        input.date_to
+      ),
+    };
   }
 
   private async teamMembers(

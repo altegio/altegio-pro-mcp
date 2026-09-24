@@ -312,6 +312,7 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   analytics_get_product_sales: 'analytics:read',
   analytics_get_cash_flow_breakdown: 'analytics:read',
   analytics_get_profit_and_loss_statement: 'analytics:read',
+  analytics_get_customer_cash_receipts: 'analytics:read',
   analytics_get_capacity_heatmap: 'analytics:read',
   analytics_get_revenue_leakage: 'analytics:read',
   analytics_get_team_member_service_matrix: 'analytics:read',

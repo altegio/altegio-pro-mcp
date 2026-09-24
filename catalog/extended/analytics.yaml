@@ -859,6 +859,11 @@ paths:
       x-altegio-caveat: >-
         Returns a localized HTML page. When the report-builder feature hides
         system reports this route redirects and is treated as unavailable.
+        The backend rounds the requested period to whole local calendar months,
+        reads an unbounded active transaction list for authorized accounts,
+        and renders signed monthly income-category rows with drill-down IDs.
+        The cash-receipts adapter accepts only complete months and reconciles
+        every income component against the source aggregate.
       parameters:
         - { name: location_id, in: path, required: true, schema: { type: integer } }
         - { name: date_from, in: query, required: true, schema: { type: string, format: date } }
