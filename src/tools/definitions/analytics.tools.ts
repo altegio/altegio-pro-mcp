@@ -28,6 +28,7 @@ import * as analytics from '../../capabilities/analytics/use-cases.js';
 import * as legacyAnalytics from '../../capabilities/analytics/legacy-use-cases.js';
 import * as decisionAnalytics from '../../capabilities/analytics/decision-use-cases.js';
 import * as reactivationAnalytics from '../../capabilities/analytics/reactivation.js';
+import * as serviceMix from '../../capabilities/analytics/service-mix.js';
 import { includeContactsArg } from '../contacts.js';
 import { clientFiltersSchema } from './client-filters.schema.js';
 
@@ -820,6 +821,95 @@ export const analyticsGetServiceProfitabilityTool = defineTool({
   }),
   handler: async ({ input, client }) =>
     legacyAnalytics.getServiceProfitability(client, input),
+});
+
+export const analyticsGetServiceMixTrendTool = defineTool({
+  name: 'analytics_get_service_mix_trend',
+  category: 'Analytics',
+  description:
+    '[Analytics] Monthly delivered service value from attended appointment service lines, grouped by service, current category, team member or unambiguously assigned appointment resource. Scans every source page or refuses the call; no partial totals. manual_cost is the line total before loyalty deductions, not cash receipts or accounting revenue. Resource assignment is not proof of device use; multiple lines or instances go into an unattributed group. Product sales and client-account top-ups are excluded.',
+  annotations: { title: 'Analytics: service mix trend', ...READ_ONLY },
+  input: z.object({
+    location_id: locationId,
+    ...periodFields,
+    group_by: z
+      .enum(['service', 'current_category', 'team_member', 'assigned_resource'])
+      .optional(),
+    team_member_id: z.number().int().positive().optional(),
+    page: z.number().int().positive().optional(),
+    page_size: z.number().int().min(1).max(50).optional(),
+  }),
+  outputSchema: objectSchema({
+    location_id: { type: 'integer' },
+    period: periodSchema,
+    currency: str,
+    group_by: { type: 'string' },
+    team_member_id: int,
+    rows: {
+      type: 'array',
+      items: objectSchema({
+        month: { type: 'string' },
+        group_id: int,
+        group_title: str,
+        line_count: { type: 'integer' },
+        appointment_count: { type: 'integer' },
+        client_count: { type: 'integer' },
+        delivered_service_value: { type: 'number' },
+        charge_after_loyalty: num,
+        attribution: { type: 'string' },
+      }),
+    },
+    page: { type: 'object' },
+    totals: { type: 'object' },
+    provenance: { type: 'object' },
+    untrusted_data_note: { type: 'string' },
+  }),
+  handler: async ({ input, client }) =>
+    serviceMix.getServiceMixTrend(client, input),
+});
+
+export const analyticsGetClientServicePenetrationTool = defineTool({
+  name: 'analytics_get_client_service_penetration',
+  category: 'Analytics',
+  description:
+    '[Analytics] Distinct identified clients with an attended visit who used selected target services or current service categories over up to 365 days. Optionally choose source services/categories to count overlap and page stable client IDs who used source but not target, for cross-sell research. Includes delivered-value cohorts with exact denominators. Categories reflect the current catalog. Cohorts rank manual_cost from attended services, not cash spending or payer cohorts; no contacts, conversion predictions or causal uplift.',
+  annotations: { title: 'Analytics: client service penetration', ...READ_ONLY },
+  input: z.object({
+    location_id: locationId,
+    ...periodFields,
+    source_service_ids: z.array(z.number().int().positive()).max(30).optional(),
+    source_category_ids: z
+      .array(z.number().int().positive())
+      .max(30)
+      .optional(),
+    target_service_ids: z.array(z.number().int().positive()).max(30).optional(),
+    target_category_ids: z
+      .array(z.number().int().positive())
+      .max(30)
+      .optional(),
+    page: z.number().int().positive().optional(),
+    page_size: z.number().int().min(1).max(100).optional(),
+  }),
+  outputSchema: objectSchema({
+    location_id: { type: 'integer' },
+    period: periodSchema,
+    source_service_ids: { type: 'array', items: { type: 'integer' } },
+    source_category_ids: { type: 'array', items: { type: 'integer' } },
+    target_service_ids: { type: 'array', items: { type: 'integer' } },
+    target_category_ids: { type: 'array', items: { type: 'integer' } },
+    denominator: { type: 'object' },
+    target_adopters: { type: 'integer' },
+    penetration_percent: { type: 'number' },
+    source_clients: { type: 'integer' },
+    source_target_overlap: { type: 'integer' },
+    source_without_target: { type: 'integer' },
+    delivered_value_cohorts: { type: 'array', items: { type: 'object' } },
+    candidate_client_ids: { type: 'array', items: { type: 'integer' } },
+    page: { type: 'object' },
+    provenance: { type: 'object' },
+  }),
+  handler: async ({ input, client }) =>
+    serviceMix.getClientServicePenetration(client, input),
 });
 
 export const analyticsGetTeamMemberSalesTool = defineTool({

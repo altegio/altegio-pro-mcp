@@ -14,7 +14,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Features
 
-- **90 tools served (96 defined, 6 withheld from every view)** — including a 24-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
+- **92 tools served (98 defined, 6 withheld from every view)** — including a 26-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
 - **Administrative writes** for staff, services, appointments, schedules, clients, categories, booking forms, and location users
 - **Analytics**: key metrics, profit-and-loss and cash-flow views, capacity heatmaps, revenue leakage, team-member × service analysis, product/inventory decisions, retention, forecasts and day-end reporting
 - **Location settings**: appointment calendar, online booking, booking forms, resources
@@ -28,7 +28,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Available Tools
 
-**90 tools served (96 defined, 6 withheld from every view)**, organized by category
+**92 tools served (98 defined, 6 withheld from every view)**, organized by category
 for complete business management. Which of them a given address serves, and why,
 is the generated table in
 [`docs/architecture/tool-surface.md`](docs/architecture/tool-surface.md).
@@ -131,7 +131,7 @@ either a `period` preset (`today`, `yesterday`, `this_week`, `last_week`,
 `this_month`, `last_month`, `last_30_days`, `this_quarter`, `last_quarter`,
 `this_year`) or an explicit `date_from` + `date_to` pair in `YYYY-MM-DD`. Presets
 resolve in the location's own timezone, ranges over 365 days are refused before
-the call, and amounts come back in major units with an ISO currency code.
+the call, and amounts come back in major units with a source currency label or code.
 
 - `analytics_get_overview` - Key metrics with a comparison to the previous period of equal length: revenue (total, services, products), average check, occupancy, appointments by outcome, and new / returning / active / lost clients
 - `analytics_get_daily_series` - One metric family day by day as compact `[date, value]` pairs: `revenue`, `appointments` (including online bookings), `occupancy` (with the no-show share of working time) or `clients`
@@ -146,6 +146,8 @@ the call, and amounts come back in major units with an ISO currency code.
 - `analytics_get_client_retention` - New, returning, eligible-to-return and returned clients by team member
 - `analytics_get_client_forecast` - Per-client forecast export with predicted visits, return window and revenue; contacts are opt-in
 - `analytics_get_service_profitability` - Revenue, costs, compensation and contribution result by service or service category
+- `analytics_get_service_mix_trend` - Monthly attended service-line value by service, current category, team member or unambiguously assigned appointment resource; exact page scan or refusal
+- `analytics_get_client_service_penetration` - Distinct attended clients, target-service adoption, source/target overlap, delivered-value cohorts and paged client IDs for source-only candidates; no contacts
 - `analytics_get_team_member_sales` - Services, products, revenue, future appointments and worked-hour efficiency by team member
 - `analytics_get_profit_and_loss_statement` - Posted income and expense categories, sales-stream memo figures and service contribution, with explicit missing-cost disclosure instead of an unproven net-profit label
 - `analytics_get_capacity_heatmap` - Scheduled, booked, completed-utilized and idle hours by hour, weekday or date-hour, with peak and underused buckets
