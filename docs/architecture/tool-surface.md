@@ -120,6 +120,7 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | `analytics_get_appointments_breakdown` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
 | `analytics_get_capacity_heatmap` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
 | `analytics_get_cash_flow_breakdown` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_client_cash_receipts` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
 | `analytics_get_client_forecast` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
 | `analytics_get_client_payer_cohorts` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
 | `analytics_get_client_reactivation_candidates` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
@@ -127,7 +128,6 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | `analytics_get_client_sales` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
 | `analytics_get_client_service_penetration` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
 | `analytics_get_client_visit_stats` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
-| `analytics_get_customer_cash_receipts` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
 | `analytics_get_daily_series` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
 | `analytics_get_day_end_report` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
 | `analytics_get_forecast` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
@@ -155,8 +155,8 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 
 | Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `appointments_attendance_apply` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:write, confirm |
-| `appointments_attendance_preview` | `all` | `dflt` | `ro` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:read |
+| `appointments_apply_attendance` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:write, confirm |
+| `appointments_preview_attendance` | `all` | `dflt` | `ro` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:read |
 | `create_appointment` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:create |
 | `delete_appointment` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:write, confirm |
 | `get_appointments` | `all` | `dflt` | `ro` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:read |

@@ -1,12 +1,9 @@
 /** Bounded, exact scan of the documented V1 appointment list for analytics. */
 import type { AltegioClient } from '../../providers/altegio-client.js';
 import type { AltegioBooking } from '../../types/altegio.types.js';
-import {
-  httpFromClient,
-  queryString,
-  requireUserToken,
-} from '../altegio-http.js';
+import { httpFromClient, queryString } from '../altegio-http.js';
 import { AnalyticsInputError } from '../../capabilities/analytics/errors.js';
+import { callAnalytics } from './analytics-http.js';
 
 const PAGE_SIZE = 1000; // Backend PageApiRecordsController maximum.
 const MAX_RECORDS = 30000;
@@ -56,7 +53,6 @@ export async function scanRecords(
   teamMemberId?: number
 ): Promise<RecordScan> {
   const http = httpFromClient(client);
-  requireUserToken(http, 'read service analytics');
   const records: ServiceRecord[] = [];
   const ids = new Set<number>();
   let expected: number | undefined;
@@ -72,10 +68,10 @@ export async function scanRecords(
       page,
       count: PAGE_SIZE,
     })}`;
-    const response = await http.request(path);
-    if (!response.ok)
-      throw new Error(`Appointment source returned HTTP ${response.status}.`);
-    const envelope = (await response.json()) as {
+    const envelope = ((await callAnalytics(http, path, {
+      kind: 'appointments',
+      context: 'read appointments for service analytics',
+    })) ?? {}) as {
       success?: boolean;
       data?: unknown;
       meta?: { total_count?: unknown };

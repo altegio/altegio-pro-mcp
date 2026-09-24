@@ -52,6 +52,42 @@ export const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     tool: 'analytics_get_product_sales',
   },
   {
+    key: 'delivered_service_value',
+    name: 'Delivered service value',
+    definition:
+      'Recorded service-line totals of attended appointments before loyalty deductions. It measures services delivered, not cash received or accounting revenue; product sales and client-account top-ups are excluded.',
+    tool: 'analytics_get_service_mix_trend',
+  },
+  {
+    key: 'penetration_percent',
+    name: 'Service penetration',
+    definition:
+      'Share of identified active attended clients in the period who used the target services, current categories or assigned resources.',
+    formula: 'target_adopters ÷ identified active attended clients × 100',
+    tool: 'analytics_get_client_service_penetration',
+  },
+  {
+    key: 'classified_client_cash_net',
+    name: 'Classified client cash, net',
+    definition:
+      'Signed net receipts posted to authorized accounts in the standard client-payment income categories: services, products, client-account top-ups, miscellaneous income, memberships, gift cards and penalties. Refunds reduce it; custom income categories are excluded.',
+    tool: 'analytics_get_client_cash_receipts',
+  },
+  {
+    key: 'posted_income_net',
+    name: 'Posted income, net',
+    definition:
+      'All signed income posted to authorized finance accounts, custom income categories included; it reconciles to the finance report month by month.',
+    tool: 'analytics_get_client_cash_receipts',
+  },
+  {
+    key: 'payer_net_cash',
+    name: 'Payer net cash',
+    definition:
+      'Signed net receipts from identified clients in service payments, product sales, miscellaneous income and client-account top-ups. Only clients with a positive period total are ranked into payer cohorts.',
+    tool: 'analytics_get_client_payer_cohorts',
+  },
+  {
     key: 'cash_flow_net_movement',
     name: 'Cash flow net movement',
     definition:
@@ -318,11 +354,11 @@ export const COVERAGE_GAPS: readonly {
   readonly alternative: string;
 }[] = [
   {
-    topic: 'Service penetration, device revenue and client cross-sell cohorts',
+    topic: 'Per-service device usage and package-adjusted service value',
     reason:
-      'The API has no verified bounded year-wide source combining attended service lines, historical resource attribution, client identity, package-adjusted delivery value and separate cash receipts. A paged appointment scan can be incomplete and current service-resource links do not prove historical device usage.',
+      'The bulk appointment list carries the resources assigned to an appointment, not which service line used which resource, and its service-line totals are before loyalty deductions rather than package-adjusted value. The per-service resource link is readable only one visit at a time, and periods above 30,000 appointments are refused.',
     alternative:
-      'Use analytics_get_service_profitability for its stated cash/card service breakdown, and clients_get_segment_report for supported client segments. Neither is a device revenue or service-penetration report; those require new API aggregates before MCP can expose complete results.',
+      'analytics_get_service_mix_trend attributes a visit’s service value to its resource when one resource type is assigned and keeps the rest unattributed; analytics_get_client_service_penetration counts every assigned resource for client adoption and returns cross-sell candidates. Both treat resource assignment as an operational proxy. For cash-basis client ranking use analytics_get_client_payer_cohorts.',
   },
   {
     topic: 'The report builder (custom and template report tables)',
@@ -394,9 +430,11 @@ export const COVERAGE_GAPS: readonly {
       'analytics_get_appointments_breakdown by source, and the online-booking series of analytics_get_daily_series, are the closest proxies.',
   },
   {
-    topic: 'Client segments',
-    reason: 'Reserved for Altegio internal use.',
-    alternative: 'None.',
+    topic: 'Altegio’s own location segments',
+    reason:
+      'The segments API classifies locations for Altegio’s internal marketing and is restricted to Altegio’s own team.',
+    alternative:
+      'For client segments use clients_search, and clients_get_segment_report for per-client lifetime value rows.',
   },
   {
     topic: 'Chain-level analytics across locations',

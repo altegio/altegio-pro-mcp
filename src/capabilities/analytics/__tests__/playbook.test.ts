@@ -17,6 +17,7 @@ import {
   BENCHMARKS,
 } from '../playbook.js';
 import { renderPlaybook } from '../../../resources/analytics.resources.js';
+import { isToolDisabled } from '../../../tools/disabled-tools.js';
 
 const analyticsToolNames = new Set(
   (Object.values(definitions) as unknown[])
@@ -47,6 +48,18 @@ describe('analytics playbook', () => {
       (name) => !analyticsToolNames.has(name)
     );
     expect(unknown).toEqual([]);
+  });
+
+  it('routes at least one question to every served analytics tool', () => {
+    const routed = new Set(
+      QUESTION_ROUTES.flatMap((route) =>
+        [...route.tool.matchAll(/analytics_[a-z_]+/g)].map((m) => m[0])
+      )
+    );
+    const unrouted = [...analyticsToolNames].filter(
+      (name) => !isToolDisabled(name) && !routed.has(name)
+    );
+    expect(unrouted).toEqual([]);
   });
 
   it('routes every common question to an analytics tool', () => {

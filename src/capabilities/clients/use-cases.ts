@@ -193,17 +193,22 @@ export async function listClientProfiles(
     include_custom_fields?: boolean;
   }
 ): Promise<ClientsResult> {
+  const {
+    include_contacts: withContacts,
+    include_custom_fields: includeCustomFields,
+    ...query
+  } = input;
   const page = input.page ?? 1;
   const pageSize = input.page_size ?? 25;
   const result = await adapter(client).listClientProfiles({
-    ...input,
+    ...query,
     page,
     page_size: pageSize,
   });
-  const includeContacts = input.include_contacts === true;
+  const includeContacts = withContacts === true;
   const rows = result.rows.map((row) => {
     const projected = includeContacts ? { ...row } : withoutContacts(row);
-    if (input.include_custom_fields !== true) delete projected.custom_fields;
+    if (includeCustomFields !== true) delete projected.custom_fields;
     return projected;
   });
   return {
@@ -225,7 +230,7 @@ export async function listClientProfiles(
       returned: rows.length,
       has_more: result.total_count > page * pageSize,
       contacts_included: includeContacts,
-      custom_fields_included: input.include_custom_fields === true,
+      custom_fields_included: includeCustomFields === true,
       rows,
     },
   };

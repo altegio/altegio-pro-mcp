@@ -14,7 +14,14 @@ describe('client-file upload boundary', () => {
       bytes: Buffer.from([0, 1, 2]),
       mime: 'application/pdf',
     });
-    for (const name of ['../x.pdf', 'a\\b.pdf', 'x.exe', 'x\n.pdf']) {
+    for (const name of [
+      '../x.pdf',
+      'a\\b.pdf',
+      'x.exe',
+      'x\n.pdf',
+      'pdf',
+      '.pdf',
+    ]) {
       expect(() => prepareClientFile(name, 'AAEC')).toThrow();
     }
     for (const value of ['AAE', 'data:application/pdf;base64,AAEC', '']) {

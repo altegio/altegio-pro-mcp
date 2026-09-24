@@ -30,29 +30,40 @@ candidates are inspected.
 Current-phone lookup can miss prior phone numbers, transferred, deleted or
 otherwise omitted memberships, so this is not a complete historical ledger.
 
-`created_date` is membership creation, never labeled a sale. The current type
-`cost` is not a purchase price. For a linked `goods_transaction_id`, the tool
-reads the goods transaction and requires a sale transaction, a matching
+`created_date` is membership creation (`created_at`), never labeled a sale. The
+current type `cost` is not a purchase price. For a linked `goods_transaction_id`,
+the tool reads the goods transaction and requires a sale transaction, a matching
 membership type, one sold unit and a non-deleted record before reporting its
-`create_date` as sale date and `cost_per_unit` as the recorded nominal unit
-value. It follows `document_id` to the sale document when permitted. The sale
+`create_date` as `sale_date` and `cost_per_unit` as `recorded_unit_price` — the
+unit price recorded on that transaction, not a proven membership price or paid
+amount. It follows `document_id` to the sale document when permitted. The sale
 document can contain multiple items and payments, and the public contract does
 not link this goods transaction to a unique sale-item payment allocation.
 `paid_amount` therefore remains null, even if the document includes a payment
-total. Coverage explains the missing link or permission at every row.
+total. Each row states its evidence in two canonical fields:
+`sale_transaction` (`verified`, `not_linked`, `mismatch`, `forbidden`,
+`not_found`, `unavailable`) and `sale_document` (`readable`, `not_linked`,
+`not_checked`, `forbidden`, `not_found`, `unavailable`). A readable document is
+only that — its items are not matched to the membership.
 
 ## Attendance
 
-`appointments_attendance_preview` accepts 1–20 unique IDs, reads each
-appointment, its current status and visit link, and reports the user's
-`record_form_access`, `edit_records_access` and
-`records_edit_last_days_count` when the rights API is available. It mints a
-ten-minute token bound to the location, IDs, target and snapshot.
-`appointments_attendance_apply` requires that token and human confirmation,
-re-reads every selected appointment before any write, then sends one
+`appointments_preview_attendance` accepts 1–20 unique IDs, reads each
+appointment, its current status (canonical `waiting`, `confirmed`, `arrived`,
+`no_show`) and visit link — a zero visit ID means none — and reports the user's
+appointment-form and edit rights and edit window (`records_edit_last_days_count`,
+-1 = no limit) as `can_open_appointment_form`, `can_edit_appointments` and
+`edit_window_days` when the rights API is available. It mints a ten-minute token
+bound to the location, IDs, target status and that snapshot.
+`appointments_apply_attendance` takes the same selection plus the token (the
+snapshot itself is not echoed back), requires human confirmation, re-reads every
+selected appointment and refuses when the token does not match the current
+snapshot, then sends one
 `POST /company/{location_id}/records/{record_id}/attendance` per distinct
 selected visit group. It re-reads selected group members after each response
-and stops on the first failure. The backend may update linked appointments
+and stops on the first failure; each group reports an `outcome` of `updated`,
+`already_target_status`, `write_failed` (with the HTTP status) or
+`write_unverified`. The backend may update linked appointments
 that were not selected and trigger payment, loyalty or notification work. A
 response's `records` field is timetable-change data, not a per-ID bulk result.
 The workflow is not atomic and cannot roll back earlier successful groups.
@@ -69,7 +80,9 @@ used. Comment text is nonblank and at most 255 characters; a form URL remains
 text. File listing uses
 `/company/{location_id}/clients/files/{client_id}`. Results expose at most 50
 entries and state when more exist. Free text from comments, membership labels
-and filenames is sanitized before structured output.
+and filenames is sanitized in structured output and fenced as untrusted data in
+the text result. A file's `size_label` is the source's human-readable size
+(for example `96.65 KB`), not a byte count.
 
 Hosted upload uses the `clients_upload_file` MCP tool. The caller sends the
 completed file bytes as canonical raw base64 (`file_base64`) plus `filename`;

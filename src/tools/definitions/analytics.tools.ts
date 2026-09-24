@@ -827,7 +827,7 @@ export const analyticsGetServiceMixTrendTool = defineTool({
   name: 'analytics_get_service_mix_trend',
   category: 'Analytics',
   description:
-    '[Analytics] Monthly delivered service value from attended appointment service lines, grouped by service, current category, team member, assigned resource, or assigned device versus current category with service drilldown. Scans every source page or refuses the call. manual_cost is a line total before loyalty deductions, not cash receipts or accounting revenue. All lines on a visit with one known resource type are attributed to it. When several resource types are assigned, their IDs are reported but line value remains unattributed; it is never duplicated across devices. Product sales and account top-ups are excluded.',
+    '[Analytics] Monthly delivered service value from attended appointment service lines, grouped by service, current category, team member, assigned resource, or assigned device versus current category with service drilldown. Scans every appointment page of the period (at most 30,000 appointments) or refuses the call. Delivered service value is the recorded service-line total before loyalty deductions, not cash received or accounting revenue; charge_after_loyalty is the line charge after them. All lines on a visit with one known resource type are attributed to it. When several resource types are assigned, their ids are reported but line value remains unattributed; it is never duplicated across devices. Product sales and client-account top-ups are excluded; for cash use analytics_get_client_cash_receipts.',
   annotations: { title: 'Analytics: service mix trend', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -840,10 +840,29 @@ export const analyticsGetServiceMixTrendTool = defineTool({
         'assigned_resource',
         'assigned_device_or_current_category',
       ])
-      .optional(),
-    team_member_id: z.number().int().positive().optional(),
-    page: z.number().int().positive().optional(),
-    page_size: z.number().int().min(1).max(50).optional(),
+      .optional()
+      .describe(
+        'Row grouping (default service). current_category uses today’s catalog category; assigned_resource uses the resource assigned to the appointment; assigned_device_or_current_category uses that resource when there is one, otherwise the current category, with one row per service.'
+      ),
+    team_member_id: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Report on appointments of one team member only.'),
+    page: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Page of monthly rows, starting at 1.'),
+    page_size: z
+      .number()
+      .int()
+      .min(1)
+      .max(50)
+      .optional()
+      .describe('Monthly rows per page, at most 50. Default 25.'),
   }),
   outputSchema: objectSchema({
     location_id: { type: 'integer' },
@@ -886,31 +905,64 @@ export const analyticsGetClientServicePenetrationTool = defineTool({
   name: 'analytics_get_client_service_penetration',
   category: 'Analytics',
   description:
-    '[Analytics] Distinct attended clients who used target services, current categories or resources assigned to appointments over up to 365 days. Every recorded resource type on an attended service visit counts for resource adoption, including visits with multiple resources; delivered value is not duplicated across them. Returns top SKU/group adoption, confirmed mono-group clients, co-occurrence, delivered-value cohort gaps and paged non-adopter IDs. Every percentage uses the identified active attended-client denominator. Resource assignment is an operational usage proxy, not an immutable usage audit; cohorts rank delivered manual_cost, not cash spending.',
+    '[Analytics] Distinct attended clients who used target services, current categories or resources assigned to appointments over up to 365 days. Every recorded resource type on an attended service visit counts for resource adoption, including visits with multiple resources; delivered value is not duplicated across them. Returns top service and group adoption, confirmed mono-group clients (one known group only), co-occurrence, delivered-value cohort gaps and a paged list of client ids from the source group who did not use the target (cross-sell candidates; all non-adopters when no source is given). Every percentage uses the identified active attended-client denominator. Resource assignment is an operational usage proxy, not an immutable usage audit; cohorts rank delivered service value, not cash — for cash-ranked clients use analytics_get_client_payer_cohorts.',
   annotations: { title: 'Analytics: client service penetration', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
     ...periodFields,
-    source_service_ids: z.array(z.number().int().positive()).max(30).optional(),
+    source_service_ids: z
+      .array(z.number().int().positive())
+      .max(30)
+      .optional()
+      .describe(
+        'Source group: clients who used any of these services (get_services for ids). Leave all source filters empty to use every active client.'
+      ),
     source_category_ids: z
       .array(z.number().int().positive())
       .max(30)
-      .optional(),
+      .optional()
+      .describe(
+        'Source group: clients who used a service in any of these current categories.'
+      ),
     source_resource_ids: z
       .array(z.number().int().positive())
       .max(30)
-      .optional(),
-    target_service_ids: z.array(z.number().int().positive()).max(30).optional(),
+      .optional()
+      .describe(
+        'Source group: clients with an appointment assigned to any of these resources (get_resources for ids).'
+      ),
+    target_service_ids: z
+      .array(z.number().int().positive())
+      .max(30)
+      .optional()
+      .describe(
+        'Target: services whose adoption is measured. Give at least one target service, category or resource.'
+      ),
     target_category_ids: z
       .array(z.number().int().positive())
       .max(30)
-      .optional(),
+      .optional()
+      .describe(
+        'Target: current service categories whose adoption is measured.'
+      ),
     target_resource_ids: z
       .array(z.number().int().positive())
       .max(30)
-      .optional(),
-    page: z.number().int().positive().optional(),
-    page_size: z.number().int().min(1).max(100).optional(),
+      .optional()
+      .describe('Target: resources whose adoption is measured.'),
+    page: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Page of candidate client ids, starting at 1.'),
+    page_size: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe('Candidate client ids per page, at most 100. Default 50.'),
   }),
   outputSchema: objectSchema({
     location_id: { type: 'integer' },
@@ -927,7 +979,18 @@ export const analyticsGetClientServicePenetrationTool = defineTool({
     source_clients: { type: 'integer' },
     source_target_overlap: { type: 'integer' },
     source_without_target: { type: 'integer' },
-    delivered_value_cohorts: { type: 'array', items: { type: 'object' } },
+    delivered_value_cohorts: {
+      type: 'array',
+      items: objectSchema({
+        cohort: { type: 'string' },
+        denominator: { type: 'integer' },
+        target_adopters: { type: 'integer' },
+        penetration_percent: { type: 'number' },
+        target_non_adopters: { type: 'integer' },
+        confirmed_mono_group_clients: { type: 'integer' },
+        clients_with_unattributed_lines: { type: 'integer' },
+      }),
+    },
     cohort_penetration_gap_percentage_points: num,
     group_insights: objectSchema({
       group_basis: { type: 'string' },
@@ -948,7 +1011,7 @@ export const analyticsGetClientServicePenetrationTool = defineTool({
               cohort: { type: 'string' },
               denominator: { type: 'integer' },
               adopters: { type: 'integer' },
-              percent: num,
+              penetration_percent: num,
             }),
           },
           top_vs_remaining_gap_percentage_points: num,
@@ -971,12 +1034,14 @@ export const analyticsGetClientServicePenetrationTool = defineTool({
         type: 'array',
         items: objectSchema({
           first_group: objectSchema({
-            type: { type: 'string' },
-            id: { type: 'integer' },
+            group_type: { type: 'string' },
+            group_id: { type: 'integer' },
+            group_title: str,
           }),
           second_group: objectSchema({
-            type: { type: 'string' },
-            id: { type: 'integer' },
+            group_type: { type: 'string' },
+            group_id: { type: 'integer' },
+            group_title: str,
           }),
           active_clients: { type: 'integer' },
           penetration_percent: { type: 'number' },
@@ -988,6 +1053,7 @@ export const analyticsGetClientServicePenetrationTool = defineTool({
     candidate_client_ids: { type: 'array', items: { type: 'integer' } },
     page: { type: 'object' },
     provenance: { type: 'object' },
+    untrusted_data_note: { type: 'string' },
   }),
   handler: async ({ input, client }) =>
     serviceMix.getClientServicePenetration(client, input),
@@ -2027,7 +2093,7 @@ export const analyticsDeleteAssistantReportTool = defineTool({
   name: 'analytics_delete_assistant_report',
   category: 'Analytics',
   description:
-    '[Analytics] Permanently delete one report created by this assistant. The report must have a name beginning with "[Altegio Assistant]"; reports created or named by the owner are refused. Get the exact report_id from analytics_list_saved_reports. Use this to remove failed, obsolete or duplicate assistant artifacts without touching customer-created reports.',
+    '[Analytics] Permanently delete one report created by this assistant. The report must have a name beginning with "[Altegio Assistant]"; reports created or named by the owner are refused. Get the exact report_id from analytics_list_saved_reports. Use this to remove failed, obsolete or duplicate assistant artifacts without touching reports the location’s own users created.',
   annotations: {
     title: 'Analytics: delete an assistant report',
     readOnlyHint: false,

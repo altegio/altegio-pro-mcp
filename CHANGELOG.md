@@ -6,6 +6,69 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — audit of the 2026-09-24 tools
+
+Renamed before wider use, to follow the `<domain>_<verb>_<object>` rule and the
+product glossary: `appointments_attendance_preview` →
+`appointments_preview_attendance`, `appointments_attendance_apply` →
+`appointments_apply_attendance`, and `analytics_get_customer_cash_receipts` →
+`analytics_get_client_cash_receipts` (`classified_customer_cash_net` →
+`classified_client_cash_net`).
+
+- **Attendance:** statuses use the canonical appointment vocabulary (`waiting`,
+  `confirmed`, `arrived`, `no_show`) instead of V1 codes; the snapshot is
+  `appointments`, not `records`. The apply call takes the preview token and the
+  same selection only — the token is verified against a fresh re-read, so the
+  snapshot is no longer echoed back. A zero visit id means "no visit" instead
+  of breaking the apply schema. Group results report `outcome`, and a failed
+  write carries its HTTP status and the API's reason.
+- **Membership purchases:** a sale is accepted only as a live sale of one unit
+  of the membership type; its price is `recorded_unit_price` (not a proven
+  paid amount), and evidence is two canonical fields, `sale_transaction` and
+  `sale_document`, instead of free-form coverage strings. A readable sale
+  document is reported as `readable`, not "verified".
+- **Client comments and files:** comment text, filenames and membership labels
+  are fenced as untrusted data in the text result; file size is `size_label`.
+- **Service analytics:** descriptions and provenance no longer expose backend
+  field names; penetration rows use the same keys throughout (`cohort`,
+  `penetration_percent`, `group_type`/`group_id`/`group_title` for pair
+  members) and carry `untrusted_data_note`. A refused appointment list now
+  returns an actionable access error.
+- **Finance reports:** period and permission checks are shared and phrased for
+  both reports; the cash-receipts limitations point to
+  `analytics_get_client_payer_cohorts`; payer cohorts stop reading transaction
+  details after the first refusal and report an oversized period as an input
+  error.
+- **Guidance:** the analytics coverage no longer claims that service penetration
+  and device revenue are unavailable; the playbook routes a question to every
+  served analytics tool (a new test enforces it) and the glossary defines the
+  new metrics. `customer` joins the forbidden analytics vocabulary.
+- **Uploads:** a filename must have a name before its extension (`.pdf` and
+  `pdf` are refused).
+
+### Added — client-card workflows, access diagnosis and attendance
+
+`diagnose_location_access` separates effective user rights, optional
+Marketplace application declarations and the uninspectable partner grant after
+an HTTP 403. `clients_get_membership_purchases` verifies a client's memberships
+and their linked sale evidence. `clients_list_comments`, `clients_add_comment`,
+`clients_list_files` and `clients_upload_file` read and write client-card
+comments and files (uploads strictly below 12 MiB; the hosted JSON body limit
+is 17 MiB). `appointments_preview_attendance` and
+`appointments_apply_attendance` change attendance for up to 20 appointments by
+visit group with human confirmation, never atomically.
+
+### Added — client segment report and full client profiles
+
+`clients_get_segment_report` returns paged lifetime value and engagement rows
+for a `clients_search` segment without contacts. `clients_list_profiles` pages
+full client cards with opt-in contacts and custom fields.
+
+### Added — client cash receipts
+
+`analytics_get_client_cash_receipts` reports reconciled monthly net posted
+receipts by income stream for up to 12 complete local months.
+
 ### Added — bounded cash-basis payer cohorts
 
 `analytics_get_client_payer_cohorts` joins the permission-filtered finance

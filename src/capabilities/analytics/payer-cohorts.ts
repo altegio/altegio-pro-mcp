@@ -1,11 +1,21 @@
 /** Cash-basis payer cohorts from bounded, permission-filtered finance reads. */
 import type { AltegioClient } from '../../providers/altegio-client.js';
 import { V1LegacyAnalyticsAdapter } from '../../api/v1/legacy-analytics-adapter.js';
-import { AltegioApiError } from '../../utils/errors.js';
 import { LegacyAnalyticsParseError } from '../../api/v1/legacy-analytics-parser.js';
-import { assertFinanceReportAccess, validatePeriod } from './cash-receipts.js';
+import { AnalyticsAccessError, AnalyticsInputError } from './errors.js';
+import {
+  INCOME_CATEGORY_IDS,
+  assertFinanceReportAccess,
+  validateCompleteMonths,
+} from './finance-access.js';
 
-const TYPES = [5, 7, 8, 10] as const;
+/** The four client cash streams a payer is ranked by. */
+const TYPES = [
+  INCOME_CATEGORY_IDS.services,
+  INCOME_CATEGORY_IDS.products,
+  INCOME_CATEGORY_IDS.miscellaneous_income,
+  INCOME_CATEGORY_IDS.client_account_topups,
+] as const;
 const PAGE_SIZE = 200;
 const MAX_TRANSACTIONS = 4000;
 const CONCURRENCY = 16;
@@ -88,9 +98,8 @@ async function scanIds(
       if (count === null) {
         count = result.count;
         if (ids.length + count > MAX_TRANSACTIONS)
-          throw new AltegioApiError(
-            `Payer cohorts need ${ids.length + count} finance detail reads, above the ${MAX_TRANSACTIONS} transaction limit. Narrow the period; no partial cohort was returned.`,
-            413
+          throw new AnalyticsInputError(
+            `Payer cohorts need ${ids.length + count} finance detail reads, above the ${MAX_TRANSACTIONS} transaction limit. Narrow the period; no partial cohort was returned.`
           );
       } else if (result.count !== count) {
         throw new LegacyAnalyticsParseError(
@@ -122,25 +131,33 @@ async function readDetails(
 ): Promise<FinanceTransaction[]> {
   const rows = new Array<FinanceTransaction>(ids.length);
   let next = 0;
+  // The whole report fails on the first refused or inconsistent detail, so
+  // the other workers stop taking ids instead of reading the rest in vain.
+  let failed = false;
   await Promise.all(
     Array.from({ length: Math.min(CONCURRENCY, ids.length) }, async () => {
-      while (next < ids.length) {
+      while (!failed && next < ids.length) {
         const index = next++;
         const expected = ids[index]!;
-        const response = await client.request<unknown>(
-          'GET',
-          `/finance_transactions/${input.location_id}/${expected.id}`
-        );
-        const row = transaction(response.data, expected.id);
-        if (
-          row.type_id !== expected.type ||
-          (allowedAccounts && !allowedAccounts.has(row.account_id))
-        )
-          throw new LegacyAnalyticsParseError(
-            'payer cohorts',
-            'a transaction changed or fell outside the authorized source'
+        try {
+          const response = await client.request<unknown>(
+            'GET',
+            `/finance_transactions/${input.location_id}/${expected.id}`
           );
-        rows[index] = row;
+          const row = transaction(response.data, expected.id);
+          if (
+            row.type_id !== expected.type ||
+            (allowedAccounts && !allowedAccounts.has(row.account_id))
+          )
+            throw new LegacyAnalyticsParseError(
+              'payer cohorts',
+              'a transaction changed or fell outside the authorized source'
+            );
+          rows[index] = row;
+        } catch (error) {
+          failed = true;
+          throw error;
+        }
       }
     })
   );
@@ -151,22 +168,21 @@ export async function getClientPayerCohorts(
   client: AltegioClient,
   input: PayerCohortsInput
 ) {
-  validatePeriod(input.date_from, input.date_to);
+  validateCompleteMonths(input.date_from, input.date_to);
   const rights = await assertFinanceReportAccess(client, input.location_id);
   if (
     rights.finances_transactions_access !== true ||
     rights.finances_access !== true
   )
-    throw new AltegioApiError(
-      'The current user needs finance transaction and finance access for payer cohorts.',
-      403
+    throw new AnalyticsAccessError(
+      'Payer cohorts need the finance access and finance transactions rights in this location. Ask a location owner to grant them.'
     );
-  // Both the web list and the V1 detail route silently enforce this limit.
-  // Refuse it rather than returning a complete-looking shortened period.
+  // Both the web list and the V1 detail route silently enforce this limit
+  // (-1 means none). Refuse it rather than return a complete-looking cohort
+  // over a silently shortened period.
   if (Number(rights.finances_last_days_count) !== -1)
-    throw new AltegioApiError(
-      'Payer cohorts require unrestricted finance transaction history. This user has a last-days limit that can silently shorten the requested period.',
-      403
+    throw new AnalyticsAccessError(
+      'Payer cohorts require unrestricted finance transaction history. This user has a last-days limit that can silently shorten the requested period; ask a location owner to lift it or run the report as an unrestricted user.'
     );
   const allowedAccounts =
     rights.finances_accounts_limited_access === true

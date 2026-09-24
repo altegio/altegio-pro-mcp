@@ -34,7 +34,7 @@ describe('destructive tools are gated', () => {
   it('covers exactly the known destructive surface', () => {
     expect(destructiveNames).toEqual([
       'analytics_delete_assistant_report',
-      'appointments_attendance_apply',
+      'appointments_apply_attendance',
       'clients_delete',
       'delete_appointment',
       'delete_booking_form',

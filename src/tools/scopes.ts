@@ -265,8 +265,8 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
 
   // --- Appointments ---------------------------------------------------------
   get_appointments: 'appointments:read',
-  appointments_attendance_preview: 'appointments:read',
-  appointments_attendance_apply: 'appointments:write',
+  appointments_preview_attendance: 'appointments:read',
+  appointments_apply_attendance: 'appointments:write',
   create_appointment: 'appointments:create',
   update_appointment: 'appointments:write',
   delete_appointment: 'appointments:write',
@@ -312,7 +312,7 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   analytics_get_product_sales: 'analytics:read',
   analytics_get_cash_flow_breakdown: 'analytics:read',
   analytics_get_profit_and_loss_statement: 'analytics:read',
-  analytics_get_customer_cash_receipts: 'analytics:read',
+  analytics_get_client_cash_receipts: 'analytics:read',
   analytics_get_client_payer_cohorts: 'analytics:read',
   analytics_get_capacity_heatmap: 'analytics:read',
   analytics_get_revenue_leakage: 'analytics:read',

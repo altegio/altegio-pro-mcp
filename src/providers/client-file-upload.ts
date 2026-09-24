@@ -36,7 +36,9 @@ export function prepareClientFile(
       'Use a filename of 1–255 characters without paths or control characters.'
     );
   }
-  const extension = filename.split('.').pop()?.toLowerCase() ?? '';
+  // A bare "pdf" or ".pdf" has no name before its extension.
+  const dot = filename.lastIndexOf('.');
+  const extension = dot > 0 ? filename.slice(dot + 1).toLowerCase() : '';
   const mime = MIME_BY_EXTENSION[extension];
   if (!mime) {
     throw new Error(
