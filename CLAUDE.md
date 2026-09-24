@@ -96,7 +96,7 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 
 **[Auth] Authentication (2):** login, logout
 **[Location] Location (3):** list_locations, update_location, diagnose_location_access
-**[Staff] Staff CRUD (4):** get, create, update, delete (create supports `is_paid_staff`)
+**[Staff] Staff CRUD (4):** get, create, update, delete (create supports `is_paid_staff` and `has_timetable_access`; user fields are optional — omitted means no user account)
 **[Positions] Positions (2):** get, create (no update/delete tool exists — the 2025-10-30 note below overstated this)
 **[Services] Services (8):** get, create, update, delete, plus service↔team-member links: link_service_team_member, update_service_team_member, unlink_service_team_member, link_team_member_services (bulk)
 **[Categories] Service Categories (2):** get, delete
