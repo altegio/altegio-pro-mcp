@@ -14,7 +14,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Features
 
-- **82 tools served (88 defined, 6 withheld from every view)** — including a 24-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
+- **83 tools served (89 defined, 6 withheld from every view)** — including a 24-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
 - **Administrative writes** for staff, services, appointments, schedules, clients, categories, booking forms, and location users
 - **Analytics**: key metrics, profit-and-loss and cash-flow views, capacity heatmaps, revenue leakage, team-member × service analysis, product/inventory decisions, retention, forecasts and day-end reporting
 - **Location settings**: appointment calendar, online booking, booking forms, resources
@@ -28,7 +28,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Available Tools
 
-**82 tools served (88 defined, 6 withheld from every view)**, organized by category
+**83 tools served (89 defined, 6 withheld from every view)**, organized by category
 for complete business management. Which of them a given address serves, and why,
 is the generated table in
 [`docs/architecture/tool-surface.md`](docs/architecture/tool-surface.md).
@@ -84,7 +84,7 @@ update/delete are intentionally not exposed; internal V2 routes are out of scope
 - `get_booking_forms` / `create_booking_form` / `delete_booking_form` - Online booking widgets
 
 ### 👤 Clients and Location Access
-- `clients_search`, `clients_get_segment_report`, `clients_get_card`, `clients_get_visit_history`, `clients_lookup` - Search, report on and inspect the client base
+- `clients_search`, `clients_get_segment_report`, `clients_list_profiles`, `clients_get_card`, `clients_get_visit_history`, `clients_lookup` - Search, report on and inspect the client base
 - `clients_delete` - Permanently delete a client
 - `remove_location_user` - Revoke a user's access to one location; requires the user ID twice as an explicit safeguard
 
@@ -477,7 +477,7 @@ Four properties are deliberate:
 | `get_appointments`                                                                                                                | `appointments:read`                                                       |
 | `create_appointment`                                                                                                              | `appointments:create`                                                     |
 | `update_appointment`, `delete_appointment`                                                                                        | `appointments:write`                                                      |
-| `clients_search`, `clients_get_segment_report`, `clients_get_card`, `clients_get_visit_history`, `clients_lookup`                | `clients:read`                                                            |
+| `clients_search`, `clients_get_segment_report`, `clients_list_profiles`, `clients_get_card`, `clients_get_visit_history`, `clients_lookup`                | `clients:read`                                                            |
 | `clients_delete`                                                                                                                  | `clients:write`                                                           |
 | `analytics_*` reads                                                                                                               | `analytics:read` _(placeholder domain — no v3 scope exists yet)_          |
 | `altegio_call_operation`                                                                                                          | `api:read` _(placeholder — one tool reaches every documented GET)_        |

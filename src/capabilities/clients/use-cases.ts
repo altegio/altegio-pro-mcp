@@ -17,6 +17,7 @@ import { httpFromClient } from '../../api/altegio-http.js';
 import { V1ClientsAdapter } from '../../api/v1/clients-adapter.js';
 import type {
   ClientSegmentRow,
+  ClientProfilesQuery,
   ClientSearchFilters,
   ClientSortField,
   FilterMatch,
@@ -178,6 +179,54 @@ export async function getClientSegmentReport(
       has_more: report.total_count > page * pageSize,
       contacts_included: false,
       rows: report.rows,
+    },
+  };
+}
+
+/** Paged full client-base profiles, including tags and custom fields. */
+export async function listClientProfiles(
+  client: AltegioClient,
+  input: Omit<ClientProfilesQuery, 'page' | 'page_size'> & {
+    page?: number;
+    page_size?: number;
+    include_contacts?: boolean;
+    include_custom_fields?: boolean;
+  }
+): Promise<ClientsResult> {
+  const page = input.page ?? 1;
+  const pageSize = input.page_size ?? 25;
+  const result = await adapter(client).listClientProfiles({
+    ...input,
+    page,
+    page_size: pageSize,
+  });
+  const includeContacts = input.include_contacts === true;
+  const rows = result.rows.map((row) => {
+    const projected = includeContacts ? { ...row } : withoutContacts(row);
+    if (input.include_custom_fields !== true) delete projected.custom_fields;
+    return projected;
+  });
+  return {
+    text: segmentSummary(
+      {
+        total_count: result.total_count,
+        page,
+        page_size: pageSize,
+        rows: result.rows.map((row) => ({ id: row.id, name: row.name ?? '' })),
+      },
+      'id',
+      ROWS_IN_SUMMARY
+    ),
+    structuredContent: {
+      location_id: input.location_id,
+      total_count: result.total_count,
+      page,
+      page_size: pageSize,
+      returned: rows.length,
+      has_more: result.total_count > page * pageSize,
+      contacts_included: includeContacts,
+      custom_fields_included: input.include_custom_fields === true,
+      rows,
     },
   };
 }

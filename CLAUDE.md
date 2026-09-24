@@ -90,7 +90,7 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 
 ### Tools Available
 
-**82 tools served (88 defined, 6 withheld from every view).** The counts below are pinned by `src/tools/__tests__/tool-count.test.ts` — edit them only with the code. Which tool is served on which address, and why, is the generated table in [`docs/architecture/tool-surface.md`](docs/architecture/tool-surface.md) (`npm run surface:build`).
+**83 tools served (89 defined, 6 withheld from every view).** The counts below are pinned by `src/tools/__tests__/tool-count.test.ts` — edit them only with the code. Which tool is served on which address, and why, is the generated table in [`docs/architecture/tool-surface.md`](docs/architecture/tool-surface.md) (`npm run surface:build`).
 
 **Category-organized with [Prefix] tags for LLM navigation:**
 
@@ -102,7 +102,7 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 **[Categories] Service Categories (2):** get, delete
 **[Schedule] Schedule CRUD (4):** get, create, update, delete
 **[Appointments] Appointments CRUD (4):** get, create, update, delete
-**[Clients] Client base (6):** `clients_search` (segment & count the base with a fully-typed filter model), `clients_get_segment_report` (paged lifetime value and engagement rows), `clients_get_card`, `clients_get_visit_history`, `clients_lookup` (autocomplete), `clients_delete`
+**[Clients] Client base (7):** `clients_search` (segment & count the base with a fully-typed filter model), `clients_get_segment_report` (paged lifetime value and engagement rows), `clients_list_profiles` (paged full client cards), `clients_get_card`, `clients_get_visit_history`, `clients_lookup` (autocomplete), `clients_delete`
 **[Settings] Location Settings (7):** get/update appointment settings, get/update online booking settings, get/create/delete booking forms
 **[Resources] Resources (1):** get (read-only; API has no create)
 **[Users] Location access (1):** `remove_location_user` — off the default `/mcp` view, served on `/mcp/catalog` and stdio

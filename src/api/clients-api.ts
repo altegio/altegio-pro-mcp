@@ -234,6 +234,35 @@ export interface ClientCard {
   last_changed_at: string | null;
 }
 
+/** The legacy client-base list returns full cards in stable ascending id order. */
+export interface ClientProfilesQuery {
+  location_id: number;
+  page: number;
+  page_size: number;
+  name?: string;
+  phone?: string;
+  email?: string;
+  loyalty_card_number?: string;
+  client_ids?: number[];
+  paid_min?: number;
+  paid_max?: number;
+  changed_after?: string;
+  changed_before?: string;
+}
+
+export interface ClientProfile extends ClientCard {
+  display_name: string | null;
+  /** Amount paid by this client in this location, in major units. */
+  total_paid: number | null;
+}
+
+export interface ClientProfilesPage {
+  total_count: number;
+  page: number;
+  page_size: number;
+  rows: ClientProfile[];
+}
+
 // ========== per-client visit history ==========
 
 /**
@@ -300,6 +329,7 @@ export interface ClientLookupRow {
 
 export interface ClientsApi {
   searchClients(query: ClientSearchQuery): Promise<ClientSegment>;
+  listClientProfiles(query: ClientProfilesQuery): Promise<ClientProfilesPage>;
   searchClientReport(
     query: Omit<ClientSearchQuery, 'fields'>
   ): Promise<ClientReport>;

@@ -1,10 +1,8 @@
 /**
  * `[Clients]` tool pack — the client base of one location.
  *
- * Four read tools: segment the client base by value, engagement, loyalty and
- * consent (`clients_search`); read one client card (`clients_get_card`); read a
- * client's visit and purchase history (`clients_get_visit_history`); and a fast
- * typeahead lookup (`clients_lookup`).
+ * Client-base segmentation, full profile pages, individual cards, visit
+ * history, and typeahead lookup.
  *
  * All names, parameters and result fields use canonical product vocabulary; the
  * legacy v1 filter dialect (`record`, `abonement`, `certificate`, `category`,
@@ -186,6 +184,90 @@ export const clientsGetSegmentReportTool = defineTool({
   }),
   handler: async ({ input, client }) =>
     clients.getClientSegmentReport(client, input),
+});
+
+// ========== clients_list_profiles ==========
+
+export const clientsListProfilesTool = defineTool({
+  name: 'clients_list_profiles',
+  category: 'Clients',
+  description:
+    '[Clients] Read a page of full client profiles in ascending client-id order, with tags, loyalty card, birthday, comments, lifetime spent and paid amounts, visit count and client-account balance. Supports name/contact/card, client-id, paid-amount and last-changed filters. Returns exact total count and up to 50 profiles per page. Standard phone and email fields require include_contacts; custom fields require include_custom_fields. This older client-list API has simpler filtering than clients_search: use clients_search for loyalty or appointment-history segments, then pass its ids here to fetch their full profiles. Needs edit-location and client-base access.',
+  annotations: { title: 'Clients: list full profiles', ...READ_ONLY },
+  input: z.object({
+    location_id: locationId,
+    page: z.number().int().positive().optional(),
+    page_size: z.number().int().positive().max(50).optional(),
+    name: z.string().min(1).optional().describe('Substring of client name.'),
+    phone: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Phone fragment to filter clients.'),
+    email: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Email fragment to filter clients.'),
+    loyalty_card_number: z.string().min(1).optional(),
+    client_ids: z.array(z.number().int().positive()).min(1).max(50).optional(),
+    paid_min: z.number().int().positive().optional(),
+    paid_max: z.number().int().positive().optional(),
+    changed_after: z.string().datetime({ offset: true }).optional(),
+    changed_before: z.string().datetime({ offset: true }).optional(),
+    include_contacts: includeContactsArg,
+    include_custom_fields: z
+      .boolean()
+      .optional()
+      .describe(
+        'Include location-defined client fields in each profile (default false).'
+      ),
+  }),
+  outputSchema: objectSchema({
+    location_id: { type: 'integer' as const },
+    total_count: { type: 'integer' as const },
+    page: { type: 'integer' as const },
+    page_size: { type: 'integer' as const },
+    returned: { type: 'integer' as const },
+    has_more: { type: 'boolean' as const },
+    contacts_included: { type: 'boolean' as const },
+    custom_fields_included: { type: 'boolean' as const },
+    rows: {
+      type: 'array' as const,
+      items: objectSchema(
+        {
+          id: { type: 'integer' as const },
+          name: str,
+          surname: str,
+          patronymic: str,
+          display_name: str,
+          phone: str,
+          email: str,
+          gender: str,
+          importance: str,
+          discount: num,
+          loyalty_card_number: str,
+          birth_date: str,
+          comment: str,
+          total_spent: num,
+          total_paid: num,
+          client_account_balance: num,
+          visit_count: int,
+          sms_birthday_greeting: { type: ['boolean', 'null'] as const },
+          sms_excluded_from_campaigns: { type: ['boolean', 'null'] as const },
+          tags: {
+            type: 'array' as const,
+            items: objectSchema({ id: int, title: str, color: str }),
+          },
+          custom_fields: { type: 'object' as const },
+          last_changed_at: str,
+        },
+        ['id']
+      ),
+    },
+  }),
+  handler: async ({ input, client }) =>
+    clients.listClientProfiles(client, input),
 });
 
 // ========== clients_get_card ==========

@@ -2,7 +2,7 @@
  * Clients resources — the client-base segmentation reference.
  *
  * One document under `altegio://docs/clients-segmentation`: the full filter
- * vocabulary of `clients_search`, the canonical → v1 mapping, the two
+ * vocabulary of \`clients_search\`, the canonical → v1 mapping, the two
  * visit-outcome numberings, and worked segments. Written in canonical product
  * vocabulary; the legacy wire words appear only as the "sends" column of the
  * mapping table, which is their documented purpose.
@@ -25,6 +25,15 @@ discount and client-account balance per client, use
 per page, without contact fields or per-client card requests. Its money and
 visit columns describe the client's lifetime history, even when a filter uses
 an appointment date window.
+
+For a page of **full client profiles** (tags, custom fields, loyalty card,
+birthday, comment, lifetime spent and paid), use \`clients_list_profiles\`.
+It uses the older full-list API and has narrower filters: name, contact,
+loyalty card, client IDs, lifetime paid amount and last-changed time. One page
+has at most 50 profiles in ascending client-ID order. To retrieve full cards
+for a complex segment, obtain IDs with \`clients_search\` and pass a bounded
+set to \`clients_list_profiles\`. Standard phone and email fields require
+\`include_contacts\`; custom fields require \`include_custom_fields\`.
 
 - **match**: \`all\` (every filter must hold, the default) or \`any\` (any filter).
 - **paging**: \`page\` (1-based) and \`page_size\` (max 200, default 25).

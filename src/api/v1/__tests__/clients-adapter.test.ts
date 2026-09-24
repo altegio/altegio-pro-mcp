@@ -67,6 +67,61 @@ function adapter(
   return { api: new V1ClientsAdapter(transport.http), calls: transport.calls };
 }
 
+describe('V1ClientsAdapter.listClientProfiles', () => {
+  it('maps the full paged list and its narrower legacy filters', async () => {
+    const { api, calls } = adapter([
+      [/^\/clients\/4564\?/, 'clients-profiles'],
+    ]);
+    const result = await api.listClientProfiles({
+      location_id: 4564,
+      page: 2,
+      page_size: 50,
+      name: 'Jam',
+      client_ids: [66, 67],
+      paid_min: 100,
+      changed_after: '2026-09-01T00:00:00Z',
+    });
+    const url = new URL(calls[0]!.path, 'https://example.com');
+    expect(calls[0]!.method).toBe('GET');
+    expect(url.pathname).toBe('/clients/4564');
+    expect(url.searchParams.get('count')).toBe('50');
+    expect(url.searchParams.get('fullname')).toBe('Jam');
+    expect(url.searchParams.getAll('id[]')).toEqual(['66', '67']);
+    expect(url.searchParams.get('paid_min')).toBe('100');
+    expect(url.searchParams.get('changed_after')).toBe('2026-09-01T00:00:00Z');
+    expect(result.total_count).toBe(101);
+    expect(result.rows[0]).toMatchObject({
+      id: 66,
+      patronymic: 'A',
+      gender: 'male',
+      total_spent: 1250.5,
+      total_paid: 1200,
+      loyalty_card_number: '000123',
+      tags: [{ id: 3, title: 'VIP' }],
+      custom_fields: { preferred_day: 'Monday' },
+    });
+  });
+
+  it('rejects malformed pages instead of returning incomplete results', async () => {
+    const { api } = adapter([
+      [
+        /^\/clients\//,
+        {
+          status: 200,
+          body: {
+            success: true,
+            data: [{ name: 'No id' }],
+            meta: { total_count: 1 },
+          },
+        },
+      ],
+    ]);
+    await expect(
+      api.listClientProfiles({ location_id: 1, page: 1, page_size: 25 })
+    ).rejects.toThrow('valid id');
+  });
+});
+
 describe('V1ClientsAdapter.searchClients', () => {
   it('sends the translated filter payload and returns the segment', async () => {
     const { api, calls } = adapter([[/\/clients\/search/, 'clients-search']]);

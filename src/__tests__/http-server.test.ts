@@ -349,6 +349,7 @@ describe('HTTP server facet wiring, end to end', () => {
         'clients_get_card',
         'clients_get_segment_report',
         'clients_get_visit_history',
+        'clients_list_profiles',
         'clients_lookup',
         'clients_search',
         'create_appointment',

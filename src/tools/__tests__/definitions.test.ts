@@ -9,7 +9,7 @@ const tools = (Object.values(defs) as unknown[]).filter(
 describe('factory tool definitions', () => {
   // Includes the temporary legacy reports and five decision-ready analytics tools.
   it('exposes all factory-defined tools', () => {
-    expect(tools.length).toBe(76);
+    expect(tools.length).toBe(77);
   });
 
   it('every tool produces a valid MCP spec', () => {

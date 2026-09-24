@@ -300,6 +300,32 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     },
   },
 
+  clients_list_profiles: {
+    what: 'client names, comments, tags and custom fields in full profile rows',
+    canary: {
+      args: { location_id: 1 },
+      routes: [
+        {
+          match: /\/clients\/1\?/,
+          body: ok(
+            envelope(
+              [
+                {
+                  id: 9,
+                  name: CANARY,
+                  comment: CANARY,
+                  categories: [],
+                  custom_fields: {},
+                },
+              ],
+              { total_count: 1 }
+            )
+          ),
+        },
+      ],
+    },
+  },
+
   clients_get_card: {
     what: 'client name, tags and the comment staff wrote on the card',
     canary: {
