@@ -198,6 +198,15 @@ export async function listClientProfiles(
     include_custom_fields: includeCustomFields,
     ...query
   } = input;
+  if (
+    input.total_paid_min !== undefined &&
+    input.total_paid_max !== undefined &&
+    input.total_paid_min > input.total_paid_max
+  ) {
+    throw new ClientsInputError(
+      'total_paid_min must not exceed total_paid_max. Swap or widen the range and retry.'
+    );
+  }
   const page = input.page ?? 1;
   const pageSize = input.page_size ?? 25;
   const result = await adapter(client).listClientProfiles({

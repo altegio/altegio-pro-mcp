@@ -244,8 +244,10 @@ export interface ClientProfilesQuery {
   email?: string;
   loyalty_card_number?: string;
   client_ids?: number[];
-  paid_min?: number;
-  paid_max?: number;
+  /** Lowest lifetime `total_paid` to include, inclusive, in major units. */
+  total_paid_min?: number;
+  /** Highest lifetime `total_paid` to include, inclusive, in major units. */
+  total_paid_max?: number;
   changed_after?: string;
   changed_before?: string;
 }

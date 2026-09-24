@@ -78,7 +78,7 @@ describe('V1ClientsAdapter.listClientProfiles', () => {
       page_size: 50,
       name: 'Jam',
       client_ids: [66, 67],
-      paid_min: 100,
+      total_paid_min: 100,
       changed_after: '2026-09-01T00:00:00Z',
     });
     const url = new URL(calls[0]!.path, 'https://example.com');
@@ -88,6 +88,10 @@ describe('V1ClientsAdapter.listClientProfiles', () => {
     expect(url.searchParams.get('fullname')).toBe('Jam');
     expect(url.searchParams.getAll('id[]')).toEqual(['66', '67']);
     expect(url.searchParams.get('paid_min')).toBe('100');
+    // An absent paid_max reads as 0 upstream and would exclude every payer.
+    expect(url.searchParams.get('paid_max')).toBe(
+      String(Number.MAX_SAFE_INTEGER)
+    );
     expect(url.searchParams.get('changed_after')).toBe('2026-09-01T00:00:00Z');
     expect(result.total_count).toBe(101);
     expect(result.rows[0]).toMatchObject({
@@ -100,6 +104,69 @@ describe('V1ClientsAdapter.listClientProfiles', () => {
       tags: [{ id: 3, title: 'VIP' }],
       custom_fields: { preferred_day: 'Monday' },
     });
+  });
+
+  it('sends a lone maximum as is and no paid bounds when none were asked', async () => {
+    const { api, calls } = adapter([
+      [/^\/clients\/4564\?/, 'clients-profiles'],
+    ]);
+    await api.listClientProfiles({
+      location_id: 4564,
+      page: 1,
+      page_size: 25,
+      total_paid_max: 5000,
+    });
+    await api.listClientProfiles({ location_id: 4564, page: 1, page_size: 25 });
+    const bounded = new URL(calls[0]!.path, 'https://example.com');
+    expect(bounded.searchParams.get('paid_min')).toBeNull();
+    expect(bounded.searchParams.get('paid_max')).toBe('5000');
+    const unbounded = new URL(calls[1]!.path, 'https://example.com');
+    expect(unbounded.searchParams.get('paid_min')).toBeNull();
+    expect(unbounded.searchParams.get('paid_max')).toBeNull();
+  });
+
+  it.each([
+    ['a row below total_paid_min', { total_paid_min: 1500 }],
+    ['a row above total_paid_max', { total_paid_max: 1000 }],
+    [
+      'a row outside the requested client ids',
+      { client_ids: [67], total_paid_min: 100 },
+    ],
+  ])('refuses the unfiltered fallback page: %s', async (_label, filters) => {
+    // The fixture row is client 66 with total_paid 1200.
+    const { api } = adapter([[/^\/clients\//, 'clients-profiles']]);
+    await expect(
+      api.listClientProfiles({
+        location_id: 4564,
+        page: 1,
+        page_size: 25,
+        ...filters,
+      })
+    ).rejects.toThrow('drops these filters entirely when no client matches');
+  });
+
+  it('refuses a paid-filtered row whose paid total is missing', async () => {
+    const { api } = adapter([
+      [
+        /^\/clients\//,
+        {
+          status: 200,
+          body: {
+            success: true,
+            data: [{ id: 5, name: 'No paid total' }],
+            meta: { total_count: 1 },
+          },
+        },
+      ],
+    ]);
+    await expect(
+      api.listClientProfiles({
+        location_id: 1,
+        page: 1,
+        page_size: 25,
+        total_paid_min: 1,
+      })
+    ).rejects.toThrow('No profiles were returned');
   });
 
   it('rejects malformed pages instead of returning incomplete results', async () => {
