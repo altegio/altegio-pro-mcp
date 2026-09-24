@@ -34,10 +34,13 @@ stdio. The `analytics:read` execution scope and request location boundary apply.
   current catalog remain in an unattributed category.
 - `GET /resources/{location_id}` maps instance ID to parent resource ID and
   title. The record's resource instances are attached to the appointment, not
-  individual service lines. Resource value is assigned only when one service
-  line and one known resource instance exist on the attended appointment.
-  Other lines remain in the explicit unattributed group. This is assigned
-  resource association, not a measurement of actual device use.
+  individual service lines. When all assigned instances belong to one known
+  parent resource, all delivered service lines on that appointment are grouped
+  under it. This includes visits with several services sharing that resource.
+  When several parent resources are assigned, their IDs remain on each
+  unattributed service row, but the line value is not copied to each device.
+  Unknown instance IDs remain visible as unmapped IDs. Resource assignment is
+  an operational usage proxy, not an immutable usage audit.
 - Backend `RecordResourcesBridge::createManyRecordResourceInstancesLinks` stores
   `record_id`, `resource_instance_id` and `service_id` on the internal record
   resource link. `RecordInfoService::getRecordsInfo` exposes only instance IDs.
@@ -47,8 +50,9 @@ stdio. The `analytics:read` execution scope and request location boundary apply.
   records would require one extra request per appointment, with no bulk page
   or snapshot. No bounded period aggregate was found in the ERP-web analytics
   controllers. The MCP does not infer the link from today's service-resource
-  configuration. An appointment with several lines or instances remains
-  unattributed to devices.
+  configuration. Multiple instances of one resource type can be grouped, but
+  lines on appointments with several resource types cannot be allocated to
+  individual devices from this bulk response.
 - `AttendanceServiceItem::getFirstCost` multiplies stored `first_cost` by line
   amount. The field is initialized from the visit pricing DTO's price; the
   record API does not establish that it was the published price-list value at
@@ -77,13 +81,17 @@ location is required before any accounting claim.
 - Penetration denominator is distinct identified clients with at least one
   attended appointment in the selected period. An anonymous appointment is
   excluded and counted separately. Target adoption is one client per selected
-  service, current-category or unambiguously assigned resource set, no matter
-  how many lines or visits. Optional source groups provide an overlap and a
+  service, current-category or appointment-assigned resource set, no matter
+  how many lines or visits. Every known resource on an attended appointment
+  with delivered service lines counts for resource adoption, even if several
+  are associated with it. Optional source groups provide an overlap and a
   stable, paged list of clients who used source but not target. Names, contacts
   and appointment comments are never returned.
-- Hybrid device/category rows use the single unambiguous assigned appointment
-  resource, otherwise the service's **current** category if no instance was
-  assigned. Ambiguous assignments and unknown categories remain unattributed.
+- Hybrid device/category rows use the assigned resource when all appointment
+  instances map to one parent type, otherwise the service's **current**
+  category if no instance was assigned. Several resource types and unknown
+  categories remain unattributed for additive delivered value; resource IDs
+  and unmapped instance IDs stay visible on those rows.
   Monthly rows drill down to service SKU without multiplying a line across
   devices. Penetration ranks at most 20 groups, SKUs and group pairs from the
   complete scan, with exact total counts for each ranked set. Mono-group

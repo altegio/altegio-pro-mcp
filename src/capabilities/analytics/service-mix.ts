@@ -122,6 +122,8 @@ type ServiceGroup = {
   type: 'assigned_resource' | 'current_category' | 'unattributed';
   id: number | null;
   title: string | null;
+  associated_resource_ids: number[];
+  unmapped_resource_instance_ids: number[];
 };
 
 /** The record API exposes appointment resources, not the service-resource link. */
@@ -130,28 +132,55 @@ function serviceGroup(
   record: ServiceRecord,
   line: ServiceRecord['services'][number]
 ): ServiceGroup {
-  const instances = Array.isArray(record.resource_instance_ids)
-    ? record.resource_instance_ids.filter(positiveId)
-    : [];
+  const instances = [...new Set(record.resource_instance_ids)].sort(
+    (a, b) => a - b
+  );
+  const known = instances.map((id) => data.resource_names.get(id));
+  const associatedResourceIds = [
+    ...new Set(
+      known.flatMap((resource) => (resource ? [resource.resource_id] : []))
+    ),
+  ].sort((a, b) => a - b);
+  const unmappedInstanceIds = instances.filter((_, index) => !known[index]);
   if (instances.length > 0) {
-    if (record.services.length === 1 && instances.length === 1) {
-      const resource = data.resource_names.get(instances[0]!);
-      if (resource)
-        return {
-          type: 'assigned_resource',
-          id: resource.resource_id,
-          title: resource.title,
-        };
+    // Multiple service lines may share one recorded resource. Several
+    // instances of the same parent resource still form one additive group.
+    if (
+      associatedResourceIds.length === 1 &&
+      unmappedInstanceIds.length === 0
+    ) {
+      const resource = known[0]!;
+      return {
+        type: 'assigned_resource',
+        id: resource.resource_id,
+        title: resource.title,
+        associated_resource_ids: associatedResourceIds,
+        unmapped_resource_instance_ids: [],
+      };
     }
-    return { type: 'unattributed', id: null, title: null };
+    return {
+      type: 'unattributed',
+      id: null,
+      title: null,
+      associated_resource_ids: associatedResourceIds,
+      unmapped_resource_instance_ids: unmappedInstanceIds,
+    };
   }
   const categoryId = data.service_categories.get(line.id);
   return categoryId === undefined
-    ? { type: 'unattributed', id: null, title: null }
+    ? {
+        type: 'unattributed',
+        id: null,
+        title: null,
+        associated_resource_ids: [],
+        unmapped_resource_instance_ids: [],
+      }
     : {
         type: 'current_category',
         id: categoryId,
         title: data.category_names.get(categoryId) ?? null,
+        associated_resource_ids: [],
+        unmapped_resource_instance_ids: [],
       };
 }
 export interface ServiceMixInput extends PeriodInput {
@@ -169,6 +198,8 @@ interface MixRow {
   group_type: ServiceGroup['type'] | null;
   service_id: number | null;
   service_title: string | null;
+  associated_resource_ids: number[];
+  unmapped_resource_instance_ids: number[];
   line_count: number;
   appointment_count: number;
   client_count: number;
@@ -178,6 +209,8 @@ interface MixRow {
     | 'direct'
     | 'current_catalog'
     | 'single_appointment_resource'
+    | 'shared_appointment_resource'
+    | 'mixed_appointment_resource'
     | 'unattributed';
 }
 
@@ -227,6 +260,8 @@ export async function getServiceMixTrend(
       let title: string | null = null;
       let attribution: MixRow['attribution'] = 'direct';
       let groupType: MixRow['group_type'] = null;
+      let associatedResourceIds: number[] = [];
+      let unmappedInstanceIds: number[] = [];
       if (groupBy === 'service') {
         groupId = line.id;
         title = line.title ?? null;
@@ -241,6 +276,8 @@ export async function getServiceMixTrend(
         attribution = groupId === null ? 'unattributed' : 'direct';
       } else {
         const group = serviceGroup(data, record, line);
+        associatedResourceIds = group.associated_resource_ids;
+        unmappedInstanceIds = group.unmapped_resource_instance_ids;
         if (groupBy === 'assigned_resource') {
           if (group.type === 'assigned_resource') {
             groupId = group.id;
@@ -255,11 +292,13 @@ export async function getServiceMixTrend(
           groupId === null
             ? 'unattributed'
             : group.type === 'assigned_resource'
-              ? 'single_appointment_resource'
+              ? lines.length === 1
+                ? 'single_appointment_resource'
+                : 'shared_appointment_resource'
               : 'current_catalog';
       }
       if (attribution === 'unattributed') unattributedLines += 1;
-      const key = `${month}:${groupType ?? groupBy}:${groupId ?? 'null'}:${groupBy === 'assigned_device_or_current_category' ? line.id : ''}`;
+      const key = `${month}:${groupType ?? groupBy}:${groupId ?? 'null'}:${groupBy === 'assigned_device_or_current_category' ? line.id : ''}:${associatedResourceIds.join(',')}:${unmappedInstanceIds.join(',')}`;
       let row = groups.get(key);
       if (!row) {
         row = {
@@ -273,6 +312,8 @@ export async function getServiceMixTrend(
             groupBy === 'assigned_device_or_current_category'
               ? (line.title ?? null)
               : null,
+          associated_resource_ids: associatedResourceIds,
+          unmapped_resource_instance_ids: unmappedInstanceIds,
           line_count: 0,
           appointment_count: 0,
           client_count: 0,
@@ -284,6 +325,21 @@ export async function getServiceMixTrend(
           charge_missing: false,
         };
         groups.set(key, row);
+      }
+      if (row.attribution !== attribution) {
+        if (
+          [
+            'single_appointment_resource',
+            'shared_appointment_resource',
+            'mixed_appointment_resource',
+          ].includes(row.attribution) &&
+          [
+            'single_appointment_resource',
+            'shared_appointment_resource',
+          ].includes(attribution)
+        )
+          row.attribution = 'mixed_appointment_resource';
+        else throw new Error('Incompatible service grouping provenance.');
       }
       row.line_count += 1;
       row.delivered_service_value += value;
@@ -302,6 +358,8 @@ export async function getServiceMixTrend(
       group_type: row.group_type,
       service_id: row.service_id,
       service_title: sanitizeUntrusted(row.service_title, { maxChars: 140 }),
+      associated_resource_ids: row.associated_resource_ids,
+      unmapped_resource_instance_ids: row.unmapped_resource_instance_ids,
       line_count: row.line_count,
       appointment_count: row.appointments.size,
       client_count: row.clients.size,
@@ -316,7 +374,14 @@ export async function getServiceMixTrend(
         a.month.localeCompare(b.month) ||
         (a.group_type ?? '').localeCompare(b.group_type ?? '') ||
         (a.group_id ?? -1) - (b.group_id ?? -1) ||
-        (a.service_id ?? -1) - (b.service_id ?? -1)
+        (a.service_id ?? -1) - (b.service_id ?? -1) ||
+        a.attribution.localeCompare(b.attribution) ||
+        a.associated_resource_ids
+          .join(',')
+          .localeCompare(b.associated_resource_ids.join(',')) ||
+        a.unmapped_resource_instance_ids
+          .join(',')
+          .localeCompare(b.unmapped_resource_instance_ids.join(','))
     );
   const page = input.page ?? 1;
   const pageSize = input.page_size ?? 25;
@@ -350,9 +415,9 @@ export async function getServiceMixTrend(
           'attendance_service_item.manual_cost line total; before loyalty deductions; not cash or recognized accounting revenue',
         category_basis: 'current catalog category, not historical category',
         resource_basis:
-          'appointment assigned resource, attributed only for one service line and one known resource instance; not proof of actual device use',
+          'one known assigned resource type can cover several appointment service lines; multiple resource types remain unallocated with their associations shown',
         hybrid_group_basis:
-          'assigned resource for a single service line and one known appointment instance; otherwise current category when no instance is assigned; ambiguous assignments and missing categories are unattributed',
+          'assigned resource when every known appointment instance belongs to one resource type; otherwise current category when no instance is assigned; multiple resource types and missing mappings remain unattributed',
         product_sales_included: false,
       },
       untrusted_data_note: UNTRUSTED_NOTE,
@@ -395,6 +460,12 @@ export async function getClientServicePenetration(
   const sourceResources = new Set(input.source_resource_ids ?? []);
   const knownResources = new Set(
     [...data.resource_names.values()].map((resource) => resource.resource_id)
+  );
+  const resourceTitles = new Map<number, string>(
+    [...data.resource_names.values()].map((resource) => [
+      resource.resource_id,
+      resource.title,
+    ])
   );
   for (const id of [...targetResources, ...sourceResources])
     if (!knownResources.has(id))
@@ -447,6 +518,19 @@ export async function getClientServicePenetration(
         item.groups.add(key);
         groupLabels.set(key, group);
       }
+      // Resource adoption is appointment-level. Even when money cannot be
+      // allocated among several devices, preserve every recorded association.
+      for (const resourceId of group.associated_resource_ids) {
+        const key = `assigned_resource:${resourceId}`;
+        item.groups.add(key);
+        groupLabels.set(key, {
+          type: 'assigned_resource',
+          id: resourceId,
+          title: resourceTitles.get(resourceId) ?? null,
+          associated_resource_ids: [resourceId],
+          unmapped_resource_instance_ids: [],
+        });
+      }
       let sku = skuClients.get(line.id);
       if (!sku) {
         sku = {
@@ -464,13 +548,17 @@ export async function getClientServicePenetration(
       if (
         target.has(line.id) ||
         (category !== undefined && targetCategories.has(category)) ||
-        (group.type === 'assigned_resource' && targetResources.has(group.id!))
+        group.associated_resource_ids.some((resourceId) =>
+          targetResources.has(resourceId)
+        )
       )
         item.target = true;
       if (
         sourceIds.has(line.id) ||
         (category !== undefined && sourceCategories.has(category)) ||
-        (group.type === 'assigned_resource' && sourceResources.has(group.id!))
+        group.associated_resource_ids.some((resourceId) =>
+          sourceResources.has(resourceId)
+        )
       )
         item.source = true;
     }
@@ -652,7 +740,7 @@ export async function getClientServicePenetration(
           : null,
       group_insights: {
         group_basis:
-          'single assigned appointment resource, otherwise current category when no resource is assigned; ambiguous or missing mappings are unattributed',
+          'all known appointment resource associations count for client adoption; delivered value is assigned only when every instance belongs to one resource type; otherwise current category when no resource is assigned or unattributed',
         ranking_limit: 20,
         total_attributed_groups: topGroups.length,
         top_groups: topGroups.slice(0, 20),
@@ -688,7 +776,7 @@ export async function getClientServicePenetration(
         category_basis:
           'current service catalog category, not historical category',
         resource_basis:
-          'appointment resource assigned to a single service line and one known instance; not proof of actual device use',
+          'appointment-level assigned resource associations on attended service visits; multiple resources may count for client adoption but delivered value is not duplicated across them',
         rank_rule:
           'descending delivered value; ties by ascending client id; first floor(N/10) and next floor(N/10)',
       },
