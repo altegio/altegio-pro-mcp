@@ -878,10 +878,14 @@ paths:
       x-altegio-api-version: web
       x-altegio-permission: finances_transactions_access
       x-altegio-caveat: >-
-        JSON envelope contains an exact count and localized HTML rows with stable
-        transaction IDs and local display dates, but no client IDs. The start
-        date is silently clamped by finances_last_days_count. The payer-cohort
-        adapter refuses any finite last-days limit, pages every selected income
+        JSON envelope contains an exact count and HTML rows with stable
+        transaction IDs and local dates, but no client IDs. The date cell is a
+        fixed DD.MM.YY HH:MM:SS rendering (independent of the user language and
+        the location date-format setting) shifted to location time exactly as
+        the monthly finance report buckets it; the V1 detail date is raw server
+        time. The parser refuses any other date shape. The start date is
+        silently clamped by finances_last_days_count. The payer-cohort adapter
+        refuses any finite last-days limit, pages every selected income
         category, and rechecks the complete ID/date list after detail reads.
       parameters:
         - { name: location_id, in: path, required: true, schema: { type: integer } }

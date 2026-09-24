@@ -105,6 +105,22 @@ describe('clients_list_profiles', () => {
       custom_fields: { preferred_day: 'Monday' },
     });
   });
+
+  it('refuses an inverted total-paid range before calling the source', async () => {
+    const calls: string[] = [];
+    const client = fakeClient(
+      [[/^\/clients\//, fixture('clients-profiles')]],
+      calls
+    );
+    await expect(
+      listClientProfiles(client, {
+        location_id: 4564,
+        total_paid_min: 5000,
+        total_paid_max: 100,
+      })
+    ).rejects.toThrow('total_paid_min must not exceed total_paid_max');
+    expect(calls).toHaveLength(0);
+  });
 });
 
 describe('clients_get_segment_report', () => {

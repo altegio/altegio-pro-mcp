@@ -192,7 +192,7 @@ export const clientsListProfilesTool = defineTool({
   name: 'clients_list_profiles',
   category: 'Clients',
   description:
-    '[Clients] Read a page of full client profiles in ascending client-id order, with tags, loyalty card, birthday, comments, lifetime spent and paid amounts, visit count and client-account balance. Supports name/contact/card, client-id, paid-amount and last-changed filters. Returns exact total count and up to 50 profiles per page. Standard phone and email fields require include_contacts; custom fields require include_custom_fields. This older client-list API has simpler filtering than clients_search: use clients_search for loyalty or appointment-history segments, then pass its ids here to fetch their full profiles. Needs edit-location and client-base access.',
+    '[Clients] Read a page of full client profiles in ascending client-id order, with tags, loyalty card, birthday, comments, lifetime spent and paid amounts, visit count and client-account balance. Supports name/contact/card, client-id, lifetime total-paid range (total_paid_min/total_paid_max) and last-changed filters. Returns exact total count and up to 50 profiles per page. Standard phone and email fields require include_contacts; custom fields require include_custom_fields. This older client-list API has simpler filtering than clients_search: use clients_search for loyalty or appointment-history segments, then pass its ids here to fetch their full profiles. Needs edit-location and client-base access.',
   annotations: { title: 'Clients: list full profiles', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -211,8 +211,22 @@ export const clientsListProfilesTool = defineTool({
       .describe('Email fragment to filter clients.'),
     loyalty_card_number: z.string().min(1).optional(),
     client_ids: z.array(z.number().int().positive()).min(1).max(50).optional(),
-    paid_min: z.number().int().positive().optional(),
-    paid_max: z.number().int().positive().optional(),
+    total_paid_min: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Lowest lifetime total_paid to include, inclusive, in major units. Whole number, at least 1.'
+      ),
+    total_paid_max: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Highest lifetime total_paid to include, inclusive, in major units. Whole number, at least 1; with only this bound, clients who paid nothing are included.'
+      ),
     changed_after: z.string().datetime({ offset: true }).optional(),
     changed_before: z.string().datetime({ offset: true }).optional(),
     include_contacts: includeContactsArg,

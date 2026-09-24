@@ -29,11 +29,15 @@ an appointment date window.
 For a page of **full client profiles** (tags, custom fields, loyalty card,
 birthday, comment, lifetime spent and paid), use \`clients_list_profiles\`.
 It uses the older full-list API and has narrower filters: name, contact,
-loyalty card, client IDs, lifetime paid amount and last-changed time. One page
-has at most 50 profiles in ascending client-ID order. To retrieve full cards
-for a complex segment, obtain IDs with \`clients_search\` and pass a bounded
-set to \`clients_list_profiles\`. Standard phone and email fields require
-\`include_contacts\`; custom fields require \`include_custom_fields\`.
+loyalty card, client IDs, a lifetime total-paid range
+(\`total_paid_min\`/\`total_paid_max\`, matching each profile's \`total_paid\`)
+and last-changed time. When nothing matches a total-paid range or client-ID
+list, the source would answer with unfiltered profiles, so the tool refuses
+that page instead. One page has at most 50 profiles in ascending client-ID
+order. To retrieve full cards for a complex segment, obtain IDs with
+\`clients_search\` and pass a bounded set to \`clients_list_profiles\`.
+Standard phone and email fields require \`include_contacts\`; custom fields
+require \`include_custom_fields\`.
 
 - **match**: \`all\` (every filter must hold, the default) or \`any\` (any filter).
 - **paging**: \`page\` (1-based) and \`page_size\` (max 200, default 25).

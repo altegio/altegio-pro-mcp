@@ -10,6 +10,7 @@
 import type { AltegioHttp } from '../altegio-http.js';
 import { callClients, callEnveloped } from './clients-http.js';
 import { buildFilterPayload } from '../../capabilities/clients/filters.js';
+import { ClientsInputError } from '../../capabilities/clients/errors.js';
 import {
   GENDER_FROM_CODE,
   IMPORTANCE_FROM_CODE,
@@ -122,6 +123,19 @@ function cardFromWire(card: Record<string, unknown>, id: number): ClientCard {
   };
 }
 
+/**
+ * The legacy list reads an absent `paid_max` as 0, which excludes every client
+ * with a positive paid amount (`PageApiClientsController::action_read` →
+ * `ClientStorage::getClientIdsBySalonIdAndPaidAmount`). A minimum alone
+ * therefore goes out with this explicit ceiling.
+ */
+const UNBOUNDED_PAID_MAX = Number.MAX_SAFE_INTEGER;
+
+const PROFILE_FILTER_DROPPED =
+  'No profiles were returned: the client list answered with profiles outside the requested total-paid range or client ids. ' +
+  'The source drops these filters entirely when no client matches them, so most likely no client in this location matches. ' +
+  'Widen total_paid_min/total_paid_max or check the client ids; for spend-based segments use clients_search.';
+
 export class V1ClientsAdapter implements ClientsApi {
   constructor(private readonly http: AltegioHttp) {}
 
@@ -138,10 +152,15 @@ export class V1ClientsAdapter implements ClientsApi {
     if (query.loyalty_card_number)
       params.set('card', query.loyalty_card_number);
     for (const id of query.client_ids ?? []) params.append('id[]', String(id));
-    if (query.paid_min !== undefined)
-      params.set('paid_min', String(query.paid_min));
-    if (query.paid_max !== undefined)
-      params.set('paid_max', String(query.paid_max));
+    const paidFiltered =
+      query.total_paid_min !== undefined || query.total_paid_max !== undefined;
+    if (query.total_paid_min !== undefined)
+      params.set('paid_min', String(query.total_paid_min));
+    if (paidFiltered)
+      params.set(
+        'paid_max',
+        String(query.total_paid_max ?? UNBOUNDED_PAID_MAX)
+      );
     if (query.changed_after) params.set('changed_after', query.changed_after);
     if (query.changed_before)
       params.set('changed_before', query.changed_before);
@@ -178,6 +197,23 @@ export class V1ClientsAdapter implements ClientsApi {
         total_paid: asNumber(row.paid),
       };
     });
+    // The backend turns the paid range (intersected with `id[]`) into an id
+    // list and, when that list is empty, drops the id restriction instead of
+    // matching nothing: "no client matches" comes back as the unfiltered base.
+    // A row outside the requested bounds or ids is that fallback.
+    const requestedIds = query.client_ids ? new Set(query.client_ids) : null;
+    const { total_paid_min: min, total_paid_max: max } = query;
+    for (const row of rows) {
+      const paid = row.total_paid;
+      if (
+        (requestedIds !== null && !requestedIds.has(row.id)) ||
+        (paidFiltered && paid === null) ||
+        (min !== undefined && paid !== null && paid < min) ||
+        (max !== undefined && paid !== null && paid > max)
+      ) {
+        throw new ClientsInputError(PROFILE_FILTER_DROPPED);
+      }
+    }
     return {
       total_count: totalCount,
       page: query.page,

@@ -6,6 +6,29 @@ is declared stable.
 
 ## [Unreleased]
 
+### Fixed — client profile paid filters and payer-cohort dates
+
+- **`clients_list_profiles`:** the paid-amount inputs are now
+  `total_paid_min`/`total_paid_max`, matching the `total_paid` output field
+  (`paid_min`/`paid_max` stay wire names inside the V1 adapter). A minimum
+  alone used to return the **whole client base**: the source reads an absent
+  maximum as 0, so no client matched, and when nothing matches a paid range
+  (or its intersection with `client_ids`) it drops the filter instead of
+  returning nothing. The adapter now sends an explicit ceiling with a lone
+  minimum, an inverted range is an input error, and a page containing a
+  profile outside the requested bounds or ids is refused rather than returned.
+  Verified live on demo location 4564: `paid_min=1` answered 94 of 94 clients,
+  with a ceiling 65.
+- **`analytics_get_client_payer_cohorts`:** the finance-list markup contract
+  moved from the adapter into `src/api/v1/finance-transactions-parser.ts`
+  with a golden fixture. The ERP renders the list date with a hard-coded
+  `d.m.y H:i:s` pattern — not the user's language or the location's EU/US
+  date setting — using the same server-to-location shift the monthly report
+  buckets by, so it stays the local-month source; the V1 detail `date` is raw
+  server time and is not used. The parser now accepts exactly that shape and
+  refuses every other date format, cancelled or unidentified rows, and
+  incomplete pages; the page-total row is skipped explicitly.
+
 ### Changed — audit of the 2026-09-24 tools
 
 Renamed before wider use, to follow the `<domain>_<verb>_<object>` rule and the
