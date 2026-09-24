@@ -101,6 +101,7 @@ describe('static views', () => {
         'clients_lookup',
         'clients_list_comments',
         'clients_list_files',
+        'clients_upload_file',
         'clients_search',
         'create_appointment',
         'delete_appointment',

@@ -281,6 +281,7 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   clients_list_comments: 'clients:read',
   clients_add_comment: 'clients:write',
   clients_list_files: 'clients:read',
+  clients_upload_file: 'clients:write',
   clients_get_segment_report: 'clients:read',
   clients_list_profiles: 'clients:read',
   clients_get_card: 'clients:read',

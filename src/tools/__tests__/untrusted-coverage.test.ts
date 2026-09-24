@@ -89,6 +89,10 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     what: 'uploaded filenames and download URLs',
     coveredBy: 'src/tools/__tests__/customer-workflows.test.ts',
   },
+  clients_upload_file: {
+    what: 'filenames and download URLs in the complete upload response',
+    coveredBy: 'src/tools/__tests__/customer-workflows.test.ts',
+  },
   altegio_call_operation: {
     what: 'the entire API response — one tool reaches every documented GET, so the payload is fenced whole, with no field list to enumerate',
     canary: {

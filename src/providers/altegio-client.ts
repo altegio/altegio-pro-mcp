@@ -19,6 +19,7 @@ import type {
   AltegioResource,
 } from '../types/altegio.types.js';
 import { CredentialManager } from './credential-manager.js';
+import { prepareClientFile } from './client-file-upload.js';
 import { AuthenticationError, AltegioApiError } from '../utils/errors.js';
 import { upstreamDetail } from '../tools/tool-result.js';
 import {
@@ -1441,6 +1442,40 @@ export class AltegioClient {
     }
 
     return { data: body as T };
+  }
+
+  /** Upload one client-card file through the documented multipart V1 operation. */
+  async uploadClientFile(
+    locationId: number,
+    clientId: number,
+    filename: string,
+    fileBase64: string
+  ): Promise<unknown[]> {
+    assertCompanyAllowed(locationId);
+    this.requireAuth();
+    const { bytes, mime } = prepareClientFile(filename, fileBase64);
+    const form = new FormData();
+    form.set(
+      'file',
+      new Blob([new Uint8Array(bytes)], { type: mime }),
+      filename
+    );
+    const path = `/company/${locationId}/clients/files/${clientId}`;
+    const response = await this.apiRequest(path, {
+      method: 'POST',
+      body: form,
+    });
+    const files = await this.handleResponse<unknown>(
+      response,
+      'upload client file'
+    );
+    if (!Array.isArray(files)) {
+      throw new AltegioApiError(
+        'The client-file upload returned an invalid file list.',
+        502
+      );
+    }
+    return files;
   }
 
   /** Curated documented JSON writes. The universal executor remains GET only. */
