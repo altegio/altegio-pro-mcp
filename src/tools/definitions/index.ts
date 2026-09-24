@@ -16,3 +16,4 @@ export * from './executor.tools.js';
 export * from './analytics.tools.js';
 export * from './clients.tools.js';
 export * from './users.tools.js';
+export * from './customer-workflows.tools.js';

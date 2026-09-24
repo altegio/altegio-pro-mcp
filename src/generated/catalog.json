@@ -7,7 +7,7 @@
       "spec": "docs/en/b2b-v1/openapi.yaml",
       "title": "Business Management",
       "version": "1.0.0",
-      "operations": 260
+      "operations": 263
     },
     {
       "source": "v3",
@@ -27,7 +27,7 @@
     "salon_id": "location_id",
     "staff_id": "team_member_id"
   },
-  "operationCount": 317,
+  "operationCount": 320,
   "curatedCount": 32,
   "domains": [
     {
@@ -36,7 +36,7 @@
     },
     {
       "domain": "appointments",
-      "operations": 21
+      "operations": 22
     },
     {
       "domain": "auth",
@@ -56,7 +56,7 @@
     },
     {
       "domain": "clients",
-      "operations": 18
+      "operations": 19
     },
     {
       "domain": "custom_fields",
@@ -84,7 +84,7 @@
     },
     {
       "domain": "memberships",
-      "operations": 11
+      "operations": 12
     },
     {
       "domain": "notifications",
@@ -4225,6 +4225,7 @@
       "path": "/chain/{chain_id}/loyalty/abonements",
       "displayPath": "/chain/{chain_id}/loyalty/abonements",
       "summary": "Get a List of Memberships by Filter",
+      "description": "Requires Chain membership access. Supply `abonements_ids` or both `created_after` and `created_before`; otherwise the request returns 400. The date range filters membership creation, not sales. This list is not filtered by client, and `type.cost` is the membership type's current price, not a historical paid amount.",
       "tags": [
         "Subscriptions & Certificates"
       ],
@@ -4233,7 +4234,7 @@
       "security": {
         "required": true,
         "schemes": [
-          "BearerPartner"
+          "BearerPartnerUser"
         ]
       },
       "parameters": [
@@ -8122,8 +8123,8 @@
       "method": "GET",
       "path": "/clients/{location_id}",
       "displayPath": "/clients/{location_id}",
-      "summary": "Deprecated. Get full client profiles in a location",
-      "description": "Returns full client cards (including categories, custom fields, lifetime spent and paid amounts) in ascending client ID order. The default page is 1 and the default count is 20; count is limited to 300. The response includes meta.total_count for pagination. Requires both location edit access and client-base access. Phone, email and comments can be masked or omitted according to the user permissions. This legacy route has only the filters listed below. For richer segmentation and sorting, use POST /company/{location_id}/clients/search; that endpoint returns a selected field projection rather than full cards.",
+      "summary": "Deprecated. Get a list of clients",
+      "description": "+ Parameter\r\n    + company_id (required, number, `1`) - location ID\r\n    + page (number, `1`) - Page number\r\n    + count (number, `20`) - Number of clients per page\r\n\r\n\r\n#### Client filtering\r\n+ fullname:Joh (optional, string) - Name (part of name) to filter clients\r\n+ phone:1315 (optional, string) - Phone (part of the number) for filtering clients\r\n+ email:test@ (optional, string) - Email (part) for client filtering\r\n+ card:5663rt (optional, string) - Card (part) for filtering customers by loyalty card number\r\n+ paid_min:100 (optional, number) - Minimum amount paid, to filter customers by the amount of payments\r\n+ paid_max:0 (optional, number) - Maximum amount paid, to filter customers by the amount of payments\r\n+ paid_max:0 (optional, number) - Maximum amount paid, to filter customers by the amount of payments\r\n+ id:66 (optional, number) - ID of one client for filtering clients\r\n+ id[]: 66 (optional, array) - IDs of multiple clients to filter\r\n+ changed_after: '2000-01-01T00:00:00' (optional, string) - Filtering clients changed/created since a specific date and time\r\n+ changed_before: '2020-12-31T23:59:59' (optional, string) - Filtering clients changed/created before a specific date and time",
       "tags": [
         "Clients"
       ],
@@ -8146,44 +8147,12 @@
           }
         },
         {
-          "description": "Loyalty card number fragment",
-          "name": "card",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "description": "Include clients changed after this ISO 8601 date-time",
-          "name": "changed_after",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "format": "date-time",
-            "type": "string"
-          }
-        },
-        {
-          "description": "Include clients changed before this ISO 8601 date-time",
-          "name": "changed_before",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "format": "date-time",
-            "type": "string"
-          }
-        },
-        {
           "description": "Number of customers per page",
           "name": "count",
           "in": "query",
           "required": false,
           "schema": {
-            "default": 20,
-            "maximum": 300,
-            "minimum": 1,
-            "type": "integer"
+            "type": "number"
           }
         },
         {
@@ -8205,24 +8174,12 @@
           }
         },
         {
-          "description": "Client ID (for several IDs, use the repeated id[] parameter)",
-          "name": "id",
+          "description": "ID of one or more clients to filter clients",
+          "name": "location_id",
           "in": "query",
           "required": false,
           "schema": {
-            "type": "integer"
-          }
-        },
-        {
-          "description": "Repeat this parameter for each client ID to include",
-          "name": "id[]",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "items": {
-              "type": "integer"
-            },
-            "type": "array"
+            "type": "number"
           }
         },
         {
@@ -8231,9 +8188,7 @@
           "in": "query",
           "required": false,
           "schema": {
-            "default": 1,
-            "minimum": 1,
-            "type": "integer"
+            "type": "number"
           }
         },
         {
@@ -8242,8 +8197,7 @@
           "in": "query",
           "required": false,
           "schema": {
-            "minimum": 1,
-            "type": "integer"
+            "type": "number"
           }
         },
         {
@@ -8252,8 +8206,7 @@
           "in": "query",
           "required": false,
           "schema": {
-            "minimum": 1,
-            "type": "integer"
+            "type": "number"
           }
         },
         {
@@ -8279,12 +8232,13 @@
                 "type": "number"
               },
               "birth_date": {
-                "description": "Client date of birth (YYYY-MM-DD, or an empty string when unset)",
+                "description": "Client's date of birth",
+                "format": "date",
                 "type": "string"
               },
               "card": {
                 "description": "Client card number",
-                "type": "string"
+                "type": "number"
               },
               "categories": {
                 "description": "Client categories",
@@ -8299,21 +8253,25 @@
                 "type": "string"
               },
               "custom_fields": {
-                "additionalProperties": true,
                 "description": "Additional client fields",
+                "properties": {},
                 "type": "object"
               },
               "discount": {
                 "description": "Discount",
                 "type": "number"
               },
-              "display_name": {
-                "description": "Formatted client name",
-                "type": "string"
-              },
               "email": {
                 "description": "Client Email",
                 "type": "string"
+              },
+              "gender": {
+                "description": "Gender name",
+                "type": "string"
+              },
+              "gender_id": {
+                "description": "Gender identifier, 0 - unknown, 1 - male, 2 - female",
+                "type": "number"
               },
               "id": {
                 "description": "Client ID",
@@ -8336,25 +8294,9 @@
                 "description": "Client name",
                 "type": "string"
               },
-              "paid": {
-                "description": "Lifetime amount paid by the client in this location, in major currency units",
-                "type": "number"
-              },
-              "patronymic": {
-                "description": "Client patronymic",
-                "type": "string"
-              },
               "phone": {
                 "description": "Customer phone",
                 "type": "string"
-              },
-              "sex": {
-                "description": "Gender name",
-                "type": "string"
-              },
-              "sex_id": {
-                "description": "Gender identifier, 0 - unknown, 1 - male, 2 - female",
-                "type": "integer"
               },
               "sms_check": {
                 "description": "1 - Happy Birthday by SMS, 0 - do not congratulate",
@@ -8365,12 +8307,8 @@
                 "type": "number"
               },
               "spent": {
-                "description": "Lifetime amount sold to the client in this location, in major currency units",
+                "description": "How much money spent in the location at the time of adding",
                 "type": "number"
-              },
-              "surname": {
-                "description": "Client surname",
-                "type": "string"
               },
               "visits": {
                 "description": "Number of visits",
@@ -8616,326 +8554,6 @@
       "response": {
         "contentType": "application/json",
         "statusCode": "200"
-      }
-    },
-    {
-      "source": "v1",
-      "operationId": "list_client_comments",
-      "method": "GET",
-      "path": "/clients/{location_id}/clients/{client_id}/comments",
-      "displayPath": "/clients/{location_id}/clients/{client_id}/comments",
-      "summary": "List of a comments for a client",
-      "description": "Returns a list of a comments for a client and a files in a client details uploads history.",
-      "tags": [
-        "Clients"
-      ],
-      "domain": "clients",
-      "deprecated": false,
-      "security": {
-        "required": true,
-        "schemes": [
-          "BearerPartnerUser"
-        ]
-      },
-      "parameters": [
-        {
-          "description": "ID of a location client.",
-          "name": "client_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "ID of a location.",
-          "name": "location_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "number"
-          }
-        }
-      ],
-      "response": {
-        "contentType": "application/json",
-        "statusCode": "200",
-        "envelope": "v1",
-        "schema": {
-          "items": {
-            "description": "Data for an existing comment for a client.",
-            "properties": {
-              "create_date": {
-                "description": "Datetime of a comment for a client created.",
-                "format": "date-time",
-                "type": "string"
-              },
-              "files": {
-                "description": "Files in a client details that triggered the comment creation (`type` = \"file\", for `type` = \"default\" the files array is returned empty).",
-                "items": {
-                  "description": "Data for an existing file in a client details.",
-                  "type": "object",
-                  "x-truncated": true
-                },
-                "type": "array"
-              },
-              "id": {
-                "description": "ID of a comment for a client.",
-                "type": "number"
-              },
-              "text": {
-                "description": "Text of a comment for a client (`type` = \"default\", for `type` = \"file\" the text is returned empty).",
-                "type": "string"
-              },
-              "type": {
-                "description": "Type of a comment for a client: `default`: - text comment; `file`: - uploaded file.",
-                "enum": [
-                  "default",
-                  "file"
-                ],
-                "type": "string"
-              },
-              "update_date": {
-                "description": "Datetime of a comment for a client last updated.",
-                "format": "date-time",
-                "type": "string"
-              },
-              "user": {
-                "allOf": [
-                  {
-                    "description": "Data for an existing user.",
-                    "properties": {
-                      "avatar": {
-                        "description": "Avatar of a user.",
-                        "type": "string",
-                        "x-truncated": true
-                      },
-                      "id": {
-                        "description": "ID of a user.",
-                        "type": "number",
-                        "x-truncated": true
-                      },
-                      "name": {
-                        "description": "Name of a user.",
-                        "type": "string",
-                        "x-truncated": true
-                      }
-                    },
-                    "type": "object"
-                  }
-                ],
-                "description": "User created a comment for a client or uploaded files in a client details.",
-                "type": [
-                  "object",
-                  "null"
-                ]
-              }
-            },
-            "type": "object"
-          },
-          "type": "array"
-        }
-      }
-    },
-    {
-      "source": "v1",
-      "operationId": "create_client_comment",
-      "method": "POST",
-      "path": "/clients/{location_id}/clients/{client_id}/comments",
-      "displayPath": "/clients/{location_id}/clients/{client_id}/comments",
-      "summary": "Add a comment for a client",
-      "description": "Creates a new text comment for a client.",
-      "tags": [
-        "Clients"
-      ],
-      "domain": "clients",
-      "deprecated": false,
-      "security": {
-        "required": true,
-        "schemes": [
-          "BearerPartnerUser"
-        ]
-      },
-      "parameters": [
-        {
-          "description": "ID of a location client.",
-          "name": "client_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "ID of a location.",
-          "name": "location_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "number"
-          }
-        }
-      ],
-      "requestBody": {
-        "required": false,
-        "contentType": "application/json",
-        "schema": {
-          "properties": {
-            "text": {
-              "description": "Text of a comment for a client.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "text"
-          ],
-          "type": "object"
-        }
-      },
-      "response": {
-        "contentType": "application/json",
-        "statusCode": "201",
-        "envelope": "v1",
-        "schema": {
-          "description": "Data for an existing comment for a client.",
-          "properties": {
-            "create_date": {
-              "description": "Datetime of a comment for a client created.",
-              "format": "date-time",
-              "type": "string"
-            },
-            "files": {
-              "description": "Files in a client details that triggered the comment creation (`type` = \"file\", for `type` = \"default\" the files array is returned empty).",
-              "items": {
-                "description": "Data for an existing file in a client details.",
-                "properties": {
-                  "filename": {
-                    "description": "Original filename for a file in a client details.",
-                    "type": "string",
-                    "x-truncated": true
-                  },
-                  "link": {
-                    "description": "Download link for a file in a client details.",
-                    "type": "string",
-                    "x-truncated": true
-                  }
-                },
-                "type": "object"
-              },
-              "type": "array"
-            },
-            "id": {
-              "description": "ID of a comment for a client.",
-              "type": "number"
-            },
-            "text": {
-              "description": "Text of a comment for a client (`type` = \"default\", for `type` = \"file\" the text is returned empty).",
-              "type": "string"
-            },
-            "type": {
-              "description": "Type of a comment for a client: `default`: - text comment; `file`: - uploaded file.",
-              "enum": [
-                "default",
-                "file"
-              ],
-              "type": "string"
-            },
-            "update_date": {
-              "description": "Datetime of a comment for a client last updated.",
-              "format": "date-time",
-              "type": "string"
-            },
-            "user": {
-              "allOf": [
-                {
-                  "description": "Data for an existing user.",
-                  "properties": {
-                    "avatar": {
-                      "description": "Avatar of a user.",
-                      "type": "string"
-                    },
-                    "id": {
-                      "description": "ID of a user.",
-                      "type": "number"
-                    },
-                    "name": {
-                      "description": "Name of a user.",
-                      "type": "string"
-                    }
-                  },
-                  "type": "object"
-                }
-              ],
-              "description": "User created a comment for a client or uploaded files in a client details.",
-              "type": [
-                "object",
-                "null"
-              ]
-            }
-          },
-          "type": "object"
-        }
-      }
-    },
-    {
-      "source": "v1",
-      "operationId": "delete_client_comment",
-      "method": "DELETE",
-      "path": "/clients/{location_id}/clients/{client_id}/comments/{comment_id}",
-      "displayPath": "/clients/{location_id}/clients/{client_id}/comments/{comment_id}",
-      "summary": "Delete a comment for a client",
-      "description": "Deletes a comment for a client; does not delete files uploaded that triggered creation of a comment.",
-      "tags": [
-        "Clients"
-      ],
-      "domain": "clients",
-      "deprecated": false,
-      "security": {
-        "required": true,
-        "schemes": [
-          "BearerPartnerUser"
-        ]
-      },
-      "parameters": [
-        {
-          "description": "ID of a location client.",
-          "name": "client_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "ID of a comment for client.",
-          "name": "comment_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "ID of a location.",
-          "name": "location_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "number"
-          }
-        }
-      ],
-      "response": {
-        "contentType": "application/json",
-        "statusCode": "204",
-        "envelope": "v1",
-        "schema": {
-          "description": "Response data.",
-          "type": [
-            "object",
-            "null"
-          ]
-        }
       }
     },
     {
@@ -13059,12 +12677,429 @@
     },
     {
       "source": "v1",
+      "operationId": "get_client_membership_activity_history",
+      "method": "GET",
+      "path": "/company/{location_id}/client/{client_id}/loyalty/abonements/{membership_id}/history",
+      "displayPath": "/company/{location_id}/client/{client_id}/loyalty/abonements/{membership_id}/history",
+      "summary": "Get a client's membership activity history",
+      "description": "Returns state changes and usage events for one membership belonging to the specified client at this Location. The client must belong to the Location, and the membership must be found among that client's memberships by phone; either mismatch returns 404. The caller needs Location access, Loyalty access, and permission to view membership history. This activity history is not a purchase history and does not provide a sale price or paid amount.",
+      "tags": [
+        "Subscriptions & Certificates"
+      ],
+      "domain": "memberships",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Client ID at this Location",
+          "name": "client_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Membership instance ID",
+          "name": "membership_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Optional related data: `loyalty_transaction`, `loyalty_entity_changes`, or `user`. State changes are included by default.",
+          "name": "include",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "items": {
+            "properties": {
+              "date": {
+                "description": "Event time in the Location's time zone.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "loyalty_entity_changes": {
+                "description": "State changes, or null when the event has none.",
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "operation_type": {
+                "properties": {
+                  "slug": {
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "title": {
+                    "type": "string",
+                    "x-truncated": true
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "list_client_comments",
+      "method": "GET",
+      "path": "/company/{location_id}/clients/{client_id}/comments",
+      "displayPath": "/company/{location_id}/clients/{client_id}/comments",
+      "summary": "List client card comments",
+      "description": "Returns text comments and file upload history for one Location client.\nRequires `clients_access` and `client_comments_list_access`. File entries\nhave `type: file` and a `files` array; text entries have `type: default`.\nSaving a form URL as comment text does not upload a completed document.",
+      "tags": [
+        "Clients"
+      ],
+      "domain": "clients",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "ID of a location client.",
+          "name": "client_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "ID of a location.",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        }
+      ],
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "items": {
+            "description": "Data for an existing comment for a client.",
+            "properties": {
+              "create_date": {
+                "description": "Datetime of a comment for a client created.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "files": {
+                "description": "Files in a client details that triggered the comment creation (`type` = \"file\", for `type` = \"default\" the files array is returned empty).",
+                "items": {
+                  "description": "Data for an existing file in a client details.",
+                  "type": "object",
+                  "x-truncated": true
+                },
+                "type": "array"
+              },
+              "id": {
+                "description": "ID of a comment for a client.",
+                "type": "number"
+              },
+              "is_editable": {
+                "description": "Whether this Business User can delete the comment",
+                "type": "boolean"
+              },
+              "text": {
+                "description": "Text of a comment for a client (`type` = \"default\", for `type` = \"file\" the text is returned empty).",
+                "type": "string"
+              },
+              "type": {
+                "description": "Type of a comment for a client: `default`: - text comment; `file`: - uploaded file.",
+                "enum": [
+                  "default",
+                  "file"
+                ],
+                "type": "string"
+              },
+              "update_date": {
+                "description": "Datetime of a comment for a client last updated.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "user": {
+                "allOf": [
+                  {
+                    "description": "Data for an existing user.",
+                    "properties": {
+                      "avatar": {
+                        "description": "Avatar of a user.",
+                        "type": "string",
+                        "x-truncated": true
+                      },
+                      "id": {
+                        "description": "ID of a user.",
+                        "type": "number",
+                        "x-truncated": true
+                      },
+                      "name": {
+                        "description": "Name of a user.",
+                        "type": "string",
+                        "x-truncated": true
+                      }
+                    },
+                    "type": "object"
+                  }
+                ],
+                "description": "User created a comment for a client or uploaded files in a client details.",
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "create_client_comment",
+      "method": "POST",
+      "path": "/company/{location_id}/clients/{client_id}/comments",
+      "displayPath": "/company/{location_id}/clients/{client_id}/comments",
+      "summary": "Add a client card comment",
+      "description": "Creates a text comment for one Location client. Requires `clients_access`\nand `client_comments_add_access`. `text` must be nonblank and at most 255\ncharacters. A URL in `text` is saved as text; it does not attach or upload\nthe document at that URL.",
+      "tags": [
+        "Clients"
+      ],
+      "domain": "clients",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "ID of a location client.",
+          "name": "client_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "ID of a location.",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "properties": {
+            "text": {
+              "description": "Text of a comment for a client",
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "type": "object"
+        }
+      },
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "201",
+        "envelope": "v1",
+        "schema": {
+          "description": "Data for an existing comment for a client.",
+          "properties": {
+            "create_date": {
+              "description": "Datetime of a comment for a client created.",
+              "format": "date-time",
+              "type": "string"
+            },
+            "files": {
+              "description": "Files in a client details that triggered the comment creation (`type` = \"file\", for `type` = \"default\" the files array is returned empty).",
+              "items": {
+                "description": "Data for an existing file in a client details.",
+                "properties": {
+                  "filename": {
+                    "description": "Original filename for a file in a client details.",
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "link": {
+                    "description": "Download link for a file in a client details.",
+                    "type": "string",
+                    "x-truncated": true
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "id": {
+              "description": "ID of a comment for a client.",
+              "type": "number"
+            },
+            "is_editable": {
+              "description": "Whether this Business User can delete the comment",
+              "type": "boolean"
+            },
+            "text": {
+              "description": "Text of a comment for a client (`type` = \"default\", for `type` = \"file\" the text is returned empty).",
+              "type": "string"
+            },
+            "type": {
+              "description": "Type of a comment for a client: `default`: - text comment; `file`: - uploaded file.",
+              "enum": [
+                "default",
+                "file"
+              ],
+              "type": "string"
+            },
+            "update_date": {
+              "description": "Datetime of a comment for a client last updated.",
+              "format": "date-time",
+              "type": "string"
+            },
+            "user": {
+              "allOf": [
+                {
+                  "description": "Data for an existing user.",
+                  "properties": {
+                    "avatar": {
+                      "description": "Avatar of a user.",
+                      "type": "string"
+                    },
+                    "id": {
+                      "description": "ID of a user.",
+                      "type": "number"
+                    },
+                    "name": {
+                      "description": "Name of a user.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              ],
+              "description": "User created a comment for a client or uploaded files in a client details.",
+              "type": [
+                "object",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "delete_client_comment",
+      "method": "DELETE",
+      "path": "/company/{location_id}/clients/{client_id}/comments/{comment_id}",
+      "displayPath": "/company/{location_id}/clients/{client_id}/comments/{comment_id}",
+      "summary": "Delete a comment for a client",
+      "description": "Deletes a client card comment with the corresponding own or other comment edit permission. It does not delete an uploaded file linked to a file comment.",
+      "tags": [
+        "Clients"
+      ],
+      "domain": "clients",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "ID of a location client.",
+          "name": "client_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "ID of a comment for client.",
+          "name": "comment_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "ID of a location.",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        }
+      ],
+      "response": {
+        "statusCode": "204"
+      }
+    },
+    {
+      "source": "v1",
       "operationId": "get_client_file_list",
       "method": "GET",
       "path": "/company/{location_id}/clients/files/{client_id}",
       "displayPath": "/company/{location_id}/clients/files/{client_id}",
-      "summary": "Sample Request to Get a List of Client Files",
-      "description": "A list of uploaded client files can be retrieved by providing both the location ID and the client ID in the request.\r\nThe client ID can be obtained from the client collection.\r\n\r\nThe response returns an array of [client files](#client-file).\r\n\r\n<a name=\"client-file\"></a>\r\nEach client file has the following structure:\r\n\r\n| Field | Type | Description |\r\n| -----------------| ------- | -------------------------------------------------- ------------------------ |\r\n| id | number | File ID |\r\n| client_id | number | Client ID |\r\n| name | string | Filename with extension |\r\n| description | string | File description |\r\n| extension | string | File name extension |\r\n| mime | string | MIME file type |\r\n| link | string | File download link |\r\n| date_create | string | File upload date in ISO8601 format |\r\n| size | string | Formatted file size string |\r\n| username | string | The name of the user who uploaded the file |\r\n| user_avatar | string | Avatar of the user who uploaded the file |\r\n| can_edit | boolean | Is there a right to change and delete the file? true - there is a right, false - there is no right |",
+      "summary": "List client card files",
+      "description": "Lists uploaded files for one Location client. Requires `clients_access`\nand `client_files_list_access`. The `link` is a download route, while\n`full_link` is its absolute URL. A saved form URL in a comment is not a\nfile and does not appear here until the completed document is uploaded.",
       "tags": [
         "Clients"
       ],
@@ -13112,6 +13147,10 @@
                 "description": "Client ID",
                 "type": "number"
               },
+              "create_date": {
+                "description": "Legacy Location-formatted creation date; prefer date_create",
+                "type": "string"
+              },
               "date_create": {
                 "description": "File upload date in ISO8601 format",
                 "format": "date-time",
@@ -13123,6 +13162,138 @@
               },
               "extension": {
                 "description": "File name extension",
+                "type": "string"
+              },
+              "full_link": {
+                "description": "Absolute file download URL",
+                "type": "string"
+              },
+              "id": {
+                "description": "File ID",
+                "type": "number"
+              },
+              "link": {
+                "description": "File download link",
+                "type": "string"
+              },
+              "mime": {
+                "description": "MIME file type",
+                "type": "string"
+              },
+              "name": {
+                "description": "File name with extension",
+                "type": "string"
+              },
+              "size": {
+                "description": "Formatted file size string",
+                "type": "string"
+              },
+              "user_avatar": {
+                "description": "Avatar of the user who uploaded the file",
+                "type": "string"
+              },
+              "user_name": {
+                "description": "The name of the user who uploaded the file",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "upload_client_file",
+      "method": "POST",
+      "path": "/company/{location_id}/clients/files/{client_id}",
+      "displayPath": "/company/{location_id}/clients/files/{client_id}",
+      "summary": "Upload a completed document to a client card",
+      "description": "Uploads one completed file as multipart form data under the field name\n`file`. Requires `clients_access` and `client_files_upload_access`. The\nLocation client must match the path. Accepted filename extensions are\njpeg, jpg, png, gif, doc, docx, pdf, xls, xlsx, and txt (also uppercase);\nthe file must be smaller than 12 MiB. A successful upload also creates a\n`type: file` entry in the client comment history. The response returns the\ncurrent complete file list, not only the newly uploaded file.\n\nSave a form URL through the client comment endpoint if the form is still\nbeing filled out. Call this endpoint with the finished file bytes when the\ndocument is complete; posting a URL string here does not fetch its contents.",
+      "tags": [
+        "Clients"
+      ],
+      "domain": "clients",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Client ID",
+          "name": "client_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentType": "multipart/form-data",
+        "schema": {
+          "properties": {
+            "file": {
+              "description": "Completed document bytes",
+              "format": "binary",
+              "type": "string"
+            }
+          },
+          "required": [
+            "file"
+          ],
+          "type": "object"
+        }
+      },
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "description": "Array of objects with data",
+          "items": {
+            "properties": {
+              "can_edit": {
+                "description": "Is there a right to change and delete the file? true - there is a right, false - there is no right",
+                "type": "boolean"
+              },
+              "client_id": {
+                "description": "Client ID",
+                "type": "number"
+              },
+              "create_date": {
+                "description": "Legacy Location-formatted creation date; prefer date_create",
+                "type": "string"
+              },
+              "date_create": {
+                "description": "File upload date in ISO8601 format",
+                "format": "date-time",
+                "type": "string"
+              },
+              "description": {
+                "description": "File Description",
+                "type": "string"
+              },
+              "extension": {
+                "description": "File name extension",
+                "type": "string"
+              },
+              "full_link": {
+                "description": "Absolute file download URL",
                 "type": "string"
               },
               "id": {
@@ -13166,7 +13337,8 @@
       "method": "DELETE",
       "path": "/company/{location_id}/clients/files/{client_id}/{file_id}",
       "displayPath": "/company/{location_id}/clients/files/{client_id}/{file_id}",
-      "summary": "Delete request example",
+      "summary": "Delete a client card file",
+      "description": "Deletes an uploaded file belonging to this Location client. Requires\n`clients_access` and `client_files_delete_access`. The client comment\nhistory is a separate resource; deleting a file does not turn a saved form\nURL into an uploaded document.",
       "tags": [
         "Clients"
       ],
@@ -13219,7 +13391,6 @@
       "path": "/company/{location_id}/clients/search",
       "displayPath": "/company/{location_id}/clients/search",
       "summary": "Get a list of clients",
-      "description": "Filter and sort the client base, returning meta.total_count and only the requested fields for one page. If fields is omitted, each row contains only id. This endpoint cannot return tags/categories, custom fields, birth date, loyalty card or comments; use the deprecated GET /clients/{location_id} for full profile pages or GET /client/{location_id}/{id} for one card.",
       "tags": [
         "Clients"
       ],
@@ -13249,24 +13420,8 @@
           "description": "Get a list of clients",
           "properties": {
             "fields": {
-              "description": "Fields to return in each row. id is always included; without this property, only id is returned. Categories/tags and custom fields are unavailable here.",
+              "description": "Fields to be returned in the response",
               "items": {
-                "enum": [
-                  "id",
-                  "name",
-                  "surname",
-                  "patronymic",
-                  "phone",
-                  "email",
-                  "discount",
-                  "first_visit_date",
-                  "last_visit_date",
-                  "sold_amount",
-                  "visits_count",
-                  "tips_count",
-                  "deposit_balance",
-                  "reserved_deposit_balance"
-                ],
                 "type": "string"
               },
               "type": "array"
@@ -13308,7 +13463,7 @@
                 "first_visit_date",
                 "last_visit_date",
                 "sold_amount",
-                "visits_count"
+                "visit_count"
               ],
               "type": "string"
             },
@@ -14526,6 +14681,103 @@
         "tool_name": "create_position",
         "write_allowed": false,
         "notes": "Deprecated but still the only public V1 position create operation. Public V1 has no supported position update or delete; do not use internal V2.\n"
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "update_appointment_attendance",
+      "method": "POST",
+      "path": "/company/{location_id}/records/{record_id}/attendance",
+      "displayPath": "/company/{location_id}/records/{appointment_id}/attendance",
+      "summary": "Change Appointment attendance status",
+      "description": "Change the attendance status of one Appointment without resending the full\nAppointment. The body field is `attendance` (not `visit_attendance`). The\nsupported statuses are `-1` (did not come), `0` (waiting), `1` (came), and\n`2` (confirmed). Read the current status from the Appointment first.\n\nThe Business User needs `record_form_access` and `edit_records_access` for\nthis Location. The Appointment must fall within the Location's\n`records_edit_last_days_count` editing window (`-1` means no history limit).\nA request can also be rejected while online payment is pending, by payment\npolicy, or when a printed sale receipt would be invalidated. With a printed\nreceipt, only `1` and `2` remain eligible statuses. Submitting the current\nstatus leaves it unchanged.\n\nAppointments linked into one visit share an attendance group. Changing one\nAppointment can update the status of other Appointments in that visit and\ntrigger related payment, loyalty, and notification processing. The `records`\nresponse field contains timetable change data; it is not a per-ID bulk result.\n\nFor a bounded bulk workflow, select a finite set of Appointment IDs, read\neach Appointment and confirm its Location, current status, and visit link,\nthen send one request per distinct attendance group. Re-read affected\nAppointments after each change, record successes and failures per group, and\nstop or report on a failed request. This endpoint offers no atomic bulk\noperation or all-or-nothing rollback.",
+      "tags": [
+        "Appointments"
+      ],
+      "domain": "appointments",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Appointment ID",
+          "name": "record_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "properties": {
+            "attendance": {
+              "description": "Desired attendance status",
+              "enum": [
+                -1,
+                0,
+                1,
+                2
+              ],
+              "type": "integer"
+            }
+          },
+          "required": [
+            "attendance"
+          ],
+          "type": "object"
+        }
+      },
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "properties": {
+            "attendance": {
+              "enum": [
+                -1,
+                0,
+                1,
+                2
+              ],
+              "type": "integer"
+            },
+            "records": {
+              "description": "Timetable changes keyed by Appointment ID, or an empty array when there are none",
+              "oneOf": [
+                {
+                  "additionalProperties": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "object"
+                },
+                {
+                  "maxItems": 0,
+                  "type": "array"
+                }
+              ]
+            }
+          },
+          "type": "object"
+        }
       }
     },
     {
@@ -15754,6 +16006,7 @@
       "path": "/company/{location_id}/sale/{document_id}",
       "displayPath": "/company/{location_id}/sale/{document_id}",
       "summary": "Receipt of a Sales Transaction",
+      "description": "Reads one sale document at the specified Location. For a membership with a nonzero `goods_transaction_id`, first retrieve that goods transaction to get its `document_id`. The caller needs Location access and, for a sale document, Inventory access. The sale state contains items and payment transactions; it is not a single membership purchase amount. Match document and item IDs before attributing any payment to a membership.",
       "tags": [
         "Sales"
       ],
@@ -20708,7 +20961,7 @@
       "path": "/company/{location_id}/users/{user_id}/permissions",
       "displayPath": "/company/{location_id}/users/{user_id}/permissions",
       "summary": "Getting permission values and user role",
-      "description": "Return user role and list of permissions values.",
+      "description": "Returns the role and configured permission values for the specified Business User at this Location. The caller needs permission to view Location users. The user must be linked to the Location; otherwise the endpoint returns 404. For the authenticated caller's effective permissions, use `GET /user/permissions/{location_id}` instead.",
       "tags": [
         "Users & Permissions"
       ],
@@ -26209,7 +26462,7 @@
       "path": "/loyalty/abonements",
       "displayPath": "/loyalty/abonements",
       "summary": "Get Client Memberships",
-      "description": "Returns a list of client's memberships by phone",
+      "description": "Returns memberships found by client phone at the specified Location. Requires the authenticated Business User to have Loyalty access at that Location. `company_group_id` can narrow results to a Chain. Each membership includes its number, type, creation time, and `goods_transaction_id` when linked to a goods transaction. `created_date` is membership creation time, not a guaranteed sale date. The type's `cost` is a current type price, not proof of the amount paid or the nominal price at purchase. Follow a nonzero `goods_transaction_id` through `GET /storage_operations/goods_transactions/{location_id}/{transaction_id}` to obtain its `document_id`, then use `GET /transactions/{location_id}` with `document_id` to inspect recorded payments. The response does not include a purchase receipt or a verified paid total.",
       "tags": [
         "Subscriptions & Certificates"
       ],
@@ -26218,10 +26471,19 @@
       "security": {
         "required": true,
         "schemes": [
-          "BearerPartner"
+          "BearerPartnerUser"
         ]
       },
       "parameters": [
+        {
+          "description": "Optional Chain ID used to narrow the membership lookup.",
+          "name": "company_group_id",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        },
         {
           "description": "Location ID",
           "name": "company_id",
@@ -26237,7 +26499,7 @@
           "in": "query",
           "required": true,
           "schema": {
-            "type": "number"
+            "type": "string"
           }
         }
       ],
@@ -26273,7 +26535,7 @@
                 "type": "string"
               },
               "created_date": {
-                "description": "Subscription creation date",
+                "description": "Membership creation date; this is not necessarily the sale date.",
                 "format": "date-time",
                 "type": "string"
               },
@@ -26291,7 +26553,7 @@
                 "type": "integer"
               },
               "goods_transaction_id": {
-                "description": "Product transaction ID",
+                "description": "Linked goods transaction ID, if present; use it to retrieve the sale document ID. A value of 0 does not establish a sale.",
                 "type": "integer"
               },
               "id": {
@@ -26402,7 +26664,7 @@
                     "x-truncated": true
                   },
                   "cost": {
-                    "description": "Subscription price",
+                    "description": "Current membership type price, not the historical amount paid for an individual membership.",
                     "type": "number",
                     "x-truncated": true
                   },
@@ -34551,6 +34813,7 @@
       "path": "/storage_operations/goods_transactions/{location_id}/{transaction_id}",
       "displayPath": "/storage_operations/goods_transactions/{location_id}/{transaction_id}",
       "summary": "Get a transaction",
+      "description": "Reads a goods transaction by ID at the specified Location. A membership's `goods_transaction_id` can be used here to obtain this transaction's `document_id`, `create_date`, `cost_per_unit`, `discount`, and `cost`. These fields describe the goods transaction; they do not establish the total amount paid. The caller needs permission to view Inventory transactions.",
       "tags": [
         "Inventory"
       ],
@@ -37497,7 +37760,7 @@
       "path": "/transactions/{location_id}",
       "displayPath": "/transactions/{location_id}",
       "summary": "Get transactions",
-      "description": "#### Transaction filtering\n\n+ page: Page number\n\n+ count: Number of customers per page\n\n+ account_id: Checkout ID\n\n+ supplier_id: Supplier ID\n\n+ client_id: Client ID\n\n+ user_id: user ID\n\n+ master_id: team member ID\n\n+ type: transaction type\n\n+ real_money: Indicates whether this is a real-money (fiat) transaction\n\n+ deleted: whether the transaction was deleted\n\n+ start_date: start date of the period\n\n+ end_date: end date of the period\n\n+ balance_is: 0 - any balance, 1 - positive, 2 - negative\n\n+ document_id: document ID",
+      "description": "#### Transaction filtering\n\n+ page: Page number\n\n+ count: Number of customers per page\n\n+ account_id: Checkout ID\n\n+ supplier_id: Supplier ID\n\n+ client_id: Client ID\n\n+ user_id: user ID\n\n+ master_id: team member ID\n\n+ type: transaction type\n\n+ real_money: Indicates whether this is a real-money (fiat) transaction\n\n+ deleted: whether the transaction was deleted\n\n+ start_date: start date of the period\n\n+ end_date: end date of the period\n\n+ balance_is: 0 - any balance, 1 - positive, 2 - negative\n\n+ document_id: document ID\n\nUse `document_id` from a linked membership goods transaction to inspect money transactions on the sale document. A document can contain multiple items and payments; this endpoint does not calculate a membership-specific paid total. Reading it requires Finances access. Results are limited by the caller's allowed accounts, expense types, and finance history window.",
       "tags": [
         "Payments"
       ],
@@ -38122,7 +38385,7 @@
                 "type": "string"
               },
               "created_date": {
-                "description": "Subscription creation date",
+                "description": "Membership creation date; this is not necessarily the sale date.",
                 "format": "date-time",
                 "type": "string"
               },
@@ -38140,7 +38403,7 @@
                 "type": "integer"
               },
               "goods_transaction_id": {
-                "description": "Product transaction ID",
+                "description": "Linked goods transaction ID, if present; use it to retrieve the sale document ID. A value of 0 does not establish a sale.",
                 "type": "integer"
               },
               "id": {
@@ -38251,7 +38514,7 @@
                     "x-truncated": true
                   },
                   "cost": {
-                    "description": "Subscription price",
+                    "description": "Current membership type price, not the historical amount paid for an individual membership.",
                     "type": "number",
                     "x-truncated": true
                   },
@@ -38564,8 +38827,8 @@
       "method": "GET",
       "path": "/user/permissions/{location_id}",
       "displayPath": "/user/permissions/{location_id}",
-      "summary": "Get a list of rights",
-      "description": "+ Parameter\r\n    + company_id (required, number, `1`) - location ID",
+      "summary": "Get effective permissions for the authenticated Business User",
+      "description": "Returns the authenticated Business User's effective permission groups for this Location. Use the same User Token as the request returning 403. Optionally pass `group_permissions[]` to limit the returned groups; without it, all groups are returned. This checks the user's Location access and cannot inspect another user or the Marketplace application's declared permissions. The caller must have access to the Location (`canEditSalon`). A missing Location returns 404; insufficient Location access returns 403.",
       "tags": [
         "Users & Permissions"
       ],
@@ -38585,6 +38848,18 @@
           "required": true,
           "schema": {
             "type": "number"
+          }
+        },
+        {
+          "description": "Permission group names to return, for example `loyalty` or `storages`. Repeat the parameter for multiple groups.",
+          "name": "group_permissions[]",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           }
         }
       ],

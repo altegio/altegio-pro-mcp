@@ -89,12 +89,18 @@ describe('static views', () => {
     const index = buildFacetIndex(tools);
     expect([...index.members('ops')].sort()).toEqual(
       [
+        'appointments_attendance_apply',
+        'appointments_attendance_preview',
+        'clients_add_comment',
         'clients_delete',
         'clients_get_card',
+        'clients_get_membership_purchases',
         'clients_get_segment_report',
         'clients_list_profiles',
         'clients_get_visit_history',
         'clients_lookup',
+        'clients_list_comments',
+        'clients_list_files',
         'clients_search',
         'create_appointment',
         'delete_appointment',
@@ -122,10 +128,10 @@ describe('static views', () => {
     expect(members).toHaveLength(wizard.length + FACET_BASE_TOOLS.length);
   });
 
-  it('leaves marketing at the base tools until its packs land', () => {
+  it('serves membership evidence on marketing', () => {
     const index = buildFacetIndex(tools);
     expect([...index.members('marketing')].sort()).toEqual(
-      [...FACET_BASE_TOOLS].sort()
+      [...FACET_BASE_TOOLS, 'clients_get_membership_purchases'].sort()
     );
   });
 
@@ -331,8 +337,11 @@ describe('static views', () => {
         FACET_BASE_TOOLS.length + analyticsCount
       );
       expect(index.members('finance')).toHaveLength(
-        FACET_BASE_TOOLS.length + analyticsCount
+        FACET_BASE_TOOLS.length + analyticsCount + 1
       );
+      expect(
+        index.includes('finance', 'clients_get_membership_purchases')
+      ).toBe(true);
       expect(index.includes('ops', 'analytics_get_overview')).toBe(false);
     });
 

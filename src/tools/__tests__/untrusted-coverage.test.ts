@@ -77,6 +77,18 @@ const envelope = (data: unknown, meta?: unknown): unknown => ({
 // ===========================================================================
 
 const FREE_TEXT: Record<string, FreeTextEntry> = {
+  clients_get_membership_purchases: {
+    what: 'membership number and type title supplied by location data',
+    coveredBy: 'src/tools/__tests__/customer-workflows.test.ts',
+  },
+  clients_list_comments: {
+    what: 'client and staff comment text',
+    coveredBy: 'src/tools/__tests__/customer-workflows.test.ts',
+  },
+  clients_list_files: {
+    what: 'uploaded filenames and download URLs',
+    coveredBy: 'src/tools/__tests__/customer-workflows.test.ts',
+  },
   altegio_call_operation: {
     what: 'the entire API response — one tool reaches every documented GET, so the payload is fenced whole, with no field list to enumerate',
     canary: {
@@ -503,6 +515,14 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
 // ===========================================================================
 
 const NO_FREE_TEXT: Record<string, string> = {
+  diagnose_location_access:
+    'statuses and caller-selected permission keys; application slugs are API vocabulary',
+  clients_add_comment:
+    'created comment ID and timestamp only; the supplied text is not echoed',
+  appointments_attendance_preview:
+    'ids, dates, status codes and visit ids only',
+  appointments_attendance_apply:
+    'ids, status codes and our own outcome labels only',
   // --- authentication ---
   altegio_login:
     'two fixed sentences; the API’s own wording on a failure goes through upstreamDetail',

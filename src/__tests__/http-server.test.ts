@@ -345,10 +345,16 @@ describe('HTTP server facet wiring, end to end', () => {
 
       const ops = await toolNamesOn(port, '/mcp/ops');
       expect([...ops].sort()).toEqual([
+        'appointments_attendance_apply',
+        'appointments_attendance_preview',
+        'clients_add_comment',
         'clients_delete',
         'clients_get_card',
+        'clients_get_membership_purchases',
         'clients_get_segment_report',
         'clients_get_visit_history',
+        'clients_list_comments',
+        'clients_list_files',
         'clients_list_profiles',
         'clients_lookup',
         'clients_search',

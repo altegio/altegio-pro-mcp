@@ -1443,6 +1443,17 @@ export class AltegioClient {
     return { data: body as T };
   }
 
+  /** Curated documented JSON writes. The universal executor remains GET only. */
+  async postJson<T = unknown>(path: string, body: object): Promise<T> {
+    this.requireAuth();
+    const response = await this.apiRequest(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return this.handleResponse<T>(response, `call POST ${path}`);
+  }
+
   isAuthenticated(): boolean {
     return !!this.resolveUserToken();
   }

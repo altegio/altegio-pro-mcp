@@ -88,10 +88,16 @@ describe('tools/list per facet', () => {
     const client = await connect('ops');
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name).sort()).toEqual([
+      'appointments_attendance_apply',
+      'appointments_attendance_preview',
+      'clients_add_comment',
       'clients_delete',
       'clients_get_card',
+      'clients_get_membership_purchases',
       'clients_get_segment_report',
       'clients_get_visit_history',
+      'clients_list_comments',
+      'clients_list_files',
       'clients_list_profiles',
       'clients_lookup',
       'clients_search',
@@ -104,11 +110,11 @@ describe('tools/list per facet', () => {
     await client.close();
   });
 
-  it('serves only the base tools on the marketing facet', async () => {
+  it('serves membership evidence on the marketing facet', async () => {
     const client = await connect('marketing');
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name).sort()).toEqual(
-      [...FACET_BASE_TOOLS].sort()
+      [...FACET_BASE_TOOLS, 'clients_get_membership_purchases'].sort()
     );
     await client.close();
   });

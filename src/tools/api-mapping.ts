@@ -50,6 +50,25 @@ export const executorTools: string[] = [
 ];
 
 export const apiMapping: Record<string, ApiMapping> = {
+  clients_list_comments: {
+    path: '/company/{location_id}/clients/{client_id}/comments',
+    method: 'get',
+    operationId: 'list_client_comments',
+    pathParams: ['location_id', 'client_id'],
+  },
+  clients_add_comment: {
+    path: '/company/{location_id}/clients/{client_id}/comments',
+    method: 'post',
+    operationId: 'create_client_comment',
+    pathParams: ['location_id', 'client_id'],
+    bodyParams: ['text'],
+  },
+  clients_list_files: {
+    path: '/company/{location_id}/clients/files/{client_id}',
+    method: 'get',
+    operationId: 'get_client_file_list',
+    pathParams: ['location_id', 'client_id'],
+  },
   // ==========================================
   // Authentication
   // ==========================================
@@ -685,6 +704,76 @@ export const apiMapping: Record<string, ApiMapping> = {
  * or in `catalog/extended/*.yaml`, so the compliance test walks both maps.
  */
 export const multiApiMapping: Record<string, ApiMapping[]> = {
+  diagnose_location_access: [
+    {
+      path: '/company/{location_id}',
+      method: 'get',
+      operationId: 'get_location',
+      pathParams: ['location_id'],
+    },
+    {
+      path: '/user/permissions/{location_id}',
+      method: 'get',
+      operationId: 'get_permission_list',
+      pathParams: ['location_id'],
+    },
+  ],
+  clients_get_membership_purchases: [
+    {
+      path: '/client/{location_id}/{id}',
+      method: 'get',
+      operationId: 'get_client',
+      pathParams: ['location_id', 'id'],
+    },
+    {
+      path: '/loyalty/abonements',
+      method: 'get',
+      operationId: 'get_client_memberships',
+      pathParams: [],
+      queryParams: ['company_id', 'phone'],
+    },
+    {
+      path: '/company/{location_id}/client/{client_id}/loyalty/abonements/{membership_id}/history',
+      method: 'get',
+      operationId: 'get_client_membership_activity_history',
+      pathParams: ['location_id', 'client_id', 'membership_id'],
+    },
+    {
+      path: '/storage_operations/goods_transactions/{location_id}/{transaction_id}',
+      method: 'get',
+      operationId: 'get_transaction',
+      pathParams: ['location_id', 'transaction_id'],
+    },
+    {
+      path: '/company/{location_id}/sale/{document_id}',
+      method: 'get',
+      operationId: 'get_sale_transaction',
+      pathParams: ['location_id', 'document_id'],
+    },
+  ],
+  appointments_attendance_preview: [
+    {
+      path: '/record/{location_id}/{record_id}',
+      method: 'get',
+      operationId: 'get_appointment',
+      pathParams: ['location_id', 'record_id'],
+    },
+  ],
+  appointments_attendance_apply: [
+    {
+      path: '/record/{location_id}/{record_id}',
+      method: 'get',
+      operationId: 'get_appointment',
+      pathParams: ['location_id', 'record_id'],
+    },
+    {
+      path: '/company/{location_id}/records/{record_id}/attendance',
+      method: 'post',
+      operationId: 'update_appointment_attendance',
+      pathParams: ['location_id', 'record_id'],
+      bodyParams: ['attendance'],
+    },
+  ],
   analytics_get_product_sales: [
     {
       path: '/storages/sales_analysis/search/{location_id}/',

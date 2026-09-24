@@ -90,19 +90,19 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 
 ### Tools Available
 
-**83 tools served (89 defined, 6 withheld from every view).** The counts below are pinned by `src/tools/__tests__/tool-count.test.ts` — edit them only with the code. Which tool is served on which address, and why, is the generated table in [`docs/architecture/tool-surface.md`](docs/architecture/tool-surface.md) (`npm run surface:build`).
+**90 tools served (96 defined, 6 withheld from every view).** The counts below are pinned by `src/tools/__tests__/tool-count.test.ts` — edit them only with the code. Which tool is served on which address, and why, is the generated table in [`docs/architecture/tool-surface.md`](docs/architecture/tool-surface.md) (`npm run surface:build`).
 
 **Category-organized with [Prefix] tags for LLM navigation:**
 
 **[Auth] Authentication (2):** login, logout
-**[Location] Location (2):** list_locations, update_location
+**[Location] Location (3):** list_locations, update_location, diagnose_location_access
 **[Staff] Staff CRUD (4):** get, create, update, delete (create supports `is_paid_staff`)
 **[Positions] Positions (2):** get, create (no update/delete tool exists — the 2025-10-30 note below overstated this)
 **[Services] Services (8):** get, create, update, delete, plus service↔team-member links: link_service_team_member, update_service_team_member, unlink_service_team_member, link_team_member_services (bulk)
 **[Categories] Service Categories (2):** get, delete
 **[Schedule] Schedule CRUD (4):** get, create, update, delete
-**[Appointments] Appointments CRUD (4):** get, create, update, delete
-**[Clients] Client base (7):** `clients_search` (segment & count the base with a fully-typed filter model), `clients_get_segment_report` (paged lifetime value and engagement rows), `clients_list_profiles` (paged full client cards), `clients_get_card`, `clients_get_visit_history`, `clients_lookup` (autocomplete), `clients_delete`
+**[Appointments] Appointments (6):** get, create, update, delete, `appointments_attendance_preview`, `appointments_attendance_apply` (bounded visit-group updates)
+**[Clients] Client base (11):** `clients_search`, `clients_get_segment_report`, `clients_list_profiles`, `clients_get_card`, `clients_get_visit_history`, `clients_lookup`, `clients_delete`, `clients_get_membership_purchases`, `clients_list_comments`, `clients_add_comment`, `clients_list_files`
 **[Settings] Location Settings (7):** get/update appointment settings, get/update online booking settings, get/create/delete booking forms
 **[Resources] Resources (1):** get (read-only; API has no create)
 **[Users] Location access (1):** `remove_location_user` — off the default `/mcp` view, served on `/mcp/catalog` and stdio
