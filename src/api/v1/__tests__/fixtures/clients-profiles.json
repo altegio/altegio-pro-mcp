@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "data": [
+    {
+      "id": 66,
+      "name": "James",
+      "surname": "Smith",
+      "patronymic": "A",
+      "display_name": "James Smith",
+      "phone": "+13155550177",
+      "email": "james@example.com",
+      "sex_id": 1,
+      "importance_id": 3,
+      "discount": 10,
+      "card": "000123",
+      "birth_date": "1990-04-03",
+      "comment": "prefers mornings",
+      "spent": 1250.5,
+      "paid": 1200,
+      "balance": -50.5,
+      "visits": 9,
+      "sms_check": 1,
+      "sms_not": 0,
+      "categories": [{ "id": 3, "title": "VIP", "color": "#e8d313" }],
+      "custom_fields": { "preferred_day": "Monday" },
+      "last_change_date": "2026-09-20T12:00:00+0000"
+    }
+  ],
+  "meta": { "page": 2, "total_count": 101 }
+}

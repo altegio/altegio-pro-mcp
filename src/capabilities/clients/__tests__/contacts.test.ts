@@ -14,6 +14,7 @@ import type { AltegioClient } from '../../../providers/altegio-client.js';
 import {
   getClientCard,
   getClientSegmentReport,
+  listClientProfiles,
   lookupClients,
   searchClients,
 } from '../use-cases.js';
@@ -66,6 +67,45 @@ function fakeClient(
 const cardClient = () => fakeClient([[/^\/client\//, fixture('client-card')]]);
 const lookupClient = () =>
   fakeClient([[/autocomplete/, fixture('clients-autocomplete')]]);
+
+describe('clients_list_profiles', () => {
+  it('withholds contacts by default while retaining complete profile fields', async () => {
+    const client = fakeClient([[/^\/clients\//, fixture('clients-profiles')]]);
+    const result = await listClientProfiles(client, {
+      location_id: 4564,
+      page: 2,
+      page_size: 50,
+    });
+    const output = result.structuredContent as {
+      rows: Array<Record<string, unknown>>;
+      has_more: boolean;
+    };
+    expect(output.has_more).toBe(true);
+    expect(output.rows[0]).toMatchObject({ total_paid: 1200 });
+    expect(output.rows[0]).not.toHaveProperty('custom_fields');
+    expect(output.rows[0]).not.toHaveProperty('phone');
+    expect(output.rows[0]).not.toHaveProperty('email');
+    expect(everything(result)).not.toContain('+13155550177');
+    expect(everything(result)).not.toContain('james@example.com');
+
+    const withContacts = await listClientProfiles(client, {
+      location_id: 4564,
+      include_contacts: true,
+      include_custom_fields: true,
+    });
+    expect(
+      (
+        withContacts.structuredContent as {
+          rows: Array<Record<string, unknown>>;
+        }
+      ).rows[0]
+    ).toMatchObject({
+      phone: '+13155550177',
+      email: 'james@example.com',
+      custom_fields: { preferred_day: 'Monday' },
+    });
+  });
+});
 
 describe('clients_get_segment_report', () => {
   it('returns a bounded page and withholds unexpected source contacts', async () => {

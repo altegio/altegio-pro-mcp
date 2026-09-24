@@ -22,6 +22,9 @@ import {
 } from '../../capabilities/clients/vocabulary.js';
 import type {
   ClientCard,
+  ClientProfile,
+  ClientProfilesPage,
+  ClientProfilesQuery,
   ClientLookupQuery,
   ClientLookupRow,
   ClientReactivationQuery,
@@ -80,8 +83,108 @@ function importanceFromCode(value: unknown): Importance | null {
   return n === null ? null : (IMPORTANCE_FROM_CODE[n] ?? null);
 }
 
+function cardFromWire(card: Record<string, unknown>, id: number): ClientCard {
+  const tagsRaw = Array.isArray(card.categories) ? card.categories : [];
+  const tags = tagsRaw
+    .filter((t): t is Record<string, unknown> => !!t && typeof t === 'object')
+    .map((t) => ({
+      id: asNumber(t.id),
+      title: asString(t.title),
+      color: asString(t.color),
+    }));
+  const customFields =
+    card.custom_fields &&
+    typeof card.custom_fields === 'object' &&
+    !Array.isArray(card.custom_fields)
+      ? (card.custom_fields as Record<string, unknown>)
+      : {};
+  return {
+    id,
+    name: asString(card.name),
+    surname: asString(card.surname),
+    patronymic: asString(card.patronymic ?? card.middle_name),
+    phone: asString(card.phone),
+    email: asString(card.email),
+    gender: genderFromCode(card.sex_id ?? card.gender_id),
+    importance: importanceFromCode(card.importance_id),
+    discount: asNumber(card.discount),
+    loyalty_card_number: asString(card.card),
+    birth_date: asString(card.birth_date),
+    comment: asString(card.comment),
+    total_spent: asNumber(card.spent),
+    client_account_balance: asNumber(card.balance),
+    visit_count: asNumber(card.visits),
+    sms_birthday_greeting: asFlag(card.sms_check),
+    sms_excluded_from_campaigns: asFlag(card.sms_not),
+    tags,
+    custom_fields: customFields,
+    last_changed_at: asString(card.last_change_date),
+  };
+}
+
 export class V1ClientsAdapter implements ClientsApi {
   constructor(private readonly http: AltegioHttp) {}
+
+  async listClientProfiles(
+    query: ClientProfilesQuery
+  ): Promise<ClientProfilesPage> {
+    const params = new URLSearchParams({
+      page: String(query.page),
+      count: String(query.page_size),
+    });
+    if (query.name) params.set('fullname', query.name);
+    if (query.phone) params.set('phone', query.phone);
+    if (query.email) params.set('email', query.email);
+    if (query.loyalty_card_number)
+      params.set('card', query.loyalty_card_number);
+    for (const id of query.client_ids ?? []) params.append('id[]', String(id));
+    if (query.paid_min !== undefined)
+      params.set('paid_min', String(query.paid_min));
+    if (query.paid_max !== undefined)
+      params.set('paid_max', String(query.paid_max));
+    if (query.changed_after) params.set('changed_after', query.changed_after);
+    if (query.changed_before)
+      params.set('changed_before', query.changed_before);
+    const { data, meta } = await callEnveloped<unknown>(
+      this.http,
+      `/clients/${query.location_id}?${params.toString()}`,
+      { context: 'list client profiles' }
+    );
+    const totalCount = asNumber(meta.total_count);
+    if (
+      !Array.isArray(data) ||
+      totalCount === null ||
+      !Number.isInteger(totalCount) ||
+      totalCount < 0
+    ) {
+      throw new Error(
+        'Client profiles source returned an invalid page or total count.'
+      );
+    }
+    const rows: ClientProfile[] = data.map((raw) => {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        throw new Error('Client profiles source returned an invalid row.');
+      }
+      const row = raw as Record<string, unknown>;
+      const id = asNumber(row.id);
+      if (id === null || !Number.isInteger(id) || id <= 0) {
+        throw new Error(
+          'Client profiles source returned a row without a valid id.'
+        );
+      }
+      return {
+        ...cardFromWire(row, id),
+        display_name: asString(row.display_name),
+        total_paid: asNumber(row.paid),
+      };
+    });
+    return {
+      total_count: totalCount,
+      page: query.page,
+      page_size: query.page_size,
+      rows,
+    };
+  }
 
   async searchClients(query: ClientSearchQuery): Promise<ClientSegment> {
     const payload = buildFilterPayload(query.filters, query.match);
@@ -277,46 +380,7 @@ export class V1ClientsAdapter implements ClientsApi {
       `/client/${query.location_id}/${query.client_id}`,
       { context: 'read the client card' }
     );
-    const card = data ?? {};
-
-    const tagsRaw = Array.isArray(card.categories) ? card.categories : [];
-    const tags = tagsRaw
-      .filter((t): t is Record<string, unknown> => !!t && typeof t === 'object')
-      .map((t) => ({
-        id: asNumber(t.id),
-        title: asString(t.title),
-        color: asString(t.color),
-      }));
-
-    const customFields =
-      card.custom_fields &&
-      typeof card.custom_fields === 'object' &&
-      !Array.isArray(card.custom_fields)
-        ? (card.custom_fields as Record<string, unknown>)
-        : {};
-
-    return {
-      id: asNumber(card.id) ?? query.client_id,
-      name: asString(card.name),
-      surname: asString(card.surname),
-      patronymic: asString(card.middle_name),
-      phone: asString(card.phone),
-      email: asString(card.email),
-      gender: genderFromCode(card.gender_id),
-      importance: importanceFromCode(card.importance_id),
-      discount: asNumber(card.discount),
-      loyalty_card_number: asString(card.card),
-      birth_date: asString(card.birth_date),
-      comment: asString(card.comment),
-      total_spent: asNumber(card.spent),
-      client_account_balance: asNumber(card.balance),
-      visit_count: asNumber(card.visits),
-      sms_birthday_greeting: asFlag(card.sms_check),
-      sms_excluded_from_campaigns: asFlag(card.sms_not),
-      tags,
-      custom_fields: customFields,
-      last_changed_at: asString(card.last_change_date),
-    };
+    return cardFromWire(data ?? {}, asNumber(data?.id) ?? query.client_id);
   }
 
   async getVisitHistory(query: VisitHistoryQuery): Promise<VisitHistory> {
