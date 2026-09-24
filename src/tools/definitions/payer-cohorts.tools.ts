@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import { getClientPayerCohorts } from '../../capabilities/analytics/payer-cohorts.js';
+import { completeMonthsInput } from './finance-period.schema.js';
 
 const integer = { type: 'integer' as const };
 const number = { type: 'number' as const };
@@ -16,27 +17,33 @@ export const analyticsGetClientPayerCohortsTool = defineTool({
   name: 'analytics_get_client_payer_cohorts',
   category: 'Analytics',
   description:
-    '[Analytics] Rank identified paying clients by signed net cash receipts in service payments, product sales, miscellaneous income and client-account top-ups over up to 12 complete months. Returns top 10%, next 10%, remaining payer counts and cash, plus a page of stable client IDs for one cohort. Reads every selected transaction detail, verifies unrestricted finance history and authorized accounts, repeats the source list and reconciles each month to the finance report. Refuses oversized or changed sources; no partial cohort or contacts.',
+    '[Analytics] Rank identified paying clients by signed net cash receipts in service payments, product sales, miscellaneous income and client-account top-ups over up to 12 complete local months. Returns top 10%, next 10% and remaining payer counts and cash, plus a page of stable client ids for one cohort. Reads every selected finance transaction (at most 4,000), verifies unrestricted finance history and authorized accounts, repeats the source list and reconciles each month to the finance report. Refuses oversized or changed sources; never returns a partial cohort or contacts. For monthly receipts by stream use analytics_get_client_cash_receipts.',
   annotations: {
     title: 'Analytics: client payer cohorts',
     readOnlyHint: true,
     openWorldHint: true,
   },
   input: z.object({
-    location_id: z.number().int().positive(),
-    date_from: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/)
-      .describe('First day of the first local calendar month, YYYY-MM-DD.'),
-    date_to: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/)
-      .describe('Last day of the final local calendar month, YYYY-MM-DD.'),
+    ...completeMonthsInput,
     target_cohort: z
       .enum(['top_payer_decile', 'next_payer_decile', 'remaining_payers'])
-      .optional(),
-    page: z.number().int().positive().optional(),
-    page_size: z.number().int().min(1).max(100).optional(),
+      .optional()
+      .describe(
+        'Cohort whose client ids to page through (default top_payer_decile).'
+      ),
+    page: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Page of client ids, starting at 1.'),
+    page_size: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe('Client ids per page, at most 100. Default 50.'),
   }),
   outputSchema: object({
     location_id: integer,

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
-import { getCustomerCashReceipts } from '../../capabilities/analytics/cash-receipts.js';
+import { getClientCashReceipts } from '../../capabilities/analytics/cash-receipts.js';
+import { completeMonthsInput } from './finance-period.schema.js';
 
 const number = { type: 'number' as const };
 const text = { type: 'string' as const };
@@ -20,29 +21,17 @@ const streams = object({
   penalties: number,
 });
 
-export const analyticsGetCustomerCashReceiptsTool = defineTool({
-  name: 'analytics_get_customer_cash_receipts',
+export const analyticsGetClientCashReceiptsTool = defineTool({
+  name: 'analytics_get_client_cash_receipts',
   category: 'Analytics',
   description:
-    '[Analytics] Monthly net posted cash receipts by service payments, product sales, client-account top-ups, miscellaneous income, memberships, gift cards and penalties. Reconciles every local month against the authenticated finance report income total. A wallet top-up is counted on receipt; spending that wallet balance is not counted again. Custom income categories remain unclassified, and disabled historical custom categories can be omitted by the source. Signed refunds reduce net receipts but gross receipts and refund totals are unavailable. This is cash basis, separate from delivered service manual_cost. Requires the location finance annual-report right; account restrictions apply.',
+    '[Analytics] Monthly net posted cash receipts by service payments, product sales, client-account top-ups, miscellaneous income, memberships, gift cards and penalties, for up to 12 complete local calendar months. Reconciles every month against the authenticated finance report income total. A client-account top-up is counted when received; spending that balance later is not counted again. Custom income categories remain unclassified, and disabled historical custom categories can be omitted by the source. Signed refunds reduce net receipts; gross receipts and refund totals are unavailable. This is cash basis, separate from the delivered service value of analytics_get_service_mix_trend; for ranked paying clients use analytics_get_client_payer_cohorts. Requires the location finance annual-report right; account restrictions apply.',
   annotations: {
-    title: 'Analytics: customer cash receipts',
+    title: 'Analytics: client cash receipts',
     readOnlyHint: true,
     openWorldHint: true,
   },
-  input: z.object({
-    location_id: z.number().int().positive(),
-    date_from: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/)
-      .describe('First day of the first local calendar month, YYYY-MM-DD.'),
-    date_to: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/)
-      .describe(
-        'Last day of the final local calendar month, YYYY-MM-DD. Up to 12 complete months.'
-      ),
-  }),
+  input: z.object(completeMonthsInput),
   outputSchema: object({
     location_id: { type: 'integer' },
     period: object({
@@ -56,7 +45,7 @@ export const analyticsGetCustomerCashReceiptsTool = defineTool({
       items: object({
         month: text,
         streams,
-        classified_customer_cash_net: number,
+        classified_client_cash_net: number,
         unclassified_category_count: { type: 'integer' },
         unclassified_posted_income_net: number,
         posted_income_net: number,
@@ -64,7 +53,7 @@ export const analyticsGetCustomerCashReceiptsTool = defineTool({
     },
     totals: object({
       streams,
-      classified_customer_cash_net: number,
+      classified_client_cash_net: number,
       unclassified_posted_income_net: number,
       posted_income_net: number,
     }),
@@ -75,5 +64,5 @@ export const analyticsGetCustomerCashReceiptsTool = defineTool({
       limitations: { type: 'array', items: text },
     }),
   }),
-  handler: async ({ client, input }) => getCustomerCashReceipts(client, input),
+  handler: async ({ client, input }) => getClientCashReceipts(client, input),
 });

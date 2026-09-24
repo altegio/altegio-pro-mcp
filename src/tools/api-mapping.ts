@@ -717,7 +717,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       method: 'get',
       operationId: 'get_appointment_list',
       pathParams: ['location_id'],
-      queryParams: ['start_date', 'end_date', 'page', 'count'],
+      queryParams: ['start_date', 'end_date', 'staff_id', 'page', 'count'],
     },
     {
       path: '/company/{location_id}',
@@ -770,7 +770,16 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       operationId: 'deprecated_get_service_category_list',
       pathParams: ['location_id', 'id'],
     },
+    {
+      path: '/resources/{location_id}',
+      method: 'get',
+      operationId: 'get_resource_list',
+      pathParams: ['location_id'],
+    },
   ],
+  // The optional Marketplace application read is a developers-contract route
+  // (`docs/en/developers/openapi.yaml`), outside the B2B V1 spec this map is
+  // checked against, so it is not listed here.
   diagnose_location_access: [
     {
       path: '/company/{location_id}',
@@ -818,15 +827,21 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       pathParams: ['location_id', 'document_id'],
     },
   ],
-  appointments_attendance_preview: [
+  appointments_preview_attendance: [
     {
       path: '/record/{location_id}/{record_id}',
       method: 'get',
       operationId: 'get_appointment',
       pathParams: ['location_id', 'record_id'],
     },
+    {
+      path: '/user/permissions/{location_id}',
+      method: 'get',
+      operationId: 'get_permission_list',
+      pathParams: ['location_id'],
+    },
   ],
-  appointments_attendance_apply: [
+  appointments_apply_attendance: [
     {
       path: '/record/{location_id}/{record_id}',
       method: 'get',
@@ -898,7 +913,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       source: 'extended',
     },
   ],
-  analytics_get_customer_cash_receipts: [
+  analytics_get_client_cash_receipts: [
     {
       path: '/user/permissions/{location_id}',
       method: 'get',

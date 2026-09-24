@@ -2,6 +2,7 @@ import { describe, expect, it, jest, afterEach } from '@jest/globals';
 import type { AltegioClient } from '../../../providers/altegio-client.js';
 import { V1LegacyAnalyticsAdapter } from '../../../api/v1/legacy-analytics-adapter.js';
 import { getClientPayerCohorts } from '../payer-cohorts.js';
+import { AltegioApiError } from '../../../utils/errors.js';
 
 const input = {
   location_id: 4564,
@@ -127,6 +128,37 @@ describe('cash-basis payer cohorts', () => {
     await expect(getClientPayerCohorts(client, input)).rejects.toThrow(
       'last-days limit'
     );
+  });
+
+  it('stops reading details after the first refused transaction', async () => {
+    source(200);
+    pages(200);
+    const client = fakeClient(Array.from({ length: 200 }, () => 1));
+    const original = client.request.bind(client);
+    let detailReads = 0;
+    client.request = jest.fn(
+      async (...args: Parameters<typeof client.request>) => {
+        if (args[1].startsWith('/finance_transactions/')) {
+          detailReads += 1;
+          if (args[1].endsWith('/1'))
+            throw new AltegioApiError('forbidden', 403);
+        }
+        return original(...args);
+      }
+    ) as typeof client.request;
+    await expect(getClientPayerCohorts(client, input)).rejects.toThrow(
+      'forbidden'
+    );
+    // One wave of concurrent reads may finish; the remaining ids are skipped.
+    expect(detailReads).toBeLessThan(50);
+  });
+
+  it('refuses a period above the transaction cap with an input error', async () => {
+    source(10);
+    pages(4001);
+    await expect(
+      getClientPayerCohorts(fakeClient([10]), input)
+    ).rejects.toThrow('Narrow the period');
   });
 
   it('refuses a detail outside the account allowlist', async () => {

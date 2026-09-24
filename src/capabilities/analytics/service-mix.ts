@@ -9,7 +9,8 @@ import { AnalyticsInputError } from './errors.js';
 import { resolveLocationTimezone } from './location-timezone.js';
 import { resolvePeriod, type PeriodInput } from './periods.js';
 
-const money = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+/** Two decimals, for money and percentages alike. */
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 const positiveId = (n: unknown): n is number =>
   Number.isSafeInteger(n) && (n as number) > 0;
 const attended = (r: ServiceRecord): boolean =>
@@ -22,7 +23,7 @@ const lineValue = (line: ServiceRecord['services'][number]): number => {
     !Number.isFinite(line.manual_cost)
   )
     throw new Error(
-      'An attended service line has no valid manual_cost; the report cannot be complete.'
+      'An attended service line has no recorded line total; the report cannot be complete.'
     );
   // Backend AttendanceServiceItem::getManualCost returns the line total. It is
   // NOT a per-unit price and must not be multiplied by amount.
@@ -363,10 +364,10 @@ export async function getServiceMixTrend(
       line_count: row.line_count,
       appointment_count: row.appointments.size,
       client_count: row.clients.size,
-      delivered_service_value: money(row.delivered_service_value),
+      delivered_service_value: round2(row.delivered_service_value),
       charge_after_loyalty: row.charge_missing
         ? null
-        : money(row.charge_after_loyalty ?? 0),
+        : round2(row.charge_after_loyalty ?? 0),
       attribution: row.attribution,
     }))
     .sort(
@@ -386,7 +387,7 @@ export async function getServiceMixTrend(
   const page = input.page ?? 1;
   const pageSize = input.page_size ?? 25;
   return {
-    text: `${allRows.length} monthly ${groupBy} cells; ${arrivedAppointments} attended appointments. Delivered service value ${money(deliveredTotal)} ${data.currency ?? '(currency unavailable)'}.`,
+    text: `${allRows.length} monthly ${groupBy} cells; ${arrivedAppointments} attended appointments. Delivered service value ${round2(deliveredTotal)} ${data.currency ?? '(currency unavailable)'}.`,
     structuredContent: {
       location_id: input.location_id,
       period: data.period,
@@ -402,17 +403,17 @@ export async function getServiceMixTrend(
       },
       totals: {
         attended_appointments: arrivedAppointments,
-        delivered_service_value: money(deliveredTotal),
+        delivered_service_value: round2(deliveredTotal),
         unattributed_service_lines: unattributedLines,
       },
       provenance: {
-        source: 'GET /records/{location_id}',
+        source: 'documented V1 appointment list',
         source_count: data.source_count,
         pages_scanned: data.pages,
         scanned_at: data.scanned_at,
         completeness: 'all_source_pages_read; no transactional snapshot',
         amount_basis:
-          'attendance_service_item.manual_cost line total; before loyalty deductions; not cash or recognized accounting revenue',
+          'recorded service-line total before loyalty deductions; not cash received or recognized accounting revenue',
         category_basis: 'current catalog category, not historical category',
         resource_basis:
           'one known assigned resource type can cover several appointment service lines; multiple resource types remain unallocated with their associations shown',
@@ -576,11 +577,11 @@ export async function getClientServicePenetration(
     { name: 'remaining_active_clients', members: ranked.slice(2 * decile) },
   ];
   const cohortRows = cohorts.map(({ name, members }) => ({
-    name,
+    cohort: name,
     denominator: members.length,
     target_adopters: members.filter(([, item]) => item.target).length,
-    target_penetration_percent: members.length
-      ? money(
+    penetration_percent: members.length
+      ? round2(
           (100 * members.filter(([, item]) => item.target).length) /
             members.length
         )
@@ -625,29 +626,33 @@ export async function getClientServicePenetration(
           );
       }
   }
+  const groupRef = (key: string) => {
+    const group = groupLabels.get(key)!;
+    return {
+      group_type: group.type,
+      group_id: group.id,
+      group_title: sanitizeUntrusted(group.title, { maxChars: 140 }),
+    };
+  };
   const topGroups = [...groupCounts.entries()]
     .map(([key, count]) => ({
-      group_type: groupLabels.get(key)!.type,
-      group_id: groupLabels.get(key)!.id,
-      group_title: sanitizeUntrusted(groupLabels.get(key)!.title, {
-        maxChars: 140,
-      }),
+      ...groupRef(key),
       active_clients: count.clients,
       penetration_percent: ranked.length
-        ? money((100 * count.clients) / ranked.length)
+        ? round2((100 * count.clients) / ranked.length)
         : 0,
       confirmed_mono_group_clients: count.mono_clients,
       cohort_penetration: cohortRows.map((cohort, index) => ({
-        cohort: cohort.name,
+        cohort: cohort.cohort,
         denominator: cohort.denominator,
         adopters: count.cohort_clients[index]!,
-        percent: cohort.denominator
-          ? money((100 * count.cohort_clients[index]!) / cohort.denominator)
+        penetration_percent: cohort.denominator
+          ? round2((100 * count.cohort_clients[index]!) / cohort.denominator)
           : null,
       })),
       top_vs_remaining_gap_percentage_points:
         cohortRows[0]!.denominator && cohortRows[2]!.denominator
-          ? money(
+          ? round2(
               (100 * count.cohort_clients[0]!) / cohortRows[0]!.denominator -
                 (100 * count.cohort_clients[2]!) / cohortRows[2]!.denominator
             )
@@ -665,10 +670,10 @@ export async function getClientServicePenetration(
       service_title: sanitizeUntrusted(sku.title, { maxChars: 140 }),
       active_clients: sku.clients.size,
       penetration_percent: ranked.length
-        ? money((100 * sku.clients.size) / ranked.length)
+        ? round2((100 * sku.clients.size) / ranked.length)
         : 0,
       service_lines: sku.lines,
-      delivered_service_value: money(sku.value),
+      delivered_service_value: round2(sku.value),
     }))
     .sort(
       (a, b) =>
@@ -678,27 +683,21 @@ export async function getClientServicePenetration(
     .map(([pair, activeClients]) => {
       const [left, right] = pair.split('|');
       return {
-        first_group: {
-          type: groupLabels.get(left!)!.type,
-          id: groupLabels.get(left!)!.id,
-        },
-        second_group: {
-          type: groupLabels.get(right!)!.type,
-          id: groupLabels.get(right!)!.id,
-        },
+        first_group: groupRef(left!),
+        second_group: groupRef(right!),
         active_clients: activeClients,
         penetration_percent: ranked.length
-          ? money((100 * activeClients) / ranked.length)
+          ? round2((100 * activeClients) / ranked.length)
           : 0,
       };
     })
     .sort(
       (a, b) =>
         b.active_clients - a.active_clients ||
-        a.first_group.type.localeCompare(b.first_group.type) ||
-        (a.first_group.id ?? 0) - (b.first_group.id ?? 0) ||
-        a.second_group.type.localeCompare(b.second_group.type) ||
-        (a.second_group.id ?? 0) - (b.second_group.id ?? 0)
+        a.first_group.group_type.localeCompare(b.first_group.group_type) ||
+        (a.first_group.group_id ?? 0) - (b.first_group.group_id ?? 0) ||
+        a.second_group.group_type.localeCompare(b.second_group.group_type) ||
+        (a.second_group.group_id ?? 0) - (b.second_group.group_id ?? 0)
     );
   const adopters = ranked.filter(([, item]) => item.target).length;
   const overlap = sourceClients.filter(([, item]) => item.target).length;
@@ -709,7 +708,7 @@ export async function getClientServicePenetration(
   const page = input.page ?? 1;
   const pageSize = input.page_size ?? 50;
   return {
-    text: `${adopters} of ${ranked.length} identified active clients used the target service group (${ranked.length ? money((100 * adopters) / ranked.length) : 0}%). ${candidates.length} source-group clients did not use it.`,
+    text: `${adopters} of ${ranked.length} identified active clients used the target service group (${ranked.length ? round2((100 * adopters) / ranked.length) : 0}%). ${candidates.length} source-group clients did not use it.`,
     structuredContent: {
       location_id: input.location_id,
       period: data.period,
@@ -725,7 +724,7 @@ export async function getClientServicePenetration(
       },
       target_adopters: adopters,
       penetration_percent: ranked.length
-        ? money((100 * adopters) / ranked.length)
+        ? round2((100 * adopters) / ranked.length)
         : 0,
       source_clients: sourceClients.length,
       source_target_overlap: overlap,
@@ -733,9 +732,9 @@ export async function getClientServicePenetration(
       delivered_value_cohorts: cohortRows,
       cohort_penetration_gap_percentage_points:
         cohortRows[0]!.denominator && cohortRows[2]!.denominator
-          ? money(
-              cohortRows[0]!.target_penetration_percent -
-                cohortRows[2]!.target_penetration_percent
+          ? round2(
+              cohortRows[0]!.penetration_percent -
+                cohortRows[2]!.penetration_percent
             )
           : null,
       group_insights: {
@@ -766,13 +765,13 @@ export async function getClientServicePenetration(
         has_more: page * pageSize < candidates.length,
       },
       provenance: {
-        source: 'GET /records/{location_id}',
+        source: 'documented V1 appointment list',
         source_count: data.source_count,
         pages_scanned: data.pages,
         scanned_at: data.scanned_at,
         completeness: 'all_source_pages_read; no transactional snapshot',
         cohort_basis:
-          'attendance_service_item.manual_cost delivered value among identified active attended clients; not incoming cash or payer cohorts',
+          'delivered service value (recorded service-line totals before loyalty deductions) among identified active attended clients; not incoming cash — payer cohorts come from analytics_get_client_payer_cohorts',
         category_basis:
           'current service catalog category, not historical category',
         resource_basis:
@@ -780,6 +779,7 @@ export async function getClientServicePenetration(
         rank_rule:
           'descending delivered value; ties by ascending client id; first floor(N/10) and next floor(N/10)',
       },
+      untrusted_data_note: UNTRUSTED_NOTE,
     },
   };
 }

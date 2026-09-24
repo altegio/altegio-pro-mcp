@@ -88,8 +88,8 @@ describe('tools/list per facet', () => {
     const client = await connect('ops');
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name).sort()).toEqual([
-      'appointments_attendance_apply',
-      'appointments_attendance_preview',
+      'appointments_apply_attendance',
+      'appointments_preview_attendance',
       'clients_add_comment',
       'clients_delete',
       'clients_get_card',

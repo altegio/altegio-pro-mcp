@@ -11,7 +11,7 @@
  * `AltegioApiError`, so the tool factory's error wrapper passes the message
  * through unchanged.
  */
-import { AltegioApiError } from '../../utils/errors.js';
+import { AltegioApiError, AuthenticationError } from '../../utils/errors.js';
 import { upstreamDetail } from '../../tools/tool-result.js';
 
 /** Bad or impossible tool input (range too long, missing period, unknown field). */
@@ -48,7 +48,8 @@ export type AnalyticsEndpointKind =
   | 'day_end_report'
   | 'client_visits'
   | 'report_builder'
-  | 'loyalty';
+  | 'loyalty'
+  | 'appointments';
 
 const NO_ACCESS =
   'The signed-in user has no Analytics access right in this location. ' +
@@ -66,6 +67,10 @@ const NO_CLIENT_ACCESS =
   'The signed-in user cannot read client cards in this location, which per-client visit counts come from. ' +
   'Ask a location owner to grant access to clients.';
 
+const NO_APPOINTMENT_ACCESS =
+  'The signed-in user cannot read the appointment calendar of this location, which service analytics is built from. ' +
+  'Ask a location owner to grant access to the appointment calendar.';
+
 const FORECAST_OFF =
   'The revenue and visits forecast is not enabled for this location. ' +
   'It is an optional module; ask Altegio support to switch it on, or use analytics_get_overview and analytics_get_daily_series for actuals.';
@@ -82,6 +87,8 @@ function accessMessage(kind: AnalyticsEndpointKind): string {
       return NO_OCCUPANCY_ACCESS;
     case 'client_visits':
       return NO_CLIENT_ACCESS;
+    case 'appointments':
+      return NO_APPOINTMENT_ACCESS;
     case 'forecast':
       return `${NO_ACCESS} If the right is already granted, the forecast module itself may be switched off for this location.`;
     default:
@@ -131,6 +138,13 @@ export function mapAnalyticsHttpError(
   kind: AnalyticsEndpointKind,
   context: string
 ): AltegioApiError {
+  if (status === 401 && kind === 'appointments') {
+    // The appointment list answers a missing right with 403; 401 there is a
+    // missing or expired session, as on every other documented V1 route.
+    return new AuthenticationError(
+      'The Altegio session is missing or expired. Sign in again, then retry.'
+    );
+  }
   if (status === 401 || status === 403) {
     if (kind === 'forecast' && status === 403) {
       return new AnalyticsUnavailableError(FORECAST_OFF, status);

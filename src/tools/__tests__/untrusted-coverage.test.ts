@@ -79,19 +79,19 @@ const envelope = (data: unknown, meta?: unknown): unknown => ({
 const FREE_TEXT: Record<string, FreeTextEntry> = {
   clients_get_membership_purchases: {
     what: 'membership number and type title supplied by location data',
-    coveredBy: 'src/tools/__tests__/customer-workflows.test.ts',
+    coveredBy: 'src/tools/__tests__/client-card.test.ts',
   },
   clients_list_comments: {
     what: 'client and staff comment text',
-    coveredBy: 'src/tools/__tests__/customer-workflows.test.ts',
+    coveredBy: 'src/tools/__tests__/client-card.test.ts',
   },
   clients_list_files: {
     what: 'uploaded filenames and download URLs',
-    coveredBy: 'src/tools/__tests__/customer-workflows.test.ts',
+    coveredBy: 'src/tools/__tests__/client-card.test.ts',
   },
   clients_upload_file: {
     what: 'filenames and download URLs in the complete upload response',
-    coveredBy: 'src/tools/__tests__/customer-workflows.test.ts',
+    coveredBy: 'src/tools/__tests__/client-card.test.ts',
   },
   altegio_call_operation: {
     what: 'the entire API response — one tool reaches every documented GET, so the payload is fenced whole, with no field list to enumerate',
@@ -432,6 +432,10 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     what: 'service, team-member and resource titles from location records',
     coveredBy: 'src/capabilities/analytics/__tests__/service-mix.test.ts',
   },
+  analytics_get_client_service_penetration: {
+    what: 'service, current-category and resource titles in the group and service rankings',
+    coveredBy: 'src/capabilities/analytics/__tests__/service-mix.test.ts',
+  },
   analytics_get_team_member_capacity: {
     what: 'team-member names and positions',
     coveredBy: 'src/capabilities/analytics/__tests__/legacy-use-cases.test.ts',
@@ -527,10 +531,10 @@ const NO_FREE_TEXT: Record<string, string> = {
     'statuses and caller-selected permission keys; application slugs are API vocabulary',
   clients_add_comment:
     'created comment ID and timestamp only; the supplied text is not echoed',
-  appointments_attendance_preview:
-    'ids, dates, status codes and visit ids only',
-  appointments_attendance_apply:
-    'ids, status codes and our own outcome labels only',
+  appointments_preview_attendance:
+    'ids, dates, visit ids and canonical statuses only',
+  appointments_apply_attendance:
+    'ids, canonical statuses and our own outcome labels only',
   // --- authentication ---
   altegio_login:
     'two fixed sentences; the API’s own wording on a failure goes through upstreamDetail',
@@ -585,9 +589,7 @@ const NO_FREE_TEXT: Record<string, string> = {
     'team-member ids, dates, hours, counts and money; names are not returned',
   analytics_get_revenue_leakage:
     'canonical category keys, counts, money, hours and our own formula text',
-  analytics_get_client_service_penetration:
-    'stable client and service ids, fixed cohort labels, counts and percentages; no names or contacts',
-  analytics_get_customer_cash_receipts:
+  analytics_get_client_cash_receipts:
     'month keys, stable income category ids, signed amounts and fixed source limitations only',
   analytics_get_client_payer_cohorts:
     'client IDs, fixed cohort names, counts, signed amounts and fixed source limitations only',

@@ -212,6 +212,10 @@ export const QUESTION_ROUTES: readonly QuestionRoute[] = [
     tool: 'analytics_get_capacity_heatmap',
   },
   {
+    question: 'How busy is each team member / occupancy per person',
+    tool: 'analytics_get_team_member_occupancy',
+  },
+  {
     question: 'Is this client reliable / how much have they spent',
     tool: 'analytics_get_client_visit_stats',
   },
@@ -230,6 +234,16 @@ export const QUESTION_ROUTES: readonly QuestionRoute[] = [
   {
     question: 'Which services or categories are most profitable',
     tool: 'analytics_get_service_profitability',
+  },
+  {
+    question:
+      'How is our service mix changing month by month / delivered value by device or resource',
+    tool: 'analytics_get_service_mix_trend',
+  },
+  {
+    question:
+      'How many clients use a service or device / who is a cross-sell candidate for it',
+    tool: 'analytics_get_client_service_penetration',
   },
   {
     question: 'Which team members have idle hours or spare capacity',
@@ -251,6 +265,15 @@ export const QUESTION_ROUTES: readonly QuestionRoute[] = [
   {
     question: 'Where did cash move by account and payment item',
     tool: 'analytics_get_cash_flow_breakdown',
+  },
+  {
+    question:
+      'How much cash did clients pay in each month, by services, products, top-ups and other streams',
+    tool: 'analytics_get_client_cash_receipts',
+  },
+  {
+    question: 'Who are our top paying clients by cash received',
+    tool: 'analytics_get_client_payer_cohorts',
   },
   {
     question: 'Revenue by team member',
@@ -288,7 +311,7 @@ export interface SlicingNote {
 export const SLICING_NOTES: readonly SlicingNote[] = [
   {
     dimension: 'Period',
-    how: 'Every tool takes either a preset (today, yesterday, this_week, last_week, this_month, last_month, last_30_days, this_quarter, last_quarter, this_year) or an explicit date_from + date_to in YYYY-MM-DD. Presets resolve in the location’s own timezone. At most 365 days per call. Prefer a preset over hand-computed dates.',
+    how: 'Most tools take either a preset (today, yesterday, this_week, last_week, this_month, last_month, last_30_days, this_quarter, last_quarter, this_year) or an explicit date_from + date_to in YYYY-MM-DD. Presets resolve in the location’s own timezone. At most 365 days per call. Prefer a preset over hand-computed dates. analytics_get_client_cash_receipts and analytics_get_client_payer_cohorts take only explicit whole local calendar months, at most 12.',
   },
   {
     dimension: 'Comparison',

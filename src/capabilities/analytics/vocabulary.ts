@@ -116,6 +116,8 @@ export const FORBIDDEN_WORDS: readonly string[] = [
   'average_bill',
   'cashless',
   'fired',
+  // The glossary's canonical person is the client ("Never use: Customer").
+  'customer',
 ] as const;
 
 /**

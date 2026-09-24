@@ -78,7 +78,7 @@ update/delete are intentionally not exposed; internal V2 routes are out of scope
 - `create_appointment` - Create client appointment
 - `update_appointment` - Modify existing appointment
 - `delete_appointment` - Cancel appointment
-- `appointments_attendance_preview` / `appointments_attendance_apply` - Preview up to 20 attendance changes, then apply by visit group with human confirmation; linked appointments may change and earlier groups cannot be rolled back after failure
+- `appointments_preview_attendance` / `appointments_apply_attendance` - Preview up to 20 attendance changes, then apply by visit group with human confirmation; linked appointments may change and earlier groups cannot be rolled back after failure
 
 ### ⚙️ Location Settings
 - `get_appointment_settings` / `update_appointment_settings` - Appointment calendar defaults (record type, group capacity)
@@ -88,7 +88,7 @@ update/delete are intentionally not exposed; internal V2 routes are out of scope
 ### 👤 Clients and Location Access
 - `clients_search`, `clients_get_segment_report`, `clients_list_profiles`, `clients_get_card`, `clients_get_visit_history`, `clients_lookup` - Search, report on and inspect the client base
 - `clients_delete` - Permanently delete a client
-- `clients_get_membership_purchases` - Verify membership identity and linked sale evidence; sale date and nominal value are conditional, paid amount is null without item attribution
+- `clients_get_membership_purchases` - Verify membership identity and linked sale evidence; sale date and recorded unit price are conditional, paid amount is null without item attribution
 - `clients_list_comments` / `clients_add_comment` - Read or add client card text comments, including form URLs as text
 - `clients_list_files` - Read uploaded file metadata and download links
 - `clients_upload_file` - Attach one completed file to a client card using raw base64 bytes in an MCP tool call (strictly below 12 MiB)
@@ -151,7 +151,7 @@ the call, and amounts come back in major units with a source currency label or c
 - `analytics_get_client_service_penetration` - Distinct attended clients, target-service adoption, source/target overlap, delivered-value cohorts and paged client IDs for source-only candidates; no contacts
 - `analytics_get_team_member_sales` - Services, products, revenue, future appointments and worked-hour efficiency by team member
 - `analytics_get_profit_and_loss_statement` - Posted income and expense categories, sales-stream memo figures and service contribution, with explicit missing-cost disclosure instead of an unproven net-profit label
-- `analytics_get_customer_cash_receipts` - Reconciled monthly net cash receipts by service, product, client-account top-up and other posted income streams
+- `analytics_get_client_cash_receipts` - Reconciled monthly net cash receipts by service, product, client-account top-up and other posted income streams
 - `analytics_get_client_payer_cohorts` - Bounded, reconciled cash-basis payer cohorts and paged stable client IDs across up to 12 complete months; requires unrestricted finance history
 - `analytics_get_capacity_heatmap` - Scheduled, booked, completed-utilized and idle hours by hour, weekday or date-hour, with peak and underused buckets
 - `analytics_get_revenue_leakage` - No-show, cancellation, unpaid-risk and discount signals plus optional unbooked-capacity opportunity; unlike estimates are never summed into a false total
@@ -484,9 +484,9 @@ Four properties are deliberate:
 | `remove_location_user`                                                                                                            | `team_members:manage_access`                                              |
 | `get_services`, `get_service_categories`                                                                                          | `services:read`                                                           |
 | `create_service`, `update_service`, `delete_service`, `delete_service_category`, the four service ↔ team-member link tools        | `services:write`                                                          |
-| `get_appointments`, `appointments_attendance_preview`                                                                                                                | `appointments:read`                                                       |
+| `get_appointments`, `appointments_preview_attendance`                                                                                                                | `appointments:read`                                                       |
 | `create_appointment`                                                                                                              | `appointments:create`                                                     |
-| `update_appointment`, `delete_appointment`, `appointments_attendance_apply`                                                                                        | `appointments:write`                                                      |
+| `update_appointment`, `delete_appointment`, `appointments_apply_attendance`                                                                                        | `appointments:write`                                                      |
 | `clients_search`, `clients_get_segment_report`, `clients_list_profiles`, `clients_get_card`, `clients_get_visit_history`, `clients_lookup`, `clients_list_comments`, `clients_list_files` | `clients:read`                                                            |
 | `clients_get_membership_purchases` | `clients:read` + `loyalty:read` + `products:read` |
 | `clients_delete`, `clients_add_comment`, `clients_upload_file`                                                                                                                  | `clients:write`                                                           |
