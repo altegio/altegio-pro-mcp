@@ -14,7 +14,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Features
 
-- **94 tools served (100 defined, 6 withheld from every view)** — including a 27-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
+- **95 tools served (101 defined, 6 withheld from every view)** — including a 28-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
 - **Administrative writes** for staff, services, appointments, schedules, clients, categories, booking forms, and location users
 - **Analytics**: key metrics, profit-and-loss and cash-flow views, capacity heatmaps, revenue leakage, team-member × service analysis, product/inventory decisions, retention, forecasts and day-end reporting
 - **Location settings**: appointment calendar, online booking, booking forms, resources
@@ -28,7 +28,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Available Tools
 
-**94 tools served (100 defined, 6 withheld from every view)**, organized by category
+**95 tools served (101 defined, 6 withheld from every view)**, organized by category
 for complete business management. Which of them a given address serves, and why,
 is the generated table in
 [`docs/architecture/tool-surface.md`](docs/architecture/tool-surface.md).
@@ -151,7 +151,8 @@ the call, and amounts come back in major units with a source currency label or c
 - `analytics_get_client_service_penetration` - Distinct attended clients, target-service adoption, source/target overlap, delivered-value cohorts and paged client IDs for source-only candidates; no contacts
 - `analytics_get_team_member_sales` - Services, products, revenue, future appointments and worked-hour efficiency by team member
 - `analytics_get_profit_and_loss_statement` - Posted income and expense categories, sales-stream memo figures and service contribution, with explicit missing-cost disclosure instead of an unproven net-profit label
-- `analytics_get_customer_cash_receipts` - Reconciled monthly net cash receipts by service, product, client-account top-up and other posted income streams; payer cohorts remain unavailable without a bounded client-linked finance source
+- `analytics_get_customer_cash_receipts` - Reconciled monthly net cash receipts by service, product, client-account top-up and other posted income streams
+- `analytics_get_client_payer_cohorts` - Bounded, reconciled cash-basis payer cohorts and paged stable client IDs across up to 12 complete months; requires unrestricted finance history
 - `analytics_get_capacity_heatmap` - Scheduled, booked, completed-utilized and idle hours by hour, weekday or date-hour, with peak and underused buckets
 - `analytics_get_revenue_leakage` - No-show, cancellation, unpaid-risk and discount signals plus optional unbooked-capacity opportunity; unlike estimates are never summed into a false total
 - `analytics_get_team_member_service_matrix` - Genuine team-member × service cells with revenue, contribution and share metrics, bounded ranking and explicit unavailable dimensions

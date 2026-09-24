@@ -871,6 +871,28 @@ paths:
       responses:
         '200': { description: Localized HTML table with posted income, expense and result rows. }
 
+  /finances/transactions_search/{location_id}/:
+    get:
+      operationId: get_legacy_finance_transaction_list
+      summary: Search active finance transactions for a location
+      x-altegio-api-version: web
+      x-altegio-permission: finances_transactions_access
+      x-altegio-caveat: >-
+        JSON envelope contains an exact count and localized HTML rows with stable
+        transaction IDs and local display dates, but no client IDs. The start
+        date is silently clamped by finances_last_days_count. The payer-cohort
+        adapter refuses any finite last-days limit, pages every selected income
+        category, and rechecks the complete ID/date list after detail reads.
+      parameters:
+        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - { name: start_date, in: query, required: true, schema: { type: string, format: date } }
+        - { name: end_date, in: query, required: true, schema: { type: string, format: date } }
+        - { name: type, in: query, required: true, schema: { type: integer } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: editable_length, in: query, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200': { description: JSON envelope containing HTML transaction rows and exact count. }
+
   /storages/turnover/search/{location_id}/:
     get:
       operationId: get_legacy_inventory_turnover_report

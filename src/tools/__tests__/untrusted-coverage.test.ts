@@ -589,6 +589,8 @@ const NO_FREE_TEXT: Record<string, string> = {
     'stable client and service ids, fixed cohort labels, counts and percentages; no names or contacts',
   analytics_get_customer_cash_receipts:
     'month keys, stable income category ids, signed amounts and fixed source limitations only',
+  analytics_get_client_payer_cohorts:
+    'client IDs, fixed cohort names, counts, signed amounts and fixed source limitations only',
   analytics_list_report_fields:
     'the report builder’s own field registry — platform vocabulary, not text anyone at the location typed',
 
