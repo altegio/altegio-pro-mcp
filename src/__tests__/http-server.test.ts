@@ -358,6 +358,7 @@ describe('HTTP server facet wiring, end to end', () => {
         'clients_list_profiles',
         'clients_lookup',
         'clients_search',
+        'clients_upload_file',
         'create_appointment',
         'delete_appointment',
         'get_appointments',

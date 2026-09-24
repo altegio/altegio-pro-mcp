@@ -7,6 +7,7 @@ import {
 } from '../confirmation.js';
 import { AltegioApiError, ExecutorRefusalError } from '../../utils/errors.js';
 import type { AltegioClient } from '../../providers/altegio-client.js';
+import { CLIENT_FILE_MAX_BASE64_CHARS } from '../../providers/client-file-upload.js';
 
 const id = z.number().int().positive();
 const obj = (value: unknown): Record<string, unknown> =>
@@ -410,6 +411,63 @@ export const clientsListFilesTool = defineTool({
     }));
     return {
       text: `Returned ${files.length} of ${all.length} client files.`,
+      structuredContent: sanitizeUntrustedDeep({
+        location_id: input.location_id,
+        client_id: input.client_id,
+        total_count: all.length,
+        complete: all.length <= 50,
+        files,
+      }),
+    };
+  },
+});
+
+export const clientsUploadFileTool = defineTool({
+  name: 'clients_upload_file',
+  category: 'Clients',
+  description:
+    '[Clients] Attach one completed file to a client card. Supply the actual file bytes as raw base64, not a URL or data URI. Allowed extensions: jpeg, jpg, png, gif, doc, docx, pdf, xls, xlsx, txt; nonempty file strictly below 12 MiB. Requires client and file-upload rights. The result is the current file list; the upload also creates a file comment.',
+  annotations: {
+    title: 'Upload client file',
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: true,
+  },
+  input: z.object({
+    location_id: id,
+    client_id: id,
+    filename: z
+      .string()
+      .min(1)
+      .max(255)
+      .describe('File name with an allowed extension; no path.'),
+    file_base64: z
+      .string()
+      .min(1)
+      .max(CLIENT_FILE_MAX_BASE64_CHARS)
+      .describe(
+        'Raw RFC 4648 base64 of the completed file bytes; no data URI prefix.'
+      ),
+  }),
+  handler: async ({ input, client }) => {
+    const all = rows(
+      await client.uploadClientFile(
+        input.location_id,
+        input.client_id,
+        input.filename,
+        input.file_base64
+      )
+    );
+    const files = all.slice(0, 50).map((entry) => ({
+      id: integer(entry.id),
+      name: string(entry.name)?.slice(0, 255) ?? null,
+      created_at: string(entry.date_create),
+      size: string(entry.size),
+      download_url: clientFileDownloadUrl(entry.full_link),
+    }));
+    return {
+      text: `Uploaded one file to client ${input.client_id}; returned ${files.length} of ${all.length} files.`,
       structuredContent: sanitizeUntrustedDeep({
         location_id: input.location_id,
         client_id: input.client_id,

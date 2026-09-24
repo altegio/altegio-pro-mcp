@@ -101,6 +101,7 @@ describe('tools/list per facet', () => {
       'clients_list_profiles',
       'clients_lookup',
       'clients_search',
+      'clients_upload_file',
       'create_appointment',
       'delete_appointment',
       'get_appointments',

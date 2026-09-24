@@ -14,7 +14,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Features
 
-- **92 tools served (98 defined, 6 withheld from every view)** — including a 26-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
+- **93 tools served (99 defined, 6 withheld from every view)** — including a 26-tool analytics pack, a 3-tool API explorer and 12 onboarding wizard tools for first-time setup
 - **Administrative writes** for staff, services, appointments, schedules, clients, categories, booking forms, and location users
 - **Analytics**: key metrics, profit-and-loss and cash-flow views, capacity heatmaps, revenue leakage, team-member × service analysis, product/inventory decisions, retention, forecasts and day-end reporting
 - **Location settings**: appointment calendar, online booking, booking forms, resources
@@ -28,7 +28,7 @@ MCP server for Altegio.Pro business management API - B2B integration for salon/s
 
 ## Available Tools
 
-**92 tools served (98 defined, 6 withheld from every view)**, organized by category
+**93 tools served (99 defined, 6 withheld from every view)**, organized by category
 for complete business management. Which of them a given address serves, and why,
 is the generated table in
 [`docs/architecture/tool-surface.md`](docs/architecture/tool-surface.md).
@@ -90,7 +90,8 @@ update/delete are intentionally not exposed; internal V2 routes are out of scope
 - `clients_delete` - Permanently delete a client
 - `clients_get_membership_purchases` - Verify membership identity and linked sale evidence; sale date and nominal value are conditional, paid amount is null without item attribution
 - `clients_list_comments` / `clients_add_comment` - Read or add client card text comments, including form URLs as text
-- `clients_list_files` - Read uploaded file metadata and download links (completed-file upload is not offered by the hosted MCP transport)
+- `clients_list_files` - Read uploaded file metadata and download links
+- `clients_upload_file` - Attach one completed file to a client card using raw base64 bytes in an MCP tool call (strictly below 12 MiB)
 - `remove_location_user` - Revoke a user's access to one location; requires the user ID twice as an explicit safeguard
 
 ### 🪑 Resources
@@ -486,7 +487,7 @@ Four properties are deliberate:
 | `update_appointment`, `delete_appointment`, `appointments_attendance_apply`                                                                                        | `appointments:write`                                                      |
 | `clients_search`, `clients_get_segment_report`, `clients_list_profiles`, `clients_get_card`, `clients_get_visit_history`, `clients_lookup`, `clients_list_comments`, `clients_list_files` | `clients:read`                                                            |
 | `clients_get_membership_purchases` | `clients:read` + `loyalty:read` + `products:read` |
-| `clients_delete`, `clients_add_comment`                                                                                                                  | `clients:write`                                                           |
+| `clients_delete`, `clients_add_comment`, `clients_upload_file`                                                                                                                  | `clients:write`                                                           |
 | `analytics_*` reads                                                                                                               | `analytics:read` _(placeholder domain — no v3 scope exists yet)_          |
 | `altegio_call_operation`                                                                                                          | `api:read` _(placeholder — one tool reaches every documented GET)_        |
 | `altegio_login`, `altegio_logout`, `altegio_search_operations`, `altegio_describe_operation`, the wizard's local-state tools      | none                                                                      |

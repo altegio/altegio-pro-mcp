@@ -16,13 +16,13 @@ the code disagree, which is how a surface change reaches a reviewer’s diff
 
 ## Counts
 
-**92 tools served (98 defined, 6 withheld from every view).**
+**93 tools served (99 defined, 6 withheld from every view).**
 
 | What | Count | Where |
 | --- | --- | --- |
-| Defined | 98 | 86 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
+| Defined | 99 | 87 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
 | Withheld from every view | 6 | `src/tools/disabled-tools.ts` (the report builder) |
-| **Served** | **92** | what `stdio` lists; every HTTP view is a subset |
+| **Served** | **93** | what `stdio` lists; every HTTP view is a subset |
 
 Served tools per category, in `tools/list` order:
 
@@ -33,7 +33,7 @@ Served tools per category, in `tools/list` order:
 | Appointments | 6 |
 | Auth | 2 |
 | Categories | 2 |
-| Clients | 11 |
+| Clients | 12 |
 | Location | 3 |
 | Onboarding | 12 |
 | Positions | 2 |
@@ -46,17 +46,17 @@ Served tools per category, in `tools/list` order:
 
 ## Views
 
-| View | Address | Serves (of 98 defined) | Reasons |
+| View | Address | Serves (of 99 defined) | Reasons |
 | --- | --- | --- | --- |
-| `all` | stdio (no HTTP route) | 92 | all ×92, -off ×6 |
-| `default` | `/mcp` | 64 | dflt ×62, -pack ×25, -off ×6, -pwd ×2, -name ×1, xtra ×1, base ×1 |
-| `readonly` | `/mcp/readonly` | 54 | ro ×54, -write ×36, -off ×6, -pwd ×2 |
-| `ops` | `/mcp/ops` | 18 | - ×72, pfx ×11, -off ×6, rule ×6, -pwd ×2, base ×1 |
-| `catalog` | `/mcp/catalog` | 32 | - ×58, rule ×31, -off ×6, -pwd ×2, base ×1 |
-| `finance` | `/mcp/finance` | 28 | - ×62, pfx ×26, -off ×6, -pwd ×2, base ×1, rule ×1 |
-| `marketing` | `/mcp/marketing` | 2 | - ×88, -off ×6, -pwd ×2, base ×1, rule ×1 |
-| `analytics` | `/mcp/analytics` | 27 | - ×63, pfx ×26, -off ×6, -pwd ×2, base ×1 |
-| `onboarding` | `/mcp/onboarding` | 13 | - ×77, pfx ×12, -off ×6, -pwd ×2, base ×1 |
+| `all` | stdio (no HTTP route) | 93 | all ×93, -off ×6 |
+| `default` | `/mcp` | 65 | dflt ×63, -pack ×25, -off ×6, -pwd ×2, -name ×1, xtra ×1, base ×1 |
+| `readonly` | `/mcp/readonly` | 54 | ro ×54, -write ×37, -off ×6, -pwd ×2 |
+| `ops` | `/mcp/ops` | 19 | - ×72, pfx ×12, -off ×6, rule ×6, -pwd ×2, base ×1 |
+| `catalog` | `/mcp/catalog` | 32 | - ×59, rule ×31, -off ×6, -pwd ×2, base ×1 |
+| `finance` | `/mcp/finance` | 28 | - ×63, pfx ×26, -off ×6, -pwd ×2, base ×1, rule ×1 |
+| `marketing` | `/mcp/marketing` | 2 | - ×89, -off ×6, -pwd ×2, base ×1, rule ×1 |
+| `analytics` | `/mcp/analytics` | 27 | - ×64, pfx ×26, -off ×6, -pwd ×2, base ×1 |
+| `onboarding` | `/mcp/onboarding` | 13 | - ×78, pfx ×12, -off ×6, -pwd ×2, base ×1 |
 
 A facet answers *how many tools fit in this host’s context*; `readonly`
 answers *what may this agent do at all*. They are different kinds of view —
@@ -189,6 +189,7 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | `clients_list_profiles` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
 | `clients_lookup` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
 | `clients_search` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
+| `clients_upload_file` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:write |
 
 ### Location
 

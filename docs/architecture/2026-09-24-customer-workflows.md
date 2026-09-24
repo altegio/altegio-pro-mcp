@@ -71,10 +71,18 @@ text. File listing uses
 entries and state when more exist. Free text from comments, membership labels
 and filenames is sanitized before structured output.
 
-The backend has a documented multipart upload of one file smaller than 12 MiB,
-but the hosted MCP HTTP server currently uses Express's default JSON body
-limit and has no verified bounded binary transfer through the OAuth proxy and
-hosts. No upload tool is exposed. A URL string is never interpreted as file
-bytes. Adding upload requires a transport test across host, proxy and server
-with size limits, approved MIME/extension checks, and evidence that bytes
-reach the backend intact.
+Hosted upload uses the `clients_upload_file` MCP tool. The caller sends the
+completed file bytes as canonical raw base64 (`file_base64`) plus `filename`;
+URLs and data URIs are not fetched. The HTTP server accepts JSON bodies up to
+17 MiB, enough for one file strictly below the backend's 12 MiB cap after
+base64 encoding. It validates filename, extension, canonical encoding and byte
+size, then sends authenticated multipart form data as field `file` to the
+published V1 operation. The client adapter confines location scope before
+transport; backend checks client ownership and `clients_access` plus
+`client_files_upload_access`. The successful API response is the complete file
+list; MCP projects at most 50 entries and states whether the projection is
+complete. The proxy streams request bytes without buffering or a lower body
+limit on service routes. The public Cloud Run ingress has a 32 MiB HTTP/1
+request limit, above the bounded MCP body. Hosts must be able to submit a
+large string tool argument; clients that cannot supply local file bytes need
+an external file-reading step before calling this tool.

@@ -69,6 +69,13 @@ export const apiMapping: Record<string, ApiMapping> = {
     operationId: 'get_client_file_list',
     pathParams: ['location_id', 'client_id'],
   },
+  clients_upload_file: {
+    path: '/company/{location_id}/clients/files/{client_id}',
+    method: 'post',
+    operationId: 'upload_client_file',
+    pathParams: ['location_id', 'client_id'],
+    bodyParams: ['file'],
+  },
   // ==========================================
   // Authentication
   // ==========================================

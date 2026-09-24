@@ -68,7 +68,9 @@ export function createApp(): {
   const app = express();
 
   // Middleware
-  app.use(express.json());
+  // Base64 of a file smaller than 12 MiB is below 16 MiB; leave room for
+  // JSON-RPC metadata while bounding every hosted MCP request.
+  app.use(express.json({ limit: '17mb' }));
 
   // Health check endpoint
   app.get('/health', (_req, res) => {
@@ -208,6 +210,36 @@ export function createApp(): {
       id: null,
     });
   });
+
+  // The parser rejects oversized uploads before MCP dispatch. Return a bounded,
+  // useful protocol error without logging or reflecting any request bytes.
+  app.use(
+    (
+      error: unknown,
+      _req: express.Request,
+      res: express.Response,
+      next: express.NextFunction
+    ) => {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'type' in error &&
+        error.type === 'entity.too.large'
+      ) {
+        res.status(413).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32000,
+            message:
+              'MCP request exceeds 17 MiB. A client file must be smaller than 12 MiB before base64 encoding.',
+          },
+          id: null,
+        });
+        return;
+      }
+      next(error);
+    }
+  );
 
   return {
     app,
