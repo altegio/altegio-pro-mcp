@@ -318,6 +318,13 @@ export const COVERAGE_GAPS: readonly {
   readonly alternative: string;
 }[] = [
   {
+    topic: 'Service penetration, device revenue and client cross-sell cohorts',
+    reason:
+      'The API has no verified bounded year-wide source combining attended service lines, historical resource attribution, client identity, package-adjusted delivery value and separate cash receipts. A paged appointment scan can be incomplete and current service-resource links do not prove historical device usage.',
+    alternative:
+      'Use analytics_get_service_profitability for its stated cash/card service breakdown, and clients_get_segment_report for supported client segments. Neither is a device revenue or service-penetration report; those require new API aggregates before MCP can expose complete results.',
+  },
+  {
     topic: 'The report builder (custom and template report tables)',
     reason:
       'The Analytics Constructor is not switched on for Altegio: its report-data API fails for every report, and the one endpoint that answers ignores the requested period, so any table it produced would be all-time data under the wrong label.',

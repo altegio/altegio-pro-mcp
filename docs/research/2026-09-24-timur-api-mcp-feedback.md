@@ -36,5 +36,8 @@ message dates. Statements attributed to Timur are distinct from Yri's replies.
 4. Keep the API catalog and resource documentation machine readable.
 
 Timur did not specify exact report columns or formulas in the messages reviewed.
-The proposed client report is therefore an implementation hypothesis, not a
-confirmed requirement from him.
+The subsequently supplied screenshots and service-penetration PDF establish
+concrete report structures and metric definitions; see
+[Timur's report examples](2026-09-24-timur-report-needs.md). The proposed client
+report remains an implementation hypothesis, not a confirmed requirement from
+him.
