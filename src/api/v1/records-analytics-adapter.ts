@@ -115,10 +115,14 @@ export async function scanRecords(
       if (
         !Array.isArray(raw.services) ||
         typeof (raw.datetime ?? raw.date) !== 'string' ||
-        !Number.isInteger(raw.attendance ?? raw.visit_attendance)
+        !Number.isInteger(raw.attendance ?? raw.visit_attendance) ||
+        !Array.isArray(raw.resource_instance_ids) ||
+        raw.resource_instance_ids.some(
+          (value) => !Number.isSafeInteger(value) || value <= 0
+        )
       )
         throw new Error(
-          'Appointment page is missing required service, date or attendance fields.'
+          'Appointment page is missing or has invalid service, date, attendance or resource-instance fields.'
         );
       ids.add(raw.id);
       records.push({
@@ -138,11 +142,7 @@ export async function scanRecords(
           cost: line.cost,
           amount: line.amount,
         })),
-        resource_instance_ids: Array.isArray(raw.resource_instance_ids)
-          ? raw.resource_instance_ids.filter((value): value is number =>
-              Number.isSafeInteger(value)
-            )
-          : [],
+        resource_instance_ids: raw.resource_instance_ids,
       });
     }
     pages = page;

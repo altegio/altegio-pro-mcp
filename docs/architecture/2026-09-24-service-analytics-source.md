@@ -38,6 +38,21 @@ stdio. The `analytics:read` execution scope and request location boundary apply.
   line and one known resource instance exist on the attended appointment.
   Other lines remain in the explicit unattributed group. This is assigned
   resource association, not a measurement of actual device use.
+- Backend `RecordResourcesBridge::createManyRecordResourceInstancesLinks` stores
+  `record_id`, `resource_instance_id` and `service_id` on the internal record
+  resource link. `RecordInfoService::getRecordsInfo` exposes only instance IDs.
+  The timetable attendance read route can include service item resource
+  instances through `TimetableAttendanceServiceItemContainerFactory`, but its
+  address takes one `record_…` or `visit_…` identifier. Enriching a year of
+  records would require one extra request per appointment, with no bulk page
+  or snapshot. No bounded period aggregate was found in the ERP-web analytics
+  controllers. The MCP does not infer the link from today's service-resource
+  configuration. An appointment with several lines or instances remains
+  unattributed to devices.
+- `AttendanceServiceItem::getFirstCost` multiplies stored `first_cost` by line
+  amount. The field is initialized from the visit pricing DTO's price; the
+  record API does not establish that it was the published price-list value at
+  delivery. Current catalog prices are not substituted for historical values.
 
 The backend `end_date` filter ends at 23:59:00. The scan requests through the
 following day and filters the returned local appointment date back to the
@@ -62,9 +77,21 @@ location is required before any accounting claim.
 - Penetration denominator is distinct identified clients with at least one
   attended appointment in the selected period. An anonymous appointment is
   excluded and counted separately. Target adoption is one client per selected
-  service or current-category set, no matter how many lines or visits. Optional source services/categories
-  provide an overlap and a stable, paged list of clients who used source but
-  not target. Names, contacts and appointment comments are never returned.
+  service, current-category or unambiguously assigned resource set, no matter
+  how many lines or visits. Optional source groups provide an overlap and a
+  stable, paged list of clients who used source but not target. Names, contacts
+  and appointment comments are never returned.
+- Hybrid device/category rows use the single unambiguous assigned appointment
+  resource, otherwise the service's **current** category if no instance was
+  assigned. Ambiguous assignments and unknown categories remain unattributed.
+  Monthly rows drill down to service SKU without multiplying a line across
+  devices. Penetration ranks at most 20 groups, SKUs and group pairs from the
+  complete scan, with exact total counts for each ranked set. Mono-group
+  clients are confirmed only when all attended service lines have an
+  attributable group; clients with unknown lines are counted separately.
+  Co-occurrence means observed use by the same client in the period.
+  The screenshot's device grouping follows service-resource catalog links, so
+  its device totals need not match this stricter appointment-assignment view.
 - Cohorts rank that **same active identified population** by summed delivered
   `manual_cost`, descending, with client ID as the tie break. Each of the first
   two groups contains `floor(N/10)` clients, then the rest. The cohort base is

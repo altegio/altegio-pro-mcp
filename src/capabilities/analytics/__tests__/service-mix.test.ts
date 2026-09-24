@@ -150,6 +150,55 @@ describe('service analytics from appointment pages', () => {
     );
   });
 
+  it('groups a single assigned device by service and keeps ambiguous lines unattributed', async () => {
+    const result = await getServiceMixTrend(fakeClient(), {
+      ...period,
+      group_by: 'assigned_device_or_current_category',
+    });
+    const content = result.structuredContent;
+    expect(content.totals.delivered_service_value).toBe(590);
+    expect(content.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          group_type: 'assigned_resource',
+          group_id: 50,
+          service_id: 10,
+          delivered_service_value: 300,
+        }),
+        expect.objectContaining({
+          group_type: 'current_category',
+          group_id: 100,
+          service_id: 10,
+          delivered_service_value: 40,
+        }),
+        expect.objectContaining({
+          group_type: 'unattributed',
+          group_id: null,
+          service_id: 20,
+          delivered_service_value: 150,
+        }),
+      ])
+    );
+    expect(
+      content.rows.reduce((sum, row) => sum + row.delivered_service_value, 0)
+    ).toBe(590);
+  });
+
+  it('does not duplicate a line assigned to several resource instances', async () => {
+    const ambiguous = { ...rows[0], resource_instance_ids: [501, 502] };
+    const result = await getServiceMixTrend(fakeClient([ambiguous]), {
+      ...period,
+      group_by: 'assigned_device_or_current_category',
+    });
+    expect(result.structuredContent.rows).toEqual([
+      expect.objectContaining({
+        group_type: 'unattributed',
+        delivered_service_value: 300,
+        line_count: 1,
+      }),
+    ]);
+  });
+
   it('counts distinct identified clients and pages source-only candidate IDs', async () => {
     const result = await getClientServicePenetration(fakeClient(), {
       ...period,
@@ -180,6 +229,97 @@ describe('service analytics from appointment pages', () => {
     );
   });
 
+  it('reports distinct group and SKU adoption, mono clients, overlap and resource gaps', async () => {
+    const extra = {
+      ...rows[0],
+      id: 6,
+      resource_instance_ids: [],
+      services: [{ id: 20, title: 'B', manual_cost: 10, cost: 10 }],
+    };
+    const result = await getClientServicePenetration(
+      fakeClient([...rows, extra]),
+      {
+        ...period,
+        source_category_ids: [200],
+        target_resource_ids: [50],
+      }
+    );
+    const content = result.structuredContent;
+    expect(content.target_adopters).toBe(1);
+    expect(content.source_clients).toBe(2);
+    expect(content.source_target_overlap).toBe(1);
+    expect(content.candidate_client_ids).toEqual([3]);
+    expect(content.group_insights.top_service_skus[0]).toEqual(
+      expect.objectContaining({ service_id: 10, active_clients: 2 })
+    );
+    expect(content.group_insights.top_groups).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          group_type: 'assigned_resource',
+          group_id: 50,
+          active_clients: 1,
+        }),
+        expect.objectContaining({
+          group_type: 'current_category',
+          group_id: 200,
+          active_clients: 2,
+        }),
+      ])
+    );
+    expect(content.group_insights.top_group_cooccurrence).toEqual(
+      expect.arrayContaining([expect.objectContaining({ active_clients: 1 })])
+    );
+    expect(content.group_insights.confirmed_mono_group_clients).toBe(2);
+    expect(content.group_insights.clients_with_unattributed_lines).toBe(1);
+    expect(content.cohort_penetration_gap_percentage_points).toBeNull();
+  });
+
+  it('refuses a resource target that cannot be mapped to an instance', async () => {
+    await expect(
+      getClientServicePenetration(fakeClient(), {
+        ...period,
+        target_resource_ids: [999],
+      })
+    ).rejects.toThrow('no current instance');
+  });
+
+  it('uses exact active-client cohort denominators for penetration gaps', async () => {
+    const ten = Array.from({ length: 10 }, (_, index) => ({
+      ...rows[0],
+      id: index + 100,
+      client: { id: index + 100 },
+      services: [
+        {
+          id: index === 0 ? 10 : 20,
+          title: 'S',
+          manual_cost: index === 0 ? 100 : 1,
+          cost: 0,
+        },
+      ],
+      resource_instance_ids: [],
+    }));
+    const result = await getClientServicePenetration(fakeClient(ten), {
+      ...period,
+      target_service_ids: [10],
+    });
+    expect(
+      result.structuredContent.delivered_value_cohorts.map(
+        (cohort) => cohort.denominator
+      )
+    ).toEqual([1, 1, 8]);
+    expect(
+      result.structuredContent.cohort_penetration_gap_percentage_points
+    ).toBe(100);
+    expect(result.structuredContent.group_insights.top_groups).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          group_id: 100,
+          top_vs_remaining_gap_percentage_points: 100,
+        }),
+      ])
+    );
+  });
+
   it('refuses a source total above the hard scan limit', async () => {
     await expect(
       scanRecords(fakeClient([], 30001), 7, '2026-05-01', '2026-05-31')
@@ -190,6 +330,14 @@ describe('service analytics from appointment pages', () => {
     await expect(
       scanRecords(fakeClient([], 1), 7, '2026-05-01', '2026-05-31')
     ).rejects.toThrow('ended before');
+  });
+
+  it('refuses a missing resource-instance field instead of treating it as no device', async () => {
+    const incomplete: Record<string, unknown> = { ...rows[0] };
+    delete incomplete.resource_instance_ids;
+    await expect(
+      scanRecords(fakeClient([incomplete]), 7, '2026-05-01', '2026-05-31')
+    ).rejects.toThrow('resource-instance fields');
   });
 
   it('reads every appointment page before claiming a complete result', async () => {

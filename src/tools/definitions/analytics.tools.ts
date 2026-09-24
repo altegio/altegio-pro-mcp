@@ -827,13 +827,19 @@ export const analyticsGetServiceMixTrendTool = defineTool({
   name: 'analytics_get_service_mix_trend',
   category: 'Analytics',
   description:
-    '[Analytics] Monthly delivered service value from attended appointment service lines, grouped by service, current category, team member or unambiguously assigned appointment resource. Scans every source page or refuses the call; no partial totals. manual_cost is the line total before loyalty deductions, not cash receipts or accounting revenue. Resource assignment is not proof of device use; multiple lines or instances go into an unattributed group. Product sales and client-account top-ups are excluded.',
+    '[Analytics] Monthly delivered service value from attended appointment service lines, grouped by service, current category, team member, assigned resource, or assigned device versus current category with service drilldown. Scans every source page or refuses the call. manual_cost is a line total before loyalty deductions, not cash receipts or accounting revenue. A device is assigned only for one line and one known appointment instance; this does not prove actual use. Ambiguous assignments remain unattributed. Product sales and account top-ups are excluded.',
   annotations: { title: 'Analytics: service mix trend', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
     ...periodFields,
     group_by: z
-      .enum(['service', 'current_category', 'team_member', 'assigned_resource'])
+      .enum([
+        'service',
+        'current_category',
+        'team_member',
+        'assigned_resource',
+        'assigned_device_or_current_category',
+      ])
       .optional(),
     team_member_id: z.number().int().positive().optional(),
     page: z.number().int().positive().optional(),
@@ -851,6 +857,9 @@ export const analyticsGetServiceMixTrendTool = defineTool({
         month: { type: 'string' },
         group_id: int,
         group_title: str,
+        group_type: str,
+        service_id: int,
+        service_title: str,
         line_count: { type: 'integer' },
         appointment_count: { type: 'integer' },
         client_count: { type: 'integer' },
@@ -872,7 +881,7 @@ export const analyticsGetClientServicePenetrationTool = defineTool({
   name: 'analytics_get_client_service_penetration',
   category: 'Analytics',
   description:
-    '[Analytics] Distinct identified clients with an attended visit who used selected target services or current service categories over up to 365 days. Optionally choose source services/categories to count overlap and page stable client IDs who used source but not target, for cross-sell research. Includes delivered-value cohorts with exact denominators. Categories reflect the current catalog. Cohorts rank manual_cost from attended services, not cash spending or payer cohorts; no contacts, conversion predictions or causal uplift.',
+    '[Analytics] Distinct attended clients who used target services, current categories or unambiguously assigned appointment resources over up to 365 days. Returns top service SKU adoption, device/category group adoption, confirmed mono-group clients, group co-occurrence, delivered-value cohort gaps and paged stable source-without-target client IDs. Every percentage uses the identified active attended-client denominator. Current categories and appointment assignments are not historical device-use proof. Cohorts rank delivered manual_cost, not cash spending; no contacts or causal uplift.',
   annotations: { title: 'Analytics: client service penetration', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -882,8 +891,16 @@ export const analyticsGetClientServicePenetrationTool = defineTool({
       .array(z.number().int().positive())
       .max(30)
       .optional(),
+    source_resource_ids: z
+      .array(z.number().int().positive())
+      .max(30)
+      .optional(),
     target_service_ids: z.array(z.number().int().positive()).max(30).optional(),
     target_category_ids: z
+      .array(z.number().int().positive())
+      .max(30)
+      .optional(),
+    target_resource_ids: z
       .array(z.number().int().positive())
       .max(30)
       .optional(),
@@ -895,8 +912,10 @@ export const analyticsGetClientServicePenetrationTool = defineTool({
     period: periodSchema,
     source_service_ids: { type: 'array', items: { type: 'integer' } },
     source_category_ids: { type: 'array', items: { type: 'integer' } },
+    source_resource_ids: { type: 'array', items: { type: 'integer' } },
     target_service_ids: { type: 'array', items: { type: 'integer' } },
     target_category_ids: { type: 'array', items: { type: 'integer' } },
+    target_resource_ids: { type: 'array', items: { type: 'integer' } },
     denominator: { type: 'object' },
     target_adopters: { type: 'integer' },
     penetration_percent: { type: 'number' },
@@ -904,6 +923,63 @@ export const analyticsGetClientServicePenetrationTool = defineTool({
     source_target_overlap: { type: 'integer' },
     source_without_target: { type: 'integer' },
     delivered_value_cohorts: { type: 'array', items: { type: 'object' } },
+    cohort_penetration_gap_percentage_points: num,
+    group_insights: objectSchema({
+      group_basis: { type: 'string' },
+      ranking_limit: { type: 'integer' },
+      total_attributed_groups: { type: 'integer' },
+      top_groups: {
+        type: 'array',
+        items: objectSchema({
+          group_type: { type: 'string' },
+          group_id: { type: 'integer' },
+          group_title: str,
+          active_clients: { type: 'integer' },
+          penetration_percent: { type: 'number' },
+          confirmed_mono_group_clients: { type: 'integer' },
+          cohort_penetration: {
+            type: 'array',
+            items: objectSchema({
+              cohort: { type: 'string' },
+              denominator: { type: 'integer' },
+              adopters: { type: 'integer' },
+              percent: num,
+            }),
+          },
+          top_vs_remaining_gap_percentage_points: num,
+        }),
+      },
+      total_service_skus: { type: 'integer' },
+      top_service_skus: {
+        type: 'array',
+        items: objectSchema({
+          service_id: { type: 'integer' },
+          service_title: str,
+          active_clients: { type: 'integer' },
+          penetration_percent: { type: 'number' },
+          service_lines: { type: 'integer' },
+          delivered_service_value: { type: 'number' },
+        }),
+      },
+      total_group_pairs: { type: 'integer' },
+      top_group_cooccurrence: {
+        type: 'array',
+        items: objectSchema({
+          first_group: objectSchema({
+            type: { type: 'string' },
+            id: { type: 'integer' },
+          }),
+          second_group: objectSchema({
+            type: { type: 'string' },
+            id: { type: 'integer' },
+          }),
+          active_clients: { type: 'integer' },
+          penetration_percent: { type: 'number' },
+        }),
+      },
+      clients_with_unattributed_lines: { type: 'integer' },
+      confirmed_mono_group_clients: { type: 'integer' },
+    }),
     candidate_client_ids: { type: 'array', items: { type: 'integer' } },
     page: { type: 'object' },
     provenance: { type: 'object' },
