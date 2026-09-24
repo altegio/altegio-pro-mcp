@@ -11,7 +11,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { AltegioClient } from '../../../providers/altegio-client.js';
-import { getClientCard, lookupClients, searchClients } from '../use-cases.js';
+import {
+  getClientCard,
+  getClientSegmentReport,
+  lookupClients,
+  searchClients,
+} from '../use-cases.js';
 import { cardSummary, lookupSummary } from '../projections.js';
 import type { ClientCard, ClientLookupRow } from '../../../api/clients-api.js';
 
@@ -61,6 +66,32 @@ function fakeClient(
 const cardClient = () => fakeClient([[/^\/client\//, fixture('client-card')]]);
 const lookupClient = () =>
   fakeClient([[/autocomplete/, fixture('clients-autocomplete')]]);
+
+describe('clients_get_segment_report', () => {
+  it('returns a bounded page and withholds unexpected source contacts', async () => {
+    const calls: string[] = [];
+    const client = fakeClient(
+      [[/\/clients\/search/, fixture('clients-segment-report')]],
+      calls
+    );
+    const result = await getClientSegmentReport(client, {
+      location_id: 4564,
+      page: 2,
+      page_size: 50,
+    });
+    const output = result.structuredContent as {
+      total_count: number;
+      has_more: boolean;
+      rows: Array<{ total_spent: number }>;
+    };
+
+    expect(calls).toHaveLength(1);
+    expect(output.total_count).toBe(908);
+    expect(output.has_more).toBe(true);
+    expect(output.rows[0]?.total_spent).toBe(1240.5);
+    expect(everything(result)).not.toContain('13155550177');
+  });
+});
 
 /** Everything the result hands the model: the summary plus the structured payload. */
 function everything(result: {

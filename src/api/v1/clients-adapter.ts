@@ -26,6 +26,7 @@ import type {
   ClientLookupRow,
   ClientReactivationQuery,
   ClientReactivationSegment,
+  ClientReport,
   ClientSegment,
   ClientSegmentRow,
   ClientsApi,
@@ -97,7 +98,9 @@ export class V1ClientsAdapter implements ClientsApi {
           ? 'ASC'
           : 'DESC';
     }
-    if (query.fields?.length) body.fields = query.fields;
+    // The backend defaults to id only. Always request name, even when the
+    // caller did not specify an advanced field projection.
+    body.fields = [...new Set(['id', 'name', ...(query.fields ?? [])])];
 
     const { data, meta } = await callEnveloped<unknown>(
       this.http,
@@ -118,12 +121,50 @@ export class V1ClientsAdapter implements ClientsApi {
           })
       : [];
 
-    const totalCount = asNumber(meta.total_count) ?? rows.length;
+    const totalCount = asNumber(meta.total_count);
+    if (
+      totalCount === null ||
+      !Number.isInteger(totalCount) ||
+      totalCount < 0
+    ) {
+      throw new Error('Client search source returned no valid total count.');
+    }
     return {
       total_count: totalCount,
       page: query.page,
       page_size: query.page_size,
       rows,
+    };
+  }
+
+  async searchClientReport(
+    query: Omit<ClientSearchQuery, 'fields'>
+  ): Promise<ClientReport> {
+    const segment = await this.searchClients({
+      ...query,
+      fields: [
+        'first_visit_date',
+        'last_visit_date',
+        'sold_amount',
+        'visits_count',
+        'discount',
+        'deposit_balance',
+      ],
+    });
+    return {
+      total_count: segment.total_count,
+      page: segment.page,
+      page_size: segment.page_size,
+      rows: segment.rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        first_visit_date: asLocalDate(row.first_visit_date),
+        last_visit_date: asLocalDate(row.last_visit_date),
+        total_spent: asNumber(row.sold_amount),
+        visit_count: asNumber(row.visits_count),
+        discount: asNumber(row.discount),
+        client_account_balance: asNumber(row.deposit_balance),
+      })),
     };
   }
 

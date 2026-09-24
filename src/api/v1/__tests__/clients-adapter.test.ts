@@ -89,6 +89,7 @@ describe('V1ClientsAdapter.searchClients', () => {
     expect(body.operation).toBe('AND');
     expect(body.order_by).toBe('sold_amount'); // total_spent → sold_amount
     expect(body.order_by_direction).toBe('DESC');
+    expect(body.fields).toEqual(['id', 'name']);
     expect(body.filters).toEqual([
       { type: 'sold_amount', state: { from: 50000 } },
       { type: 'importance', state: { value: [3] } },
@@ -114,6 +115,67 @@ describe('V1ClientsAdapter.searchClients', () => {
     });
     expect(segment.total_count).toBe(0);
     expect(segment.rows).toEqual([]);
+  });
+
+  it('refuses a search with no authoritative total count', async () => {
+    const { api } = adapter([
+      [/\/clients\/search/, { status: 200, body: { success: true, data: [] } }],
+    ]);
+    await expect(
+      api.searchClients({
+        location_id: 1,
+        filters: {},
+        match: 'all',
+        page: 1,
+        page_size: 25,
+      })
+    ).rejects.toThrow('no valid total count');
+  });
+});
+
+describe('V1ClientsAdapter.searchClientReport', () => {
+  it('requests report fields in one paged search and maps only canonical fields', async () => {
+    const { api, calls } = adapter([
+      [/\/clients\/search/, 'clients-segment-report'],
+    ]);
+    const report = await api.searchClientReport({
+      location_id: 4564,
+      filters: { total_spent: { from: 100 } },
+      match: 'all',
+      page: 2,
+      page_size: 50,
+      order_by: 'total_spent',
+      order_direction: 'desc',
+    });
+
+    expect(calls).toHaveLength(1);
+    const body = JSON.parse(calls[0]!.body!);
+    expect(body.fields).toEqual([
+      'id',
+      'name',
+      'first_visit_date',
+      'last_visit_date',
+      'sold_amount',
+      'visits_count',
+      'discount',
+      'deposit_balance',
+    ]);
+    expect(body.page).toBe(2);
+    expect(body.page_size).toBe(50);
+    expect(body.order_by).toBe('sold_amount');
+    expect(report.total_count).toBe(908);
+    expect(report.rows[0]).toEqual({
+      id: 2,
+      name: 'James Smith',
+      first_visit_date: '2025-02-02',
+      last_visit_date: '2026-08-07',
+      total_spent: 1240.5,
+      visit_count: 9,
+      discount: 10,
+      client_account_balance: 55,
+    });
+    expect(JSON.stringify(report)).not.toContain('13155550177');
+    expect(report.rows[1]?.last_visit_date).toBeNull();
   });
 });
 

@@ -135,6 +135,25 @@ export interface ClientSegment {
   rows: ClientSegmentRow[];
 }
 
+/** A bounded, per-client report from one client-base search request. */
+export interface ClientReportRow {
+  id: number;
+  name: string;
+  first_visit_date: string | null;
+  last_visit_date: string | null;
+  total_spent: number | null;
+  visit_count: number | null;
+  discount: number | null;
+  client_account_balance: number | null;
+}
+
+export interface ClientReport {
+  total_count: number;
+  page: number;
+  page_size: number;
+  rows: ClientReportRow[];
+}
+
 // ========== client reactivation audience ==========
 
 /**
@@ -281,6 +300,9 @@ export interface ClientLookupRow {
 
 export interface ClientsApi {
   searchClients(query: ClientSearchQuery): Promise<ClientSegment>;
+  searchClientReport(
+    query: Omit<ClientSearchQuery, 'fields'>
+  ): Promise<ClientReport>;
   searchReactivationCandidates(
     query: ClientReactivationQuery
   ): Promise<ClientReactivationSegment>;

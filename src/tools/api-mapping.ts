@@ -400,6 +400,13 @@ export const apiMapping: Record<string, ApiMapping> = {
     pathParams: ['location_id'],
     bodyParams: ['filters', 'operation', 'page', 'page_size'],
   },
+  clients_get_segment_report: {
+    path: '/company/{location_id}/clients/search',
+    method: 'post',
+    operationId: 'get_client_list',
+    pathParams: ['location_id'],
+    bodyParams: ['filters', 'operation', 'page', 'page_size', 'fields'],
+  },
   clients_get_card: {
     path: '/client/{location_id}/{id}',
     method: 'get',

@@ -122,6 +122,72 @@ export const clientsSearchTool = defineTool({
   handler: async ({ input, client }) => clients.searchClients(client, input),
 });
 
+// ========== clients_get_segment_report ==========
+
+export const clientsGetSegmentReportTool = defineTool({
+  name: 'clients_get_segment_report',
+  category: 'Clients',
+  description:
+    '[Clients] A paged client-base report from one API request: each matching client’s id and name, first and last arrived-visit dates, lifetime sold amount, arrived-visit count, discount and client-account balance. Filter with the same model as clients_search, then order by total_spent or visit_count to find high-value clients without fetching every client card. The money and visit values are lifetime client-base measures, not revenue for the filter period. Returns an exact segment count and at most 200 rows per page; page totals must not be presented as whole-base totals. Contact details are never included. Needs access to clients in this location.',
+  annotations: { title: 'Clients: client segment report', ...READ_ONLY },
+  input: z.object({
+    location_id: locationId,
+    filters: clientFiltersSchema.optional(),
+    match: z.enum(['all', 'any']).optional(),
+    order_by: z
+      .enum([
+        'id',
+        'name',
+        'first_visit_date',
+        'last_visit_date',
+        'total_spent',
+        'visit_count',
+      ])
+      .optional(),
+    order_direction: z.enum(['asc', 'desc']).optional(),
+    page: z.number().int().positive().optional(),
+    page_size: z.number().int().positive().max(200).optional(),
+  }),
+  outputSchema: objectSchema({
+    location_id: { type: 'integer' as const },
+    filters_applied: { type: 'object' as const },
+    match: { type: 'string' as const },
+    total_count: { type: 'integer' as const },
+    page: { type: 'integer' as const },
+    page_size: { type: 'integer' as const },
+    returned: { type: 'integer' as const },
+    has_more: { type: 'boolean' as const },
+    contacts_included: { type: 'boolean' as const },
+    rows: {
+      type: 'array' as const,
+      items: objectSchema(
+        {
+          id: { type: 'integer' as const },
+          name: { type: 'string' as const },
+          first_visit_date: str,
+          last_visit_date: str,
+          total_spent: num,
+          visit_count: int,
+          discount: num,
+          client_account_balance: num,
+        },
+        [
+          'id',
+          'name',
+          'first_visit_date',
+          'last_visit_date',
+          'total_spent',
+          'visit_count',
+          'discount',
+          'client_account_balance',
+        ]
+      ),
+    },
+  }),
+  handler: async ({ input, client }) =>
+    clients.getClientSegmentReport(client, input),
+});
+
 // ========== clients_get_card ==========
 
 export const clientsGetCardTool = defineTool({

@@ -268,6 +268,7 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
 
   // --- Client base ----------------------------------------------------------
   clients_search: 'clients:read',
+  clients_get_segment_report: 'clients:read',
   clients_get_card: 'clients:read',
   clients_get_visit_history: 'clients:read',
   clients_lookup: 'clients:read',
