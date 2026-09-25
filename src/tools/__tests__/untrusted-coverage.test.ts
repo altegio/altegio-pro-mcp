@@ -520,6 +520,10 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     what: 'the name of each client row that failed to import, with the reason the API gave',
     coveredBy: 'src/tools/__tests__/onboarding-handlers.test.ts',
   },
+  onboarding_create_test_appointments: {
+    what: 'the reason the API gave for each test appointment it refused',
+    coveredBy: 'src/tools/__tests__/onboarding-handlers.test.ts',
+  },
 };
 
 // ===========================================================================
@@ -601,7 +605,6 @@ const NO_FREE_TEXT: Record<string, string> = {
   onboarding_resume: 'the phase and our own step list',
   onboarding_status: 'the phase and counts',
   onboarding_set_schedules: 'ids, dates and counts',
-  onboarding_create_test_appointments: 'ids and counts',
   onboarding_rollback_phase: 'the phase and counts',
 };
 

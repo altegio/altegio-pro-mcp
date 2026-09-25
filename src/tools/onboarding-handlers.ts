@@ -4,8 +4,11 @@ import { z } from 'zod';
 import { parseCSV, parseBooleanCell } from '../utils/csv-parser.js';
 import { logger } from '../utils/logger.js';
 import {
+  sanitizeUntrusted,
+  sanitizeUntrustedDeep,
   withErrorHandling,
   withUntrustedBlock,
+  type ToolResult,
   type UntrustedField,
 } from './tool-result.js';
 import { AuthenticationError } from '../utils/errors.js';
@@ -21,6 +24,10 @@ import {
   CategoryBatchSchema,
   PositionBatchSchema,
   ScheduleBatchSchema,
+  OnboardingPhaseSchema,
+  toAgentPhase,
+  type OnboardingPhase,
+  type OnboardingState,
 } from '../types/onboarding.types.js';
 import type {
   CreateStaffRequest,
@@ -31,25 +38,77 @@ import type {
   SetScheduleRequest,
 } from '../types/altegio.types.js';
 
+/** Budget for the name of a failed row, as its file spelled it. */
+const FAILED_ROW_NAME_MAX_CHARS = 100;
+
+/** Budget for the reason the API gave for refusing a row. */
+const FAILED_ROW_REASON_MAX_CHARS = 300;
+
+/** Budget for one previewed value, in the fence and in structured content alike. */
+const PREVIEW_MAX_CHARS = 400;
+
+/** Rows `onboarding_preview_data` shows. */
+const PREVIEW_ROWS = 5;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * A row a batch step could not create.
+ *
+ * Both halves are text nobody on this side wrote: the name or title as it
+ * stood in the file the user brought, and the API's own complaint about it.
+ */
+interface FailedRow {
+  readonly row: unknown;
+  readonly reason: unknown;
+}
+
+function failedRow(row: unknown, error: unknown): FailedRow {
+  return { row, reason: error instanceof Error ? error.message : error };
+}
+
+/**
+ * One failed row as one line, for the fence and for structured content alike.
+ *
+ * The name and the reason are sanitized apart: joined first, a reason that
+ * opens with a forged turn marker ("System: …") would sit mid-line behind the
+ * name, where the line-start rule never sees it. The separator is not a colon,
+ * so a row that is simply named "User" or "Ai" cannot form one either. The
+ * joined line gets one more pass, for a forgery that straddles the separator
+ * ("<|" ending the name, "|>" opening the reason); the default budget of that
+ * pass exceeds both halves together, so it never truncates.
+ */
+function describeFailedRow(failure: FailedRow): string {
+  const row =
+    sanitizeUntrusted(failure.row, { maxChars: FAILED_ROW_NAME_MAX_CHARS }) ??
+    '(unnamed row)';
+  const reason =
+    sanitizeUntrusted(failure.reason, {
+      maxChars: FAILED_ROW_REASON_MAX_CHARS,
+    }) ?? '(no reason given)';
+  return sanitizeUntrusted(`${row} — ${reason}`) ?? row;
+}
+
 /**
  * Append the rows a batch import could not create, inside the untrusted fence.
  *
- * A failed row carries two pieces of text nobody on this side wrote: the name
- * or title as it stood in the file the user brought, and the API's own
- * complaint about it. Onboarding is the one flow whose whole input is an
- * imported spreadsheet, so this is where a cell of that file would otherwise
- * land in the middle of our own report.
+ * Onboarding is the one flow whose whole input is an imported spreadsheet, so
+ * this is where a cell of that file would otherwise land in the middle of our
+ * own report. The lines arrive in the form `describeFailedRow` leaves them,
+ * which the fence's own pass does not change, so the fenced text and the
+ * structured `errors` read the same.
  */
-function withFailedRows(summary: string, errors: readonly string[]): string {
-  if (errors.length === 0) return summary;
-  const rows: UntrustedField[] = errors.map((error, index) => ({
+function withFailedRows(summary: string, lines: readonly string[]): string {
+  if (lines.length === 0) return summary;
+  const rows: UntrustedField[] = lines.map((line, index) => ({
     label: `failed row ${index + 1}`,
-    value: error,
+    value: line,
   }));
   return withUntrustedBlock(
-    `${summary}\n\n✗ ${errors.length} failed; each row and the reason the API gave are listed below.`,
-    rows,
-    { maxChars: 300 }
+    `${summary}\n\n✗ ${lines.length} failed; each row and the reason the API gave are listed below.`,
+    rows
   );
 }
 
@@ -79,11 +138,67 @@ function unansweredSeatNote(rows: readonly unknown[]): string {
 }
 
 /**
- * Map an internal persisted phase key to its agent-facing name so no legacy
- * terminology leaks into tool output. The persisted state keeps the original key.
+ * The result of a step that creates entities, as `batchImportOutput` declares
+ * it. Structured content has no fence to put around the failed rows, so it
+ * carries the same sanitized lines as the fence does; everything else in it is
+ * ours — counts, IDs and a phase name.
  */
-function toAgentPhase(phase: string): string {
-  return phase === 'test_bookings' ? 'test_appointments' : phase;
+function batchResult(result: {
+  location_id: number;
+  /** Where the wizard moved to after this step. */
+  phase: OnboardingPhase;
+  created: readonly number[];
+  failures: readonly FailedRow[];
+  summary: string;
+}): ToolResult {
+  const errors = result.failures.map(describeFailedRow);
+  return {
+    content: [
+      {
+        type: 'text' as const,
+        text: withFailedRows(result.summary, errors),
+      },
+    ],
+    structuredContent: {
+      location_id: result.location_id,
+      phase: toAgentPhase(result.phase),
+      created: result.created.length,
+      failed: errors.length,
+      created_ids: [...result.created],
+      errors,
+    },
+  };
+}
+
+/**
+ * The session as `onboardingStatusOutput` declares it: checkpoints in wizard
+ * order under the names tools use, whatever order the state file holds them in.
+ */
+function statusView(state: OnboardingState) {
+  const checkpoints = OnboardingPhaseSchema.options.flatMap((phase) => {
+    const checkpoint = state.checkpoints[phase];
+    return checkpoint
+      ? [
+          {
+            phase: toAgentPhase(phase),
+            entity_count: checkpoint.entity_ids.length,
+            completed_at: checkpoint.timestamp,
+          },
+        ]
+      : [];
+  });
+  return {
+    location_id: state.company_id,
+    phase: toAgentPhase(state.phase),
+    completed: state.phase === 'complete',
+    started_at: state.started_at,
+    updated_at: state.updated_at,
+    checkpoints,
+    total_entities: checkpoints.reduce(
+      (sum, checkpoint) => sum + checkpoint.entity_count,
+      0
+    ),
+  };
 }
 
 const LocationIdSchema = z.object({
@@ -165,6 +280,7 @@ export class OnboardingHandlers {
       const state = await this.stateManager.start(location_id);
 
       return {
+        structuredContent: statusView(state),
         content: [
           {
             type: 'text' as const,
@@ -199,21 +315,24 @@ export class OnboardingHandlers {
         );
       }
 
-      const completedPhases = Object.entries(state.checkpoints)
-        .filter(([, checkpoint]) => checkpoint.completed)
+      // Text and structured content come from one view, so they cannot tell
+      // a model two different stories about the same session.
+      const view = statusView(state);
+      const completedPhases = view.checkpoints
         .map(
-          ([phase, checkpoint]) =>
-            `  - ${toAgentPhase(phase)}: ${checkpoint.entity_ids.length} entities created`
+          (checkpoint) =>
+            `  - ${checkpoint.phase}: ${checkpoint.entity_count} entities created`
         )
         .join('\n');
 
       return {
+        structuredContent: view,
         content: [
           {
             type: 'text' as const,
             text:
               `Onboarding session for location ${location_id}\n\n` +
-              `Current phase: ${toAgentPhase(state.phase)}\n` +
+              `Current phase: ${view.phase}\n` +
               `Started: ${state.started_at}\n\n` +
               `Completed:\n${completedPhases || '  (none yet)'}\n\n` +
               `Continue with next step based on current phase.`,
@@ -236,20 +355,18 @@ export class OnboardingHandlers {
         );
       }
 
-      const totalEntities = Object.values(state.checkpoints).reduce(
-        (sum, cp) => sum + cp.entity_ids.length,
-        0
-      );
+      const view = statusView(state);
 
       return {
+        structuredContent: view,
         content: [
           {
             type: 'text' as const,
             text:
               `Onboarding Status - Location ${location_id}\n\n` +
-              `Phase: ${toAgentPhase(state.phase)}\n` +
-              `Total entities created: ${totalEntities}\n` +
-              `Phases completed: ${Object.keys(state.checkpoints).length}`,
+              `Phase: ${view.phase}\n` +
+              `Total entities created: ${view.total_entities}\n` +
+              `Phases completed: ${view.checkpoints.length}`,
           },
         ],
       };
@@ -270,7 +387,7 @@ export class OnboardingHandlers {
       positionsArray = PositionBatchSchema.parse(positionsArray);
 
       const created: number[] = [];
-      const errors: string[] = [];
+      const failures: FailedRow[] = [];
 
       for (const position of positionsArray) {
         try {
@@ -283,7 +400,7 @@ export class OnboardingHandlers {
           );
           created.push(result.id);
         } catch (error) {
-          errors.push(`${position.title}: ${(error as Error).message}`);
+          failures.push(failedRow(position.title, error));
         }
       }
 
@@ -291,21 +408,18 @@ export class OnboardingHandlers {
       await this.stateManager.checkpoint(location_id, 'positions', created);
       await this.stateManager.updatePhase(location_id, 'staff');
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: withFailedRows(
-              `Positions batch processing complete:\n\n` +
-                `✓ ${created.length} positions created\n` +
-                `\nCreated position IDs: [${created.join(', ')}]\n` +
-                `Use these position_id values when adding staff.\n` +
-                `\nNext: Add staff with onboarding_add_staff_batch`,
-              errors
-            ),
-          },
-        ],
-      };
+      return batchResult({
+        location_id,
+        phase: 'staff',
+        created,
+        failures,
+        summary:
+          `Positions batch processing complete:\n\n` +
+          `✓ ${created.length} positions created\n` +
+          `\nCreated position IDs: [${created.join(', ')}]\n` +
+          `Use these position_id values when adding staff.\n` +
+          `\nNext: Add staff with onboarding_add_staff_batch`,
+      });
     });
   }
 
@@ -360,7 +474,7 @@ export class OnboardingHandlers {
       }
 
       const created: number[] = [];
-      const errors: string[] = [];
+      const failures: FailedRow[] = [];
       let paidSeats = 0;
       let inSchedule = 0;
 
@@ -387,7 +501,7 @@ export class OnboardingHandlers {
           if (staffRequest.is_paid_staff) paidSeats++;
           if (staffRequest.has_timetable_access) inSchedule++;
         } catch (error) {
-          errors.push(`${staff.name}: ${(error as Error).message}`);
+          failures.push(failedRow(staff.name, error));
         }
       }
 
@@ -395,20 +509,19 @@ export class OnboardingHandlers {
       await this.stateManager.checkpoint(location_id, 'staff', created);
       await this.stateManager.updatePhase(location_id, 'categories');
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: withFailedRows(
-              `Staff batch processing complete:\n\n` +
-                `✓ ${created.length} staff members created ` +
-                `(${paidSeats} on a paid staff seat, ${inSchedule} in the work schedule)\n` +
-                `\nNext: Add service categories with onboarding_add_categories`,
-              errors
-            ),
-          },
-        ],
-      };
+      return batchResult({
+        location_id,
+        phase: 'categories',
+        created,
+        failures,
+        summary:
+          `Staff batch processing complete:\n\n` +
+          `✓ ${created.length} staff members created ` +
+          `(${paidSeats} on a paid staff seat, ${inSchedule} in the work schedule)\n` +
+          `\nCreated team member IDs: [${created.join(', ')}]\n` +
+          `Use these team_member_id values in onboarding_set_schedules.\n` +
+          `\nNext: Add service categories with onboarding_add_categories`,
+      });
     });
   }
 
@@ -419,7 +532,7 @@ export class OnboardingHandlers {
       const { location_id, categories } = CategoryArgsSchema.parse(args);
 
       const created: number[] = [];
-      const errors: string[] = [];
+      const failures: FailedRow[] = [];
 
       for (const category of categories) {
         try {
@@ -434,7 +547,7 @@ export class OnboardingHandlers {
           );
           created.push(result.id);
         } catch (error) {
-          errors.push(`${category.title}: ${(error as Error).message}`);
+          failures.push(failedRow(category.title, error));
         }
       }
 
@@ -442,19 +555,18 @@ export class OnboardingHandlers {
       await this.stateManager.checkpoint(location_id, 'categories', created);
       await this.stateManager.updatePhase(location_id, 'services');
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: withFailedRows(
-              `Categories batch processing complete:\n\n` +
-                `✓ ${created.length} categories created\n` +
-                `\nNext: Add services with onboarding_add_services_batch`,
-              errors
-            ),
-          },
-        ],
-      };
+      return batchResult({
+        location_id,
+        phase: 'services',
+        created,
+        failures,
+        summary:
+          `Categories batch processing complete:\n\n` +
+          `✓ ${created.length} categories created\n` +
+          `\nCreated category IDs: [${created.join(', ')}]\n` +
+          `Use these category_id values when adding services.\n` +
+          `\nNext: Add services with onboarding_add_services_batch`,
+      });
     });
   }
 
@@ -474,7 +586,7 @@ export class OnboardingHandlers {
       servicesArray = ServiceBatchSchema.parse(servicesArray);
 
       const created: number[] = [];
-      const errors: string[] = [];
+      const failures: FailedRow[] = [];
 
       for (const service of servicesArray) {
         try {
@@ -491,7 +603,7 @@ export class OnboardingHandlers {
           );
           created.push(result.id);
         } catch (error) {
-          errors.push(`${service.title}: ${(error as Error).message}`);
+          failures.push(failedRow(service.title, error));
         }
       }
 
@@ -499,19 +611,17 @@ export class OnboardingHandlers {
       await this.stateManager.checkpoint(location_id, 'services', created);
       await this.stateManager.updatePhase(location_id, 'schedules');
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: withFailedRows(
-              `Services batch processing complete:\n\n` +
-                `✓ ${created.length} services created\n` +
-                `\nNext: Set work schedules with onboarding_set_schedules`,
-              errors
-            ),
-          },
-        ],
-      };
+      return batchResult({
+        location_id,
+        phase: 'schedules',
+        created,
+        failures,
+        summary:
+          `Services batch processing complete:\n\n` +
+          `✓ ${created.length} services created\n` +
+          `\nCreated service IDs: [${created.join(', ')}]\n` +
+          `\nNext: Set work schedules with onboarding_set_schedules`,
+      });
     });
   }
 
@@ -552,17 +662,18 @@ export class OnboardingHandlers {
         )
         .join('\n');
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text:
-              `Work schedules set for ${staffIds.length} staff member(s):\n\n` +
-              `${summary}\n\n` +
-              `Next: Import clients with onboarding_import_clients`,
-          },
-        ],
-      };
+      // One request sets every schedule, so a failure is the whole call's
+      // (an error result) and a success has no failed rows.
+      return batchResult({
+        location_id,
+        phase: 'clients',
+        created: staffIds,
+        failures: [],
+        summary:
+          `Work schedules set for ${staffIds.length} staff member(s):\n\n` +
+          `${summary}\n\n` +
+          `Next: Import clients with onboarding_import_clients`,
+      });
     });
   }
 
@@ -579,7 +690,7 @@ export class OnboardingHandlers {
       const clientsArray = ClientBatchSchema.parse(parsedClients);
 
       const created: number[] = [];
-      const errors: string[] = [];
+      const failures: FailedRow[] = [];
 
       for (const client of clientsArray) {
         try {
@@ -596,7 +707,7 @@ export class OnboardingHandlers {
           );
           created.push(result.id);
         } catch (error) {
-          errors.push(`${client.name}: ${(error as Error).message}`);
+          failures.push(failedRow(client.name, error));
         }
       }
 
@@ -604,19 +715,18 @@ export class OnboardingHandlers {
       await this.stateManager.checkpoint(location_id, 'clients', created);
       await this.stateManager.updatePhase(location_id, 'test_bookings');
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: withFailedRows(
-              `Client import complete:\n\n` +
-                `✓ ${created.length} clients imported\n` +
-                `\nNext: Create test appointments with onboarding_create_test_appointments`,
-              errors
-            ),
-          },
-        ],
-      };
+      // A client base can run to thousands of rows and no later step takes a
+      // client ID, so the IDs stay in structured content, not in the text.
+      return batchResult({
+        location_id,
+        phase: 'test_bookings',
+        created,
+        failures,
+        summary:
+          `Client import complete:\n\n` +
+          `✓ ${created.length} clients imported\n` +
+          `\nNext: Create test appointments with onboarding_create_test_appointments`,
+      });
     });
   }
 
@@ -645,6 +755,7 @@ export class OnboardingHandlers {
         }
 
         const created: number[] = [];
+        const failures: FailedRow[] = [];
 
         for (let i = 0; i < count; i++) {
           const staffId = staffIds[i % staffIds.length]!;
@@ -673,6 +784,9 @@ export class OnboardingHandlers {
             created.push(appointment.id);
           } catch (error) {
             logger.warn({ error }, 'Failed to create test appointment');
+            failures.push(
+              failedRow(`test appointment ${i + 1} at ${datetime}`, error)
+            );
           }
         }
 
@@ -683,21 +797,20 @@ export class OnboardingHandlers {
         );
         await this.stateManager.updatePhase(location_id, 'complete');
 
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text:
-                `Test appointments created: ${created.length}\n\n` +
-                `Onboarding complete! ✓\n\n` +
-                `Summary:\n` +
-                `  - Staff: ${staffIds.length}\n` +
-                `  - Services: ${serviceIds.length}\n` +
-                `  - Test appointments: ${created.length}\n\n` +
-                `Your platform is ready to use!`,
-            },
-          ],
-        };
+        return batchResult({
+          location_id,
+          phase: 'complete',
+          created,
+          failures,
+          summary:
+            `Test appointments created: ${created.length}\n\n` +
+            `Onboarding complete! ✓\n\n` +
+            `Summary:\n` +
+            `  - Staff: ${staffIds.length}\n` +
+            `  - Services: ${serviceIds.length}\n` +
+            `  - Test appointments: ${created.length}\n\n` +
+            `Your platform is ready to use!`,
+        });
       }
     );
   }
@@ -717,7 +830,10 @@ export class OnboardingHandlers {
         parsed = parseCSV(raw_input);
       }
 
-      if (parsed.length === 0 || !parsed[0]) {
+      // Every import tool takes rows of fields, so a first entry that is not
+      // an object (a JSON scalar or array) is as unusable as no rows at all.
+      const first: unknown = parsed[0];
+      if (!isRecord(first)) {
         return {
           content: [
             {
@@ -725,21 +841,29 @@ export class OnboardingHandlers {
               text: 'No data parsed. Check CSV format or JSON structure.',
             },
           ],
+          structuredContent: { total: 0, fields: [], preview: [] },
         };
       }
+
+      // A later entry that is not an object is still shown, under one field,
+      // so the preview never hides a row the import would then reject.
+      const rows: Record<string, unknown>[] = parsed
+        .slice(0, PREVIEW_ROWS)
+        .map((row: unknown) => (isRecord(row) ? row : { value: row }));
+      const fields = Object.keys(first);
 
       // This tool exists to show data the user brought from somewhere else:
       // every cell of it is free text written outside this server, and the
       // field names are whatever their file called them. All of it goes in the
-      // fenced block, one field per row.
-      const preview: UntrustedField[] = parsed.slice(0, 5).map((row, idx) => ({
+      // fenced block, one field per row — and, sanitized, in structured content.
+      const preview: UntrustedField[] = rows.map((row, idx) => ({
         label: `row ${idx + 1}`,
         value: Object.entries(row)
           .map(([k, v]) => `${k}: ${v}`)
           .join(', '),
       }));
 
-      const fieldCount = Object.keys(parsed[0]).length;
+      const fieldCount = fields.length;
       const seatNote = data_type === 'staff' ? unansweredSeatNote(parsed) : '';
       const importTool = {
         staff: 'onboarding_add_staff_batch',
@@ -756,20 +880,24 @@ export class OnboardingHandlers {
               `Preview of ${data_type} data:\n\n` +
                 `Total rows: ${parsed.length}\n` +
                 `Fields per row: ${fieldCount}\n` +
-                `Showing the first ${Math.min(5, parsed.length)} row(s) below, with the field names as the file spells them.\n\n` +
+                `Showing the first ${rows.length} row(s) below, with the field names as the file spells them.\n\n` +
                 seatNote +
                 `Proceed with ${importTool} to create entities.`,
               [
                 {
                   label: 'field names',
-                  value: Object.keys(parsed[0]).join(', '),
+                  value: fields.join(', '),
                 },
                 ...preview,
               ],
-              { maxChars: 400 }
+              { maxChars: PREVIEW_MAX_CHARS }
             ),
           },
         ],
+        structuredContent: sanitizeUntrustedDeep(
+          { total: parsed.length, fields, preview: rows },
+          { maxChars: PREVIEW_MAX_CHARS }
+        ),
       };
     });
   }

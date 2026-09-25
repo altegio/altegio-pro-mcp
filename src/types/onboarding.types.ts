@@ -16,6 +16,18 @@ export const OnboardingPhaseSchema = z.enum([
 
 export type OnboardingPhase = z.infer<typeof OnboardingPhaseSchema>;
 
+/**
+ * Map an internal persisted phase key to its agent-facing name so no legacy
+ * terminology leaks into tool output. The persisted state keeps the original key.
+ */
+export function toAgentPhase(phase: string): string {
+  return phase === 'test_bookings' ? 'test_appointments' : phase;
+}
+
+/** Every phase as tools name it, in wizard order. */
+export const AGENT_ONBOARDING_PHASES: readonly string[] =
+  OnboardingPhaseSchema.options.map(toAgentPhase);
+
 // Checkpoint structure
 export const CheckpointSchema = z.object({
   completed: z.boolean(),

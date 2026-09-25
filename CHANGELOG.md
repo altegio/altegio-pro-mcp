@@ -6,6 +6,42 @@ is declared stable.
 
 ## [Unreleased]
 
+### Fixed — onboarding results rejected by SDK-based hosts
+
+- **Every onboarding success now carries `structuredContent`.** Eleven of the
+  twelve wizard tools declare an `outputSchema` but returned text only, and
+  `@modelcontextprotocol/sdk`'s `Client.callTool` throws "has an output schema
+  but did not return structured content" for such a result — so an SDK-based
+  host could not use a single successful wizard step. Error results stay
+  text-only; `onboarding_rollback_phase` declares no schema, like the other
+  destructive tools.
+- **Schemas corrected to what the wizard actually reports.**
+  `onboardingStatusOutput` declared `phase` as a number and counted phases the
+  wizard does not have; it is now the agent-facing phase name (`init` …
+  `test_appointments`, `complete`), `completed`, `started_at`/`updated_at`,
+  checkpoints in wizard order and `total_entities`. `batchImportOutput` gains
+  `location_id`, the phase the wizard moved to and `created_ids`; every field
+  of the three schemas is required.
+- **Created IDs are returned.** `onboarding_set_schedules` told the model to
+  use the team member IDs returned by `onboarding_add_staff_batch`, which
+  returned none. The staff, category and service steps now list their IDs in
+  the text as the position step already did, and every step returns them in
+  `created_ids` (client IDs only there — a client base can run to thousands).
+- **Failed rows are sanitized per part.** A failed row's name and the API's
+  reason were joined before sanitizing, so a reason opening with a forged turn
+  marker ("System: …") survived mid-line inside the fence. Each half is now
+  sanitized on its own, and the structured `errors` entries are the fenced
+  lines verbatim. `onboarding_create_test_appointments` reports the appointments
+  the API refused, with its reason, instead of dropping them silently.
+- **`onboarding_preview_data`:** rows, field names and cells are sanitized in
+  structured content; an input whose first entry is not an object (a JSON
+  scalar or array) is an empty preview, and a later non-object entry is shown
+  as `{"value": …}` instead of vanishing.
+- **Test:** `src/__tests__/onboarding-structured-output-e2e.test.ts` walks the
+  whole wizard through a real SDK `Client` ↔ `Server` pair, re-validates each
+  result under JSON Schema 2020-12 and fails when an onboarding tool is left
+  out of the walk.
+
 ### Changed — paid seat and work schedule are the owner's explicit choice
 
 - **Breaking — `create_staff`:** `is_paid_staff` and `has_timetable_access`
