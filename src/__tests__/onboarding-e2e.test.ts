@@ -95,10 +95,10 @@ describe('Onboarding E2E Flow', () => {
           specialization: 'Massage Therapist',
         });
 
-      const staffCSV = `name,specialization,phone,email
-Alice Johnson,Hairdresser,+1234567890,alice@salon.com
-Bob Smith,Nail Technician,+1234567891,bob@salon.com
-Carol White,Massage Therapist,+1234567892,carol@salon.com`;
+      const staffCSV = `name,specialization,is_paid_staff,has_timetable_access
+Alice Johnson,Hairdresser,yes,yes
+Bob Smith,Nail Technician,yes,yes
+Carol White,Massage Therapist,no,no`;
 
       const staffResult = await handlers.addStaffBatch({
         location_id: companyId,
@@ -265,6 +265,8 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValue({ id: 1, name: 'Test' });
       await handlers.addStaffBatch({
         location_id: companyId,
+        is_paid_staff: true,
+        has_timetable_access: true,
         staff_data: [{ name: 'Test Staff', specialization: 'Test' }],
       });
       expect((await stateManager.load(companyId))?.phase).toBe('categories');
@@ -327,6 +329,8 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
 
       await handlers.addStaffBatch({
         location_id: companyId,
+        is_paid_staff: true,
+        has_timetable_access: true,
         staff_data: [
           { name: 'Alice', specialization: 'Test' },
           { name: 'Bob', specialization: 'Test' },
@@ -386,6 +390,8 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValueOnce({ id: 3, name: 'Staff3' });
       await handlers.addStaffBatch({
         location_id: companyId,
+        is_paid_staff: true,
+        has_timetable_access: true,
         staff_data: [
           { name: 'Staff1' },
           { name: 'Staff2' },
@@ -465,6 +471,8 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValueOnce({ id: 2, name: 'Staff2' });
       await handlers.addStaffBatch({
         location_id: companyId,
+        is_paid_staff: true,
+        has_timetable_access: true,
         staff_data: [{ name: 'Staff' }, { name: 'Staff2' }],
       });
 
@@ -505,6 +513,8 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
 
       const result = await handlers.addStaffBatch({
         location_id: companyId,
+        is_paid_staff: true,
+        has_timetable_access: true,
         staff_data: [
           { name: 'Alice', specialization: 'Hair' },
           { name: 'Bob', specialization: 'Nails' },
@@ -532,6 +542,8 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValueOnce({ id: 1, name: 'Staff1' });
       await handlers.addStaffBatch({
         location_id: companyId,
+        is_paid_staff: true,
+        has_timetable_access: true,
         staff_data: [{ name: 'Staff1' }],
       });
 
@@ -590,6 +602,8 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValue({ id: 1, name: 'Staff' });
       await handlers.addStaffBatch({
         location_id: companyId,
+        is_paid_staff: true,
+        has_timetable_access: true,
         staff_data: [{ name: 'Staff' }],
       });
 
@@ -719,6 +733,8 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValue({ id: 1, name: 'Staff' });
       await handlers.addStaffBatch({
         location_id: companyId2,
+        is_paid_staff: true,
+        has_timetable_access: true,
         staff_data: [{ name: 'Staff' }],
       });
 

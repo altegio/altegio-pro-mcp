@@ -96,7 +96,7 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 
 **[Auth] Authentication (2):** login, logout
 **[Location] Location (3):** list_locations, update_location, diagnose_location_access
-**[Staff] Staff CRUD (4):** get, create, update, delete (create supports `is_paid_staff` and `has_timetable_access`; user fields are optional — omitted means no user account)
+**[Staff] Staff CRUD (4):** get, create, update, delete (create requires the owner's explicit `is_paid_staff` and `has_timetable_access` — never defaulted; user fields are optional — omitted means no user account; no `phone_number`, quick-create never reads it)
 **[Positions] Positions (2):** get, create (no update/delete tool exists — the 2025-10-30 note below overstated this)
 **[Services] Services (8):** get, create, update, delete, plus service↔team-member links: link_service_team_member, update_service_team_member, unlink_service_team_member, link_team_member_services (bulk)
 **[Categories] Service Categories (2):** get, delete
@@ -108,7 +108,7 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 **[Users] Location access (1):** `remove_location_user` — off the default `/mcp` view, served on `/mcp/catalog` and stdio
 **[Analytics] Analytics (28):** get_overview, get_daily_series, get_appointments_breakdown, get_receptionist_performance, get_loyalty_program_results, get_forecast, get_day_end_report, get_team_member_occupancy, get_client_visit_stats, get_client_sales, get_client_retention, get_client_forecast, get_service_profitability, get_service_mix_trend, get_client_service_penetration, get_client_payer_cohorts, get_team_member_sales, get_team_member_capacity, get_client_reactivation_candidates, get_group_event_performance, get_product_sales, get_cash_flow_breakdown, get_profit_and_loss_statement, get_client_cash_receipts, get_capacity_heatmap, get_revenue_leakage, get_team_member_service_matrix, get_inventory_reorder_risks
   - The 6 report-builder tools (list_report_templates, list_report_fields, run_report, list_saved_reports, run_saved_report, delete_assistant_report) are defined and tested but **served on no view** — the backend report-data API fails for every report in production. Never point guidance at them; read `src/tools/disabled-tools.ts` first.
-**[Onboarding] Wizard (12):** start, resume, status, batch imports (positions, staff, categories, services), set schedules, import clients, test appointments, preview, rollback
+**[Onboarding] Wizard (12):** start, resume, status, batch imports (positions, staff, categories, services), set schedules, import clients, test appointments, preview, rollback (the staff import refuses a team member without the paid-seat and work-schedule answers, per row or batch-level)
 **[API] Universal executor (3):** `altegio_search_operations`, `altegio_describe_operation`, `altegio_call_operation` - backed by `src/generated/catalog.json`; reads only (writes refused, see ADR-001 D2)
 
 ### Architecture
@@ -142,6 +142,12 @@ MCP server for **B2B business management only** (Altegio.Pro, not public booking
 - `src/utils/` - logging, errors, config, credential manager
 
 ### Change history
+
+**Paid seat and work schedule are the owner's explicit choice (2026-09-24)**
+- **Decision (user):** `is_paid_staff` and `has_timetable_access` are required on `create_staff` and on every `onboarding_add_staff_batch` row (or once batch-level; a row's answer wins) and are **never defaulted**. A paid seat is billed on per-seat licensing, and a missing schedule access silently keeps a team member off the work schedule. Missing values are refused before any API call; the batch refuses as a whole, rows by number only (names are file text), and the message tells the model to ask the owner. Shared text and zod booleans: `src/tools/staff-seat-choice.ts`; CSV answers via `parseBooleanCell` in `src/utils/csv-parser.ts` (a blank cell is no answer, never `false`).
+- **Backend facts (biz.erp `MasterCreateQuickDto`, `MasterService::quickCreateSalonMasterByDto`, live on 4564):** the body is validated as a collection without missing fields — `position_id`, `user_email`, `user_phone`, `is_user_invite` must be present (null allowed for the first three) or 422 `This field is missing.`; per-seat licensing answers 400 `Billable status is required for active team members` and `Non-billable team members cannot have schedule access`; `phone_number` is never read. Spec corrected in altegio/biz.erp.api.docs#125 (a575ee52); catalog rebuilt from it.
+- **`phone_number` removed from `create_staff`** (and `CreateStaffRequest`, api-mapping). The team member's own contact phone has no public V1 write path on create; `user_phone` stays the user-account link. The staff batch ignores `phone`, `email`, `api_id` and says so.
+- **Walkthrough:** prompt, `docs/ONBOARDING_GUIDE.md`, README and the staff preview (`onboarding_preview_data` counts unanswered rows) ask both questions per team member.
 
 **Client-card, attendance and finance tools, added and audited (2026-09-24)**
 - **Added 14 tools (81 → 95 served), PRs #67–#76:** `clients_get_segment_report`, `clients_list_profiles`, `diagnose_location_access`, `clients_get_membership_purchases`, `clients_list_comments`, `clients_add_comment`, `clients_list_files`, `clients_upload_file`, `appointments_preview_attendance`, `appointments_apply_attendance`, `analytics_get_service_mix_trend`, `analytics_get_client_service_penetration`, `analytics_get_client_cash_receipts`, `analytics_get_client_payer_cohorts`. Source contracts: `docs/architecture/2026-09-24-*.md`.

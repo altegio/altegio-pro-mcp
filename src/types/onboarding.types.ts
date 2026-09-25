@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { parseBooleanCell } from '../utils/csv-parser.js';
 
 // Phase enum
 export const OnboardingPhaseSchema = z.enum([
@@ -38,13 +39,26 @@ export const OnboardingStateSchema = z.object({
 export type OnboardingState = z.infer<typeof OnboardingStateSchema>;
 
 // Batch input schemas
+
+/** An optional yes/no answer given as a JSON boolean or a CSV cell. */
+const BooleanCellSchema = z.preprocess(
+  parseBooleanCell,
+  z.boolean().optional()
+);
+
+/**
+ * One team member row. Only what quick-create stores is read: a `phone`,
+ * `email` or `api_id` column is dropped, since the operation has no field for
+ * a team member's own contacts or external id, and a user link is not made
+ * from an imported file. The paid-seat and work-schedule answers may come per
+ * row or once for the batch; `addStaffBatch` refuses a row with neither.
+ */
 export const StaffBatchItemSchema = z.object({
   name: z.string().min(1),
   specialization: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().email().optional(),
   position_id: z.coerce.number().optional(),
-  api_id: z.string().optional(),
+  is_paid_staff: BooleanCellSchema,
+  has_timetable_access: BooleanCellSchema,
 });
 
 export const ServiceBatchItemSchema = z.object({

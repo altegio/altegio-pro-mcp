@@ -6,6 +6,37 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — paid seat and work schedule are the owner's explicit choice
+
+- **Breaking — `create_staff`:** `is_paid_staff` and `has_timetable_access`
+  are required and never defaulted. A missing value is refused before any API
+  call with a message that tells the model to ask the location owner: on
+  per-seat licensing a paid staff seat is billed (the API itself refuses an
+  active team member without `is_paid_staff`, and a non-paid one with schedule
+  access).
+- **Breaking — `onboarding_add_staff_batch`:** every row needs both answers,
+  as JSON fields or CSV columns (`true`/`false`, `yes`/`no`, `1`/`0`; a blank
+  cell is no answer), or once for the whole list through the new batch-level
+  `is_paid_staff` / `has_timetable_access`; a row's own answer wins. A row with
+  neither refuses the whole batch before anything is created, naming rows by
+  number only. The result counts paid seats and team members in the work
+  schedule. This is what failed on per-seat-licensed demo location 4564.
+- **`onboarding_preview_data`:** a staff preview says how many rows still lack
+  the answers, so the owner is asked before the import.
+- **`phone_number` removed from `create_staff`:** quick-create never reads it,
+  so the value was silently dropped; the team member's own contact phone cannot
+  be set through this operation (`user_phone` stays the user-account link).
+  The staff batch ignores `phone`, `email` and `api_id` columns for the same
+  reason instead of pretending to import them; a malformed email cell no longer
+  fails the batch.
+- **Walkthrough:** the `onboarding_walkthrough` prompt, the onboarding guide
+  resource and README ask the owner both questions per team member and note
+  that only team members with schedule access can get a work schedule.
+- **Catalog:** rebuilt from `biz.erp.api.docs` a575ee52, which corrected the
+  quick-create contract (required keys, deprecated `phone_number`,
+  `has_timetable_access`, `is_user_invite` semantics, 400 refusals); the
+  `create_staff` mapping drops `phone_number`.
+
 ### Fixed — team-member creation found by the live suites
 
 - **`create_staff`:** `user_email` and `user_phone` are optional. Quick-create

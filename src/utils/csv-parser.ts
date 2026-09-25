@@ -46,3 +46,20 @@ export function parseCSV(input: string): ParsedRow[] {
 
   return rows;
 }
+
+const TRUE_CELLS = new Set(['true', 'yes', '1']);
+const FALSE_CELLS = new Set(['false', 'no', '0']);
+
+/**
+ * Read a cell as a yes/no answer: true/false, yes/no or 1/0 in any case. A
+ * blank cell is "not answered", never `false`; any other word is returned as
+ * is for the schema to reject. Non-strings (a JSON row) pass through.
+ */
+export function parseBooleanCell(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  const cell = value.trim().toLowerCase();
+  if (cell === '') return undefined;
+  if (TRUE_CELLS.has(cell)) return true;
+  if (FALSE_CELLS.has(cell)) return false;
+  return value;
+}

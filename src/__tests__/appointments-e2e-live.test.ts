@@ -80,7 +80,6 @@ describeLive('appointments end-to-end against the demo location', () => {
         name: `E2E Staff ${stamp}`,
         specialization: 'E2E Testing',
         position_id: null,
-        phone_number: null,
         // No user account: an unknown email or phone without an invitation
         // is refused by the API.
         user_email: null,

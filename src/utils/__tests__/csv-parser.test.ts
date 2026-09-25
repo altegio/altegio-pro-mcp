@@ -1,4 +1,4 @@
-import { parseCSV } from '../csv-parser';
+import { parseCSV, parseBooleanCell } from '../csv-parser';
 import {
   ServiceBatchItemSchema,
   StaffBatchItemSchema,
@@ -78,6 +78,41 @@ describe('CSV Parser', () => {
         position_id: 3,
       });
       expect(typeof result.position_id).toBe('number');
+    });
+  });
+
+  describe('parseBooleanCell', () => {
+    it.each([
+      ['true', true],
+      [' YES ', true],
+      ['1', true],
+      ['False', false],
+      ['no', false],
+      ['0', false],
+    ])('reads %p as %p', (cell, expected) => {
+      expect(parseBooleanCell(cell)).toBe(expected);
+    });
+
+    it('reads a blank cell as no answer, never false', () => {
+      expect(parseBooleanCell('')).toBeUndefined();
+      expect(parseBooleanCell('   ')).toBeUndefined();
+    });
+
+    it('passes other words and non-strings through for the schema to judge', () => {
+      expect(parseBooleanCell('maybe')).toBe('maybe');
+      expect(parseBooleanCell(true)).toBe(true);
+      expect(parseBooleanCell(undefined)).toBeUndefined();
+    });
+
+    it('parses the staff answers from CSV', () => {
+      const [row] = parseCSV(
+        'name,is_paid_staff,has_timetable_access\nAlice,no,yes'
+      );
+      expect(StaffBatchItemSchema.parse(row)).toMatchObject({
+        name: 'Alice',
+        is_paid_staff: false,
+        has_timetable_access: true,
+      });
     });
   });
 });

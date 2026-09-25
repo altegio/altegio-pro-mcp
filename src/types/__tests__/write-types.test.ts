@@ -10,10 +10,11 @@ describe('Write Operation Types', () => {
       name: 'John Doe',
       specialization: 'Stylist',
       position_id: 1,
-      phone_number: '1234567890',
       user_email: 'john@example.com',
       user_phone: '1234567890',
       is_user_invite: true,
+      is_paid_staff: true,
+      has_timetable_access: true,
     };
     expect(request.name).toBe('John Doe');
   });

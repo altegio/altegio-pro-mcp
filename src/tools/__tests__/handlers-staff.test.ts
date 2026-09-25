@@ -27,10 +27,11 @@ describe('ToolHandlers - Staff CRUD', () => {
         name: 'John Doe',
         specialization: 'Stylist',
         position_id: 1,
-        phone_number: '1234567890',
         user_email: 'john@example.com',
         user_phone: '1234567890',
         is_user_invite: true,
+        is_paid_staff: true,
+        has_timetable_access: true,
       });
 
       expect((result.content[0] as any).text).toContain(
@@ -41,10 +42,11 @@ describe('ToolHandlers - Staff CRUD', () => {
         name: 'John Doe',
         specialization: 'Stylist',
         position_id: 1,
-        phone_number: '1234567890',
         user_email: 'john@example.com',
         user_phone: '1234567890',
         is_user_invite: true,
+        is_paid_staff: true,
+        has_timetable_access: true,
       });
     });
 
@@ -59,8 +61,8 @@ describe('ToolHandlers - Staff CRUD', () => {
         name: 'Demo Stylist',
         specialization: 'Stylist',
         position_id: null,
-        phone_number: null,
         is_paid_staff: false,
+        has_timetable_access: false,
       });
 
       expect(result.isError).toBeUndefined();
@@ -70,12 +72,71 @@ describe('ToolHandlers - Staff CRUD', () => {
         name: 'Demo Stylist',
         specialization: 'Stylist',
         position_id: null,
-        phone_number: null,
         user_email: null,
         user_phone: null,
         is_user_invite: false,
         is_paid_staff: false,
+        has_timetable_access: false,
       });
+    });
+
+    it.each([
+      ['is_paid_staff', { has_timetable_access: true }, 'paid staff seat'],
+      ['has_timetable_access', { is_paid_staff: true }, 'work schedule'],
+    ])(
+      'refuses a missing %s and tells the model to ask the owner',
+      async (field, answered, topic) => {
+        const result = await handlers.createStaff({
+          location_id: 456,
+          name: 'Alice',
+          specialization: 'Stylist',
+          position_id: null,
+          ...answered,
+        });
+
+        expect(result.isError).toBe(true);
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain(`${field}: Missing. Ask the location owner`);
+        expect(text).toContain(topic);
+        expect(mockClient.createStaff).not.toHaveBeenCalled();
+      }
+    );
+
+    it('keeps the type error for a value that is not a boolean', async () => {
+      const result = await handlers.createStaff({
+        location_id: 456,
+        name: 'Alice',
+        specialization: 'Stylist',
+        position_id: null,
+        is_paid_staff: 'yes',
+        has_timetable_access: true,
+      });
+
+      expect(result.isError).toBe(true);
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).toContain('is_paid_staff');
+      expect(text).not.toContain('Ask the location owner');
+      expect(mockClient.createStaff).not.toHaveBeenCalled();
+    });
+
+    it('never sends phone_number: quick-create does not read it', async () => {
+      mockClient.createStaff.mockResolvedValue({
+        id: 125,
+        name: 'Alice',
+      } as Awaited<ReturnType<AltegioClient['createStaff']>>);
+
+      await handlers.createStaff({
+        location_id: 456,
+        name: 'Alice',
+        specialization: 'Stylist',
+        position_id: null,
+        phone_number: '15550001234',
+        is_paid_staff: true,
+        has_timetable_access: true,
+      });
+
+      const [, body] = mockClient.createStaff.mock.calls[0]!;
+      expect(body).not.toHaveProperty('phone_number');
     });
 
     it('should handle errors', async () => {
@@ -88,10 +149,11 @@ describe('ToolHandlers - Staff CRUD', () => {
         name: 'John',
         specialization: 'Stylist',
         position_id: 1,
-        phone_number: '123',
         user_email: 'john@example.com',
         user_phone: '1234567890',
         is_user_invite: true,
+        is_paid_staff: true,
+        has_timetable_access: true,
       });
 
       expect((result.content[0] as any).text).toContain(
