@@ -373,7 +373,8 @@ describe('analytics_get_team_member_occupancy', () => {
       {
         location_id: 4564,
         team_member_ids: [9001, 9002],
-        period: 'last_week',
+        date_from: '2026-08-01',
+        date_to: '2026-08-03',
       },
       [[/staff\/workload/, 'staff-workload']]
     );

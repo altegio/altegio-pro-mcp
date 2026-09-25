@@ -14,7 +14,7 @@
       "spec": "docs/en/b2b-v3/openapi.yaml",
       "title": "Business Management",
       "version": "3.0.0-preview",
-      "operations": 57
+      "operations": 59
     }
   ],
   "canonicalAliases": {
@@ -27,7 +27,7 @@
     "salon_id": "location_id",
     "staff_id": "team_member_id"
   },
-  "operationCount": 320,
+  "operationCount": 322,
   "curatedCount": 32,
   "domains": [
     {
@@ -136,7 +136,7 @@
     },
     {
       "domain": "team_members",
-      "operations": 19
+      "operations": 21
     },
     {
       "domain": "users",
@@ -41304,6 +41304,10 @@
             "authorization_endpoint": {
               "type": "string"
             },
+            "client_id_metadata_document_supported": {
+              "description": "Whether a `client_id` may be an HTTPS URL pointing to a client metadata document (CIMD). Clients that support the URL form only attempt it when this is `true`.",
+              "type": "boolean"
+            },
             "code_challenge_methods_supported": {
               "items": {
                 "type": "string"
@@ -41363,13 +41367,13 @@
       "path": "/locations",
       "displayPath": "/locations",
       "summary": "Create a location",
-      "description": "Creates a standalone Location for the current authenticated user.\n\nAuthorization is user-delegated only (Authorization Code + PKCE); installation\n(client credentials) tokens and restricted keys are rejected. `country_code`,\n`timezone`, and `currency` are derived from `city_id` and are not writable.\n\nThe `201` response carries `provisioning_status`: `ready` means base accounts and\npayment methods already exist, `pending` means defaults are still being provisioned.\nRequires `Idempotency-Key`.\n\nErrors: `403 user_not_verified` / `location_creation_forbidden` /\n`unsupported_token_subject`; `409 duplicate_location`; `422 invalid_city` /\n`unsupported_country` / `invalid_business_type` / `location_quota_exceeded`;\n`429 location_creation_rate_limited`.",
+      "description": "Creates a standalone Location for the current authenticated user.\n\nAuthorization is user-delegated only (Authorization Code + PKCE); installation\ntokens and API keys are rejected. `country_code`,\n`timezone`, and `currency` are derived from `city_id` and are not writable.\n\nThe `201` response carries `provisioning_status`: `ready` means base accounts and\npayment methods already exist, `pending` means defaults are still being provisioned.\nRequires `Idempotency-Key`.\n\nErrors: `403 user_not_verified` / `location_creation_forbidden` /\n`unsupported_token_subject`; `409 duplicate_location`; `422 invalid_city` /\n`unsupported_country` / `invalid_business_type` / `location_quota_exceeded`;\n`429 location_creation_rate_limited`.",
       "tags": [
         "Locations"
       ],
       "domain": "locations",
       "deprecated": false,
-      "status": "preview",
+      "status": "planned",
       "security": {
         "required": true,
         "schemes": [
@@ -41581,7 +41585,7 @@
       "path": "/locations/{location_id}",
       "displayPath": "/locations/{location_id}",
       "summary": "Get a location",
-      "description": "Returns the Location resource: name, address, contacts, timezone, and\ncurrency. The response carries an `ETag` header for a subsequent `PATCH`.",
+      "description": "Returns the Location resource: name, address, contacts, timezone, and\ncurrency.",
       "tags": [
         "Locations"
       ],
@@ -41591,8 +41595,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -41743,7 +41747,7 @@
       "path": "/locations/{location_id}",
       "displayPath": "/locations/{location_id}",
       "summary": "Update a location",
-      "description": "Partially updates partner-relevant Location settings with a merge-patch body.\nRequires `If-Match` with the `ETag` from a previous read.\n\n`timezone`, `country`, and `currency` are read-only and intentionally absent from the\nupdate schema — they follow `city_id`. Changing `city_id` to a city that would alter the\ncountry or currency is rejected with `422 immutable_after_finance` once financial data\nexists for the Location; before that the move is allowed and the derived values follow.",
+      "description": "Partially updates partner-relevant Location settings with a merge-patch body.\n\n`timezone`, `country`, and `currency` are read-only and intentionally absent from the\nupdate schema — they follow `city_id`. Changing `city_id` to a city that would alter the\ncountry or currency is rejected with `422 immutable_after_finance` once financial data\nexists for the Location; before that the move is allowed and the derived values follow.",
       "tags": [
         "Locations"
       ],
@@ -41753,8 +41757,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -41765,15 +41769,6 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
-        },
-        {
-          "description": "`ETag` value of the resource version the change is based on. A stale value fails with `412 stale_version`; a missing header fails with `428 precondition_required`.",
-          "name": "If-Match",
-          "in": "header",
-          "required": true,
-          "schema": {
-            "type": "string"
           }
         }
       ],
@@ -41992,13 +41987,13 @@
       "path": "/locations/{location_id}/access_roles",
       "displayPath": "/locations/{location_id}/access_roles",
       "summary": "List location access roles",
-      "description": "Returns public role ids and titles only; internal permission slugs are never exposed.\n\nCursor-paginated list. Default ordering: title, role_id tie-breaker. Cursors use the `cursor` query parameter, expire after 15 minutes, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Returns public role ids and titles only; internal permission slugs are never exposed.\n\nCursor-paginated list. Default ordering: title, role_id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
       "tags": [
         "Team Members"
       ],
       "domain": "team_members",
       "deprecated": false,
-      "status": "preview",
+      "status": "planned",
       "security": {
         "required": true,
         "schemes": [
@@ -42016,7 +42011,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after 15 minutes and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -42116,18 +42111,18 @@
       "path": "/locations/{location_id}/accounts",
       "displayPath": "/locations/{location_id}/accounts",
       "summary": "List accounts",
-      "description": "Returns the cash/settlement accounts of the Location. Use an account's `id` as\n`account_id` in `createPayment` — either as the target of an `account` payment or as\nan override of a payment method's default account.\n\n\nCursor-paginated list. Default ordering: title, id tie-breaker. Cursors use the `cursor` query parameter, expire after 15 minutes, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Returns the cash/settlement accounts of the Location. Use an account's `id` as\n`account_id` in `createPayment` — either as the target of an `account` payment or as\nan override of a payment method's default account.\n\n\nCursor-paginated list. Default ordering: title, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
       "tags": [
         "Payments"
       ],
       "domain": "payments",
       "deprecated": false,
-      "status": "preview",
+      "status": "planned",
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -42141,7 +42136,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after 15 minutes and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -42251,7 +42246,7 @@
       "path": "/locations/{location_id}/appointments",
       "displayPath": "/locations/{location_id}/appointments",
       "summary": "List appointments",
-      "description": "Returns the appointments of the Location as a cursor-paginated list, newest window\nfirst by start time with a stable tie-breaker. Client contact data inside\n`expand[]=client` uses redacted contact fields without `clients:read_contact`.\n\nCancelled appointments are included; filter them out on the `status` field. There is no\nstatus query parameter in the first iteration.\n\n\nCursor-paginated list. Default ordering: starts_at desc, id tie-breaker. Cursors use the `cursor` query parameter, expire after 15 minutes, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Returns the appointments of the Location as a cursor-paginated list, newest window\nfirst by start time with a stable tie-breaker. Client contact data inside\n`expand[]=client` uses redacted contact fields without `clients:read_contact`.\n\nCancelled appointments are included; filter them out on the `status` field. There is no\nstatus query parameter in the first iteration.\n\n\nCursor-paginated list. Default ordering: starts_at desc, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
       "tags": [
         "Appointments"
       ],
@@ -42261,8 +42256,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -42285,7 +42280,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after 15 minutes and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -42536,12 +42531,12 @@
       ],
       "domain": "appointments",
       "deprecated": false,
-      "status": "preview",
+      "status": "planned",
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -42689,125 +42684,122 @@
                       "type": [
                         "string",
                         "null"
-                      ]
+                      ],
+                      "x-truncated": true
                     },
                     "birth_date": {
-                      "format": "date",
                       "type": [
                         "string",
                         "null"
-                      ]
+                      ],
+                      "x-truncated": true
                     },
                     "comment": {
                       "description": "Private note about the client; requires comment access.",
                       "type": [
                         "string",
                         "null"
-                      ]
+                      ],
+                      "x-truncated": true
                     },
                     "created_at": {
                       "description": "UTC.",
-                      "format": "date-time",
-                      "readOnly": true,
-                      "type": "string"
+                      "type": "string",
+                      "x-truncated": true
                     },
                     "currency": {
                       "description": "ISO 4217, server-controlled by the Location.",
-                      "readOnly": true,
-                      "type": "string"
+                      "type": "string",
+                      "x-truncated": true
                     },
                     "discount": {
                       "description": "Personal discount, percent.",
                       "type": [
                         "number",
                         "null"
-                      ]
+                      ],
+                      "x-truncated": true
                     },
                     "display_name": {
-                      "readOnly": true,
-                      "type": "string"
+                      "type": "string",
+                      "x-truncated": true
                     },
                     "email": {
                       "description": "Email address. `null` when absent or withheld — see `redacted_fields`.",
                       "type": [
                         "string",
                         "null"
-                      ]
+                      ],
+                      "x-truncated": true
                     },
                     "first_visit_at": {
                       "description": "Location-local offset.",
-                      "format": "date-time",
-                      "readOnly": true,
                       "type": [
                         "string",
                         "null"
-                      ]
+                      ],
+                      "x-truncated": true
                     },
                     "id": {
-                      "readOnly": true,
-                      "type": "integer"
+                      "type": "integer",
+                      "x-truncated": true
                     },
                     "last_visit_at": {
                       "description": "Location-local offset.",
-                      "format": "date-time",
-                      "readOnly": true,
                       "type": [
                         "string",
                         "null"
-                      ]
+                      ],
+                      "x-truncated": true
                     },
                     "name": {
-                      "type": "string"
+                      "type": "string",
+                      "x-truncated": true
                     },
                     "object": {
-                      "enum": [
-                        "client"
-                      ],
-                      "readOnly": true,
-                      "type": "string"
+                      "type": "string",
+                      "x-truncated": true
                     },
                     "patronymic": {
                       "type": [
                         "string",
                         "null"
-                      ]
+                      ],
+                      "x-truncated": true
                     },
                     "phone": {
                       "description": "International phone number. `null` when absent or withheld — see `redacted_fields`.",
                       "type": [
                         "string",
                         "null"
-                      ]
+                      ],
+                      "x-truncated": true
                     },
                     "redacted_fields": {
                       "description": "Names of fields withheld by the PII policy for this object, for example `[\"phone\", \"email\"]`. A withheld contact is always returned as `null` — never as a masked or empty string, so an integration ca…",
-                      "items": {
-                        "type": "string",
-                        "x-truncated": true
-                      },
-                      "readOnly": true,
-                      "type": "array"
+                      "type": "array",
+                      "x-truncated": true
                     },
                     "sold_amount_minor": {
                       "description": "Lifetime paid total, integer minor units of the Location currency.",
-                      "readOnly": true,
-                      "type": "integer"
+                      "type": "integer",
+                      "x-truncated": true
                     },
                     "surname": {
                       "type": [
                         "string",
                         "null"
-                      ]
+                      ],
+                      "x-truncated": true
                     },
                     "updated_at": {
                       "description": "UTC.",
-                      "format": "date-time",
-                      "readOnly": true,
-                      "type": "string"
+                      "type": "string",
+                      "x-truncated": true
                     },
                     "visits_count": {
-                      "readOnly": true,
-                      "type": "integer"
+                      "type": "integer",
+                      "x-truncated": true
                     }
                   },
                   "readOnly": true,
@@ -42870,13 +42862,15 @@
                 "resource_instance_ids": {
                   "description": "Resource instances occupied by the appointment.",
                   "items": {
-                    "type": "integer"
+                    "type": "integer",
+                    "x-truncated": true
                   },
                   "type": "array"
                 },
                 "service_ids": {
                   "items": {
-                    "type": "integer"
+                    "type": "integer",
+                    "x-truncated": true
                   },
                   "type": "array"
                 },
@@ -42901,57 +42895,69 @@
                   "properties": {
                     "created_at": {
                       "description": "UTC.",
-                      "format": "date-time",
-                      "readOnly": true,
-                      "type": "string"
+                      "type": "string",
+                      "x-truncated": true
+                    },
+                    "dismissal_date": {
+                      "description": "Last working day set by `dismissTeamMember`, `YYYY-MM-DD` in the Location timezone; `null` while employed.",
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "x-truncated": true
+                    },
+                    "dismissal_reason": {
+                      "description": "Reason given on dismissal; `null` while employed.",
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "x-truncated": true
                     },
                     "id": {
-                      "readOnly": true,
-                      "type": "integer"
+                      "type": "integer",
+                      "x-truncated": true
                     },
                     "is_billable": {
                       "description": "Whether this Team Member occupies a paid seat in the Location's licence, which is what the Location is charged for. A non-billable member cannot hold schedule access, so `is_bookable` is always `fals…",
-                      "type": "boolean"
+                      "type": "boolean",
+                      "x-truncated": true
                     },
                     "is_bookable": {
                       "description": "Derived — whether the member can currently receive appointments.",
-                      "readOnly": true,
-                      "type": "boolean"
+                      "type": "boolean",
+                      "x-truncated": true
                     },
                     "name": {
-                      "type": "string"
+                      "type": "string",
+                      "x-truncated": true
                     },
                     "object": {
-                      "enum": [
-                        "team_member"
-                      ],
-                      "readOnly": true,
-                      "type": "string"
+                      "type": "string",
+                      "x-truncated": true
                     },
                     "position_id": {
                       "description": "Position from `listPositions`.",
                       "type": [
                         "integer",
                         "null"
-                      ]
+                      ],
+                      "x-truncated": true
                     },
                     "service_ids": {
-                      "description": "Services this Team Member can be scheduled for.",
-                      "items": {
-                        "type": "integer",
-                        "x-truncated": true
-                      },
-                      "type": "array"
+                      "description": "Services this Team Member can be scheduled for. Written through `updateTeamMemberServices`.",
+                      "type": "array",
+                      "x-truncated": true
                     },
                     "specialization": {
                       "description": "Public profession label shown to clients (for example in online booking).",
-                      "type": "string"
+                      "type": "string",
+                      "x-truncated": true
                     },
                     "updated_at": {
                       "description": "UTC.",
-                      "format": "date-time",
-                      "readOnly": true,
-                      "type": "string"
+                      "type": "string",
+                      "x-truncated": true
                     }
                   },
                   "readOnly": true,
@@ -43000,126 +43006,8 @@
                 "appointments": {
                   "items": {
                     "description": "A scheduled appointment. `visit_id` remains a response field and can be `null`; payment and visit operations are keyed by `appointment_id`.",
-                    "properties": {
-                      "cancellation_reason": {
-                        "type": [
-                          "string",
-                          "null"
-                        ],
-                        "x-truncated": true
-                      },
-                      "cancelled_at": {
-                        "description": "UTC; set by the cancel command.",
-                        "type": [
-                          "string",
-                          "null"
-                        ],
-                        "x-truncated": true
-                      },
-                      "client": {
-                        "description": "Present only when requested with `expand[]=client`; PII rules apply.",
-                        "type": "object",
-                        "x-truncated": true
-                      },
-                      "client_id": {
-                        "description": "`null` only on appointments without a client.",
-                        "type": [
-                          "integer",
-                          "null"
-                        ],
-                        "x-truncated": true
-                      },
-                      "comment": {
-                        "type": [
-                          "string",
-                          "null"
-                        ],
-                        "x-truncated": true
-                      },
-                      "created_at": {
-                        "description": "UTC.",
-                        "type": "string",
-                        "x-truncated": true
-                      },
-                      "duration_seconds": {
-                        "type": "integer",
-                        "x-truncated": true
-                      },
-                      "ends_at": {
-                        "description": "RFC 3339 with the Location's local UTC offset.",
-                        "type": "string",
-                        "x-truncated": true
-                      },
-                      "id": {
-                        "type": "integer",
-                        "x-truncated": true
-                      },
-                      "is_paid": {
-                        "description": "Whether the visit of this appointment is fully paid.",
-                        "type": "boolean",
-                        "x-truncated": true
-                      },
-                      "location_id": {
-                        "type": "integer",
-                        "x-truncated": true
-                      },
-                      "object": {
-                        "type": "string",
-                        "x-truncated": true
-                      },
-                      "resource_instance_ids": {
-                        "description": "Resource instances occupied by the appointment.",
-                        "type": "array",
-                        "x-truncated": true
-                      },
-                      "service_ids": {
-                        "type": "array",
-                        "x-truncated": true
-                      },
-                      "starts_at": {
-                        "description": "RFC 3339 with the Location's local UTC offset.",
-                        "type": "string",
-                        "x-truncated": true
-                      },
-                      "status": {
-                        "description": "Status of an appointment. `waiting` — scheduled, not yet confirmed; `confirmed` — confirmed by the client; `arrived` — the client attended (terminal \"done\" state); `no_show` — the client did not atte…",
-                        "type": "string",
-                        "x-truncated": true
-                      },
-                      "team_member": {
-                        "description": "Present only when requested with `expand[]=team_member`.",
-                        "type": "object",
-                        "x-truncated": true
-                      },
-                      "team_member_id": {
-                        "type": "integer",
-                        "x-truncated": true
-                      },
-                      "updated_at": {
-                        "description": "UTC.",
-                        "type": "string",
-                        "x-truncated": true
-                      },
-                      "visit_id": {
-                        "description": "Billing visit of this appointment.",
-                        "type": [
-                          "integer",
-                          "null"
-                        ],
-                        "x-truncated": true
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "object",
-                      "location_id",
-                      "team_member_id",
-                      "service_ids",
-                      "status",
-                      "starts_at",
-                      "duration_seconds"
-                    ],
-                    "type": "object"
+                    "type": "object",
+                    "x-truncated": true
                   },
                   "type": "array"
                 },
@@ -43144,7 +43032,8 @@
               ],
               "type": "object"
             }
-          ]
+          ],
+          "x-depth-limited": 2
         }
       }
     },
@@ -43165,8 +43054,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -43451,6 +43340,23 @@
                   "readOnly": true,
                   "type": "string"
                 },
+                "dismissal_date": {
+                  "description": "Last working day set by `dismissTeamMember`, `YYYY-MM-DD` in the Location timezone; `null` while employed.",
+                  "format": "date",
+                  "readOnly": true,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dismissal_reason": {
+                  "description": "Reason given on dismissal; `null` while employed.",
+                  "readOnly": true,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "id": {
                   "readOnly": true,
                   "type": "integer"
@@ -43482,11 +43388,12 @@
                   ]
                 },
                 "service_ids": {
-                  "description": "Services this Team Member can be scheduled for.",
+                  "description": "Services this Team Member can be scheduled for. Written through `updateTeamMemberServices`.",
                   "items": {
                     "type": "integer",
                     "x-truncated": true
                   },
+                  "readOnly": true,
                   "type": "array"
                 },
                 "specialization": {
@@ -43554,12 +43461,12 @@
       ],
       "domain": "appointments",
       "deprecated": false,
-      "status": "preview",
+      "status": "planned",
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -43878,6 +43785,23 @@
                   "readOnly": true,
                   "type": "string"
                 },
+                "dismissal_date": {
+                  "description": "Last working day set by `dismissTeamMember`, `YYYY-MM-DD` in the Location timezone; `null` while employed.",
+                  "format": "date",
+                  "readOnly": true,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dismissal_reason": {
+                  "description": "Reason given on dismissal; `null` while employed.",
+                  "readOnly": true,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "id": {
                   "readOnly": true,
                   "type": "integer"
@@ -43909,11 +43833,12 @@
                   ]
                 },
                 "service_ids": {
-                  "description": "Services this Team Member can be scheduled for.",
+                  "description": "Services this Team Member can be scheduled for. Written through `updateTeamMemberServices`.",
                   "items": {
                     "type": "integer",
                     "x-truncated": true
                   },
+                  "readOnly": true,
                   "type": "array"
                 },
                 "specialization": {
@@ -43981,12 +43906,12 @@
       ],
       "domain": "appointments",
       "deprecated": false,
-      "status": "preview",
+      "status": "planned",
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -44283,6 +44208,23 @@
                   "readOnly": true,
                   "type": "string"
                 },
+                "dismissal_date": {
+                  "description": "Last working day set by `dismissTeamMember`, `YYYY-MM-DD` in the Location timezone; `null` while employed.",
+                  "format": "date",
+                  "readOnly": true,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dismissal_reason": {
+                  "description": "Reason given on dismissal; `null` while employed.",
+                  "readOnly": true,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "id": {
                   "readOnly": true,
                   "type": "integer"
@@ -44314,11 +44256,12 @@
                   ]
                 },
                 "service_ids": {
-                  "description": "Services this Team Member can be scheduled for.",
+                  "description": "Services this Team Member can be scheduled for. Written through `updateTeamMemberServices`.",
                   "items": {
                     "type": "integer",
                     "x-truncated": true
                   },
+                  "readOnly": true,
                   "type": "array"
                 },
                 "specialization": {
@@ -44386,12 +44329,12 @@
       ],
       "domain": "payments",
       "deprecated": false,
-      "status": "preview",
+      "status": "planned",
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -44572,12 +44515,12 @@
       ],
       "domain": "payments",
       "deprecated": false,
-      "status": "preview",
+      "status": "planned",
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -45056,23 +44999,23 @@
     },
     {
       "source": "v3",
-      "operationId": "refundPayment",
+      "operationId": "cancelPayment",
       "method": "POST",
-      "path": "/locations/{location_id}/appointments/{appointment_id}/payments/{payment_id}/refund",
-      "displayPath": "/locations/{location_id}/appointments/{appointment_id}/payments/{payment_id}/refund",
-      "summary": "Reverse a recorded payment",
-      "description": "Locally reverses one payment action in full for the visit resolved from `appointment_id`.\nPartial reversal is not part of the contract. This is a local cancellation of posting in\nAltegio, not a payment-provider refund. Requires `Idempotency-Key`.\n\nNo step-up confirmation is part of this preview contract. Refund authorization is the\nexplicit `payments:refund` scope plus the subject's finance permission, with idempotency\nand audit on every call. A future human-confirmation flow will be added only with a\ncomplete challenge contract.",
+      "path": "/locations/{location_id}/appointments/{appointment_id}/payments/{payment_id}/cancel",
+      "displayPath": "/locations/{location_id}/appointments/{appointment_id}/payments/{payment_id}/cancel",
+      "summary": "Cancel a recorded payment",
+      "description": "Locally reverses one payment action in full for the visit resolved from `appointment_id`.\nPartial reversal is not part of the contract. This is a local cancellation of posting in\nAltegio, not a payment-provider refund. Requires `Idempotency-Key`.\n\nNo step-up confirmation is part of this preview contract. Refund authorization is the\nexplicit `checkout:cancel` scope plus the subject's finance permission, with idempotency\nand audit on every call. A future human-confirmation flow will be added only with a\ncomplete challenge contract.",
       "tags": [
         "Payments"
       ],
       "domain": "payments",
       "deprecated": false,
-      "status": "preview",
+      "status": "planned",
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -45302,12 +45245,12 @@
       ],
       "domain": "appointments",
       "deprecated": false,
-      "status": "preview",
+      "status": "planned",
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -45609,6 +45552,23 @@
                   "readOnly": true,
                   "type": "string"
                 },
+                "dismissal_date": {
+                  "description": "Last working day set by `dismissTeamMember`, `YYYY-MM-DD` in the Location timezone; `null` while employed.",
+                  "format": "date",
+                  "readOnly": true,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dismissal_reason": {
+                  "description": "Reason given on dismissal; `null` while employed.",
+                  "readOnly": true,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "id": {
                   "readOnly": true,
                   "type": "integer"
@@ -45640,11 +45600,12 @@
                   ]
                 },
                 "service_ids": {
-                  "description": "Services this Team Member can be scheduled for.",
+                  "description": "Services this Team Member can be scheduled for. Written through `updateTeamMemberServices`.",
                   "items": {
                     "type": "integer",
                     "x-truncated": true
                   },
+                  "readOnly": true,
                   "type": "array"
                 },
                 "specialization": {
@@ -45712,12 +45673,12 @@
       ],
       "domain": "visits",
       "deprecated": false,
-      "status": "preview",
+      "status": "planned",
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -46226,12 +46187,12 @@
       ],
       "domain": "visits",
       "deprecated": false,
-      "status": "preview",
+      "status": "planned",
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -46766,8 +46727,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -46923,7 +46884,7 @@
       "path": "/locations/{location_id}/clients",
       "displayPath": "/locations/{location_id}/clients",
       "summary": "List and search clients",
-      "description": "Searches the client base of the Location. Exact `phone` and `email` contact searches require `clients:read_contact` plus the subject contact permission; without that scope the API returns `403 missing_scope`/`permission_denied`, not an empty result. Free-text `query` remains under `clients:read`. Contact fields use the redaction contract when contact access is absent. This endpoint is rate-limited.\\n\\nCursor-paginated list. Default ordering: display_name, id tie-breaker. Cursors use the `cursor` query parameter, expire after 15 minutes, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Searches the client base of the Location. Exact `phone` and `email` contact searches require `clients:read_contact` plus the subject contact permission; without that scope the API returns `403 missing_scope`/`permission_denied`, not an empty result. Free-text `query` remains under `clients:read`. Contact fields use the redaction contract when contact access is absent. This endpoint is rate-limited.\\n\\nCursor-paginated list. Default ordering: display_name, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
       "tags": [
         "Clients"
       ],
@@ -46933,8 +46894,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -46948,7 +46909,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after 15 minutes and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -47197,8 +47158,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -47209,16 +47170,6 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
-        },
-        {
-          "description": "Client-generated unique key for this logical request (UUID recommended). A retry with the same key and body returns the original result; the same key with a different body fails with `409 idempotency_key_reused`. Keys are retained at least 24 hours and are scoped to credential, Location, and operation; after expiry the value may be reused for a new logical request.",
-          "name": "Idempotency-Key",
-          "in": "header",
-          "required": true,
-          "schema": {
-            "maxLength": 255,
-            "type": "string"
           }
         }
       ],
@@ -47414,7 +47365,7 @@
       "path": "/locations/{location_id}/clients/{client_id}",
       "displayPath": "/locations/{location_id}/clients/{client_id}",
       "summary": "Get a client",
-      "description": "Returns a single client. Contact fields (`phone`, `email`, `additional_phone`)\nrequire `clients:read_contact` plus the subject's contact permission — otherwise they\nare returned as `null` and listed in `redacted_fields` instead of exposing a contact string. The response carries an\n`ETag` header for a subsequent `PATCH` or `DELETE`.",
+      "description": "Returns a single client. Contact fields (`phone`, `email`, `additional_phone`)\nrequire `clients:read_contact` plus the subject's contact permission — otherwise they\nare returned as `null` and listed in `redacted_fields` instead of exposing a contact string.",
       "tags": [
         "Clients"
       ],
@@ -47424,8 +47375,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -47596,7 +47547,7 @@
       "path": "/locations/{location_id}/clients/{client_id}",
       "displayPath": "/locations/{location_id}/clients/{client_id}",
       "summary": "Update a client",
-      "description": "Partially updates a client with a merge-patch body. Requires `If-Match`. Changing the\nphone to a number owned by another client fails with `422 phone_taken` — the same\n`clients:write` signal as on create (audited and rate-limited; no other client identity\nis returned). Clearing a nullable field is done with `null`; clearing contact fields\nrequires contact write access.",
+      "description": "Partially updates a client with a merge-patch body. Changing the\nphone to a number owned by another client fails with `422 phone_taken` — the same\n`clients:write` signal as on create (audited and rate-limited; no other client identity\nis returned). Clearing a nullable field is done with `null`; clearing contact fields\nrequires contact write access.",
       "tags": [
         "Clients"
       ],
@@ -47606,8 +47557,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -47627,15 +47578,6 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
-        },
-        {
-          "description": "`ETag` value of the resource version the change is based on. A stale value fails with `412 stale_version`; a missing header fails with `428 precondition_required`.",
-          "name": "If-Match",
-          "in": "header",
-          "required": true,
-          "schema": {
-            "type": "string"
           }
         }
       ],
@@ -47848,7 +47790,7 @@
       "path": "/locations/{location_id}/clients/{client_id}",
       "displayPath": "/locations/{location_id}/clients/{client_id}",
       "summary": "Delete a client",
-      "description": "Deletes a client (soft delete). A client with the same phone can be created again\nafterwards. Requires `If-Match` with the version last seen.",
+      "description": "Deletes a client (soft delete). A client with the same phone can be created again\nafterwards.",
       "tags": [
         "Clients"
       ],
@@ -47858,8 +47800,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -47880,15 +47822,6 @@
           "schema": {
             "type": "integer"
           }
-        },
-        {
-          "description": "`ETag` value of the resource version the change is based on. A stale value fails with `412 stale_version`; a missing header fails with `428 precondition_required`.",
-          "name": "If-Match",
-          "in": "header",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
         }
       ],
       "response": {
@@ -47902,18 +47835,18 @@
       "path": "/locations/{location_id}/payment_methods",
       "displayPath": "/locations/{location_id}/payment_methods",
       "summary": "List payment methods",
-      "description": "Returns the payment methods configured for the Location - what the business accepts and how\neach method settles. This is the only source of `payment_method_id` for `createPayment`.\n\nIt does not say whether a method can pay a particular visit: read `visit.payment_methods`\nfor that, or `searchLoyaltyInstrument` for a gift card or membership held by number. Both\nreturn `ApplicablePaymentMethod`, a different shape from this one.\n\nCursor-paginated list. Default ordering: name, id tie-breaker. Cursors use the `cursor` query parameter, expire after 15 minutes, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Returns the payment methods configured for the Location - what the business accepts and how\neach method settles. This is the only source of `payment_method_id` for `createPayment`.\n\nIt does not say whether a method can pay a particular visit: read `visit.payment_methods`\nfor that, or `searchLoyaltyInstrument` for a gift card or membership held by number. Both\nreturn `ApplicablePaymentMethod`, a different shape from this one.\n\nCursor-paginated list. Default ordering: name, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
       "tags": [
         "Payments"
       ],
       "domain": "payments",
       "deprecated": false,
-      "status": "preview",
+      "status": "planned",
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -47927,7 +47860,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after 15 minutes and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -48059,7 +47992,7 @@
       "path": "/locations/{location_id}/positions",
       "displayPath": "/locations/{location_id}/positions",
       "summary": "List positions",
-      "description": "Returns the position directory of the Location. Reference a position from a Team\nMember via `position_id`.\n\n\nCursor-paginated list. Default ordering: weight desc, title, id tie-breaker. Cursors use the `cursor` query parameter, expire after 15 minutes, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Returns the position directory of the Location. Reference a position from a Team\nMember via `position_id`.\n\n\nCursor-paginated list. Default ordering: weight desc, title, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
       "tags": [
         "Positions"
       ],
@@ -48069,8 +48002,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -48084,7 +48017,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after 15 minutes and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -48183,7 +48116,7 @@
       "path": "/locations/{location_id}/positions",
       "displayPath": "/locations/{location_id}/positions",
       "summary": "Create a position",
-      "description": "Creates a position. Requires `Idempotency-Key`.",
+      "description": "Creates a position.",
       "tags": [
         "Positions"
       ],
@@ -48193,8 +48126,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -48205,16 +48138,6 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
-        },
-        {
-          "description": "Client-generated unique key for this logical request (UUID recommended). A retry with the same key and body returns the original result; the same key with a different body fails with `409 idempotency_key_reused`. Keys are retained at least 24 hours and are scoped to credential, Location, and operation; after expiry the value may be reused for a new logical request.",
-          "name": "Idempotency-Key",
-          "in": "header",
-          "required": true,
-          "schema": {
-            "maxLength": 255,
-            "type": "string"
           }
         }
       ],
@@ -48270,18 +48193,18 @@
       "path": "/locations/{location_id}/positions/{position_id}",
       "displayPath": "/locations/{location_id}/positions/{position_id}",
       "summary": "Get a position",
-      "description": "Returns a single position. The response carries an `ETag` header for a subsequent\n`PATCH` or `DELETE`.",
+      "description": "Returns a single position.",
       "tags": [
         "Positions"
       ],
       "domain": "positions",
       "deprecated": false,
-      "status": "preview",
+      "status": "available",
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -48340,7 +48263,7 @@
       "path": "/locations/{location_id}/positions/{position_id}",
       "displayPath": "/locations/{location_id}/positions/{position_id}",
       "summary": "Update a position",
-      "description": "Partially updates a position with a merge-patch body. Requires `If-Match`.",
+      "description": "Partially updates a position with a merge-patch body.",
       "tags": [
         "Positions"
       ],
@@ -48350,8 +48273,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -48371,15 +48294,6 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
-        },
-        {
-          "description": "`ETag` value of the resource version the change is based on. A stale value fails with `412 stale_version`; a missing header fails with `428 precondition_required`.",
-          "name": "If-Match",
-          "in": "header",
-          "required": true,
-          "schema": {
-            "type": "string"
           }
         }
       ],
@@ -48433,7 +48347,7 @@
       "path": "/locations/{location_id}/positions/{position_id}",
       "displayPath": "/locations/{location_id}/positions/{position_id}",
       "summary": "Delete a position",
-      "description": "Deletes a position. Requires `If-Match` with the version last seen.",
+      "description": "Deletes a position.",
       "tags": [
         "Positions"
       ],
@@ -48443,8 +48357,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -48465,15 +48379,6 @@
           "schema": {
             "type": "integer"
           }
-        },
-        {
-          "description": "`ETag` value of the resource version the change is based on. A stale value fails with `412 stale_version`; a missing header fails with `428 precondition_required`.",
-          "name": "If-Match",
-          "in": "header",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
         }
       ],
       "response": {
@@ -48487,18 +48392,18 @@
       "path": "/locations/{location_id}/products",
       "displayPath": "/locations/{location_id}/products",
       "summary": "List products",
-      "description": "Returns the minimal product catalog fields available in P0: `id`, `title`,\n`price_minor`, and `unit`. Inventory levels, balances, cost, and standalone product\nsales are not part of the preview scope.\n\nCursor-paginated list. Default ordering: title, id tie-breaker. Cursors use the `cursor` query parameter, expire after 15 minutes, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Returns the minimal product catalog fields available in P0: `id`, `title`,\n`price_minor`, and `unit`. Inventory levels, balances, cost, and standalone product\nsales are not part of the preview scope.\n\nCursor-paginated list. Default ordering: title, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
       "tags": [
         "Products"
       ],
       "domain": "products",
       "deprecated": false,
-      "status": "preview",
+      "status": "planned",
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -48512,7 +48417,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after 15 minutes and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -48630,7 +48535,7 @@
       "path": "/locations/{location_id}/resources",
       "displayPath": "/locations/{location_id}/resources",
       "summary": "List resources",
-      "description": "Returns the bookable resources of the Location (rooms, chairs, equipment) with their\ninstances. Pass instance ids as `resource_instance_ids` when creating an appointment\nfor services that require a resource. Resource management (create/update/delete) is\nnot part of the preview scope.\n\n\nCursor-paginated list. Default ordering: title, id tie-breaker. Cursors use the `cursor` query parameter, expire after 15 minutes, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Returns the bookable resources of the Location (rooms, chairs, equipment) with their\ninstances. Pass instance ids as `resource_instance_ids` when creating an appointment\nfor services that require a resource. Resource management (create/update/delete) is\nnot part of the preview scope.\n\n\nCursor-paginated list. Default ordering: title, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
       "tags": [
         "Resources"
       ],
@@ -48640,8 +48545,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -48655,7 +48560,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after 15 minutes and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -48759,7 +48664,7 @@
       "path": "/locations/{location_id}/service_categories",
       "displayPath": "/locations/{location_id}/service_categories",
       "summary": "List service categories",
-      "description": "Returns the service categories of the Location. Use a category `id` as `category_id`\nwhen creating services.\n\n\nCursor-paginated list. Default ordering: weight desc, name, id tie-breaker. Cursors use the `cursor` query parameter, expire after 15 minutes, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Returns the service categories of the Location. Use a category `id` as `category_id`\nwhen creating services.\n\n\nCursor-paginated list. Default ordering: weight desc, name, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
       "tags": [
         "Services"
       ],
@@ -48769,8 +48674,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -48784,7 +48689,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after 15 minutes and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -48888,7 +48793,7 @@
       "path": "/locations/{location_id}/service_categories",
       "displayPath": "/locations/{location_id}/service_categories",
       "summary": "Create a service category",
-      "description": "Creates a service category. Requires `Idempotency-Key`. The `201` response carries an\n`ETag` header for subsequent updates.",
+      "description": "Creates a service category.",
       "tags": [
         "Services"
       ],
@@ -48898,8 +48803,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -48910,16 +48815,6 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
-        },
-        {
-          "description": "Client-generated unique key for this logical request (UUID recommended). A retry with the same key and body returns the original result; the same key with a different body fails with `409 idempotency_key_reused`. Keys are retained at least 24 hours and are scoped to credential, Location, and operation; after expiry the value may be reused for a new logical request.",
-          "name": "Idempotency-Key",
-          "in": "header",
-          "required": true,
-          "schema": {
-            "maxLength": 255,
-            "type": "string"
           }
         }
       ],
@@ -48982,7 +48877,7 @@
       "path": "/locations/{location_id}/service_categories/{service_category_id}",
       "displayPath": "/locations/{location_id}/service_categories/{service_category_id}",
       "summary": "Update a service category",
-      "description": "Partially updates a service category with a merge-patch body. Requires `If-Match`.",
+      "description": "Partially updates a service category with a merge-patch body.",
       "tags": [
         "Services"
       ],
@@ -48992,8 +48887,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -49013,15 +48908,6 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
-        },
-        {
-          "description": "`ETag` value of the resource version the change is based on. A stale value fails with `412 stale_version`; a missing header fails with `428 precondition_required`.",
-          "name": "If-Match",
-          "in": "header",
-          "required": true,
-          "schema": {
-            "type": "string"
           }
         }
       ],
@@ -49082,7 +48968,7 @@
       "path": "/locations/{location_id}/service_categories/{service_category_id}",
       "displayPath": "/locations/{location_id}/service_categories/{service_category_id}",
       "summary": "Delete a service category",
-      "description": "Deletes a service category. Requires `If-Match` with the version last seen.",
+      "description": "Deletes a service category.",
       "tags": [
         "Services"
       ],
@@ -49092,8 +48978,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -49114,15 +49000,6 @@
           "schema": {
             "type": "integer"
           }
-        },
-        {
-          "description": "`ETag` value of the resource version the change is based on. A stale value fails with `412 stale_version`; a missing header fails with `428 precondition_required`.",
-          "name": "If-Match",
-          "in": "header",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
         }
       ],
       "response": {
@@ -49136,7 +49013,7 @@
       "path": "/locations/{location_id}/services",
       "displayPath": "/locations/{location_id}/services",
       "summary": "List services",
-      "description": "Returns the services of the Location as a cursor-paginated list. Prices are integer\nminor units; `duration_seconds` is the default duration, and `team_members[]` carries\nper-member price/duration overrides.\n\n\nCursor-paginated list. Default ordering: category_id, name, id tie-breaker. Cursors use the `cursor` query parameter, expire after 15 minutes, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Returns the services of the Location as a cursor-paginated list. Prices are integer\nminor units; `duration_seconds` is the default duration, and `team_members[]` carries\nper-member price/duration overrides.\n\n\nCursor-paginated list. Default ordering: category_id, name, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
       "tags": [
         "Services"
       ],
@@ -49146,8 +49023,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -49161,7 +49038,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after 15 minutes and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -49269,7 +49146,7 @@
                         "x-truncated": true
                       },
                       "team_members": {
-                        "description": "Team Members providing this service, with optional per-member overrides.",
+                        "description": "Team Members providing this service, with per-member overrides. Read-only here; links are written through `updateTeamMemberServices`.",
                         "type": "array",
                         "x-truncated": true
                       },
@@ -49316,7 +49193,7 @@
       "path": "/locations/{location_id}/services",
       "displayPath": "/locations/{location_id}/services",
       "summary": "Create a service",
-      "description": "Creates a service in the Location catalog. Link Team Members inline through\n`team_members[]` — a service without at least one bookable Team Member link does not\nappear in availability search. Requires `Idempotency-Key`.\n\nService packages (complex services made of multiple simple services) are created\nthrough this same operation: send `type: package` with a `package` block listing the\ncomponents.",
+      "description": "Creates a service in the Location catalog. Link Team Members inline through\n`team_members[]` — a service without at least one bookable Team Member link does not\nappear in availability search.\n\nService packages (complex services made of multiple simple services) are created\nthrough this same operation: send `type: package` with a `package` block listing the\ncomponents.",
       "tags": [
         "Services"
       ],
@@ -49326,8 +49203,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -49338,16 +49215,6 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
-        },
-        {
-          "description": "Client-generated unique key for this logical request (UUID recommended). A retry with the same key and body returns the original result; the same key with a different body fails with `409 idempotency_key_reused`. Keys are retained at least 24 hours and are scoped to credential, Location, and operation; after expiry the value may be reused for a new logical request.",
-          "name": "Idempotency-Key",
-          "in": "header",
-          "required": true,
-          "schema": {
-            "maxLength": 255,
-            "type": "string"
           }
         }
       ],
@@ -49380,62 +49247,6 @@
                 "price_minor": {
                   "description": "Integer minor units of the Location currency.",
                   "type": "integer"
-                },
-                "team_members": {
-                  "items": {
-                    "additionalProperties": false,
-                    "properties": {
-                      "duration_seconds": {
-                        "description": "Per-member duration override in seconds. `null` uses the service default.",
-                        "type": [
-                          "integer",
-                          "null"
-                        ],
-                        "x-truncated": true
-                      },
-                      "is_bookable": {
-                        "description": "Per-link online scheduling flag override; `null` uses the service default.",
-                        "type": [
-                          "boolean",
-                          "null"
-                        ],
-                        "x-truncated": true
-                      },
-                      "online_booking_enabled": {
-                        "description": "Per-link public scheduling availability override; `null` uses the service default.",
-                        "type": [
-                          "boolean",
-                          "null"
-                        ],
-                        "x-truncated": true
-                      },
-                      "price_minor": {
-                        "description": "Per-member price override, integer minor units. `null` uses the service default.",
-                        "type": [
-                          "integer",
-                          "null"
-                        ],
-                        "x-truncated": true
-                      },
-                      "team_member_id": {
-                        "type": "integer",
-                        "x-truncated": true
-                      },
-                      "technological_card_id": {
-                        "description": "Per-link technological card override; `null` uses the service default.",
-                        "type": [
-                          "integer",
-                          "null"
-                        ],
-                        "x-truncated": true
-                      }
-                    },
-                    "required": [
-                      "team_member_id"
-                    ],
-                    "type": "object"
-                  },
-                  "type": "array"
                 },
                 "type": {
                   "description": "Service kind. Immutable after creation.",
@@ -49522,62 +49333,6 @@
                 "price_minor": {
                   "description": "Integer minor units of the Location currency.",
                   "type": "integer"
-                },
-                "team_members": {
-                  "items": {
-                    "additionalProperties": false,
-                    "properties": {
-                      "duration_seconds": {
-                        "description": "Per-member duration override in seconds. `null` uses the service default.",
-                        "type": [
-                          "integer",
-                          "null"
-                        ],
-                        "x-truncated": true
-                      },
-                      "is_bookable": {
-                        "description": "Per-link online scheduling flag override; `null` uses the service default.",
-                        "type": [
-                          "boolean",
-                          "null"
-                        ],
-                        "x-truncated": true
-                      },
-                      "online_booking_enabled": {
-                        "description": "Per-link public scheduling availability override; `null` uses the service default.",
-                        "type": [
-                          "boolean",
-                          "null"
-                        ],
-                        "x-truncated": true
-                      },
-                      "price_minor": {
-                        "description": "Per-member price override, integer minor units. `null` uses the service default.",
-                        "type": [
-                          "integer",
-                          "null"
-                        ],
-                        "x-truncated": true
-                      },
-                      "team_member_id": {
-                        "type": "integer",
-                        "x-truncated": true
-                      },
-                      "technological_card_id": {
-                        "description": "Per-link technological card override; `null` uses the service default.",
-                        "type": [
-                          "integer",
-                          "null"
-                        ],
-                        "x-truncated": true
-                      }
-                    },
-                    "required": [
-                      "team_member_id"
-                    ],
-                    "type": "object"
-                  },
-                  "type": "array"
                 },
                 "type": {
                   "description": "Service kind. Immutable after creation.",
@@ -49702,7 +49457,7 @@
               "type": "integer"
             },
             "team_members": {
-              "description": "Team Members providing this service, with optional per-member overrides.",
+              "description": "Team Members providing this service, with per-member overrides. Read-only here; links are written through `updateTeamMemberServices`.",
               "items": {
                 "additionalProperties": false,
                 "properties": {
@@ -49756,6 +49511,7 @@
                 ],
                 "type": "object"
               },
+              "readOnly": true,
               "type": "array"
             },
             "type": {
@@ -49795,7 +49551,7 @@
       "path": "/locations/{location_id}/services/{service_id}",
       "displayPath": "/locations/{location_id}/services/{service_id}",
       "summary": "Get a service",
-      "description": "Returns a single service with its category, pricing, duration, Team Member links, and\npackage components when `type` is `package`.\nThe response carries an `ETag` header for a subsequent `PATCH` or `DELETE`.",
+      "description": "Returns a single service with its category, pricing, duration, Team Member links, and\npackage components when `type` is `package`.",
       "tags": [
         "Services"
       ],
@@ -49805,8 +49561,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -49932,7 +49688,7 @@
               "type": "integer"
             },
             "team_members": {
-              "description": "Team Members providing this service, with optional per-member overrides.",
+              "description": "Team Members providing this service, with per-member overrides. Read-only here; links are written through `updateTeamMemberServices`.",
               "items": {
                 "additionalProperties": false,
                 "properties": {
@@ -49986,6 +49742,7 @@
                 ],
                 "type": "object"
               },
+              "readOnly": true,
               "type": "array"
             },
             "type": {
@@ -50025,7 +49782,7 @@
       "path": "/locations/{location_id}/services/{service_id}",
       "displayPath": "/locations/{location_id}/services/{service_id}",
       "summary": "Update a service",
-      "description": "Partially updates a service with a merge-patch body. `team_members[]`, when present,\nreplaces the full set of Team Member links (use `[]` to unlink everyone). `type` is\nimmutable; for package services, `package.components` replaces the full component\nlist when present. Requires `If-Match`.",
+      "description": "Partially updates a service with a merge-patch body. `type` is immutable; for package\nservices, `package.components` replaces the full component list when present. Team\nMember links are written through `updateTeamMemberServices`, not here.",
       "tags": [
         "Services"
       ],
@@ -50035,8 +49792,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -50057,15 +49814,6 @@
           "schema": {
             "type": "integer"
           }
-        },
-        {
-          "description": "`ETag` value of the resource version the change is based on. A stale value fails with `412 stale_version`; a missing header fails with `428 precondition_required`.",
-          "name": "If-Match",
-          "in": "header",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
         }
       ],
       "requestBody": {
@@ -50073,7 +49821,7 @@
         "contentType": "application/merge-patch+json",
         "schema": {
           "additionalProperties": false,
-          "description": "Merge-patch body for a service. `team_members`, when present, replaces the full link set (`[]` unlinks everyone). `type` is immutable (`422 field_immutable`). For package services, `package.component…",
+          "description": "Merge-patch body for a service. `type` is immutable (`422 field_immutable`). Team Member links are written through `updateTeamMemberServices`, not here. For package services, `package.components`, wh…",
           "properties": {
             "category_id": {
               "type": "integer"
@@ -50141,62 +49889,6 @@
             "price_minor": {
               "description": "Integer minor units of the Location currency.",
               "type": "integer"
-            },
-            "team_members": {
-              "items": {
-                "additionalProperties": false,
-                "properties": {
-                  "duration_seconds": {
-                    "description": "Per-member duration override in seconds. `null` uses the service default.",
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "is_bookable": {
-                    "description": "Per-link online scheduling flag override; `null` uses the service default.",
-                    "type": [
-                      "boolean",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "online_booking_enabled": {
-                    "description": "Per-link public scheduling availability override; `null` uses the service default.",
-                    "type": [
-                      "boolean",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "price_minor": {
-                    "description": "Per-member price override, integer minor units. `null` uses the service default.",
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "team_member_id": {
-                    "type": "integer",
-                    "x-truncated": true
-                  },
-                  "technological_card_id": {
-                    "description": "Per-link technological card override; `null` uses the service default.",
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  }
-                },
-                "required": [
-                  "team_member_id"
-                ],
-                "type": "object"
-              },
-              "type": "array"
             }
           },
           "type": "object"
@@ -50305,7 +49997,7 @@
               "type": "integer"
             },
             "team_members": {
-              "description": "Team Members providing this service, with optional per-member overrides.",
+              "description": "Team Members providing this service, with per-member overrides. Read-only here; links are written through `updateTeamMemberServices`.",
               "items": {
                 "additionalProperties": false,
                 "properties": {
@@ -50359,6 +50051,7 @@
                 ],
                 "type": "object"
               },
+              "readOnly": true,
               "type": "array"
             },
             "type": {
@@ -50398,7 +50091,7 @@
       "path": "/locations/{location_id}/services/{service_id}",
       "displayPath": "/locations/{location_id}/services/{service_id}",
       "summary": "Delete a service",
-      "description": "Deletes a service from the catalog. Requires `If-Match` with the version last seen.",
+      "description": "Deletes a service from the catalog.",
       "tags": [
         "Services"
       ],
@@ -50408,8 +50101,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -50430,15 +50123,6 @@
           "schema": {
             "type": "integer"
           }
-        },
-        {
-          "description": "`ETag` value of the resource version the change is based on. A stale value fails with `412 stale_version`; a missing header fails with `428 precondition_required`.",
-          "name": "If-Match",
-          "in": "header",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
         }
       ],
       "response": {
@@ -50452,7 +50136,7 @@
       "path": "/locations/{location_id}/team_members",
       "displayPath": "/locations/{location_id}/team_members",
       "summary": "List team members",
-      "description": "Returns the Team Members of the Location as a cursor-paginated list. The base\nrepresentation contains name, position, and bookable services; Team Member personal\ncontact data is not exposed in the preview scope.\n\n\nCursor-paginated list. Default ordering: name, id tie-breaker. Cursors use the `cursor` query parameter, expire after 15 minutes, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Returns the Team Members of the Location as a cursor-paginated list. The base\nrepresentation contains name, position, and bookable services; Team Member personal\ncontact data is not exposed in the preview scope.\n\n\nCursor-paginated list. Default ordering: name, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
       "tags": [
         "Team Members"
       ],
@@ -50462,8 +50146,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -50477,7 +50161,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after 15 minutes and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -50542,6 +50226,22 @@
                         "type": "string",
                         "x-truncated": true
                       },
+                      "dismissal_date": {
+                        "description": "Last working day set by `dismissTeamMember`, `YYYY-MM-DD` in the Location timezone; `null` while employed.",
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "x-truncated": true
+                      },
+                      "dismissal_reason": {
+                        "description": "Reason given on dismissal; `null` while employed.",
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "x-truncated": true
+                      },
                       "id": {
                         "type": "integer",
                         "x-truncated": true
@@ -50573,7 +50273,7 @@
                         "x-truncated": true
                       },
                       "service_ids": {
-                        "description": "Services this Team Member can be scheduled for.",
+                        "description": "Services this Team Member can be scheduled for. Written through `updateTeamMemberServices`.",
                         "type": "array",
                         "x-truncated": true
                       },
@@ -50616,7 +50316,7 @@
       "path": "/locations/{location_id}/team_members",
       "displayPath": "/locations/{location_id}/team_members",
       "summary": "Create a team member",
-      "description": "Creates a Team Member in the Location. After creating, set the working schedule\n(`PATCH .../schedule`) and link services — otherwise the member does not appear in\navailability search. Requires `Idempotency-Key`.\n\n`access_invitation` is an atomic create-and-invite convenience for user-delegated\nAuthorization Code credentials only: when present, the token must also carry\n`team_members:manage_access`. Client Credentials and restricted keys cannot use it in\nthe first iteration. If the extra scope or credential class is not allowed, the request\nfails before creating the Team Member with `403 missing_scope`.",
+      "description": "Creates a Team Member in the Location. After creating, set the working schedule\n(`PATCH .../schedule`) and link services (`PATCH .../services`) — otherwise the member\ndoes not appear in availability search. System access for the new member (login, role,\ninvitation) is a separate planned operation, `sendTeamMemberInvitation`.",
       "tags": [
         "Team Members"
       ],
@@ -50626,8 +50326,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -50639,16 +50339,6 @@
           "schema": {
             "type": "integer"
           }
-        },
-        {
-          "description": "Client-generated unique key for this logical request (UUID recommended). A retry with the same key and body returns the original result; the same key with a different body fails with `409 idempotency_key_reused`. Keys are retained at least 24 hours and are scoped to credential, Location, and operation; after expiry the value may be reused for a new logical request.",
-          "name": "Idempotency-Key",
-          "in": "header",
-          "required": true,
-          "schema": {
-            "maxLength": 255,
-            "type": "string"
-          }
         }
       ],
       "requestBody": {
@@ -50657,30 +50347,6 @@
         "schema": {
           "additionalProperties": false,
           "properties": {
-            "access_invitation": {
-              "additionalProperties": false,
-              "description": "Optional - atomically invite this Team Member to a system-access role on creation (role from `listLocationAccessRoles`). Requires an Authorization Code token with `team_members:manage_access` in addi…",
-              "properties": {
-                "email": {
-                  "description": "Delivery address for the invitation.",
-                  "format": "email",
-                  "type": "string",
-                  "writeOnly": true
-                },
-                "phone": {
-                  "description": "International format. Delivery address for the invitation.",
-                  "type": "string",
-                  "writeOnly": true
-                },
-                "role_id": {
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "role_id"
-              ],
-              "type": "object"
-            },
             "is_billable": {
               "default": false,
               "description": "Whether the new Team Member takes a paid seat in the Location's licence. Defaults to `false`, so a plain create never changes what the Location is charged: the member is created without schedule acce…",
@@ -50691,64 +50357,6 @@
             },
             "position_id": {
               "type": "integer"
-            },
-            "services": {
-              "description": "Initial service links, the same link shape as on update.",
-              "items": {
-                "additionalProperties": false,
-                "description": "Service link seen from the Team Member side; carries the same per-link overrides as `ServiceTeamMemberLink`.",
-                "properties": {
-                  "duration_seconds": {
-                    "description": "Per-member duration override in seconds. `null` uses the service default.",
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "is_bookable": {
-                    "description": "Per-link online scheduling flag override; `null` uses the service default.",
-                    "type": [
-                      "boolean",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "online_booking_enabled": {
-                    "description": "Per-link public scheduling availability override; `null` uses the service default.",
-                    "type": [
-                      "boolean",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "price_minor": {
-                    "description": "Per-member price override, integer minor units. `null` uses the service default.",
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "service_id": {
-                    "type": "integer",
-                    "x-truncated": true
-                  },
-                  "technological_card_id": {
-                    "description": "Per-link technological card override; `null` uses the service default.",
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  }
-                },
-                "required": [
-                  "service_id"
-                ],
-                "type": "object"
-              },
-              "type": "array"
             },
             "specialization": {
               "description": "Public profession label shown to clients (for example in online booking).",
@@ -50774,6 +50382,23 @@
               "format": "date-time",
               "readOnly": true,
               "type": "string"
+            },
+            "dismissal_date": {
+              "description": "Last working day set by `dismissTeamMember`, `YYYY-MM-DD` in the Location timezone; `null` while employed.",
+              "format": "date",
+              "readOnly": true,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "dismissal_reason": {
+              "description": "Reason given on dismissal; `null` while employed.",
+              "readOnly": true,
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "id": {
               "readOnly": true,
@@ -50806,10 +50431,11 @@
               ]
             },
             "service_ids": {
-              "description": "Services this Team Member can be scheduled for.",
+              "description": "Services this Team Member can be scheduled for. Written through `updateTeamMemberServices`.",
               "items": {
                 "type": "integer"
               },
+              "readOnly": true,
               "type": "array"
             },
             "specialization": {
@@ -50840,7 +50466,7 @@
       "path": "/locations/{location_id}/team_members/{team_member_id}",
       "displayPath": "/locations/{location_id}/team_members/{team_member_id}",
       "summary": "Get a team member",
-      "description": "Returns a single Team Member. The response carries an `ETag` header for a subsequent\n`PATCH` or `DELETE`.",
+      "description": "Returns a single Team Member.",
       "tags": [
         "Team Members"
       ],
@@ -50850,8 +50476,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -50886,6 +50512,23 @@
               "readOnly": true,
               "type": "string"
             },
+            "dismissal_date": {
+              "description": "Last working day set by `dismissTeamMember`, `YYYY-MM-DD` in the Location timezone; `null` while employed.",
+              "format": "date",
+              "readOnly": true,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "dismissal_reason": {
+              "description": "Reason given on dismissal; `null` while employed.",
+              "readOnly": true,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "id": {
               "readOnly": true,
               "type": "integer"
@@ -50917,10 +50560,11 @@
               ]
             },
             "service_ids": {
-              "description": "Services this Team Member can be scheduled for.",
+              "description": "Services this Team Member can be scheduled for. Written through `updateTeamMemberServices`.",
               "items": {
                 "type": "integer"
               },
+              "readOnly": true,
               "type": "array"
             },
             "specialization": {
@@ -50951,7 +50595,7 @@
       "path": "/locations/{location_id}/team_members/{team_member_id}",
       "displayPath": "/locations/{location_id}/team_members/{team_member_id}",
       "summary": "Update a team member",
-      "description": "Partially updates a Team Member with a merge-patch body. `services`, when present,\nreplaces the full set of bookable service links; each link is keyed by `service_id` and\ncarries the same override fields as on Service. Missing `services` leaves links unchanged,\n`services: []` unlinks every service, and `null` override fields inherit the Service\ndefault. Requires `If-Match`; changing links moves the ETag on both the Team Member and\naffected Service resources.",
+      "description": "Partially updates the Team Member card with a merge-patch body: name, specialization,\nposition and the paid-seat flag. Service links are written through\n`updateTeamMemberServices` and dismissal through `dismissTeamMember`; neither is a field\nof the card.",
       "tags": [
         "Team Members"
       ],
@@ -50961,8 +50605,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -50983,15 +50627,6 @@
           "schema": {
             "type": "integer"
           }
-        },
-        {
-          "description": "`ETag` value of the resource version the change is based on. A stale value fails with `412 stale_version`; a missing header fails with `428 precondition_required`.",
-          "name": "If-Match",
-          "in": "header",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
         }
       ],
       "requestBody": {
@@ -50999,7 +50634,7 @@
         "contentType": "application/merge-patch+json",
         "schema": {
           "additionalProperties": false,
-          "description": "Merge-patch body for a Team Member. `services`, when present, replaces the full set of service links with the same override fields as on Service, keyed by `service_id`. Missing `services` leaves link…",
+          "description": "Merge-patch body for a Team Member card. Service links are written through `updateTeamMemberServices`, dismissal through `dismissTeamMember`; neither is a field of the card.",
           "properties": {
             "is_billable": {
               "description": "Moves the Team Member on or off a paid seat in the Location's licence, changing what the Location is charged. Turning it on fails with `422` when the licence has no free paid seat; turning it off als…",
@@ -51013,63 +50648,6 @@
                 "integer",
                 "null"
               ]
-            },
-            "services": {
-              "items": {
-                "additionalProperties": false,
-                "description": "Service link seen from the Team Member side; carries the same per-link overrides as `ServiceTeamMemberLink`.",
-                "properties": {
-                  "duration_seconds": {
-                    "description": "Per-member duration override in seconds. `null` uses the service default.",
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "is_bookable": {
-                    "description": "Per-link online scheduling flag override; `null` uses the service default.",
-                    "type": [
-                      "boolean",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "online_booking_enabled": {
-                    "description": "Per-link public scheduling availability override; `null` uses the service default.",
-                    "type": [
-                      "boolean",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "price_minor": {
-                    "description": "Per-member price override, integer minor units. `null` uses the service default.",
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "service_id": {
-                    "type": "integer",
-                    "x-truncated": true
-                  },
-                  "technological_card_id": {
-                    "description": "Per-link technological card override; `null` uses the service default.",
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  }
-                },
-                "required": [
-                  "service_id"
-                ],
-                "type": "object"
-              },
-              "type": "array"
             },
             "specialization": {
               "description": "Public profession label shown to clients (for example in online booking).",
@@ -51091,6 +50669,23 @@
               "format": "date-time",
               "readOnly": true,
               "type": "string"
+            },
+            "dismissal_date": {
+              "description": "Last working day set by `dismissTeamMember`, `YYYY-MM-DD` in the Location timezone; `null` while employed.",
+              "format": "date",
+              "readOnly": true,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "dismissal_reason": {
+              "description": "Reason given on dismissal; `null` while employed.",
+              "readOnly": true,
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "id": {
               "readOnly": true,
@@ -51123,10 +50718,11 @@
               ]
             },
             "service_ids": {
-              "description": "Services this Team Member can be scheduled for.",
+              "description": "Services this Team Member can be scheduled for. Written through `updateTeamMemberServices`.",
               "items": {
                 "type": "integer"
               },
+              "readOnly": true,
               "type": "array"
             },
             "specialization": {
@@ -51157,7 +50753,7 @@
       "path": "/locations/{location_id}/team_members/{team_member_id}",
       "displayPath": "/locations/{location_id}/team_members/{team_member_id}",
       "summary": "Delete a team member",
-      "description": "Removes a Team Member from the Location. Requires `If-Match` with the version last\nseen.",
+      "description": "Removes a Team Member from the Location.",
       "tags": [
         "Team Members"
       ],
@@ -51167,8 +50763,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -51189,15 +50785,6 @@
           "schema": {
             "type": "integer"
           }
-        },
-        {
-          "description": "`ETag` value of the resource version the change is based on. A stale value fails with `412 stale_version`; a missing header fails with `428 precondition_required`.",
-          "name": "If-Match",
-          "in": "header",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
         }
       ],
       "response": {
@@ -51217,7 +50804,7 @@
       ],
       "domain": "team_members",
       "deprecated": false,
-      "status": "preview",
+      "status": "planned",
       "security": {
         "required": true,
         "schemes": [
@@ -51324,7 +50911,7 @@
       ],
       "domain": "team_members",
       "deprecated": false,
-      "status": "preview",
+      "status": "planned",
       "security": {
         "required": true,
         "schemes": [
@@ -51457,7 +51044,7 @@
       ],
       "domain": "team_members",
       "deprecated": false,
-      "status": "preview",
+      "status": "planned",
       "security": {
         "required": true,
         "schemes": [
@@ -51563,6 +51150,155 @@
     },
     {
       "source": "v3",
+      "operationId": "dismissTeamMember",
+      "method": "POST",
+      "path": "/locations/{location_id}/team_members/{team_member_id}/dismiss",
+      "displayPath": "/locations/{location_id}/team_members/{team_member_id}/dismiss",
+      "summary": "Dismiss a team member",
+      "description": "Dismisses a Team Member as a command: the response is the Team Member with\n`dismissal_date` set and `is_bookable: false`. Dismissal is not a field of the Team\nMember card — `updateTeamMember` cannot set it. The acting user needs the dismissal\npermission of the Location; dismissing a member who has a system login also needs the\npermission to delete users, otherwise `403 permission_denied`. Dismissing an already\ndismissed member returns the current state unchanged.",
+      "tags": [
+        "Team Members"
+      ],
+      "domain": "team_members",
+      "deprecated": false,
+      "status": "preview",
+      "security": {
+        "required": true,
+        "schemes": [
+          "ApiKey",
+          "OAuth2"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Identifier of the Location. Verified against the credential on every call — a Location the credential cannot access responds with `404`.",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Identifier of the Team Member.",
+          "name": "team_member_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "requestBody": {
+        "required": false,
+        "contentType": "application/json",
+        "schema": {
+          "additionalProperties": false,
+          "description": "Body of the `dismissTeamMember` command.",
+          "properties": {
+            "dismissal_date": {
+              "description": "Last working day, `YYYY-MM-DD` in the Location timezone. Defaults to today.",
+              "format": "date",
+              "type": "string"
+            },
+            "reason": {
+              "description": "Free-form dismissal reason stored on the Team Member.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "schema": {
+          "description": "A Team Member of the Location. Personal contact data of Team Members is not exposed in the preview scope.",
+          "properties": {
+            "created_at": {
+              "description": "UTC.",
+              "format": "date-time",
+              "readOnly": true,
+              "type": "string"
+            },
+            "dismissal_date": {
+              "description": "Last working day set by `dismissTeamMember`, `YYYY-MM-DD` in the Location timezone; `null` while employed.",
+              "format": "date",
+              "readOnly": true,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "dismissal_reason": {
+              "description": "Reason given on dismissal; `null` while employed.",
+              "readOnly": true,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "id": {
+              "readOnly": true,
+              "type": "integer"
+            },
+            "is_billable": {
+              "description": "Whether this Team Member occupies a paid seat in the Location's licence, which is what the Location is charged for. A non-billable member cannot hold schedule access, so `is_bookable` is always `fals…",
+              "type": "boolean"
+            },
+            "is_bookable": {
+              "description": "Derived — whether the member can currently receive appointments.",
+              "readOnly": true,
+              "type": "boolean"
+            },
+            "name": {
+              "type": "string"
+            },
+            "object": {
+              "enum": [
+                "team_member"
+              ],
+              "readOnly": true,
+              "type": "string"
+            },
+            "position_id": {
+              "description": "Position from `listPositions`.",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "service_ids": {
+              "description": "Services this Team Member can be scheduled for. Written through `updateTeamMemberServices`.",
+              "items": {
+                "type": "integer"
+              },
+              "readOnly": true,
+              "type": "array"
+            },
+            "specialization": {
+              "description": "Public profession label shown to clients (for example in online booking).",
+              "type": "string"
+            },
+            "updated_at": {
+              "description": "UTC.",
+              "format": "date-time",
+              "readOnly": true,
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "object",
+            "name",
+            "specialization"
+          ],
+          "type": "object"
+        }
+      }
+    },
+    {
+      "source": "v3",
       "operationId": "sendTeamMemberInvitation",
       "method": "POST",
       "path": "/locations/{location_id}/team_members/{team_member_id}/invitation",
@@ -51574,7 +51310,7 @@
       ],
       "domain": "team_members",
       "deprecated": false,
-      "status": "preview",
+      "status": "planned",
       "security": {
         "required": true,
         "schemes": [
@@ -51695,7 +51431,7 @@
       "path": "/locations/{location_id}/team_members/{team_member_id}/schedule",
       "displayPath": "/locations/{location_id}/team_members/{team_member_id}/schedule",
       "summary": "Get a team member's schedule",
-      "description": "Returns the **configured working schedule** of a Team Member for a date range — the\ndays and working slots set by the business. This is not availability: free bookable\nslots come from `GET /locations/{location_id}/availability`.\n\nThe response carries an `ETag` header for a subsequent schedule `PATCH`.",
+      "description": "Returns the **configured working schedule** of a Team Member for a date range — the\ndays and working slots set by the business. This is not availability: free bookable\nslots come from `GET /locations/{location_id}/availability`.",
       "tags": [
         "Team Members"
       ],
@@ -51705,8 +51441,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -51823,7 +51559,7 @@
       "path": "/locations/{location_id}/team_members/{team_member_id}/schedule",
       "displayPath": "/locations/{location_id}/team_members/{team_member_id}/schedule",
       "summary": "Update a team member's schedule",
-      "description": "Updates the working schedule as a **merge-patch map keyed by date**: each key is a\n`YYYY-MM-DD` date, the value sets the working slots of that day, and `null` clears the\nday. Dates absent from the body are left unchanged. Times are wall-clock `HH:MM` in\nthe Location's timezone. Requires `If-Match` with the `ETag` from the schedule read.",
+      "description": "Updates the working schedule as a **merge-patch map keyed by date**: each key is a\n`YYYY-MM-DD` date, the value sets the working slots of that day, and `null` clears the\nday. Dates absent from the body are left unchanged. Times are wall-clock `HH:MM` in\nthe Location's timezone.",
       "tags": [
         "Team Members"
       ],
@@ -51833,8 +51569,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -51854,15 +51590,6 @@
           "required": true,
           "schema": {
             "type": "integer"
-          }
-        },
-        {
-          "description": "`ETag` value of the resource version the change is based on. A stale value fails with `412 stale_version`; a missing header fails with `428 precondition_required`.",
-          "name": "If-Match",
-          "in": "header",
-          "required": true,
-          "schema": {
-            "type": "string"
           }
         }
       ],
@@ -51985,6 +51712,207 @@
     },
     {
       "source": "v3",
+      "operationId": "updateTeamMemberServices",
+      "method": "PATCH",
+      "path": "/locations/{location_id}/team_members/{team_member_id}/services",
+      "displayPath": "/locations/{location_id}/team_members/{team_member_id}/services",
+      "summary": "Update a team member's service links",
+      "description": "Updates which services a Team Member provides and the per-member overrides, as a\n**merge-patch map keyed by `service_id`**: a value creates or updates the link, `null`\nunlinks the service, services absent from the body are left unchanged. This is the only\nwrite path for the Team Member ↔ service link: service and team member bodies do not\ncarry link arrays. The response lists all current links of the member.",
+      "tags": [
+        "Team Members"
+      ],
+      "domain": "team_members",
+      "deprecated": false,
+      "status": "preview",
+      "security": {
+        "required": true,
+        "schemes": [
+          "ApiKey",
+          "OAuth2"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Identifier of the Location. Verified against the credential on every call — a Location the credential cannot access responds with `404`.",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Identifier of the Team Member.",
+          "name": "team_member_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentType": "application/merge-patch+json",
+        "schema": {
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "description": "Per-link overrides for one service. Every field is optional; `null` falls back to the service default.",
+                "properties": {
+                  "duration_seconds": {
+                    "description": "Per-member duration override in seconds.",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "is_bookable": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "online_booking_enabled": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "price_minor": {
+                    "description": "Per-member price override, integer minor units of the Location currency.",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "technological_card_id": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": "Merge-patch map keyed by `service_id`: the value creates or updates the link with its overrides, `null` unlinks the service. Services absent from the body are left unchanged. This is the only place w…",
+          "propertyNames": {
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "type": "object"
+        }
+      },
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "schema": {
+          "allOf": [
+            {
+              "description": "Common list envelope. `data` holds the page items; pass `next_cursor` as the `cursor` query parameter to fetch the next page while `has_more` is `true`.",
+              "properties": {
+                "has_more": {
+                  "description": "Whether more items exist beyond this page.",
+                  "type": "boolean"
+                },
+                "next_cursor": {
+                  "description": "Opaque cursor for the next page; `null` on the last page.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "object": {
+                  "enum": [
+                    "list"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "object",
+                "has_more",
+                "next_cursor"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "data": {
+                  "items": {
+                    "additionalProperties": false,
+                    "description": "Service link seen from the Team Member side; carries the same per-link overrides as `ServiceTeamMemberLink`.",
+                    "properties": {
+                      "duration_seconds": {
+                        "description": "Per-member duration override in seconds. `null` uses the service default.",
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "x-truncated": true
+                      },
+                      "is_bookable": {
+                        "description": "Per-link online scheduling flag override; `null` uses the service default.",
+                        "type": [
+                          "boolean",
+                          "null"
+                        ],
+                        "x-truncated": true
+                      },
+                      "online_booking_enabled": {
+                        "description": "Per-link public scheduling availability override; `null` uses the service default.",
+                        "type": [
+                          "boolean",
+                          "null"
+                        ],
+                        "x-truncated": true
+                      },
+                      "price_minor": {
+                        "description": "Per-member price override, integer minor units. `null` uses the service default.",
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "x-truncated": true
+                      },
+                      "service_id": {
+                        "type": "integer",
+                        "x-truncated": true
+                      },
+                      "technological_card_id": {
+                        "description": "Per-link technological card override; `null` uses the service default.",
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "x-truncated": true
+                      }
+                    },
+                    "required": [
+                      "service_id"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "data"
+              ],
+              "type": "object"
+            }
+          ],
+          "description": "All current service links of a Team Member."
+        }
+      }
+    },
+    {
+      "source": "v3",
       "operationId": "listAccessibleResources",
       "method": "GET",
       "path": "/oauth/accessible-resources",
@@ -52000,8 +51928,8 @@
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [],
@@ -52401,7 +52329,7 @@
               "type": "string"
             },
             "expires_in": {
-              "description": "Access token lifetime in seconds (about 900).",
+              "description": "Access token lifetime in seconds (3600).",
               "type": "integer"
             },
             "refresh_token": {
@@ -52435,23 +52363,23 @@
       "path": "/reference/business_types",
       "displayPath": "/reference/business_types",
       "summary": "List business types",
-      "description": "Cursor-paginated list. Default ordering: title, id tie-breaker. Cursors use the `cursor` query parameter, expire after 15 minutes, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Cursor-paginated list. Default ordering: title, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
       "tags": [
         "Locations"
       ],
       "domain": "locations",
       "deprecated": false,
-      "status": "preview",
+      "status": "planned",
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after 15 minutes and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -52551,18 +52479,18 @@
       "path": "/reference/cities",
       "displayPath": "/reference/cities",
       "summary": "List cities",
-      "description": "Cursor-paginated list. Default ordering: country_id, name, id tie-breaker. Cursors use the `cursor` query parameter, expire after 15 minutes, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Cursor-paginated list. Default ordering: country_id, name, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
       "tags": [
         "Locations"
       ],
       "domain": "locations",
       "deprecated": false,
-      "status": "preview",
+      "status": "planned",
       "security": {
         "required": true,
         "schemes": [
-          "OAuth2",
-          "RestrictedKey"
+          "ApiKey",
+          "OAuth2"
         ]
       },
       "parameters": [
@@ -52576,7 +52504,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after 15 minutes and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
           "name": "cursor",
           "in": "query",
           "required": false,

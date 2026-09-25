@@ -838,9 +838,17 @@ export class V1AnalyticsAdapter implements AnalyticsApi {
     );
     return {
       team_member_id: query.team_member_id,
-      points: list(rows).map((row) => {
+      points: list(rows).flatMap((row) => {
         const r = record(row);
-        return [String(r.date ?? ''), toPercent(r.workload) ?? 0] as const;
+        const day = String(r.date ?? '').slice(0, 10);
+        // The legacy workload endpoint can include the first day after end_date
+        // with zero workload. It is outside this requested period and changes
+        // both the reported day count and the mean occupancy.
+        return /^\d{4}-\d{2}-\d{2}$/.test(day) &&
+          day >= query.date_from &&
+          day <= query.date_to
+          ? [[day, toPercent(r.workload) ?? 0] as const]
+          : [];
       }),
     };
   }
