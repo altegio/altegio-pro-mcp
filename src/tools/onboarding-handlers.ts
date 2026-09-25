@@ -1,7 +1,7 @@
 import { AltegioClient } from '../providers/altegio-client.js';
 import { OnboardingStateManager } from '../providers/onboarding-state-manager.js';
 import { z } from 'zod';
-import { parseCSV } from '../utils/csv-parser.js';
+import { parseCSV, parseBooleanCell } from '../utils/csv-parser.js';
 import { logger } from '../utils/logger.js';
 import {
   withErrorHandling,
@@ -10,7 +10,12 @@ import {
 } from './tool-result.js';
 import { AuthenticationError } from '../utils/errors.js';
 import {
+  seatChoiceRefusal,
+  type MissingSeatChoice,
+} from './staff-seat-choice.js';
+import {
   StaffBatchSchema,
+  type StaffBatchItem,
   ServiceBatchSchema,
   ClientBatchSchema,
   CategoryBatchSchema,
@@ -49,6 +54,31 @@ function withFailedRows(summary: string, errors: readonly string[]): string {
 }
 
 /**
+ * For a staff preview: how many rows still lack the paid-seat or work-schedule
+ * answer, so the owner is asked before the import rather than after it
+ * refuses. Blank or missing cells count as unanswered.
+ */
+function unansweredSeatNote(rows: readonly unknown[]): string {
+  const answered = (row: unknown, key: string) =>
+    typeof parseBooleanCell(
+      row !== null && typeof row === 'object'
+        ? (row as Record<string, unknown>)[key]
+        : undefined
+    ) === 'boolean';
+  const unanswered = rows.filter(
+    (row) =>
+      !answered(row, 'is_paid_staff') || !answered(row, 'has_timetable_access')
+  ).length;
+  if (unanswered === 0) return '';
+  return (
+    `${unanswered} of ${rows.length} row(s) have no is_paid_staff or has_timetable_access answer. ` +
+    'Before importing, ask the location owner whether each team member takes a paid staff seat (billed on per-seat licensing) ' +
+    'and whether they should be in the work schedule to take appointments; never choose for them. ' +
+    'Pass the answers per row or once for the whole list with the batch-level is_paid_staff and has_timetable_access.\n\n'
+  );
+}
+
+/**
  * Map an internal persisted phase key to its agent-facing name so no legacy
  * terminology leaks into tool output. The persisted state keeps the original key.
  */
@@ -63,6 +93,9 @@ const LocationIdSchema = z.object({
 const StaffBatchArgsSchema = z.object({
   location_id: z.number(),
   staff_data: z.union([StaffBatchSchema, z.string()]),
+  // The owner's one answer for every row that carries none of its own.
+  is_paid_staff: z.boolean().optional(),
+  has_timetable_access: z.boolean().optional(),
 });
 
 const ServiceBatchArgsSchema = z.object({
@@ -280,37 +313,79 @@ export class OnboardingHandlers {
     return withErrorHandling('onboarding_add_staff_batch', async () => {
       this.requireAuth();
 
-      const { location_id, staff_data } = StaffBatchArgsSchema.parse(args);
+      const {
+        location_id,
+        staff_data,
+        is_paid_staff: batchPaidSeat,
+        has_timetable_access: batchScheduleAccess,
+      } = StaffBatchArgsSchema.parse(args);
 
       // Parse CSV if string
-      let staffArray =
-        typeof staff_data === 'string' ? parseCSV(staff_data) : staff_data;
+      const staffArray = StaffBatchSchema.parse(
+        typeof staff_data === 'string' ? parseCSV(staff_data) : staff_data
+      );
 
-      // Validate with Zod
-      staffArray = StaffBatchSchema.parse(staffArray);
+      // A row's own answer wins over the batch answer. A row with neither
+      // refuses the whole batch before anything is created: a paid seat is
+      // billed, so this server never picks one (see staff-seat-choice.ts).
+      const rows: Array<{
+        staff: StaffBatchItem;
+        paidSeat: boolean;
+        scheduleAccess: boolean;
+      }> = [];
+      const missing: MissingSeatChoice[] = [];
+      staffArray.forEach((staff, index) => {
+        const paidSeat = staff.is_paid_staff ?? batchPaidSeat;
+        const scheduleAccess =
+          staff.has_timetable_access ?? batchScheduleAccess;
+        if (paidSeat !== undefined && scheduleAccess !== undefined) {
+          rows.push({ staff, paidSeat, scheduleAccess });
+          return;
+        }
+        const fields: MissingSeatChoice['fields'] = [];
+        if (paidSeat === undefined) fields.push('is_paid_staff');
+        if (scheduleAccess === undefined) fields.push('has_timetable_access');
+        missing.push({ row: index + 1, fields });
+      });
+      if (missing.length > 0) {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: seatChoiceRefusal(missing, staffArray.length),
+            },
+          ],
+          isError: true,
+        };
+      }
 
       const created: number[] = [];
       const errors: string[] = [];
+      let paidSeats = 0;
+      let inSchedule = 0;
 
-      for (const staff of staffArray) {
+      for (const { staff, paidSeat, scheduleAccess } of rows) {
         try {
           const staffRequest: CreateStaffRequest = {
             name: staff.name,
             specialization: staff.specialization || '',
             position_id: staff.position_id || null,
-            phone_number: staff.phone || null,
             // Quick-create treats these as a link to an existing user and
             // refuses an unknown one without an invitation (an empty string
             // fails validation), so batch rows create team members only.
             user_email: null,
             user_phone: null,
             is_user_invite: false,
+            is_paid_staff: paidSeat,
+            has_timetable_access: scheduleAccess,
           };
           const result = await this.client.createStaff(
             location_id,
             staffRequest
           );
           created.push(result.id);
+          if (staffRequest.is_paid_staff) paidSeats++;
+          if (staffRequest.has_timetable_access) inSchedule++;
         } catch (error) {
           errors.push(`${staff.name}: ${(error as Error).message}`);
         }
@@ -326,7 +401,8 @@ export class OnboardingHandlers {
             type: 'text' as const,
             text: withFailedRows(
               `Staff batch processing complete:\n\n` +
-                `✓ ${created.length} staff members created\n` +
+                `✓ ${created.length} staff members created ` +
+                `(${paidSeats} on a paid staff seat, ${inSchedule} in the work schedule)\n` +
                 `\nNext: Add service categories with onboarding_add_categories`,
               errors
             ),
@@ -664,6 +740,7 @@ export class OnboardingHandlers {
       }));
 
       const fieldCount = Object.keys(parsed[0]).length;
+      const seatNote = data_type === 'staff' ? unansweredSeatNote(parsed) : '';
       const importTool = {
         staff: 'onboarding_add_staff_batch',
         services: 'onboarding_add_services_batch',
@@ -680,6 +757,7 @@ export class OnboardingHandlers {
                 `Total rows: ${parsed.length}\n` +
                 `Fields per row: ${fieldCount}\n` +
                 `Showing the first ${Math.min(5, parsed.length)} row(s) below, with the field names as the file spells them.\n\n` +
+                seatNote +
                 `Proceed with ${importTool} to create entities.`,
               [
                 {

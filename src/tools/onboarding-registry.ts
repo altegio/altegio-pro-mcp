@@ -110,7 +110,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_add_staff_batch',
     description:
-      'Bulk add staff members from JSON array or CSV string. Accepts name, specialization, phone, email, position_id, api_id. Team members are created without user accounts: phone and email are not used to link or invite a user (use create_staff for that). Creates checkpoint for rollback.',
+      'Bulk add staff members from JSON array or CSV string. Reads name, specialization, position_id, is_paid_staff and has_timetable_access. Every team member needs an explicit is_paid_staff (takes a paid staff seat — billed on per-seat licensing) and has_timetable_access (in the work schedule, able to have working hours and take appointments; per-seat licensing allows it only for a paid seat). Ask the location owner for both and never choose them yourself; give them per row, or once for the whole list with the batch-level fields when the owner gave one answer for everybody. A row without an answer refuses the whole batch before anything is created. Team members are created without user accounts; phone, email and api_id columns are ignored, because the create operation stores none of them (use create_staff with user_phone or user_email to link a user). Creates checkpoint for rollback.',
     annotations: {
       title: 'Batch Add Staff',
       destructiveHint: false,
@@ -123,7 +123,7 @@ export const onboardingTools: McpToolSpec[] = [
         location_id: { type: 'number', description: 'Location ID' },
         staff_data: {
           description:
-            'JSON array of staff objects or CSV string with headers: name,specialization,phone,email,position_id,api_id',
+            'JSON array of staff objects or CSV string with headers: name,specialization,position_id,is_paid_staff,has_timetable_access (CSV answers: true/false, yes/no or 1/0; a blank cell is no answer)',
           oneOf: [
             {
               type: 'array',
@@ -132,16 +132,33 @@ export const onboardingTools: McpToolSpec[] = [
                 properties: {
                   name: { type: 'string' },
                   specialization: { type: 'string' },
-                  phone: { type: 'string' },
-                  email: { type: 'string' },
                   position_id: { type: 'number' },
-                  api_id: { type: 'string' },
+                  is_paid_staff: {
+                    type: 'boolean',
+                    description:
+                      "The owner's answer: does this team member take a paid staff seat? Overrides the batch-level value.",
+                  },
+                  has_timetable_access: {
+                    type: 'boolean',
+                    description:
+                      "The owner's answer: should this team member be in the work schedule and take appointments? Overrides the batch-level value.",
+                  },
                 },
                 required: ['name'],
               },
             },
             { type: 'string' },
           ],
+        },
+        is_paid_staff: {
+          type: 'boolean',
+          description:
+            "The owner's one answer for every row without its own: do these team members take a paid staff seat? Billed on per-seat licensing. Never defaulted — omit it unless the owner answered for the whole list.",
+        },
+        has_timetable_access: {
+          type: 'boolean',
+          description:
+            "The owner's one answer for every row without its own: should these team members be in the work schedule and take appointments? Per-seat licensing allows it only for a paid seat. Never defaulted — omit it unless the owner answered for the whole list.",
         },
       },
       required: ['location_id', 'staff_data'],

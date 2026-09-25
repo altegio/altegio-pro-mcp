@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
 import { staffListOutput, staffEntityOutput } from '../output-schemas.js';
+import { paidSeatChoice, scheduleAccessChoice } from '../staff-seat-choice.js';
 
 export const getStaffTool = defineTool({
   name: 'get_staff',
@@ -93,7 +94,7 @@ export const createStaffTool = defineTool({
   name: 'create_staff',
   category: 'Staff',
   description:
-    '[Staff] Create a new staff member. AUTHENTICATION REQUIRED. Required fields: name, specialization, position_id, phone_number. Omit user_email and user_phone to create a team member without a user account. Pass them to link an existing Altegio user, or add is_user_invite=true to invite that person; the API refuses an email or phone of an unknown user without an invitation. Set is_paid_staff=false to create test/demo staff without consuming a paid-staff license seat. To schedule and book the member, set has_timetable_access=true.',
+    '[Staff] Create a new staff member. AUTHENTICATION REQUIRED. Required fields: name, specialization, position_id, is_paid_staff, has_timetable_access. Ask the location owner for is_paid_staff and has_timetable_access and never choose them yourself: on per-seat licensing a paid staff seat is billed, and only a paid team member can be in the work schedule. A team member needs has_timetable_access=true to get working hours or appointments. Omit user_email and user_phone to create a team member without a user account. Pass them to link an existing Altegio user, or add is_user_invite=true to invite that person; the API refuses an email or phone of an unknown user without an invitation. The create operation stores no contact phone for the team member itself.',
   annotations: {
     title: 'Create Staff Member',
     destructiveHint: false,
@@ -105,10 +106,6 @@ export const createStaffTool = defineTool({
     name: z.string().min(1).describe('Staff member name'),
     specialization: z.string().min(1).describe('Staff member specialization'),
     position_id: z.number().int().positive().nullable().describe('Position ID'),
-    phone_number: z
-      .string()
-      .nullable()
-      .describe('Phone number (without +, 9-15 digits)'),
     user_email: z
       .string()
       .email()
@@ -131,18 +128,12 @@ export const createStaffTool = defineTool({
       .describe(
         'Invite user_email/user_phone to create their user account (default false). Without it, they must belong to an existing Altegio user.'
       ),
-    has_timetable_access: z
-      .boolean()
-      .optional()
-      .describe(
-        'Add the team member to the work schedule. Locations on the new team-member model refuse a schedule or appointments for a member without it; per-seat licensing allows it only with is_paid_staff=true.'
-      ),
-    is_paid_staff: z
-      .boolean()
-      .optional()
-      .describe(
-        'Whether this team member counts against the paid-staff license cap. Set false to create test/demo staff without consuming a seat; locations on per-seat licensing require a value for active team members.'
-      ),
+    has_timetable_access: scheduleAccessChoice.describe(
+      "The owner's answer: should the team member be in the work schedule, able to have working hours and take appointments? Locations on the new team-member model refuse a schedule or appointments without it; per-seat licensing allows it only with is_paid_staff=true. Never defaulted."
+    ),
+    is_paid_staff: paidSeatChoice.describe(
+      "The owner's answer: does the team member take a paid staff seat? On per-seat licensing a paid seat is billed and counts against the location's team member limit; false creates a non-paid team member (for example test or demo staff) without a seat. Ignored by locations without per-seat licensing. Never defaulted."
+    ),
   }),
   outputSchema: staffEntityOutput,
   handler: async ({ input, client }) => {

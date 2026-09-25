@@ -96,13 +96,42 @@ describe('Onboarding Handlers', () => {
       const result = await handlers.addStaffBatch({
         location_id: 123,
         staff_data: [
-          { name: 'Alice', specialization: 'Hairdresser' },
-          { name: 'Bob', specialization: 'Nail Tech' },
+          {
+            name: 'Alice',
+            specialization: 'Hairdresser',
+            is_paid_staff: true,
+            has_timetable_access: true,
+          },
+          {
+            name: 'Bob',
+            specialization: 'Receptionist',
+            is_paid_staff: false,
+            has_timetable_access: false,
+          },
         ],
       });
 
-      expect(result.content[0]?.text).toContain('2 staff members created');
-      expect(mockClient.createStaff).toHaveBeenCalledTimes(2);
+      const text = result.content[0]?.text;
+      expect(text).toContain('2 staff members created');
+      expect(text).toContain('1 on a paid staff seat, 1 in the work schedule');
+      expect(mockClient.createStaff).toHaveBeenNthCalledWith(
+        1,
+        123,
+        expect.objectContaining({
+          name: 'Alice',
+          is_paid_staff: true,
+          has_timetable_access: true,
+        })
+      );
+      expect(mockClient.createStaff).toHaveBeenNthCalledWith(
+        2,
+        123,
+        expect.objectContaining({
+          name: 'Bob',
+          is_paid_staff: false,
+          has_timetable_access: false,
+        })
+      );
     });
 
     it('should create staff from CSV string', async () => {
@@ -112,7 +141,8 @@ describe('Onboarding Handlers', () => {
         .fn()
         .mockResolvedValue({ id: 1, name: 'Alice' });
 
-      const csv = 'name,specialization\nAlice,Hairdresser';
+      const csv =
+        'name,specialization,is_paid_staff,has_timetable_access\nAlice,Hairdresser,yes,YES';
 
       const result = await handlers.addStaffBatch({
         location_id: 123,
@@ -125,6 +155,129 @@ describe('Onboarding Handlers', () => {
         expect.objectContaining({
           name: 'Alice',
           specialization: 'Hairdresser',
+          is_paid_staff: true,
+          has_timetable_access: true,
+        })
+      );
+    });
+
+    it.each([
+      ['true', 'false', true, false],
+      ['1', '0', true, false],
+      ['No', 'Yes', false, true],
+    ])(
+      'reads CSV answers %s / %s',
+      async (paidCell, accessCell, paidSeat, scheduleAccess) => {
+        await handlers.start({ location_id: 123 });
+        mockClient.createStaff = jest
+          .fn()
+          .mockResolvedValue({ id: 1, name: 'Alice' });
+
+        await handlers.addStaffBatch({
+          location_id: 123,
+          staff_data: `name,is_paid_staff,has_timetable_access\nAlice,${paidCell},${accessCell}`,
+        });
+
+        expect(mockClient.createStaff).toHaveBeenCalledWith(
+          123,
+          expect.objectContaining({
+            is_paid_staff: paidSeat,
+            has_timetable_access: scheduleAccess,
+          })
+        );
+      }
+    );
+
+    it('refuses the whole batch when a row has no answer, and creates nothing', async () => {
+      await handlers.start({ location_id: 123 });
+      mockClient.createStaff = jest.fn();
+
+      const result = await handlers.addStaffBatch({
+        location_id: 123,
+        staff_data: [
+          { name: 'Alice', is_paid_staff: true, has_timetable_access: true },
+          { name: 'Bob', is_paid_staff: true },
+          { name: 'Carol' },
+        ],
+      });
+
+      expect(result.isError).toBe(true);
+      const text = result.content[0]?.text ?? '';
+      expect(text).toContain('Refused: nothing was created');
+      expect(text).toContain('2 of 3 team members');
+      expect(text).toContain('row 2 (has_timetable_access)');
+      expect(text).toContain('row 3 (is_paid_staff, has_timetable_access)');
+      expect(text).toContain('Ask the location owner');
+      expect(text).toContain('never choose for them');
+      // Names come from the owner's file and are not echoed.
+      expect(text).not.toContain('Bob');
+      expect(mockClient.createStaff).not.toHaveBeenCalled();
+      const state = await stateManager.load(123);
+      expect(state?.checkpoints.staff).toBeUndefined();
+      expect(state?.phase).not.toBe('categories');
+    });
+
+    it('treats a blank CSV cell as no answer, never as false', async () => {
+      await handlers.start({ location_id: 123 });
+      mockClient.createStaff = jest.fn();
+
+      const result = await handlers.addStaffBatch({
+        location_id: 123,
+        staff_data: 'name,is_paid_staff,has_timetable_access\nAlice,,no',
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toContain('row 1 (is_paid_staff)');
+      expect(mockClient.createStaff).not.toHaveBeenCalled();
+    });
+
+    it('rejects a CSV answer it cannot read', async () => {
+      await handlers.start({ location_id: 123 });
+      mockClient.createStaff = jest.fn();
+
+      const result = await handlers.addStaffBatch({
+        location_id: 123,
+        staff_data: 'name,is_paid_staff,has_timetable_access\nAlice,maybe,yes',
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toContain('is_paid_staff');
+      expect(mockClient.createStaff).not.toHaveBeenCalled();
+    });
+
+    it('applies the batch-level answers to rows without their own', async () => {
+      await handlers.start({ location_id: 123 });
+      mockClient.createStaff = jest
+        .fn()
+        .mockResolvedValueOnce({ id: 1, name: 'Alice' })
+        .mockResolvedValueOnce({ id: 2, name: 'Bob' });
+
+      const result = await handlers.addStaffBatch({
+        location_id: 123,
+        staff_data: [
+          { name: 'Alice' },
+          { name: 'Bob', is_paid_staff: false, has_timetable_access: false },
+        ],
+        is_paid_staff: true,
+        has_timetable_access: true,
+      });
+
+      expect(result.isError).toBeUndefined();
+      expect(mockClient.createStaff).toHaveBeenNthCalledWith(
+        1,
+        123,
+        expect.objectContaining({
+          is_paid_staff: true,
+          has_timetable_access: true,
+        })
+      );
+      // A row's own answer wins over the batch-level one.
+      expect(mockClient.createStaff).toHaveBeenNthCalledWith(
+        2,
+        123,
+        expect.objectContaining({
+          is_paid_staff: false,
+          has_timetable_access: false,
         })
       );
     });
@@ -144,13 +297,17 @@ describe('Onboarding Handlers', () => {
             specialization: 'Hairdresser',
             phone: '420777000111',
             email: 'alice@example.com',
+            api_id: 'alice-1',
           },
           { name: 'Bob', specialization: 'Nail Tech' },
         ],
+        is_paid_staff: true,
+        has_timetable_access: true,
       });
 
       // An unknown user without an invitation is refused upstream, and an
-      // empty string fails validation, so neither row may send one.
+      // empty string fails validation, so neither row may send one. Phone,
+      // email and api_id have nowhere to go on quick-create.
       for (const [, request] of (mockClient.createStaff as jest.Mock).mock
         .calls) {
         expect(request).toMatchObject({
@@ -158,6 +315,8 @@ describe('Onboarding Handlers', () => {
           user_phone: null,
           is_user_invite: false,
         });
+        expect(request).not.toHaveProperty('phone_number');
+        expect(request).not.toHaveProperty('api_id');
       }
     });
   });
@@ -279,6 +438,33 @@ describe('Onboarding Handlers', () => {
       expect(block).toContain('row 1: name: Alice, phone: +1234567890');
       expect(block).toContain('row 2: name: Bob, phone: +0987654321');
       expect(block).toContain('field names: name, phone');
+    });
+
+    it('asks for the paid-seat and work-schedule answers a staff file lacks', async () => {
+      const result = await handlers.previewData({
+        data_type: 'staff',
+        raw_input:
+          'name,is_paid_staff,has_timetable_access\nAlice,yes,yes\nBob,,no\nCarol,no,',
+      });
+
+      const textContent = result.content[0]?.text ?? '';
+      const [summary] = textContent.split('<<<UNTRUSTED');
+      expect(summary).toContain(
+        '2 of 3 row(s) have no is_paid_staff or has_timetable_access answer'
+      );
+      expect(summary).toContain('ask the location owner');
+      expect(summary).toContain('batch-level is_paid_staff');
+    });
+
+    it('adds no seat note when every staff row is answered', async () => {
+      const result = await handlers.previewData({
+        data_type: 'staff',
+        raw_input: JSON.stringify([
+          { name: 'Alice', is_paid_staff: true, has_timetable_access: false },
+        ]),
+      });
+
+      expect(result.content[0]?.text).not.toContain('ask the location owner');
     });
 
     it.each([

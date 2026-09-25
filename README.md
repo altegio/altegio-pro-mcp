@@ -44,7 +44,7 @@ is the generated table in
 
 ### 👥 Staff Management
 - `get_staff` - View staff members with admin details
-- `create_staff` - Add new staff member
+- `create_staff` - Add new staff member (the owner's explicit `is_paid_staff` and `has_timetable_access` answers are required — never defaulted)
 - `update_staff` - Modify staff member details
 - `delete_staff` - Remove staff member
 
@@ -210,7 +210,7 @@ alternative for each.
 - `onboarding_resume` - Resume interrupted setup
 - `onboarding_status` - Check progress
 - `onboarding_add_positions` - Bulk create positions/roles (run before staff)
-- `onboarding_add_staff_batch` - Bulk import staff (CSV/JSON)
+- `onboarding_add_staff_batch` - Bulk import staff (CSV/JSON); every team member needs the owner's paid-seat and work-schedule answers, per row or once for the batch
 - `onboarding_add_categories` - Bulk create service categories
 - `onboarding_add_services_batch` - Bulk import services (CSV/JSON)
 - `onboarding_set_schedules` - Set staff work schedules

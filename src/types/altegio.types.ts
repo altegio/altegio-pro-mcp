@@ -291,7 +291,6 @@ export interface CreateStaffRequest {
   name: string;
   specialization: string;
   position_id: number | null;
-  phone_number: string | null;
   /**
    * Links an existing Altegio user found by this email or `user_phone`, or
    * names the person to invite when `is_user_invite` is true. `null` for both
@@ -304,14 +303,18 @@ export interface CreateStaffRequest {
   /**
    * Adds the team member to the work schedule. With the new team-member model
    * only such members can get a schedule and appointments; per-seat licensing
-   * allows it for paid staff only.
+   * allows it for paid staff only. Always sent: the owner's answer, never a
+   * default (see `tools/staff-seat-choice.ts`).
    */
-  has_timetable_access?: boolean;
+  has_timetable_access: boolean;
   /**
-   * Whether the team member counts against the paid-staff license cap.
-   * Omit or set false to create test/demo staff without consuming a seat.
+   * Whether the team member takes a paid staff seat. Per-seat licensing bills
+   * the seat and refuses an active team member without this value; other
+   * licensing ignores it. Always sent: the owner's answer, never a default.
    */
-  is_paid_staff?: boolean;
+  is_paid_staff: boolean;
+  // No `phone_number`: quick-create never reads it, so the team member's own
+  // contact phone cannot be set here (user_phone is a user-account link).
 }
 
 export interface UpdateStaffRequest {

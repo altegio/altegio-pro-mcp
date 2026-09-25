@@ -16,7 +16,7 @@ The onboarding wizard provides **12 specialized tools** to help new users quickl
 **Recommended setup order:**
 `positions → staff → categories → services → schedules → clients → test_appointments`
 
-Positions come first so staff can reference `position_id`. Work schedules come after staff — without them the appointment grid stays empty and the location isn't operational.
+Positions come first so staff can reference `position_id`. Work schedules come after staff — without them the appointment grid stays empty and the location isn't operational. Only team members imported with `has_timetable_access: true` can get a work schedule, and each team member's paid-seat and work-schedule answers come from the owner (see step 3).
 
 ### New steps
 
@@ -87,6 +87,24 @@ onboarding_add_categories({
 
 ### 3. Import Staff (CSV or JSON)
 
+**Ask the owner two questions for every team member first.** The import never
+defaults them and refuses the whole batch, before creating anyone, when a team
+member has no answer:
+
+- `is_paid_staff` — does this team member take a paid staff seat? On per-seat
+  licensing a paid seat is billed and counts against the location's team member
+  limit; `false` creates a non-paid team member without a seat. Locations
+  without per-seat licensing ignore it, but it is still asked.
+- `has_timetable_access` — should the team member be in the work schedule, able
+  to have working hours and take appointments? Anyone who gets a work schedule
+  or appointments later needs `true`. Per-seat licensing allows it only on a
+  paid seat (`is_paid_staff: false` with `has_timetable_access: true` is refused
+  for that row).
+
+Give the answers per team member, or once for the whole list with the
+batch-level `is_paid_staff` / `has_timetable_access` when the owner gave one
+answer for everybody. A row's own answer wins over the batch-level one.
+
 **Option A: JSON Array**
 ```typescript
 onboarding_add_staff_batch({
@@ -95,33 +113,62 @@ onboarding_add_staff_batch({
     {
       name: "Alice Johnson",
       specialization: "Senior Stylist",
-      phone: "+1234567890",
-      email: "alice@salon.com"
+      is_paid_staff: true,
+      has_timetable_access: true
     },
     {
       name: "Bob Smith",
-      specialization: "Nail Technician",
-      phone: "+1234567891"
+      specialization: "Receptionist",
+      is_paid_staff: false,
+      has_timetable_access: false
     }
   ]
 })
 ```
 
-**Option B: CSV String**
+**Option B: CSV String** (answers as `true`/`false`, `yes`/`no` or `1`/`0`)
 ```typescript
 onboarding_add_staff_batch({
   location_id: 123456,
-  staff_data: `name,specialization,phone,email
-Alice Johnson,Senior Stylist,+1234567890,alice@salon.com
-Bob Smith,Nail Technician,+1234567891,bob@salon.com
-Carol White,Massage Therapist,+1234567892,carol@salon.com`
+  staff_data: `name,specialization,is_paid_staff,has_timetable_access
+Alice Johnson,Senior Stylist,yes,yes
+Bob Smith,Nail Technician,yes,yes
+Carol White,Massage Therapist,yes,yes`
 })
 
-// Response: "Successfully created 3 staff members
-//           Created IDs: [101, 102, 103]
-//           Failed: 0
-//           Checkpoint saved at phase: staff"
+// Response: "Staff batch processing complete:
+//           ✓ 3 staff members created (3 on a paid staff seat, 3 in the work schedule)
+//           Next: Add service categories with onboarding_add_categories"
 ```
+
+**Option C: one answer for the whole list**
+```typescript
+onboarding_add_staff_batch({
+  location_id: 123456,
+  staff_data: `name,specialization
+Alice Johnson,Senior Stylist
+Bob Smith,Nail Technician`,
+  is_paid_staff: true,
+  has_timetable_access: true
+})
+```
+
+**Missing answer — nothing is created:**
+```typescript
+onboarding_add_staff_batch({
+  location_id: 123456,
+  staff_data: [{ name: "Alice Johnson" }]
+})
+
+// Response (error): "Refused: nothing was created. 1 of 1 team members have no
+//           answer for the paid seat or the work schedule:
+//           row 1 (is_paid_staff, has_timetable_access). Ask the location owner…"
+```
+
+Team members are created without user accounts. `phone`, `email` and `api_id`
+columns are ignored: the create operation stores no contact details or external
+id for a team member. To link or invite a user account, use `create_staff` with
+`user_phone` or `user_email`.
 
 ### 4. Add Services
 
@@ -214,19 +261,21 @@ onboarding_status({
 ### Staff CSV Template
 
 ```csv
-name,specialization,phone,email,api_id
-Alice Johnson,Senior Stylist,+1234567890,alice@salon.com,alice-001
-Bob Smith,Nail Technician,+1234567891,bob@salon.com,bob-002
-Carol White,Massage Therapist,+1234567892,carol@salon.com,carol-003
+name,specialization,position_id,is_paid_staff,has_timetable_access
+Alice Johnson,Senior Stylist,11,yes,yes
+Bob Smith,Receptionist,12,no,no
+Carol White,Massage Therapist,11,yes,yes
 ```
 
-**Required fields:** `name`
-**Optional fields:** `specialization`, `phone`, `email`, `api_id`
+**Required fields:** `name`; `is_paid_staff` and `has_timetable_access` in
+every row unless passed once for the batch
+**Optional fields:** `specialization`, `position_id`
 
 **Notes:**
-- Phone numbers: international format recommended (+country code)
-- API ID: custom identifier for integration purposes
-- Empty fields allowed (leave blank or use empty quotes)
+- Answers: `true`/`false`, `yes`/`no` or `1`/`0`, in any case. A blank cell is
+  no answer, never `false`.
+- `phone`, `email` and `api_id` columns are accepted and ignored — nothing
+  stores them for a team member.
 
 ### Services CSV Template
 
@@ -274,23 +323,19 @@ Check data parsing and validation without creating entities:
 ```typescript
 onboarding_preview_data({
   data_type: "staff",
-  raw_input: `name,specialization,phone
-Alice Johnson,Senior Stylist,+1234567890
-Bob Smith,Nail Technician,invalid-phone`
+  raw_input: `name,specialization,is_paid_staff,has_timetable_access
+Alice Johnson,Senior Stylist,yes,yes
+Bob Smith,Nail Technician,,`
 })
 
-// Response: "Preview for 2 staff entries:
-//
-//           ✓ Row 1: Alice Johnson - Senior Stylist
-//             phone: +1234567890
-//
-//           ✗ Row 2: Bob Smith - Nail Technician
-//             Error: phone format invalid: 'invalid-phone'
-//
-//           Valid entries: 1
-//           Invalid entries: 1
-//
-//           Fix errors before importing with onboarding_add_staff_batch()"
+// Response: "Preview of staff data:
+//           Total rows: 2
+//           Fields per row: 4
+//           …
+//           1 of 2 row(s) have no is_paid_staff or has_timetable_access answer.
+//           Before importing, ask the location owner…
+//           Proceed with onboarding_add_staff_batch to create entities."
+//           (the rows themselves follow in a fenced block)
 ```
 
 ### Resume After Error
@@ -365,18 +410,18 @@ If some entries fail during batch import:
 onboarding_add_staff_batch({
   location_id: 123456,
   staff_data: [
-    { name: "Alice", specialization: "Stylist", phone: "+1234567890" },
-    { name: "", specialization: "Invalid" },  // Missing required field
-    { name: "Bob", specialization: "Barber", phone: "+1234567891" }
+    { name: "Alice", specialization: "Stylist", is_paid_staff: true, has_timetable_access: true },
+    // Per-seat licensing: a non-paid team member cannot be in the work schedule
+    { name: "Dana", specialization: "Assistant", is_paid_staff: false, has_timetable_access: true },
+    { name: "Bob", specialization: "Barber", is_paid_staff: true, has_timetable_access: true }
   ]
 })
 
-// Response: "Batch import completed with partial success
-//           Created: 2 staff members
-//           Created IDs: [101, 103]
+// Response: "Staff batch processing complete:
+//           ✓ 2 staff members created (2 on a paid staff seat, 2 in the work schedule)
 //
-//           Failed entries: 1
-//           Row 2 - Error: name is required (empty string provided)
+//           ✗ 1 failed; each row and the reason the API gave are listed below.
+//           failed row 1: Dana: Non-billable team members cannot have schedule access
 //
 //           Checkpoint saved with successfully created entities
 //           Fix failed entries and re-run with corrected data"
@@ -489,13 +534,13 @@ onboarding_add_categories({
 })
 // Note category IDs: [501, 502]
 
-// 4. Import staff from CSV
+// 4. Import staff from CSV (paid seat and work schedule answered by the owner)
 onboarding_add_staff_batch({
   location_id: 123456,
-  staff_data: `name,specialization,phone,email
-Alice Johnson,Senior Stylist,+1234567890,alice@salon.com
-Bob Smith,Nail Technician,+1234567891,bob@salon.com
-Carol White,Manicurist,+1234567892,carol@salon.com`
+  staff_data: `name,specialization,is_paid_staff,has_timetable_access
+Alice Johnson,Senior Stylist,yes,yes
+Bob Smith,Nail Technician,yes,yes
+Carol White,Manicurist,yes,yes`
 })
 // Created staff IDs: [101, 102, 103]
 
@@ -588,10 +633,12 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 - Required: `title`
 - Run before staff so staff can reference `position_id`
 
-**`onboarding_add_staff_batch(location_id, staff_data)`**
+**`onboarding_add_staff_batch(location_id, staff_data, is_paid_staff?, has_timetable_access?)`**
 - Bulk add staff from JSON array or CSV string
-- Required: `name`
-- Optional: `specialization`, `phone`, `email`, `position_id`, `api_id`
+- Required: `name`, plus the owner's `is_paid_staff` and `has_timetable_access`
+  answers per row or once for the batch (a missing answer refuses the batch)
+- Optional: `specialization`, `position_id`
+- Ignored: `phone`, `email`, `api_id`
 
 **`onboarding_add_services_batch(location_id, services_data)`**
 - Bulk add services from JSON array or CSV string

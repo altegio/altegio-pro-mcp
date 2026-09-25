@@ -35,10 +35,11 @@ describe('AltegioClient - Staff CRUD', () => {
         name: 'John Doe',
         specialization: 'Stylist',
         position_id: 1,
-        phone_number: '1234567890',
         user_email: 'john@example.com',
         user_phone: '1234567890',
         is_user_invite: true,
+        is_paid_staff: true,
+        has_timetable_access: true,
       });
 
       expect(result.id).toBe(123);
@@ -53,7 +54,7 @@ describe('AltegioClient - Staff CRUD', () => {
       );
     });
 
-    it('should forward is_paid_staff in the request body', async () => {
+    it('should forward the paid-seat and work-schedule answers in the request body', async () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
         status: 201,
@@ -64,17 +65,19 @@ describe('AltegioClient - Staff CRUD', () => {
         name: 'Demo',
         specialization: 'Stylist',
         position_id: 1,
-        phone_number: '1234567890',
         user_email: 'demo@example.com',
         user_phone: '1234567890',
         is_user_invite: false,
         is_paid_staff: false,
+        has_timetable_access: false,
       });
 
       const body = JSON.parse(
         (global.fetch as jest.Mock).mock.calls[0][1].body as string
       );
       expect(body.is_paid_staff).toBe(false);
+      expect(body.has_timetable_access).toBe(false);
+      expect(body).not.toHaveProperty('phone_number');
     });
 
     it('should throw error when not authenticated', async () => {
@@ -88,10 +91,11 @@ describe('AltegioClient - Staff CRUD', () => {
           name: 'John',
           specialization: 'Stylist',
           position_id: 1,
-          phone_number: '123',
           user_email: 'john@example.com',
           user_phone: '1234567890',
           is_user_invite: true,
+          is_paid_staff: true,
+          has_timetable_access: true,
         })
       ).rejects.toThrow('Not authenticated');
     });

@@ -20410,7 +20410,7 @@
       "path": "/company/{location_id}/staff/quick",
       "displayPath": "/company/{location_id}/staff/quick",
       "summary": "Quick create a team member",
-      "description": "Creates a new team member with a minimal set of parameters.",
+      "description": "Creates a new team member with a minimal set of parameters.\n\nSend `user_phone` and `user_email` as `null` to create a team member without a user account. A non-null value links the existing Altegio user with that phone number or email to the team member, inviting them to the location if they have no access to it yet; set `is_user_invite` to `true` to create the user account by invitation when no user matches.\n\nOn locations with per-seat licensing, `is_paid_staff` is required for an active team member. A paid team member takes a paid staff seat and counts against the location's team member limit; a non-paid team member takes no seat and cannot have schedule access (`has_timetable_access`).",
       "tags": [
         "Team Members"
       ],
@@ -20438,27 +20438,33 @@
         "contentType": "application/json",
         "schema": {
           "properties": {
+            "has_timetable_access": {
+              "description": "Whether the team member has schedule access: they can be given a work schedule and take appointments. When omitted, it is `true` for a paid team member and `false` for a non-paid one on per-seat lice…",
+              "type": "boolean"
+            },
             "is_paid_staff": {
-              "description": "Whether the team member is a paid staff member.",
+              "description": "Whether the team member takes a paid staff seat. Required for an active team member on locations with per-seat licensing, where a paid team member counts against the location's team member limit and…",
               "type": "boolean"
             },
             "is_user_invite": {
-              "description": "Whether to send an invitation email to the user. Set to true to send invitation, false to create without sending invitation.",
+              "description": "Whether to create a user account by invitation when no Altegio user matches `user_phone` or `user_email`. With `false`, a non-null `user_phone` or `user_email` must belong to an existing user; otherw…",
               "type": "boolean"
             },
             "name": {
               "description": "Name of a team member.",
+              "maxLength": 255,
               "type": "string"
             },
             "phone_number": {
-              "description": "Phone number of a user that should be linked to a team member (without \"+\", 9 to 15 digits).",
+              "deprecated": true,
+              "description": "Not read by this endpoint: the value is ignored and is not stored on the team member. To link or invite a user account by phone number, use `user_phone`.",
               "type": [
                 "string",
                 "null"
               ]
             },
             "position_id": {
-              "description": "ID of a position that should be linked to a team member.",
+              "description": "ID of a position that should be linked to a team member, or `null` for none. The key is required.",
               "type": [
                 "number",
                 "null"
@@ -20469,20 +20475,25 @@
               "type": "string"
             },
             "user_email": {
-              "description": "Email address of the user to be created or linked to the team member.",
+              "description": "Email of the user account to link to the team member, or `null` for a team member without a user account. The key is required. An existing user with this email is linked to the team member; if no use…",
               "format": "email",
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "user_phone": {
-              "description": "User phone number (without \"+\", 9 to 15 digits). Can be the same as phone_number or different for user account login.",
-              "type": "string"
+              "description": "Phone number of the user account to link to the team member (without \"+\", 9 to 15 digits), or `null` for a team member without a user account. The key is required. An existing user with this phone nu…",
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           "required": [
             "name",
             "specialization",
             "position_id",
-            "phone_number",
             "user_email",
             "user_phone",
             "is_user_invite"
