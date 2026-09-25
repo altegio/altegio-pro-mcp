@@ -513,6 +513,21 @@ describe('V1AnalyticsAdapter — occupancy and client visits', () => {
     });
   });
 
+  it('drops a workload point after the requested end date', async () => {
+    const body = fixture('staff-workload') as {
+      success: boolean;
+      data: Array<{ date: string; workload: number }>;
+    };
+    body.data.push({ date: '2026-08-04', workload: 0 });
+    const { api } = adapter([[/staff\/workload/, { status: 200, body }]]);
+    const occupancy = await api.getTeamMemberOccupancy({
+      ...period,
+      team_member_id: 9001,
+    });
+    expect(occupancy.points).toHaveLength(3);
+    expect(occupancy.points.at(-1)).toEqual(['2026-08-03', 0]);
+  });
+
   it('reads the v2 client visit statistics through the normalized path', async () => {
     const { api, calls } = adapter([
       [/attendances_statistic/, 'client-attendances'],
