@@ -126,8 +126,8 @@ describe('Tool Registration', () => {
       expect(toolNames).not.toContain(withheld);
     }
 
-    // Total: 83 served factory-defined + 12 onboarding = 95 tools
-    expect(toolNames.length).toBe(95);
+    // Total: 84 served factory-defined + 12 onboarding = 96 tools
+    expect(toolNames.length).toBe(96);
   });
 
   it('should create server with tools', () => {
@@ -213,5 +213,50 @@ describe('schedules_get', () => {
       '2 schedule entries for team member 456'
     );
     expect(result.content[0]?.text).toContain('2025-10-27 09:00-13:00');
+  });
+});
+
+describe('users_get_current', () => {
+  it('reports the Altegio interface language and never the user hash', async () => {
+    const { getCurrentUserTool } =
+      await import('../tools/definitions/users.tools.js');
+    const client = {
+      getCurrentUser: jest.fn().mockResolvedValue({
+        id: 1884217,
+        name: 'Owner',
+        lang: 'pt-BR',
+        is_approved: true,
+        user_token: 'never-shown',
+      }),
+    } as unknown as AltegioClient;
+
+    const result = await getCurrentUserTool.createHandler(client)({});
+    const text = JSON.stringify(result);
+    expect(text).not.toContain('never-shown');
+    expect(result.structuredContent).toEqual({
+      id: 1884217,
+      name: 'Owner',
+      language: 'pt',
+      is_approved: true,
+    });
+    expect(result.content[0]?.text).toContain(
+      'Altegio interface language: pt.'
+    );
+  });
+
+  it('reports null while the API build predates the lang field', async () => {
+    const { getCurrentUserTool } =
+      await import('../tools/definitions/users.tools.js');
+    const client = {
+      getCurrentUser: jest.fn().mockResolvedValue({ id: 5 }),
+    } as unknown as AltegioClient;
+
+    const result = await getCurrentUserTool.createHandler(client)({});
+    expect(result.structuredContent).toEqual({
+      id: 5,
+      name: null,
+      language: null,
+      is_approved: null,
+    });
   });
 });

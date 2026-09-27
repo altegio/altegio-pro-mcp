@@ -364,6 +364,7 @@ describe('HTTP server facet wiring, end to end', () => {
         'clients_search',
         'clients_upload_file',
         'locations_list',
+        'users_get_current',
       ]);
 
       const all = await toolNamesOn(port, '/mcp');

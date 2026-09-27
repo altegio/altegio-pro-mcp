@@ -107,6 +107,7 @@ describe('static views', () => {
         'appointments_delete',
         'appointments_list',
         'locations_list',
+        'users_get_current',
         'appointments_update',
       ].sort()
     );

@@ -1,0 +1,59 @@
+# Extended catalog — the signed-in user's own profile, which has no entry in
+# the published OpenAPI specification (ADR-001 D4).
+#
+# `GET /user/data` is the read behind `users_get_current`. It is served by the
+# same API the mobile clients use and returns the `/auth` login payload for the
+# credential's own user, so it needs no location and is not confined to the
+# declared company scope. Shapes are recorded as observed, not as guaranteed.
+#
+# `x-altegio-source: undocumented` marks the whole file. `x-altegio-caveat`
+# records the behaviour that surprised us while integrating.
+#
+# All paths are relative to https://api.alteg.io/api/v1.
+
+openapi: 3.1.0
+info:
+  title: Altegio users — undocumented operations used by the MCP users tools
+  version: '2026-09-27'
+  description: >-
+    Hand-written stub for the undocumented profile endpoint `users_get_current`
+    depends on. Candidate for publication in the Altegio API specification; see
+    ADR-001 §8.2.
+
+x-altegio-source: undocumented
+
+paths:
+  /user/data:
+    get:
+      operationId: get_current_user
+      summary: The signed-in user's own profile
+      x-altegio-permission: any authenticated user (own record only)
+      x-altegio-caveat: >-
+        Answers 201, not 200, and echoes the credential's own `user_token`
+        (the API hash) in the payload; the tool never surfaces it. `lang`, the
+        interface language chosen in Altegio (ISO 639-1, region suffix
+        possible), is present only on API builds that ship it — older builds
+        omit the field, so it must be read as optional.
+      responses:
+        '201':
+          description: The user record in the standard {success,data,meta} envelope.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer }
+                      name: { type: string }
+                      login: { type: string }
+                      email: { type: string }
+                      phone: { type: string }
+                      avatar: { type: string }
+                      is_approved: { type: boolean }
+                      is_email_confirmed: { type: boolean }
+                      lang:
+                        type: string
+                        description: Interface language chosen in Altegio (ISO 639-1); optional.

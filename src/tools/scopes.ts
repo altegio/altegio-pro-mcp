@@ -220,6 +220,12 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   api_describe_operation: null,
   api_call_operation: 'api:read',
 
+  // --- The caller's own profile ---------------------------------------------
+  // Reads nothing but the identity the credential already proves; a v3 scope
+  // for "self" does not exist, and refusing it would leave a host unable to
+  // learn the person's interface language on a narrowly granted token.
+  users_get_current: null,
+
   // --- Location and its settings -------------------------------------------
   locations_list: 'locations:read',
   locations_diagnose_access: 'locations:read',
