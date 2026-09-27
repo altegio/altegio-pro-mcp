@@ -726,6 +726,60 @@ export class AltegioClient {
   }
 
   /**
+   * The signed-in person's interface language, read from the ERP web layout.
+   *
+   * `GET /user/data` predates the `lang` field on most API builds. Every
+   * backoffice page the ERP renders for a `user_hash` carries
+   * `ms.iso2 = '<code>'` from the language that person chose in Altegio, so
+   * the personal-account page is fetched with the same `user_hash` lane the
+   * legacy reports use and read only as far as that assignment. Best effort:
+   * `null` whenever the page cannot be read, never a guess.
+   */
+  async getCurrentUserLanguageFromWeb(): Promise<string | null> {
+    this.requireAuth();
+    const userToken = this.resolveUserToken();
+    if (!userToken) return null;
+
+    const url = new URL(`${this.legacyWebUrl}/personal_account`);
+    url.searchParams.set('user_hash', userToken);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'GET',
+        headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' },
+        redirect: 'manual',
+        credentials: 'omit',
+      });
+    } catch {
+      // The native error may carry the URL, whose query holds the token.
+      return null;
+    }
+    if (!response.ok || !response.body) {
+      await response.body?.cancel().catch(() => undefined);
+      return null;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let text = '';
+    try {
+      // The assignment sits ~50 KB into a page that is otherwise megabytes.
+      while (text.length < 512_000) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        text += decoder.decode(value, { stream: true });
+        const match = /ms\.iso2 = '([a-z]{2,3})'/.exec(text);
+        if (match) return match[1] ?? null;
+      }
+    } catch {
+      return null;
+    } finally {
+      await reader.cancel().catch(() => undefined);
+    }
+    return null;
+  }
+
+  /**
    * Get location positions (B2B API, requires user auth)
    */
   async getPositions(companyId: number): Promise<AltegioPosition[]> {

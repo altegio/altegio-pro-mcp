@@ -244,11 +244,31 @@ describe('users_get_current', () => {
     );
   });
 
-  it('reports null while the API build predates the lang field', async () => {
+  it('falls back to the ERP web layout while the API build predates lang', async () => {
+    const { getCurrentUserTool } =
+      await import('../tools/definitions/users.tools.js');
+    const fromWeb = jest.fn().mockResolvedValue('pl');
+    const client = {
+      getCurrentUser: jest.fn().mockResolvedValue({ id: 5 }),
+      getCurrentUserLanguageFromWeb: fromWeb,
+    } as unknown as AltegioClient;
+
+    const result = await getCurrentUserTool.createHandler(client)({});
+    expect(fromWeb).toHaveBeenCalledTimes(1);
+    expect(result.structuredContent).toEqual({
+      id: 5,
+      name: null,
+      language: 'pl',
+      is_approved: null,
+    });
+  });
+
+  it('reports null when neither the profile nor the web layout names a language', async () => {
     const { getCurrentUserTool } =
       await import('../tools/definitions/users.tools.js');
     const client = {
       getCurrentUser: jest.fn().mockResolvedValue({ id: 5 }),
+      getCurrentUserLanguageFromWeb: jest.fn().mockResolvedValue(null),
     } as unknown as AltegioClient;
 
     const result = await getCurrentUserTool.createHandler(client)({});
@@ -258,5 +278,19 @@ describe('users_get_current', () => {
       language: null,
       is_approved: null,
     });
+  });
+
+  it('does not touch the web layout when the profile already carries lang', async () => {
+    const { getCurrentUserTool } =
+      await import('../tools/definitions/users.tools.js');
+    const fromWeb = jest.fn();
+    const client = {
+      getCurrentUser: jest.fn().mockResolvedValue({ id: 5, lang: 'HU' }),
+      getCurrentUserLanguageFromWeb: fromWeb,
+    } as unknown as AltegioClient;
+
+    const result = await getCurrentUserTool.createHandler(client)({});
+    expect(fromWeb).not.toHaveBeenCalled();
+    expect(result.structuredContent).toMatchObject({ language: 'hu' });
   });
 });

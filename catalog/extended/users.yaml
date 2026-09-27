@@ -33,7 +33,10 @@ paths:
         (the API hash) in the payload; the tool never surfaces it. `lang`, the
         interface language chosen in Altegio (ISO 639-1, region suffix
         possible), is present only on API builds that ship it — older builds
-        omit the field, so it must be read as optional.
+        omit the field, so it must be read as optional. Until it ships, the
+        tool falls back to the ERP web layout: every backoffice page rendered
+        for the same `user_hash` (the personal-account page is used) carries
+        `ms.iso2 = '<code>'` from the person's chosen language.
       responses:
         '201':
           description: The user record in the standard {success,data,meta} envelope.

@@ -14,6 +14,9 @@ is declared stable.
   `GET /user/data`, needs no `location_id`, and is a **base tool**: every facet
   and the read-only view serve it, so a host mounted on `/pro/analytics` can
   speak the user's Altegio language. Reference host: altegio-analytics-agent.
+  While API builds predate `lang`, the language is read from the ERP web
+  layout (`ms.iso2` on the personal-account page, fetched over the legacy
+  `user_hash` lane and cancelled after ~50 KB), so it is available today.
 
 ## [0.5.0-alpha.0]
 

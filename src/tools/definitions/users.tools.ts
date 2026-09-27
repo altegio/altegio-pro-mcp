@@ -14,7 +14,7 @@ export const getCurrentUserTool = defineTool({
   name: 'users_get_current',
   category: 'Users',
   description:
-    'Who is signed in: the user id, display name, approval state and the interface language this person chose in Altegio (ISO 639-1, null when the API build predates the field). AUTHENTICATION REQUIRED. Use it to answer in the language the user reads Altegio in; it reads no location data and needs no location_id.',
+    'Who is signed in: the user id, display name, approval state and the interface language this person chose in Altegio (ISO 639-1; null only when Altegio could not report it). AUTHENTICATION REQUIRED. Use it to answer in the language the user reads Altegio in; it reads no location data and needs no location_id.',
   annotations: {
     title: 'Get Current User',
     readOnlyHint: true,
@@ -24,7 +24,10 @@ export const getCurrentUserTool = defineTool({
   outputSchema: currentUserOutput,
   handler: async ({ client }) => {
     const user = await client.getCurrentUser();
-    const language = isoLanguage(user.lang);
+    // The profile field is the contract; the ERP web layout is the fallback
+    // while API builds predate it.
+    const language =
+      isoLanguage(user.lang) ?? (await client.getCurrentUserLanguageFromWeb());
     const lines = [
       `Signed in as user ${user.id}${user.is_approved === false ? ' (not yet approved)' : ''}.`,
       language
