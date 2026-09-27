@@ -4,7 +4,7 @@
 
 Six mechanisms decide where a tool appears and two more decide whether the
 call it receives there runs. Each is justified on its own terms and none is
-collapsed into the others; this table is the single place that _joins_ them,
+collapsed into the others; this table is the single place that *joins* them,
 so "why is tool X not on address Y" has one answer instead of six lists to
 hold in your head.
 
@@ -18,69 +18,69 @@ the code disagree, which is how a surface change reaches a reviewer’s diff
 
 **95 tools served (101 defined, 6 withheld from every view).**
 
-| What                     | Count  | Where                                                                               |
-| ------------------------ | ------ | ----------------------------------------------------------------------------------- |
-| Defined                  | 101    | 89 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
-| Withheld from every view | 6      | `src/tools/disabled-tools.ts` (the report builder)                                  |
-| **Served**               | **95** | what `stdio` lists; every HTTP view is a subset                                     |
+| What | Count | Where |
+| --- | --- | --- |
+| Defined | 101 | 89 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
+| Withheld from every view | 6 | `src/tools/disabled-tools.ts` (the report builder) |
+| **Served** | **95** | what `stdio` lists; every HTTP view is a subset |
 
 Served tools per category, in `tools/list` order:
 
-| Category     | Served |
-| ------------ | ------ |
-| API          | 3      |
-| Analytics    | 28     |
-| Appointments | 6      |
-| Auth         | 2      |
-| Categories   | 2      |
-| Clients      | 12     |
-| Location     | 3      |
-| Onboarding   | 12     |
-| Positions    | 2      |
-| Resources    | 1      |
-| Schedule     | 4      |
-| Services     | 8      |
-| Settings     | 7      |
-| Team members | 4      |
-| Users        | 1      |
+| Category | Served |
+| --- | --- |
+| API | 3 |
+| Analytics | 28 |
+| Appointments | 6 |
+| Auth | 2 |
+| Categories | 2 |
+| Clients | 12 |
+| Location | 3 |
+| Onboarding | 12 |
+| Positions | 2 |
+| Resources | 1 |
+| Schedule | 4 |
+| Services | 8 |
+| Settings | 7 |
+| Team members | 4 |
+| Users | 1 |
 
 ## Views
 
-| View         | Address               | Serves (of 101 defined) | Reasons                                                           |
-| ------------ | --------------------- | ----------------------- | ----------------------------------------------------------------- |
-| `all`        | stdio (no HTTP route) | 95                      | all ×95, -off ×6                                                  |
-| `default`    | `/mcp`                | 65                      | dflt ×63, -pack ×27, -off ×6, -pwd ×2, -name ×1, xtra ×1, base ×1 |
-| `readonly`   | `/mcp/readonly`       | 56                      | ro ×56, -write ×37, -off ×6, -pwd ×2                              |
-| `ops`        | `/mcp/ops`            | 19                      | - ×74, pfx ×12, -off ×6, rule ×6, -pwd ×2, base ×1                |
-| `catalog`    | `/mcp/catalog`        | 32                      | - ×61, rule ×31, -off ×6, -pwd ×2, base ×1                        |
-| `finance`    | `/mcp/finance`        | 30                      | - ×63, pfx ×28, -off ×6, -pwd ×2, base ×1, rule ×1                |
-| `marketing`  | `/mcp/marketing`      | 2                       | - ×91, -off ×6, -pwd ×2, base ×1, rule ×1                         |
-| `analytics`  | `/mcp/analytics`      | 29                      | - ×64, pfx ×28, -off ×6, -pwd ×2, base ×1                         |
-| `onboarding` | `/mcp/onboarding`     | 13                      | - ×80, pfx ×12, -off ×6, -pwd ×2, base ×1                         |
+| View | Address | Serves (of 101 defined) | Reasons |
+| --- | --- | --- | --- |
+| `all` | stdio (no HTTP route) | 95 | all ×95, -off ×6 |
+| `default` | `/mcp` | 65 | dflt ×63, -pack ×27, -off ×6, -pwd ×2, -name ×1, xtra ×1, base ×1 |
+| `readonly` | `/mcp/readonly` | 56 | ro ×56, -write ×37, -off ×6, -pwd ×2 |
+| `ops` | `/mcp/ops` | 19 | - ×74, pfx ×12, -off ×6, rule ×6, -pwd ×2, base ×1 |
+| `catalog` | `/mcp/catalog` | 32 | - ×61, rule ×31, -off ×6, -pwd ×2, base ×1 |
+| `finance` | `/mcp/finance` | 30 | - ×63, pfx ×28, -off ×6, -pwd ×2, base ×1, rule ×1 |
+| `marketing` | `/mcp/marketing` | 2 | - ×91, -off ×6, -pwd ×2, base ×1, rule ×1 |
+| `analytics` | `/mcp/analytics` | 29 | - ×64, pfx ×28, -off ×6, -pwd ×2, base ×1 |
+| `onboarding` | `/mcp/onboarding` | 13 | - ×80, pfx ×12, -off ×6, -pwd ×2, base ×1 |
 
-A facet answers _how many tools fit in this host’s context_; `readonly`
-answers _what may this agent do at all_. They are different kinds of view —
+A facet answers *how many tools fit in this host’s context*; `readonly`
+answers *what may this agent do at all*. They are different kinds of view —
 `readonly` is not a seventh facet (ADR-001 D3 addendum).
 
 ## Legend
 
-| Code     | Served? | Meaning                                                     | Declared in                                              |
-| -------- | ------- | ----------------------------------------------------------- | -------------------------------------------------------- |
-| `all`    | yes     | the unfiltered view is never filtered                       | `ALL_TOOLS_FACET`                                        |
-| `base`   | yes     | every facet carries it unconditionally                      | `FACET_BASE_TOOLS`                                       |
-| `pwd!`   | yes     | admitted by the deployment switch                           | `PASSWORD_LOGIN_TOOLS` + `ALTEGIO_EXPOSE_PASSWORD_LOGIN` |
-| `rule`   | yes     | named one by one in this facet                              | `FACET_RULES[<facet>].tools`                             |
-| `pfx`    | yes     | matched by this facet’s prefix                              | `FACET_RULES[<facet>].prefixes`                          |
-| `xtra`   | yes     | re-admitted to `/mcp` despite an excluded prefix            | `DEFAULT_FACET_EXTRA_TOOLS`                              |
-| `dflt`   | yes     | on `/mcp` because nothing excludes it                       | (the default)                                            |
-| `ro`     | yes     | declares `readOnlyHint: true`                               | the tool’s own annotations                               |
-| `-pwd`   | no      | a password prompt under an OAuth endpoint                   | `PASSWORD_LOGIN_TOOLS` + `ALTEGIO_EXPOSE_PASSWORD_LOGIN` |
-| `-name`  | no      | a dangerous right `/mcp` does not hand a generic agent      | `DEFAULT_FACET_EXCLUDED_TOOLS`                           |
-| `-pack`  | no      | a whole pack held back from `/mcp`’s tool budget            | `DEFAULT_FACET_EXCLUDED_PREFIXES`                        |
-| `-onb`   | no      | the onboarding config switch is on                          | `MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING`                   |
-| `-`      | no      | this facet’s rule does not name it                          | `FACET_RULES[<facet>]`                                   |
-| `-write` | no      | it changes data, so the read-only address will not serve it | the tool’s own annotations                               |
-| `-off`   | no      | withheld from every view, stdio included                    | `DISABLED_TOOL_NAMES`                                    |
+| Code | Served? | Meaning | Declared in |
+| --- | --- | --- | --- |
+| `all` | yes | the unfiltered view is never filtered | `ALL_TOOLS_FACET` |
+| `base` | yes | every facet carries it unconditionally | `FACET_BASE_TOOLS` |
+| `pwd!` | yes | admitted by the deployment switch | `PASSWORD_LOGIN_TOOLS` + `ALTEGIO_EXPOSE_PASSWORD_LOGIN` |
+| `rule` | yes | named one by one in this facet | `FACET_RULES[<facet>].tools` |
+| `pfx` | yes | matched by this facet’s prefix | `FACET_RULES[<facet>].prefixes` |
+| `xtra` | yes | re-admitted to `/mcp` despite an excluded prefix | `DEFAULT_FACET_EXTRA_TOOLS` |
+| `dflt` | yes | on `/mcp` because nothing excludes it | (the default) |
+| `ro` | yes | declares `readOnlyHint: true` | the tool’s own annotations |
+| `-pwd` | no | a password prompt under an OAuth endpoint | `PASSWORD_LOGIN_TOOLS` + `ALTEGIO_EXPOSE_PASSWORD_LOGIN` |
+| `-name` | no | a dangerous right `/mcp` does not hand a generic agent | `DEFAULT_FACET_EXCLUDED_TOOLS` |
+| `-pack` | no | a whole pack held back from `/mcp`’s tool budget | `DEFAULT_FACET_EXCLUDED_PREFIXES` |
+| `-onb` | no | the onboarding config switch is on | `MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING` |
+| `-` | no | this facet’s rule does not name it | `FACET_RULES[<facet>]` |
+| `-write` | no | it changes data, so the read-only address will not serve it | the tool’s own annotations |
+| `-off` | no | withheld from every view, stdio included | `DISABLED_TOOL_NAMES` |
 
 **A withheld tool is refused, not merely hidden.** What the caller
 reads depends on why:
@@ -106,179 +106,179 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 
 ### API
 
-| Tool                     | stdio | /mcp   | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates                |
-| ------------------------ | ----- | ------ | --------- | ---- | -------- | -------- | ---------- | ---------- | ----------- | -------------------- |
-| `api_call_operation`     | `all` | `dflt` | `ro`      | `-`  | `-`      | `-`      | `-`        | `-`        | `-`         | api:read, reads-only |
-| `api_describe_operation` | `all` | `dflt` | `ro`      | `-`  | `-`      | `-`      | `-`        | `-`        | `-`         | —                    |
-| `api_search_operations`  | `all` | `dflt` | `ro`      | `-`  | `-`      | `-`      | `-`        | `-`        | `-`         | —                    |
+| Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `api_call_operation` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `-` | `-` | `-` | api:read, reads-only |
+| `api_describe_operation` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `-` | `-` | `-` | — |
+| `api_search_operations` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `-` | `-` | `-` | — |
 
 ### Analytics
 
-| Tool                                           | stdio  | /mcp    | /readonly | /ops   | /catalog | /finance | /marketing | /analytics | /onboarding | Gates          |
-| ---------------------------------------------- | ------ | ------- | --------- | ------ | -------- | -------- | ---------- | ---------- | ----------- | -------------- |
-| `analytics_delete_assistant_report`            | `-off` | `-off`  | `-off`    | `-off` | `-off`   | `-off`   | `-off`     | `-off`     | `-off`      | —              |
-| `analytics_get_appointments_breakdown`         | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_capacity_heatmap`               | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_cash_flow_breakdown`            | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_client_cash_receipts`           | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_client_forecast`                | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_client_payer_cohorts`           | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_client_reactivation_candidates` | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_client_retention`               | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_client_sales`                   | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_client_service_penetration`     | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_client_visit_stats`             | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_daily_series`                   | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_day_end_report`                 | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_forecast`                       | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_group_event_performance`        | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_inventory_reorder_risks`        | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_loyalty_program_results`        | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_overview`                       | `all`  | `xtra`  | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_product_sales`                  | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_profit_and_loss_statement`      | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_receptionist_performance`       | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_revenue_leakage`                | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_service_mix_trend`              | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_service_profitability`          | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_team_member_capacity`           | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_team_member_occupancy`          | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_team_member_sales`              | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_get_team_member_service_matrix`     | `all`  | `-pack` | `ro`      | `-`    | `-`      | `pfx`    | `-`        | `pfx`      | `-`         | analytics:read |
-| `analytics_list_report_fields`                 | `-off` | `-off`  | `-off`    | `-off` | `-off`   | `-off`   | `-off`     | `-off`     | `-off`      | —              |
-| `analytics_list_report_templates`              | `-off` | `-off`  | `-off`    | `-off` | `-off`   | `-off`   | `-off`     | `-off`     | `-off`      | —              |
-| `analytics_list_saved_reports`                 | `-off` | `-off`  | `-off`    | `-off` | `-off`   | `-off`   | `-off`     | `-off`     | `-off`      | —              |
-| `analytics_run_report`                         | `-off` | `-off`  | `-off`    | `-off` | `-off`   | `-off`   | `-off`     | `-off`     | `-off`      | —              |
-| `analytics_run_saved_report`                   | `-off` | `-off`  | `-off`    | `-off` | `-off`   | `-off`   | `-off`     | `-off`     | `-off`      | —              |
+| Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `analytics_delete_assistant_report` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | — |
+| `analytics_get_appointments_breakdown` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_capacity_heatmap` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_cash_flow_breakdown` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_client_cash_receipts` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_client_forecast` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_client_payer_cohorts` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_client_reactivation_candidates` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_client_retention` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_client_sales` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_client_service_penetration` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_client_visit_stats` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_daily_series` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_day_end_report` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_forecast` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_group_event_performance` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_inventory_reorder_risks` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_loyalty_program_results` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_overview` | `all` | `xtra` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_product_sales` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_profit_and_loss_statement` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_receptionist_performance` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_revenue_leakage` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_service_mix_trend` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_service_profitability` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_team_member_capacity` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_team_member_occupancy` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_team_member_sales` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_get_team_member_service_matrix` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `pfx` | `-` | analytics:read |
+| `analytics_list_report_fields` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | — |
+| `analytics_list_report_templates` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | — |
+| `analytics_list_saved_reports` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | — |
+| `analytics_run_report` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | — |
+| `analytics_run_saved_report` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | `-off` | — |
 
 ### Appointments
 
-| Tool                              | stdio | /mcp   | /readonly | /ops   | /catalog | /finance | /marketing | /analytics | /onboarding | Gates                       |
-| --------------------------------- | ----- | ------ | --------- | ------ | -------- | -------- | ---------- | ---------- | ----------- | --------------------------- |
-| `appointments_apply_attendance`   | `all` | `dflt` | `-write`  | `rule` | `-`      | `-`      | `-`        | `-`        | `-`         | appointments:write, confirm |
-| `appointments_create`             | `all` | `dflt` | `-write`  | `rule` | `-`      | `-`      | `-`        | `-`        | `-`         | appointments:create         |
-| `appointments_delete`             | `all` | `dflt` | `-write`  | `rule` | `-`      | `-`      | `-`        | `-`        | `-`         | appointments:write, confirm |
-| `appointments_list`               | `all` | `dflt` | `ro`      | `rule` | `-`      | `-`      | `-`        | `-`        | `-`         | appointments:read           |
-| `appointments_preview_attendance` | `all` | `dflt` | `ro`      | `rule` | `-`      | `-`      | `-`        | `-`        | `-`         | appointments:read           |
-| `appointments_update`             | `all` | `dflt` | `-write`  | `rule` | `-`      | `-`      | `-`        | `-`        | `-`         | appointments:write          |
+| Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `appointments_apply_attendance` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:write, confirm |
+| `appointments_create` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:create |
+| `appointments_delete` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:write, confirm |
+| `appointments_list` | `all` | `dflt` | `ro` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:read |
+| `appointments_preview_attendance` | `all` | `dflt` | `ro` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:read |
+| `appointments_update` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:write |
 
 ### Auth
 
-| Tool          | stdio | /mcp   | /readonly | /ops   | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
-| ------------- | ----- | ------ | --------- | ------ | -------- | -------- | ---------- | ---------- | ----------- | ----- |
-| `auth_login`  | `all` | `-pwd` | `-pwd`    | `-pwd` | `-pwd`   | `-pwd`   | `-pwd`     | `-pwd`     | `-pwd`      | —     |
-| `auth_logout` | `all` | `-pwd` | `-pwd`    | `-pwd` | `-pwd`   | `-pwd`   | `-pwd`     | `-pwd`     | `-pwd`      | —     |
+| Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `auth_login` | `all` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | — |
+| `auth_logout` | `all` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | — |
 
 ### Categories
 
-| Tool                        | stdio | /mcp   | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates                   |
-| --------------------------- | ----- | ------ | --------- | ---- | -------- | -------- | ---------- | ---------- | ----------- | ----------------------- |
-| `service_categories_delete` | `all` | `dflt` | `-write`  | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | services:write, confirm |
-| `service_categories_list`   | `all` | `dflt` | `ro`      | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | services:read           |
+| Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `service_categories_delete` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write, confirm |
+| `service_categories_list` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | services:read |
 
 ### Clients
 
-| Tool                               | stdio | /mcp   | /readonly | /ops  | /catalog | /finance | /marketing | /analytics | /onboarding | Gates                                       |
-| ---------------------------------- | ----- | ------ | --------- | ----- | -------- | -------- | ---------- | ---------- | ----------- | ------------------------------------------- |
-| `clients_add_comment`              | `all` | `dflt` | `-write`  | `pfx` | `-`      | `-`      | `-`        | `-`        | `-`         | clients:write                               |
-| `clients_delete`                   | `all` | `dflt` | `-write`  | `pfx` | `-`      | `-`      | `-`        | `-`        | `-`         | clients:write, confirm                      |
-| `clients_get_card`                 | `all` | `dflt` | `ro`      | `pfx` | `-`      | `-`      | `-`        | `-`        | `-`         | clients:read                                |
-| `clients_get_membership_purchases` | `all` | `dflt` | `ro`      | `pfx` | `-`      | `rule`   | `rule`     | `-`        | `-`         | clients:read + loyalty:read + products:read |
-| `clients_get_segment_report`       | `all` | `dflt` | `ro`      | `pfx` | `-`      | `-`      | `-`        | `-`        | `-`         | clients:read                                |
-| `clients_get_visit_history`        | `all` | `dflt` | `ro`      | `pfx` | `-`      | `-`      | `-`        | `-`        | `-`         | clients:read                                |
-| `clients_list_comments`            | `all` | `dflt` | `ro`      | `pfx` | `-`      | `-`      | `-`        | `-`        | `-`         | clients:read                                |
-| `clients_list_files`               | `all` | `dflt` | `ro`      | `pfx` | `-`      | `-`      | `-`        | `-`        | `-`         | clients:read                                |
-| `clients_list_profiles`            | `all` | `dflt` | `ro`      | `pfx` | `-`      | `-`      | `-`        | `-`        | `-`         | clients:read                                |
-| `clients_lookup`                   | `all` | `dflt` | `ro`      | `pfx` | `-`      | `-`      | `-`        | `-`        | `-`         | clients:read                                |
-| `clients_search`                   | `all` | `dflt` | `ro`      | `pfx` | `-`      | `-`      | `-`        | `-`        | `-`         | clients:read                                |
-| `clients_upload_file`              | `all` | `dflt` | `-write`  | `pfx` | `-`      | `-`      | `-`        | `-`        | `-`         | clients:write                               |
+| Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `clients_add_comment` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:write |
+| `clients_delete` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:write, confirm |
+| `clients_get_card` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
+| `clients_get_membership_purchases` | `all` | `dflt` | `ro` | `pfx` | `-` | `rule` | `rule` | `-` | `-` | clients:read + loyalty:read + products:read |
+| `clients_get_segment_report` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
+| `clients_get_visit_history` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
+| `clients_list_comments` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
+| `clients_list_files` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
+| `clients_list_profiles` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
+| `clients_lookup` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
+| `clients_search` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
+| `clients_upload_file` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:write |
 
 ### Location
 
-| Tool                        | stdio | /mcp   | /readonly | /ops   | /catalog | /finance | /marketing | /analytics | /onboarding | Gates           |
-| --------------------------- | ----- | ------ | --------- | ------ | -------- | -------- | ---------- | ---------- | ----------- | --------------- |
-| `locations_diagnose_access` | `all` | `dflt` | `ro`      | `-`    | `rule`   | `-`      | `-`        | `-`        | `-`         | locations:read  |
-| `locations_list`            | `all` | `base` | `ro`      | `base` | `base`   | `base`   | `base`     | `base`     | `base`      | locations:read  |
-| `locations_update`          | `all` | `dflt` | `-write`  | `-`    | `rule`   | `-`      | `-`        | `-`        | `-`         | locations:write |
+| Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `locations_diagnose_access` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
+| `locations_list` | `all` | `base` | `ro` | `base` | `base` | `base` | `base` | `base` | `base` | locations:read |
+| `locations_update` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write |
 
 ### Onboarding
 
-| Tool                                  | stdio | /mcp   | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates                                                                             |
-| ------------------------------------- | ----- | ------ | --------- | ---- | -------- | -------- | ---------- | ---------- | ----------- | --------------------------------------------------------------------------------- |
-| `onboarding_add_categories`           | `all` | `dflt` | `-write`  | `-`  | `-`      | `-`      | `-`        | `-`        | `pfx`       | services:write                                                                    |
-| `onboarding_add_positions`            | `all` | `dflt` | `-write`  | `-`  | `-`      | `-`      | `-`        | `-`        | `pfx`       | team_members:write                                                                |
-| `onboarding_add_services_batch`       | `all` | `dflt` | `-write`  | `-`  | `-`      | `-`      | `-`        | `-`        | `pfx`       | services:write                                                                    |
-| `onboarding_add_team_members_batch`   | `all` | `dflt` | `-write`  | `-`  | `-`      | `-`      | `-`        | `-`        | `pfx`       | team_members:write                                                                |
-| `onboarding_create_test_appointments` | `all` | `dflt` | `-write`  | `-`  | `-`      | `-`      | `-`        | `-`        | `pfx`       | appointments:create                                                               |
-| `onboarding_import_clients`           | `all` | `dflt` | `-write`  | `-`  | `-`      | `-`      | `-`        | `-`        | `pfx`       | clients:write                                                                     |
-| `onboarding_preview_data`             | `all` | `dflt` | `ro`      | `-`  | `-`      | `-`      | `-`        | `-`        | `pfx`       | —                                                                                 |
-| `onboarding_resume`                   | `all` | `dflt` | `ro`      | `-`  | `-`      | `-`      | `-`        | `-`        | `pfx`       | —                                                                                 |
-| `onboarding_rollback_phase`           | `all` | `dflt` | `-write`  | `-`  | `-`      | `-`      | `-`        | `-`        | `pfx`       | team_members:write + services:write + clients:write + appointments:write, confirm |
-| `onboarding_set_schedules`            | `all` | `dflt` | `-write`  | `-`  | `-`      | `-`      | `-`        | `-`        | `pfx`       | team_members:write                                                                |
-| `onboarding_start`                    | `all` | `dflt` | `-write`  | `-`  | `-`      | `-`      | `-`        | `-`        | `pfx`       | —                                                                                 |
-| `onboarding_status`                   | `all` | `dflt` | `ro`      | `-`  | `-`      | `-`      | `-`        | `-`        | `pfx`       | —                                                                                 |
+| Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `onboarding_add_categories` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | services:write |
+| `onboarding_add_positions` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | team_members:write |
+| `onboarding_add_services_batch` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | services:write |
+| `onboarding_add_team_members_batch` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | team_members:write |
+| `onboarding_create_test_appointments` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | appointments:create |
+| `onboarding_import_clients` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | clients:write |
+| `onboarding_preview_data` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `-` | `-` | `pfx` | — |
+| `onboarding_resume` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `-` | `-` | `pfx` | — |
+| `onboarding_rollback_phase` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | team_members:write + services:write + clients:write + appointments:write, confirm |
+| `onboarding_set_schedules` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | team_members:write |
+| `onboarding_start` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | — |
+| `onboarding_status` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `-` | `-` | `pfx` | — |
 
 ### Positions
 
-| Tool               | stdio | /mcp   | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates              |
-| ------------------ | ----- | ------ | --------- | ---- | -------- | -------- | ---------- | ---------- | ----------- | ------------------ |
-| `positions_create` | `all` | `dflt` | `-write`  | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | team_members:write |
-| `positions_list`   | `all` | `dflt` | `ro`      | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | team_members:read  |
+| Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `positions_create` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write |
+| `positions_list` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:read |
 
 ### Resources
 
-| Tool             | stdio | /mcp   | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates          |
-| ---------------- | ----- | ------ | --------- | ---- | -------- | -------- | ---------- | ---------- | ----------- | -------------- |
-| `resources_list` | `all` | `dflt` | `ro`      | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | locations:read |
+| Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `resources_list` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
 
 ### Schedule
 
-| Tool               | stdio | /mcp   | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates                       |
-| ------------------ | ----- | ------ | --------- | ---- | -------- | -------- | ---------- | ---------- | ----------- | --------------------------- |
-| `schedules_create` | `all` | `dflt` | `-write`  | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | team_members:write          |
-| `schedules_delete` | `all` | `dflt` | `-write`  | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | team_members:write, confirm |
-| `schedules_get`    | `all` | `dflt` | `ro`      | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | team_members:read           |
-| `schedules_update` | `all` | `dflt` | `-write`  | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | team_members:write          |
+| Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `schedules_create` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write |
+| `schedules_delete` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write, confirm |
+| `schedules_get` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:read |
+| `schedules_update` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write |
 
 ### Services
 
-| Tool                               | stdio | /mcp   | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates                   |
-| ---------------------------------- | ----- | ------ | --------- | ---- | -------- | -------- | ---------- | ---------- | ----------- | ----------------------- |
-| `services_create`                  | `all` | `dflt` | `-write`  | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | services:write          |
-| `services_delete`                  | `all` | `dflt` | `-write`  | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | services:write, confirm |
-| `services_link_team_member`        | `all` | `dflt` | `-write`  | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | services:write          |
-| `services_list`                    | `all` | `dflt` | `ro`      | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | services:read           |
-| `services_unlink_team_member`      | `all` | `dflt` | `-write`  | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | services:write, confirm |
-| `services_update`                  | `all` | `dflt` | `-write`  | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | services:write          |
-| `services_update_team_member_link` | `all` | `dflt` | `-write`  | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | services:write          |
-| `team_members_link_services`       | `all` | `dflt` | `-write`  | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | services:write          |
+| Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `services_create` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write |
+| `services_delete` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write, confirm |
+| `services_link_team_member` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write |
+| `services_list` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | services:read |
+| `services_unlink_team_member` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write, confirm |
+| `services_update` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write |
+| `services_update_team_member_link` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write |
+| `team_members_link_services` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write |
 
 ### Settings
 
-| Tool                                   | stdio | /mcp   | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates                    |
-| -------------------------------------- | ----- | ------ | --------- | ---- | -------- | -------- | ---------- | ---------- | ----------- | ------------------------ |
-| `booking_forms_create`                 | `all` | `dflt` | `-write`  | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | locations:write          |
-| `booking_forms_delete`                 | `all` | `dflt` | `-write`  | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | locations:write, confirm |
-| `booking_forms_list`                   | `all` | `dflt` | `ro`      | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | locations:read           |
-| `settings_get_appointment_calendar`    | `all` | `dflt` | `ro`      | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | locations:read           |
-| `settings_get_online_booking`          | `all` | `dflt` | `ro`      | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | locations:read           |
-| `settings_update_appointment_calendar` | `all` | `dflt` | `-write`  | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | locations:write          |
-| `settings_update_online_booking`       | `all` | `dflt` | `-write`  | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | locations:write          |
+| Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `booking_forms_create` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write |
+| `booking_forms_delete` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write, confirm |
+| `booking_forms_list` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
+| `settings_get_appointment_calendar` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
+| `settings_get_online_booking` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
+| `settings_update_appointment_calendar` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write |
+| `settings_update_online_booking` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write |
 
 ### Team members
 
-| Tool                  | stdio | /mcp   | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates                       |
-| --------------------- | ----- | ------ | --------- | ---- | -------- | -------- | ---------- | ---------- | ----------- | --------------------------- |
-| `team_members_create` | `all` | `dflt` | `-write`  | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | team_members:write          |
-| `team_members_delete` | `all` | `dflt` | `-write`  | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | team_members:write, confirm |
-| `team_members_list`   | `all` | `dflt` | `ro`      | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | team_members:read           |
-| `team_members_update` | `all` | `dflt` | `-write`  | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | team_members:write          |
+| Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `team_members_create` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write |
+| `team_members_delete` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write, confirm |
+| `team_members_list` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:read |
+| `team_members_update` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write |
 
 ### Users
 
-| Tool                    | stdio | /mcp    | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates                               |
-| ----------------------- | ----- | ------- | --------- | ---- | -------- | -------- | ---------- | ---------- | ----------- | ----------------------------------- |
-| `locations_remove_user` | `all` | `-name` | `-write`  | `-`  | `rule`   | `-`      | `-`        | `-`        | `-`         | team_members:manage_access, confirm |
+| Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `locations_remove_user` | `all` | `-name` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:manage_access, confirm |
 
 ## Deployment switches
 
@@ -298,3 +298,4 @@ onboarding on `/mcp`. Two environment switches change it.
 `MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING=true`:
 
 - `/mcp` — −`onboarding_add_categories`, −`onboarding_add_positions`, −`onboarding_add_services_batch`, −`onboarding_add_team_members_batch`, −`onboarding_create_test_appointments`, −`onboarding_import_clients`, −`onboarding_preview_data`, −`onboarding_resume`, −`onboarding_rollback_phase`, −`onboarding_set_schedules`, −`onboarding_start`, −`onboarding_status`
+
