@@ -18,7 +18,9 @@ const args = Object.fromEntries(
     .map((a, i, arr) => (a.startsWith('--') ? [a.slice(2), arr[i + 1]] : null))
     .filter(Boolean)
 );
-const documentedFile = path.resolve(args.documented ?? '.inventory/documented-ops.tsv');
+const documentedFile = path.resolve(
+  args.documented ?? '.inventory/documented-ops.tsv'
+);
 const routesFile = path.resolve(args.routes ?? '.inventory/backend-routes.tsv');
 const outFile = path.resolve(args.out ?? '.inventory/undocumented-v1.tsv');
 
@@ -64,7 +66,9 @@ const matched = unique.filter((r) => docKeys.has(`${r[1]} ${r[2]}`));
 const undocumented = unique.filter((r) => !docKeys.has(`${r[1]} ${r[2]}`));
 
 console.log(`backend /api/v1 unique method+path: ${unique.length}`);
-console.log(`documented (v1 + public + developers) operations: ${docKeys.size}`);
+console.log(
+  `documented (v1 + public + developers) operations: ${docKeys.size}`
+);
 console.log(`backend routes matched by docs: ${matched.length}`);
 console.log(`backend routes NOT documented: ${undocumented.length}`);
 
@@ -85,8 +89,13 @@ Object.entries(bySegment)
 
 const backendKeys = new Set(unique.map((r) => `${r[1]} ${r[2]}`));
 const stale = [...docKeys].filter((k) => !backendKeys.has(k));
-console.log(`documented operations with no exact backend route (aliases or stale): ${stale.length}`);
+console.log(
+  `documented operations with no exact backend route (aliases or stale): ${stale.length}`
+);
 
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
-fs.writeFileSync(outFile, undocumented.map((r) => r.join('\t')).join('\n') + '\n');
+fs.writeFileSync(
+  outFile,
+  undocumented.map((r) => r.join('\t')).join('\n') + '\n'
+);
 console.log(`written ${outFile}`);

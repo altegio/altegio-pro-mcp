@@ -450,8 +450,7 @@ export class OnboardingHandlers {
       const missing: MissingSeatChoice[] = [];
       staffArray.forEach((staff, index) => {
         const paidSeat = staff.has_paid_seat ?? batchPaidSeat;
-        const scheduleAccess =
-          staff.has_schedule_access ?? batchScheduleAccess;
+        const scheduleAccess = staff.has_schedule_access ?? batchScheduleAccess;
         if (paidSeat !== undefined && scheduleAccess !== undefined) {
           rows.push({ staff, paidSeat, scheduleAccess });
           return;

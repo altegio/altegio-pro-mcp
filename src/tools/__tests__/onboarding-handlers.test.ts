@@ -374,8 +374,18 @@ describe('Onboarding Handlers', () => {
       const result = await handlers.addServicesBatch({
         location_id: 123,
         services: [
-          { title: 'Haircut', price_min: 50, duration_seconds: 1800, category_id: 10 },
-          { title: 'Manicure', price_min: 30, duration_seconds: 1200, category_id: 10 },
+          {
+            title: 'Haircut',
+            price_min: 50,
+            duration_seconds: 1800,
+            category_id: 10,
+          },
+          {
+            title: 'Manicure',
+            price_min: 30,
+            duration_seconds: 1200,
+            category_id: 10,
+          },
         ],
       });
 
@@ -1023,7 +1033,9 @@ describe('Onboarding Handlers', () => {
         () =>
           handlers.addServicesBatch({
             location_id: 123,
-            services: [{ title: CANARY, price_min: 10, duration_seconds: 1800 }],
+            services: [
+              { title: CANARY, price_min: 10, duration_seconds: 1800 },
+            ],
           }),
       ],
       [
@@ -1094,7 +1106,12 @@ describe('Onboarding Handlers', () => {
       await handlers.addServicesBatch({
         location_id: 123,
         services: [
-          { title: 'Haircut', price_min: 50, duration_seconds: 1800, category_id: 10 },
+          {
+            title: 'Haircut',
+            price_min: 50,
+            duration_seconds: 1800,
+            category_id: 10,
+          },
         ],
       });
 

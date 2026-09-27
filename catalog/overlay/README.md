@@ -16,11 +16,11 @@ the executor write allowlist.
 
 ## Files
 
-| File | Purpose |
-| --- | --- |
-| `_schema.yaml` | Field-by-field format reference with an annotated example. Files starting with `_` are documentation and are **not** read by the build. |
+| File                  | Purpose                                                                                                                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `_schema.yaml`        | Field-by-field format reference with an annotated example. Files starting with `_` are documentation and are **not** read by the build.                                                    |
 | `existing-tools.yaml` | The operations already covered by the hand-written tools in `src/tools/definitions/` — their tool names and domains, so a future generated pack never claims a name that is already taken. |
-| `<domain>.yaml` | One file per domain as packs get curated. |
+| `<domain>.yaml`       | One file per domain as packs get curated.                                                                                                                                                  |
 
 ## Shape
 

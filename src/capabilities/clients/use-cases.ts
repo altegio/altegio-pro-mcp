@@ -25,10 +25,7 @@ import type {
   AppointmentOutcome,
 } from '../../api/clients-api.js';
 import { ClientsInputError } from './errors.js';
-import {
-  pageMetadata,
-  windowPagination,
-} from '../../tools/pagination.js';
+import { pageMetadata, windowPagination } from '../../tools/pagination.js';
 import {
   cardSummary,
   lookupSummary,

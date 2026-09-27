@@ -18,7 +18,7 @@ export const analyticsGetClientPayerCohortsTool = defineTool({
   name: 'analytics_get_client_payer_cohorts',
   category: 'Analytics',
   description:
-    '[Analytics] Rank identified paying clients by signed net cash receipts in service payments, product sales, miscellaneous income and client-account top-ups over up to 12 complete local months. Returns top 10%, next 10% and remaining payer counts and cash, plus a page of stable client ids for one cohort. Reads every selected finance transaction (at most 4,000), verifies unrestricted finance history and authorized accounts, repeats the source list and reconciles each month to the finance report. Refuses oversized or changed sources; never returns a partial cohort or contacts. For monthly receipts by stream use analytics_get_client_cash_receipts.',
+    'Rank identified paying clients by signed net cash receipts in service payments, product sales, miscellaneous income and client-account top-ups over up to 12 complete local months. Returns top 10%, next 10% and remaining payer counts and cash, plus a page of stable client ids for one cohort. Reads every selected finance transaction (at most 4,000), verifies unrestricted finance history and authorized accounts, repeats the source list and reconciles each month to the finance report. Refuses oversized or changed sources; never returns a partial cohort or contacts. For monthly receipts by stream use analytics_get_client_cash_receipts.',
   annotations: {
     title: 'Analytics: client payer cohorts',
     readOnlyHint: true,

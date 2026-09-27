@@ -13,7 +13,12 @@ import { catalog } from '../executor/catalog.js';
 import { MAX_SEARCH_RESULTS, searchOperations } from '../executor/search.js';
 import { describeOperation } from '../executor/describe.js';
 import { callOperation } from '../executor/call.js';
-import { pageArg, pageMetadata, pageSizeArg, paginationOutput } from '../pagination.js';
+import {
+  pageArg,
+  pageMetadata,
+  pageSizeArg,
+  paginationOutput,
+} from '../pagination.js';
 
 const DOMAINS = catalog.domains.map((d) => d.domain).join(', ');
 
@@ -49,7 +54,7 @@ export const searchOperationsTool = defineTool({
   name: 'api_search_operations',
   category: 'API',
   description:
-    '[API] Find the API operations behind a business question — "who worked last Tuesday", ' +
+    'Find the API operations behind a business question — "who worked last Tuesday", ' +
     '"loyalty card balance", "cash register shifts" — when no dedicated tool covers it. ' +
     `Returns a page of up to ${MAX_SEARCH_RESULTS} operations with their operationId, method, canonical path, one-line ` +
     'summary and domain, and names the curated tool when one already exists (prefer that ' +
@@ -152,7 +157,7 @@ export const describeOperationTool = defineTool({
   name: 'api_describe_operation',
   category: 'API',
   description:
-    '[API] Read the full contract of one API operation before calling it: every parameter ' +
+    'Read the full contract of one API operation before calling it: every parameter ' +
     'with type, requiredness and description, the request body shape, the response shape, ' +
     'whether a logged-in session is needed, whether it is deprecated, which spec it comes ' +
     'from, and which legacy parameter names are accepted under canonical ones (for example ' +
@@ -184,7 +189,7 @@ export const callOperationTool = defineTool({
   name: 'api_call_operation',
   category: 'API',
   description:
-    '[API] Run a documented read against the Altegio API when no curated tool covers it. ' +
+    'Run a documented read against the Altegio API when no curated tool covers it. ' +
     'Give the operationId from `api_search_operations` and its parameters under `params`; ' +
     'canonical names are accepted (`location_id`, `team_member_id`, `appointment_id`, ' +
     '`product_id`), required parameters are validated against the spec, and the result comes ' +

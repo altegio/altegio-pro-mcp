@@ -43,8 +43,8 @@ tests/
 examples/
 *.md
 !README.md
-!docs/Altegio API and Product Logic Documentation.md
-!docs/ONBOARDING_GUIDE.md
+!docs/product-logic.md
+!docs/onboarding-guide.md
 
 # CI/CD
 .github/

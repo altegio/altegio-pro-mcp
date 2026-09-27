@@ -1,34 +1,32 @@
 # OpenAPI Specification
 
-## Overview
+The tool catalog (`src/generated/catalog.json`) and the spec-compliance tests are
+built from the Altegio B2B OpenAPI specification. The public reference is
+published at <https://developer.alteg.io/api>; the build reads a local checkout
+of the specification repository.
 
-Corporate OpenAPI specification lives in a separate repository cloned alongside this project at `../biz.erp.api.docs/`.
+## Location of the specification
 
-**Spec files:** `../biz.erp.api.docs/docs/en/b2b-v1/openapi.yaml` (v1, legacy but live), `../biz.erp.api.docs/docs/en/b2b-v3/openapi.yaml` (V3 preview, October 2026), `../biz.erp.api.docs/docs/en/public/openapi.yaml`, `../biz.erp.api.docs/docs/en/developers/openapi.yaml`. `docs/en/b2b-v2/openapi.yaml` is internal-only by API-team policy.
+Set `ALTEGIO_API_DOCS` to the root of the checkout. Without the variable the
+build looks for a sibling directory named `biz.erp.api.docs` next to this
+repository. Inside the checkout the build reads:
 
-## Workflow
+- `docs/en/b2b-v1/openapi.yaml` — V1, the live API every curated tool uses
+  (path items under `docs/en/paths/**`, schemas under `docs/en/schemas/**`)
+- `docs/en/b2b-v3/openapi.yaml` — V3 preview, described in the catalog but not
+  callable yet
 
-**IMPORTANT:** Before starting any new task, ALWAYS pull the latest specification:
+The checkout is read-only for this project. Corrections to the specification
+belong in the specification repository.
+
+## Commands
 
 ```bash
-git -C ../biz.erp.api.docs pull origin master
+npm run catalog:build   # rebuild src/generated/catalog.json
+npm run catalog:check   # CI gate; skipped with a notice when no checkout is found
+npm run api:inventory   # spec inventory, written to the gitignored .inventory/
 ```
 
-## Usage in Development
-
-When implementing new features or fixing bugs, always check the OpenAPI spec first:
-- Main files: `../biz.erp.api.docs/docs/en/b2b-v1/openapi.yaml`, `../biz.erp.api.docs/docs/en/b2b-v3/openapi.yaml`
-- Path items: `../biz.erp.api.docs/docs/en/paths/**` (referenced via `$ref` from the spec files)
-- Schemas and responses: `../biz.erp.api.docs/docs/en/schemas/**`, `../biz.erp.api.docs/docs/en/components/responses/`
-
-## Critical Rules
-
-**NEVER modify anything inside `../biz.erp.api.docs/`!**
-
-- This is a separate repository, read-only for this project
-- All changes must be made in the source repository directly
-
-## Alternative Access
-
-If you don't have the repository cloned locally, the API documentation is also available at:
-- https://developer.alteg.io/api (cached at `/tmp/alteg_api.html`)
+Pull the latest specification before rebuilding the catalog, and commit the
+regenerated `src/generated/catalog.json` in the same pull request. Never edit the
+generated file by hand.

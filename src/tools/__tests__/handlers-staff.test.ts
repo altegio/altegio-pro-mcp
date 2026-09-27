@@ -36,9 +36,7 @@ describe('ToolHandlers - Staff CRUD', () => {
         has_schedule_access: true,
       });
 
-      expect(result.content[0]?.text).toContain(
-        'Created team member'
-      );
+      expect(result.content[0]?.text).toContain('Created team member');
       expect(result.content[0]?.text).toContain('John Doe');
       expect(mockClient.createStaff).toHaveBeenCalledWith(456, {
         name: 'John Doe',
@@ -177,9 +175,7 @@ describe('ToolHandlers - Staff CRUD', () => {
         name: 'John Smith',
       });
 
-      expect(result.content[0]?.text).toContain(
-        'Updated team member'
-      );
+      expect(result.content[0]?.text).toContain('Updated team member');
       expect(mockClient.updateStaff).toHaveBeenCalledWith(456, 123, {
         name: 'John Smith',
       });
@@ -195,9 +191,7 @@ describe('ToolHandlers - Staff CRUD', () => {
         team_member_id: 123,
       });
 
-      expect(result.content[0]?.text).toContain(
-        'Deleted team member'
-      );
+      expect(result.content[0]?.text).toContain('Deleted team member');
       expect(mockClient.deleteStaff).toHaveBeenCalledWith(456, 123);
     });
   });

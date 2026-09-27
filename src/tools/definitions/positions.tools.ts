@@ -12,7 +12,7 @@ export const getPositionsTool = defineTool({
   name: 'positions_list',
   category: 'Positions',
   description:
-    '[Positions] Get the positions that can be assigned to team members in a location. AUTHENTICATION REQUIRED. This uses the deprecated but still documented public V1 read; public V1 does not provide position update or delete operations.',
+    'Get the positions that can be assigned to team members in a location. AUTHENTICATION REQUIRED. This uses the deprecated but still documented public V1 read; public V1 does not provide position update or delete operations.',
   annotations: {
     title: 'Get Positions',
     readOnlyHint: true,
@@ -62,7 +62,7 @@ export const createPositionTool = defineTool({
   name: 'positions_create',
   category: 'Positions',
   description:
-    '[Positions] Create a new position through the deprecated but still documented public V1 quick-create operation. AUTHENTICATION REQUIRED. Positions categorize team-member roles (for example Manager, Stylist, Receptionist). Public V1 accepts only the title and does not provide position update or delete operations.',
+    'Create a new position through the deprecated but still documented public V1 quick-create operation. AUTHENTICATION REQUIRED. Positions categorize team-member roles (for example Manager, Stylist, Receptionist). Public V1 accepts only the title and does not provide position update or delete operations.',
   annotations: {
     title: 'Create Position',
     destructiveHint: false,

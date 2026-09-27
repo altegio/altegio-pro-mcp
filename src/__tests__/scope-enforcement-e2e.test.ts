@@ -273,7 +273,10 @@ describe('token scopes gate execution, end to end', () => {
   it('refuses in band when the token lacks the scope, and keeps the session', async () => {
     const session = await openSession('appointments:read clients:read');
 
-    const denied = await session.call('locations_list', { managed_only: true, page_size: 1 });
+    const denied = await session.call('locations_list', {
+      managed_only: true,
+      page_size: 1,
+    });
     // In band: a 200 carrying a JSON-RPC result, not an HTTP 403 and not a
     // protocol error — the session must survive a denial.
     expect(denied.status).toBe(200);

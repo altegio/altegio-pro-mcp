@@ -38,9 +38,24 @@ paths:
         Returns a raw array with no {success,data,meta} envelope, like the other
         chart endpoints. Series carry stable slugs.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: date_from, in: query, required: true, schema: { type: string, format: date } }
-        - { name: date_to, in: query, required: true, schema: { type: string, format: date } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: date_from,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: date_to,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
         - { name: team_member_id, in: query, schema: { type: integer } }
         - { name: position_id, in: query, schema: { type: integer } }
         - { name: user_id, in: query, schema: { type: integer } }
@@ -73,9 +88,24 @@ paths:
         With no receptionist matching the filter the response is an all-zero
         container with HTTP 200, not an error.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: date_from, in: query, required: true, schema: { type: string, format: date } }
-        - { name: date_to, in: query, required: true, schema: { type: string, format: date } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: date_from,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: date_to,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
         - { name: user_id, in: query, schema: { type: integer } }
         - name: include
           in: query
@@ -111,9 +141,24 @@ paths:
       summary: Appointments closed and settled by receptionists
       x-altegio-permission: reports_access | reports_admins_access | own user_id
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: date_from, in: query, required: true, schema: { type: string, format: date } }
-        - { name: date_to, in: query, required: true, schema: { type: string, format: date } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: date_from,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: date_to,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
         - { name: user_id, in: query, schema: { type: integer } }
         - name: include
           in: query
@@ -151,9 +196,24 @@ paths:
         Includes client account top-ups. Sums are floats in major units; the
         currency arrives as the shared currency object.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: date_from, in: query, required: true, schema: { type: string, format: date } }
-        - { name: date_to, in: query, required: true, schema: { type: string, format: date } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: date_from,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: date_to,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
         - { name: user_id, in: query, schema: { type: integer } }
         - name: include
           in: query
@@ -189,9 +249,24 @@ paths:
       summary: Clients rebooked after an attended visit
       x-altegio-permission: reports_access | reports_admins_access | own user_id
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: date_from, in: query, required: true, schema: { type: string, format: date } }
-        - { name: date_to, in: query, required: true, schema: { type: string, format: date } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: date_from,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: date_to,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
         - { name: user_id, in: query, schema: { type: integer } }
         - name: include
           in: query
@@ -219,9 +294,24 @@ paths:
       summary: Clients rebooked after a no-show
       x-altegio-permission: reports_access | reports_admins_access | own user_id
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: date_from, in: query, required: true, schema: { type: string, format: date } }
-        - { name: date_to, in: query, required: true, schema: { type: string, format: date } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: date_from,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: date_to,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
         - { name: user_id, in: query, schema: { type: integer } }
         - name: include
           in: query
@@ -253,8 +343,17 @@ paths:
         a model forecast with the actuals. With no prediction for the range an
         empty container is returned with HTTP 200.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: start_date, in: query, schema: { type: string, format: date } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: start_date,
+            in: query,
+            schema: { type: string, format: date },
+          }
         - { name: end_date, in: query, schema: { type: string, format: date } }
       responses:
         '200':
@@ -284,9 +383,24 @@ paths:
         rows that cannot be attributed — call it once per team member.
         start_date and end_date are required (HTTP 400 otherwise).
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: start_date, in: query, required: true, schema: { type: string, format: date } }
-        - { name: end_date, in: query, required: true, schema: { type: string, format: date } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: start_date,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: end_date,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
         - { name: team_member_id, in: query, schema: { type: integer } }
       responses:
         '200':
@@ -316,8 +430,18 @@ paths:
         "<client_id>_<location_id>", and client account top-ups arrive as an
         include we do not read.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: client_id, in: path, required: true, schema: { type: integer } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: client_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
       responses:
         '200':
           description: Attended and missed visit counts, money spent and paid, account balance.
@@ -350,7 +474,12 @@ paths:
         datasets, of which roughly 165 are curated and the rest are mechanical
         aggregate variants. Proxy it, never hard-code it.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
       responses:
         '200':
           description: Every visible column of every dataset.
@@ -378,7 +507,16 @@ paths:
                           enum: [NUMERICS, DATE, STRING, BOOLEAN]
                         metric_type_slug:
                           type: string
-                          enum: [sum, percent, average, minimum, maximum, count, plain]
+                          enum:
+                            [
+                              sum,
+                              percent,
+                              average,
+                              minimum,
+                              maximum,
+                              count,
+                              plain,
+                            ]
                         expression_slug: { type: [string, 'null'] }
                         is_default: { type: boolean }
                         is_groupable: { type: boolean }
@@ -395,7 +533,12 @@ paths:
         includes carry the column, filter and grouping definition needed to
         clone a template into a runnable report.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
         - name: include
           in: query
           schema:
@@ -433,7 +576,12 @@ paths:
       x-altegio-permission: reports_access, plus an active subscription
       x-altegio-caveat: A missing access right answers 404, not 403.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
       responses:
         '200':
           description: Saved reports.
@@ -455,7 +603,12 @@ paths:
         stays visible to the user. The MCP keeps exactly one report per template
         or ad-hoc shape, named "[Altegio Assistant] …", and reuses it.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
       requestBody:
         required: true
         content:
@@ -481,8 +634,18 @@ paths:
         A report belonging to another location answers 404, and so does a
         missing access right — 404 does not prove the report is gone.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: report_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: report_id,
+            in: path,
+            required: true,
+            schema: { type: string, format: uuid },
+          }
         - name: include
           in: query
           schema:
@@ -505,8 +668,18 @@ paths:
       summary: Update one saved report in place
       x-altegio-permission: reports_access, plus an active subscription
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: report_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: report_id,
+            in: path,
+            required: true,
+            schema: { type: string, format: uuid },
+          }
       requestBody:
         required: true
         content:
@@ -535,8 +708,18 @@ paths:
         and `summary` blocks name their column id field `report_grouping_id`
         even though it holds a report column id.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: report_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: report_id,
+            in: path,
+            required: true,
+            schema: { type: string, format: uuid },
+          }
       requestBody:
         required: true
         content:
@@ -553,7 +736,24 @@ paths:
                       id: { type: string, format: uuid }
                       operator:
                         type: string
-                        enum: ['>', '>=', '<', '<=', '=', '!=', 'IN', 'NOT IN', 'LIKE', 'NOT LIKE', 'ILIKE', 'NOT ILIKE', 'BETWEEN', 'IS', 'IS NOT']
+                        enum:
+                          [
+                            '>',
+                            '>=',
+                            '<',
+                            '<=',
+                            '=',
+                            '!=',
+                            'IN',
+                            'NOT IN',
+                            'LIKE',
+                            'NOT LIKE',
+                            'ILIKE',
+                            'NOT ILIKE',
+                            'BETWEEN',
+                            'IS',
+                            'IS NOT',
+                          ]
                       value:
                         oneOf:
                           - type: string
@@ -620,8 +820,18 @@ paths:
         period already stored in the report. Returns arrays of cells rather
         than the new header/rows/summary pivot.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: report_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: report_id,
+            in: path,
+            required: true,
+            schema: { type: string, format: uuid },
+          }
       requestBody:
         required: false
         content:
@@ -662,8 +872,18 @@ paths:
         generations address the same saved-report records. The MCP exposes this
         route only for reports whose name starts with "[Altegio Assistant]".
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: report_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: report_id,
+            in: path,
+            required: true,
+            schema: { type: string, format: uuid },
+          }
       responses:
         '204':
           description: Report deleted.
@@ -680,13 +900,35 @@ paths:
         parsed structure. Authentication is injected by the transport and is
         never exposed as a tool argument or catalog parameter.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: start_date, in: query, required: true, schema: { type: string, format: date } }
-        - { name: end_date, in: query, required: true, schema: { type: string, format: date } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: start_date,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: end_date,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
         - { name: page, in: query, schema: { type: integer, minimum: 1 } }
-        - { name: editable_length, in: query, schema: { type: integer, minimum: 1, maximum: 250 } }
+        - {
+            name: editable_length,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 250 },
+          }
       responses:
-        '200': { description: JSON envelope containing the report HTML and total row count. }
+        '200':
+          {
+            description: JSON envelope containing the report HTML and total row count.,
+          }
 
   /analytics_retention/retention_search/{location_id}/:
     get:
@@ -696,12 +938,28 @@ paths:
       x-altegio-permission: Client retention report
       x-altegio-caveat: Temporary until an equivalent V3 operation exists; response content is HTML pinned by a contract fixture.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: start_date, in: query, required: true, schema: { type: string, format: date } }
-        - { name: end_date, in: query, required: true, schema: { type: string, format: date } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: start_date,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: end_date,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
         - { name: service_id, in: query, schema: { type: integer, minimum: 0 } }
       responses:
-        '200': { description: JSON envelope containing the report HTML and totals. }
+        '200':
+          { description: JSON envelope containing the report HTML and totals. }
 
   /analytics/rfm/{location_id}/excel/clients:
     get:
@@ -713,8 +971,17 @@ paths:
         Temporary BIFF8 workbook export. It contains no client id, so the MCP
         reports client_id as null rather than inferring identity from contact data.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: prediction_date, in: query, schema: { type: string, format: date } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: prediction_date,
+            in: query,
+            schema: { type: string, format: date },
+          }
       responses:
         '200': { description: BIFF8 workbook with one forecast row per client. }
 
@@ -726,16 +993,46 @@ paths:
       x-altegio-permission: Sales by services report
       x-altegio-caveat: Temporary until an equivalent V3 operation exists; response content is HTML pinned by a contract fixture.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: start_date, in: query, required: true, schema: { type: string, format: date } }
-        - { name: end_date, in: query, required: true, schema: { type: string, format: date } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: start_date,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: end_date,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
         - { name: master_id, in: query, schema: { type: integer, minimum: 0 } }
-        - { name: category_id, in: query, schema: { type: integer, minimum: 0 } }
-        - { name: detailing, in: query, schema: { type: integer, enum: [0, 1] } }
+        - {
+            name: category_id,
+            in: query,
+            schema: { type: integer, minimum: 0 },
+          }
+        - {
+            name: detailing,
+            in: query,
+            schema: { type: integer, enum: [0, 1] },
+          }
         - { name: page, in: query, schema: { type: integer, minimum: 1 } }
-        - { name: editable_length, in: query, schema: { type: integer, minimum: 1, maximum: 500 } }
+        - {
+            name: editable_length,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 500 },
+          }
       responses:
-        '200': { description: JSON envelope containing the report HTML and total row count. }
+        '200':
+          {
+            description: JSON envelope containing the report HTML and total row count.,
+          }
 
   /analytics_masters/masters_search/{location_id}/:
     get:
@@ -745,16 +1042,52 @@ paths:
       x-altegio-permission: Sales by team members report
       x-altegio-caveat: Temporary until an equivalent V3 operation exists; repeated filter ids match the ERP report form.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: start_date, in: query, required: true, schema: { type: string, format: date } }
-        - { name: end_date, in: query, required: true, schema: { type: string, format: date } }
-        - { name: 'services_ids[]', in: query, schema: { type: array, items: { type: integer } } }
-        - { name: 'groups_ids[]', in: query, schema: { type: array, items: { type: integer } } }
-        - { name: 'goods_ids[]', in: query, schema: { type: array, items: { type: integer } } }
-        - { name: 'goods_categories_ids[]', in: query, schema: { type: array, items: { type: integer } } }
-        - { name: 'position_ids[]', in: query, schema: { type: array, items: { type: integer } } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: start_date,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: end_date,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: 'services_ids[]',
+            in: query,
+            schema: { type: array, items: { type: integer } },
+          }
+        - {
+            name: 'groups_ids[]',
+            in: query,
+            schema: { type: array, items: { type: integer } },
+          }
+        - {
+            name: 'goods_ids[]',
+            in: query,
+            schema: { type: array, items: { type: integer } },
+          }
+        - {
+            name: 'goods_categories_ids[]',
+            in: query,
+            schema: { type: array, items: { type: integer } },
+          }
+        - {
+            name: 'position_ids[]',
+            in: query,
+            schema: { type: array, items: { type: integer } },
+          }
       responses:
-        '200': { description: JSON envelope containing the report HTML and totals. }
+        '200':
+          { description: JSON envelope containing the report HTML and totals. }
 
   /analytics_workload/workload_search/{location_id}/:
     get:
@@ -764,11 +1097,27 @@ paths:
       x-altegio-permission: Team occupancy report
       x-altegio-caveat: Temporary until equivalent V3; golden contracts in legacy-analytics-next.test.ts and legacy-analytics-adapter.test.ts.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: "start_date", in: query, schema: { type: string, format: date } }
-        - { name: "end_date", in: query, schema: { type: string, format: date } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: 'start_date',
+            in: query,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: 'end_date',
+            in: query,
+            schema: { type: string, format: date },
+          }
       responses:
-        '200': { description: JSON search envelope containing HTML; bounded parsing and explicit structural drift failures. }
+        '200':
+          {
+            description: JSON search envelope containing HTML; bounded parsing and explicit structural drift failures.,
+          }
 
   /dashboard/activities/{location_id}/search:
     get:
@@ -778,18 +1127,34 @@ paths:
       x-altegio-permission: Group-event dashboard access
       x-altegio-caveat: Temporary until equivalent V3; golden contracts in legacy-analytics-next.test.ts and legacy-analytics-adapter.test.ts.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: "start_date", in: query, schema: { type: string, format: date } }
-        - { name: "end_date", in: query, schema: { type: string, format: date } }
-        - { name: "page", in: query, schema: { type: integer } }
-        - { name: "editable_length", in: query, schema: { type: integer } }
-        - { name: "master", in: query, schema: { type: integer } }
-        - { name: "service", in: query, schema: { type: integer } }
-        - { name: "service_category", in: query, schema: { type: integer } }
-        - { name: "category", in: query, schema: { type: integer } }
-        - { name: "removed", in: query, schema: { type: integer } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: 'start_date',
+            in: query,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: 'end_date',
+            in: query,
+            schema: { type: string, format: date },
+          }
+        - { name: 'page', in: query, schema: { type: integer } }
+        - { name: 'editable_length', in: query, schema: { type: integer } }
+        - { name: 'master', in: query, schema: { type: integer } }
+        - { name: 'service', in: query, schema: { type: integer } }
+        - { name: 'service_category', in: query, schema: { type: integer } }
+        - { name: 'category', in: query, schema: { type: integer } }
+        - { name: 'removed', in: query, schema: { type: integer } }
       responses:
-        '200': { description: JSON search envelope containing HTML; bounded parsing and explicit structural drift failures. }
+        '200':
+          {
+            description: JSON search envelope containing HTML; bounded parsing and explicit structural drift failures.,
+          }
 
   /storages/sales_analysis/search/{location_id}/:
     get:
@@ -799,16 +1164,32 @@ paths:
       x-altegio-permission: Inventory sales report; cost view separately enforced
       x-altegio-caveat: Temporary until equivalent V3; golden contracts in legacy-analytics-next.test.ts and legacy-analytics-adapter.test.ts.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: "start_date", in: query, schema: { type: string, format: date } }
-        - { name: "end_date", in: query, schema: { type: string, format: date } }
-        - { name: "page", in: query, schema: { type: integer } }
-        - { name: "editable_length", in: query, schema: { type: integer } }
-        - { name: "category_id", in: query, schema: { type: integer } }
-        - { name: "employee_id", in: query, schema: { type: integer } }
-        - { name: "supplier_id", in: query, schema: { type: integer } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: 'start_date',
+            in: query,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: 'end_date',
+            in: query,
+            schema: { type: string, format: date },
+          }
+        - { name: 'page', in: query, schema: { type: integer } }
+        - { name: 'editable_length', in: query, schema: { type: integer } }
+        - { name: 'category_id', in: query, schema: { type: integer } }
+        - { name: 'employee_id', in: query, schema: { type: integer } }
+        - { name: 'supplier_id', in: query, schema: { type: integer } }
       responses:
-        '200': { description: JSON search envelope containing HTML; bounded parsing and explicit structural drift failures. }
+        '200':
+          {
+            description: JSON search envelope containing HTML; bounded parsing and explicit structural drift failures.,
+          }
 
   /finances_reports/account_period_search/{location_id}/:
     get:
@@ -818,21 +1199,57 @@ paths:
       x-altegio-permission: Finance period report; no CSV export permission needed
       x-altegio-caveat: Temporary until equivalent V3; golden contracts in legacy-analytics-next.test.ts and legacy-analytics-adapter.test.ts.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: "start_date", in: query, schema: { type: string, format: date } }
-        - { name: "end_date", in: query, schema: { type: string, format: date } }
-        - { name: "accounts_ids[]", in: query, schema: { type: array, items: { type: integer } } }
-        - { name: "master_id", in: query, schema: { type: integer } }
-        - { name: "supplier_id", in: query, schema: { type: integer } }
-        - { name: "type", in: query, schema: { type: integer } }
-        - { name: "account_type", in: query, schema: { type: integer } }
-        - { name: "services_ids[]", in: query, schema: { type: array, items: { type: integer } } }
-        - { name: "goods_ids[]", in: query, schema: { type: array, items: { type: integer } } }
-        - { name: "groups_ids[]", in: query, schema: { type: array, items: { type: integer } } }
-        - { name: "goods_categories_ids[]", in: query, schema: { type: array, items: { type: integer } } }
-        - { name: "movements_funds", in: query, schema: { type: integer } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: 'start_date',
+            in: query,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: 'end_date',
+            in: query,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: 'accounts_ids[]',
+            in: query,
+            schema: { type: array, items: { type: integer } },
+          }
+        - { name: 'master_id', in: query, schema: { type: integer } }
+        - { name: 'supplier_id', in: query, schema: { type: integer } }
+        - { name: 'type', in: query, schema: { type: integer } }
+        - { name: 'account_type', in: query, schema: { type: integer } }
+        - {
+            name: 'services_ids[]',
+            in: query,
+            schema: { type: array, items: { type: integer } },
+          }
+        - {
+            name: 'goods_ids[]',
+            in: query,
+            schema: { type: array, items: { type: integer } },
+          }
+        - {
+            name: 'groups_ids[]',
+            in: query,
+            schema: { type: array, items: { type: integer } },
+          }
+        - {
+            name: 'goods_categories_ids[]',
+            in: query,
+            schema: { type: array, items: { type: integer } },
+          }
+        - { name: 'movements_funds', in: query, schema: { type: integer } }
       responses:
-        '200': { description: JSON search envelope containing HTML; bounded parsing and explicit structural drift failures. }
+        '200':
+          {
+            description: JSON search envelope containing HTML; bounded parsing and explicit structural drift failures.,
+          }
 
   /storages/sales_analysis/categories_search/{location_id}/:
     get:
@@ -842,14 +1259,30 @@ paths:
       x-altegio-permission: Inventory sales report; category costs withheld by MCP
       x-altegio-caveat: Temporary until equivalent V3; golden contracts in legacy-analytics-next.test.ts and legacy-analytics-adapter.test.ts.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: "start_date", in: query, schema: { type: string, format: date } }
-        - { name: "end_date", in: query, schema: { type: string, format: date } }
-        - { name: "category_id", in: query, schema: { type: integer } }
-        - { name: "employee_id", in: query, schema: { type: integer } }
-        - { name: "supplier_id", in: query, schema: { type: integer } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: 'start_date',
+            in: query,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: 'end_date',
+            in: query,
+            schema: { type: string, format: date },
+          }
+        - { name: 'category_id', in: query, schema: { type: integer } }
+        - { name: 'employee_id', in: query, schema: { type: integer } }
+        - { name: 'supplier_id', in: query, schema: { type: integer } }
       responses:
-        '200': { description: JSON search envelope containing HTML; bounded parsing and explicit structural drift failures. }
+        '200':
+          {
+            description: JSON search envelope containing HTML; bounded parsing and explicit structural drift failures.,
+          }
   /finances_reports/annual_report/{location_id}/:
     get:
       operationId: get_legacy_profit_and_loss_report
@@ -865,11 +1298,30 @@ paths:
         The cash-receipts adapter accepts only complete months and reconciles
         every income component against the source aggregate.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: date_from, in: query, required: true, schema: { type: string, format: date } }
-        - { name: date_to, in: query, required: true, schema: { type: string, format: date } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: date_from,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: date_to,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
       responses:
-        '200': { description: Localized HTML table with posted income, expense and result rows. }
+        '200':
+          {
+            description: Localized HTML table with posted income,
+            expense and result rows.,
+          }
 
   /finances/transactions_search/{location_id}/:
     get:
@@ -888,14 +1340,36 @@ paths:
         refuses any finite last-days limit, pages every selected income
         category, and rechecks the complete ID/date list after detail reads.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: start_date, in: query, required: true, schema: { type: string, format: date } }
-        - { name: end_date, in: query, required: true, schema: { type: string, format: date } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: start_date,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: end_date,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
         - { name: type, in: query, required: true, schema: { type: integer } }
         - { name: page, in: query, schema: { type: integer, minimum: 1 } }
-        - { name: editable_length, in: query, schema: { type: integer, minimum: 1 } }
+        - {
+            name: editable_length,
+            in: query,
+            schema: { type: integer, minimum: 1 },
+          }
       responses:
-        '200': { description: JSON envelope containing HTML transaction rows and exact count. }
+        '200':
+          {
+            description: JSON envelope containing HTML transaction rows and exact count.,
+          }
 
   /storages/turnover/search/{location_id}/:
     get:
@@ -907,16 +1381,46 @@ paths:
         Returns a JSON search envelope whose content field is a localized HTML
         table. The route supports one inventory, category and supplier filter.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
-        - { name: start_date, in: query, required: true, schema: { type: string, format: date } }
-        - { name: end_date, in: query, required: true, schema: { type: string, format: date } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
+        - {
+            name: start_date,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: end_date,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
         - { name: storage_id, in: query, schema: { type: integer, minimum: 0 } }
-        - { name: category_id, in: query, schema: { type: integer, minimum: 0 } }
-        - { name: supplier_id, in: query, schema: { type: integer, minimum: 0 } }
+        - {
+            name: category_id,
+            in: query,
+            schema: { type: integer, minimum: 0 },
+          }
+        - {
+            name: supplier_id,
+            in: query,
+            schema: { type: integer, minimum: 0 },
+          }
         - { name: page, in: query, schema: { type: integer, minimum: 1 } }
-        - { name: editable_length, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+        - {
+            name: editable_length,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 100 },
+          }
       responses:
-        '200': { description: JSON envelope containing inventory-turnover HTML and total row count. }
+        '200':
+          {
+            description: JSON envelope containing inventory-turnover HTML and total row count.,
+          }
 
 components:
   schemas:

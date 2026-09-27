@@ -226,7 +226,9 @@ describe('static views', () => {
     // default endpoint does not offer a generic agent (v3 authorization RFC).
     it('withholds locations_remove_user from /mcp', () => {
       const index = buildFacetIndex(tools);
-      expect(index.includes(DEFAULT_FACET, 'locations_remove_user')).toBe(false);
+      expect(index.includes(DEFAULT_FACET, 'locations_remove_user')).toBe(
+        false
+      );
     });
 
     it('keeps it reachable on the catalog facet and on stdio', () => {
@@ -497,9 +499,7 @@ describe('the read-only view', () => {
   });
 
   it('serves the read-only executor, which refuses writes itself', () => {
-    expect(index.includes(READONLY_VIEW, 'api_search_operations')).toBe(
-      true
-    );
+    expect(index.includes(READONLY_VIEW, 'api_search_operations')).toBe(true);
     expect(index.includes(READONLY_VIEW, 'api_call_operation')).toBe(true);
   });
 
@@ -534,9 +534,9 @@ describe('the read-only view', () => {
     });
 
     it('keeps a /mcp segment the base already carries (internal lane)', () => {
-      const internal = 'https://mcp.altegio.dev/pro/mcp';
+      const internal = 'https://mcp.example.com/pro/mcp';
       expect(viewUrl(internal, READONLY_VIEW)).toBe(
-        'https://mcp.altegio.dev/pro/mcp/readonly'
+        'https://mcp.example.com/pro/mcp/readonly'
       );
       expect(viewUrl(internal, DEFAULT_FACET)).toBe(internal);
     });

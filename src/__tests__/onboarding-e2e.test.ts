@@ -145,8 +145,18 @@ Carol White,Massage Therapist,no,no`;
             duration_seconds: 1800,
             category_id: 10,
           },
-          { title: 'Manicure', price_min: 35, duration_seconds: 1800, category_id: 11 },
-          { title: 'Pedicure', price_min: 45, duration_seconds: 2400, category_id: 11 },
+          {
+            title: 'Manicure',
+            price_min: 35,
+            duration_seconds: 1800,
+            category_id: 11,
+          },
+          {
+            title: 'Pedicure',
+            price_min: 45,
+            duration_seconds: 2400,
+            category_id: 11,
+          },
         ],
       });
       expect(servicesResult.content[0]?.text).toContain('4 services created');
@@ -404,7 +414,9 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValueOnce({ id: 20, title: 'Service1' });
       await handlers.addServicesBatch({
         location_id: companyId,
-        services: [{ title: 'Service1', price_min: 50, duration_seconds: 1800 }],
+        services: [
+          { title: 'Service1', price_min: 50, duration_seconds: 1800 },
+        ],
       });
 
       // Resume and check progress

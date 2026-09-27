@@ -177,7 +177,7 @@ export const deleteScheduleTool = defineTool({
   name: 'schedules_delete',
   category: 'Schedule',
   description:
-    "Make the given dates non-working days for a team member by deleting their schedule there. Asks for confirmation first.",
+    'Make the given dates non-working days for a team member by deleting their schedule there. Asks for confirmation first.',
   annotations: {
     title: 'Delete Schedule',
     destructiveHint: true,

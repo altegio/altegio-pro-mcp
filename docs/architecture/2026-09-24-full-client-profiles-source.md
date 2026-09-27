@@ -5,15 +5,15 @@ client. The documented segmentation endpoint returns a selected field projection
 and cannot include tags or custom fields. The older client-list endpoint returns
 the same full profile shape as a card for every client on the requested page.
 
-| Contract | Finding |
-| --- | --- |
-| Source | Documented, deprecated `GET /clients/{location_id}` (`deprecated_get_client_list`) |
-| Implementation | `PageApiClientsController::action_read` → `CClientFilter` → `ClientContainerService::loadContainers` → `LegacyApiClientContainerTransformer` |
-| Access | Both `canEditSalon` and `hasSalonClientsAccess`; the controller also narrows a visiting team member's clients to their appointments. Contact and comment permissions are applied by `ClientContainerService`. |
-| Filters | `fullname`, `phone`, `email`, `card`, `id`/`id[]`, positive integer `paid_min`/`paid_max` (MCP inputs `total_paid_min`/`total_paid_max`), ISO `changed_after`/`changed_before`. These are independent of the typed client-search filters. |
-| Paging | Ascending client ID, 1-based `page`, backend `count` maximum 300, exact `meta.total_count`. MCP caps each page at 50 and client ID lists at 50. |
-| Fields | Name parts, display name, contact fields, gender, importance, loyalty card, discount, birthday, comment, SMS flags, lifetime spent and paid, balance, visits, changed time, tags and custom fields. The MCP maps names and numeric codes to canonical profile fields. |
-| Side effects | Read only. No report creation or export. |
+| Contract       | Finding                                                                                                                                                                                                                                                               |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source         | Documented, deprecated `GET /clients/{location_id}` (`deprecated_get_client_list`)                                                                                                                                                                                    |
+| Implementation | `PageApiClientsController::action_read` → `CClientFilter` → `ClientContainerService::loadContainers` → `LegacyApiClientContainerTransformer`                                                                                                                          |
+| Access         | Both `canEditSalon` and `hasSalonClientsAccess`; the controller also narrows a visiting team member's clients to their appointments. Contact and comment permissions are applied by `ClientContainerService`.                                                         |
+| Filters        | `fullname`, `phone`, `email`, `card`, `id`/`id[]`, positive integer `paid_min`/`paid_max` (MCP inputs `total_paid_min`/`total_paid_max`), ISO `changed_after`/`changed_before`. These are independent of the typed client-search filters.                             |
+| Paging         | Ascending client ID, 1-based `page`, backend `count` maximum 300, exact `meta.total_count`. MCP caps each page at 50 and client ID lists at 50.                                                                                                                       |
+| Fields         | Name parts, display name, contact fields, gender, importance, loyalty card, discount, birthday, comment, SMS flags, lifetime spent and paid, balance, visits, changed time, tags and custom fields. The MCP maps names and numeric codes to canonical profile fields. |
+| Side effects   | Read only. No report creation or export.                                                                                                                                                                                                                              |
 
 The `spent`, `paid`, `visits` and `balance` values are lifetime/current client
 card measures. They are **not** totals for a date filter; `changed_after` only

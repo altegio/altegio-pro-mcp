@@ -39,7 +39,12 @@ paths:
         parameters (name, surname, patronymic, phone, email, card), not one
         combined term.
       parameters:
-        - { name: location_id, in: path, required: true, schema: { type: integer } }
+        - {
+            name: location_id,
+            in: path,
+            required: true,
+            schema: { type: integer },
+          }
         - name: name
           in: query
           description: Name fragment to search for.

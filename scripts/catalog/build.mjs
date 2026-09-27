@@ -35,7 +35,12 @@ export const CATALOG_VERSION = 1;
 const MAX_SCHEMA_DEPTH = 3;
 
 /** Schema keys dropped on the way into the catalog (D8: context economy). */
-const SCHEMA_DROP_KEYS = new Set(['example', 'examples', 'title', 'externalDocs']);
+const SCHEMA_DROP_KEYS = new Set([
+  'example',
+  'examples',
+  'title',
+  'externalDocs',
+]);
 
 /** Longest schema `description` kept, in characters. */
 const MAX_SCHEMA_DESCRIPTION = 200;
@@ -455,7 +460,10 @@ function extractSecurity(operation, rootDoc) {
 }
 
 function pickParameters(pathItem, operation, ctx) {
-  const merged = [...(pathItem.parameters ?? []), ...(operation.parameters ?? [])];
+  const merged = [
+    ...(pathItem.parameters ?? []),
+    ...(operation.parameters ?? []),
+  ];
   const seen = new Set();
   const out = [];
 
@@ -950,6 +958,9 @@ function main(argv) {
   return 0;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))
+) {
   process.exit(main(process.argv.slice(2)));
 }

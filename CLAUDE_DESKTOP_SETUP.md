@@ -36,9 +36,7 @@ Add configuration:
   "mcpServers": {
     "altegio-pro": {
       "command": "node",
-      "args": [
-        "/FULL/PATH/TO/altegio-mcp/dist/index.js"
-      ],
+      "args": ["/FULL/PATH/TO/altegio-mcp/dist/index.js"],
       "env": {
         "ALTEGIO_API_TOKEN": "your_partner_token_here"
       }
@@ -48,6 +46,7 @@ Add configuration:
 ```
 
 **Replace:**
+
 - `/FULL/PATH/TO/altegio-mcp` with actual path
 - `your_partner_token_here` with your token
 
@@ -57,35 +56,17 @@ Close and restart Claude Desktop.
 
 ### Step 5: Verify
 
-Look for MCP indicator - you should see `altegio-pro` with 33 tools available.
+Look for the MCP indicator: the `altegio-pro` server and its tools should be listed.
 
 ---
 
-## Option 2: Remote Server via Bridge
+## Option 2: Hosted Server
 
-If you deployed MCP server to Cloud Run, connect via bridge:
-
-### Step 1: Download Bridge
-
-```bash
-curl -O https://raw.githubusercontent.com/altegio/altegio-pro-mcp/main/docker-bridge.cjs
-```
-
-### Step 2: Configure
-
-```json
-{
-  "mcpServers": {
-    "altegio-remote": {
-      "command": "node",
-      "args": ["/path/to/docker-bridge.cjs"],
-      "env": {
-        "MCP_DOCKER_URL": "https://your-service-name.run.app"
-      }
-    }
-  }
-}
-```
+Claude Desktop connects to a hosted deployment directly over Streamable HTTP.
+Add the server address as a custom connector (Settings → Connectors) and sign in
+when prompted; no local process or bridge script is needed. Use the address of
+the complete surface, or one of its views (`/<facet>` or `/readonly`) when the
+host caps active tools. See [README.md](README.md) for the served views.
 
 ---
 
@@ -115,9 +96,7 @@ Add to config (replace YOUR_USERNAME and YOUR_TOKEN):
   "mcpServers": {
     "altegio-pro": {
       "command": "node",
-      "args": [
-        "/Users/YOUR_USERNAME/Developer/altegio-mcp/dist/index.js"
-      ],
+      "args": ["/path/to/altegio-pro-mcp/dist/index.js"],
       "env": {
         "ALTEGIO_API_TOKEN": "YOUR_TOKEN",
         "LOG_LEVEL": "info"
@@ -167,16 +146,18 @@ Add to config (use double backslashes):
 After setup, Claude Desktop will have:
 
 **Authentication:**
+
 - `auth_login` - Login with email/password
 - `auth_logout` - Clear credentials
 
 **Business Management:**
+
 - `locations_list` - Get managed locations
 - `appointments_list` - View appointments
-- `team_members_list` - View all staff (B2B)
-- `services_list` - View services (B2B)
+- `team_members_list` - View team members
+- `services_list` - View services
 - `service_categories_list` - View categories
-- `schedules_get` - View staff member schedules
+- `schedules_get` - View team member work schedules
 
 ---
 
@@ -185,6 +166,7 @@ After setup, Claude Desktop will have:
 ### "node: command not found"
 
 Install Node.js:
+
 - **macOS**: `brew install node`
 - **Windows**: Download from [nodejs.org](https://nodejs.org)
 - **Linux**: `sudo apt install nodejs`
@@ -196,6 +178,7 @@ Install Node.js:
    - **Windows**: `%APPDATA%\Claude\logs\mcp-server-altegio-pro.log`
 
 2. Test server manually:
+
 ```bash
 cd /path/to/altegio-mcp
 ALTEGIO_API_TOKEN=your_token node dist/index.js

@@ -28,7 +28,7 @@ export const diagnoseLocationAccessTool = defineTool({
   name: 'locations_diagnose_access',
   category: 'Location',
   description:
-    '[Location] Diagnose an HTTP 403 for the current Altegio credential pair at a location. Reads location access and the user’s effective permission groups with the same request credential. Optionally reads an application’s declared permissions, which do not prove installation or effective system-user rights. Partner-token grants cannot be inspected by this API, so a 403 alone cannot isolate the failing grant. No permissions are changed.',
+    'Diagnose an HTTP 403 for the current Altegio credential pair at a location. Reads location access and the user’s effective permission groups with the same request credential. Optionally reads an application’s declared permissions, which do not prove installation or effective system-user rights. Partner-token grants cannot be inspected by this API, so a 403 alone cannot isolate the failing grant. No permissions are changed.',
   annotations: {
     title: 'Diagnose location access',
     readOnlyHint: true,

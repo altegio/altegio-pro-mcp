@@ -144,13 +144,10 @@ export const createStaffTool = defineTool({
       is_paid_staff: has_paid_seat,
     });
     return {
-      text: withUntrustedBlock(
-        `Created team member ${staff.id}.`,
-        [
-          { label: 'name', value: staff.name },
-          { label: 'specialization', value: staff.specialization },
-        ]
-      ),
+      text: withUntrustedBlock(`Created team member ${staff.id}.`, [
+        { label: 'name', value: staff.name },
+        { label: 'specialization', value: staff.specialization },
+      ]),
       structuredContent: {
         id: staff.id,
         name: sanitizeUntrusted(staff.name) ?? undefined,

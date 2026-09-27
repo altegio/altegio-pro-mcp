@@ -6,6 +6,54 @@ is declared stable.
 
 ## [Unreleased]
 
+## [0.5.0-alpha.0]
+
+### Breaking changes — one public contract before the open-source alpha
+
+- **Tool names follow `<domain>_<verb>_<object>` everywhere.** No aliases are
+  served; refresh cached tool lists. Renames in this release:
+
+  | Former name                                                                             | Name                                                                                           |
+  | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+  | `altegio_login`, `altegio_logout`                                                       | `auth_login`, `auth_logout`                                                                    |
+  | `list_locations`, `update_location`, `diagnose_location_access`, `remove_location_user` | `locations_list`, `locations_update`, `locations_diagnose_access`, `locations_remove_user`     |
+  | `get_positions`, `create_position`                                                      | `positions_list`, `positions_create`                                                           |
+  | `get_services`, `create_service`, `update_service`, `delete_service`                    | `services_list`, `services_create`, `services_update`, `services_delete`                       |
+  | `link_service_team_member`, `update_service_team_member`, `unlink_service_team_member`  | `services_link_team_member`, `services_update_team_member_link`, `services_unlink_team_member` |
+  | `link_team_member_services`                                                             | `team_members_link_services`                                                                   |
+  | `get_service_categories`, `delete_service_category`                                     | `service_categories_list`, `service_categories_delete`                                         |
+  | `get_schedule`, `create_schedule`, `update_schedule`, `delete_schedule`                 | `schedules_get`, `schedules_create`, `schedules_update`, `schedules_delete`                    |
+  | `get_appointments`, `create_appointment`, `update_appointment`, `delete_appointment`    | `appointments_list`, `appointments_create`, `appointments_update`, `appointments_delete`       |
+  | `get_appointment_settings`, `update_appointment_settings`                               | `settings_get_appointment_calendar`, `settings_update_appointment_calendar`                    |
+  | `get_online_booking_settings`, `update_online_booking_settings`                         | `settings_get_online_booking`, `settings_update_online_booking`                                |
+  | `get_booking_forms`, `create_booking_form`, `delete_booking_form`                       | `booking_forms_list`, `booking_forms_create`, `booking_forms_delete`                           |
+  | `get_resources`                                                                         | `resources_list`                                                                               |
+  | `altegio_search_operations`, `altegio_describe_operation`, `altegio_call_operation`     | `api_search_operations`, `api_describe_operation`, `api_call_operation`                        |
+
+- **Canonical input names.** Upstream V1 wire names no longer appear in tool
+  arguments: `team_members_create` takes `has_paid_seat`, `has_schedule_access`
+  and `invite_user`; services take `duration_seconds`, `sort_weight` and
+  `external_id`; schedule tools take `date_from` / `date_to`; the onboarding
+  batches take `team_members` and `services` with the same field names, and CSV
+  headers follow suit. Unknown or former names are rejected before any upstream
+  call.
+- **One pagination contract.** Every collection tool takes `page` and
+  `page_size` (former `count` and `limit` arguments are gone) and returns
+  `items` plus a `pagination` object: `page`, `page_size`, `returned`, `total`
+  (`null` when the source reports none), `has_more`, `next_page`. Date-windowed
+  histories return `pagination.next_date_from` / `next_date_to`. The former
+  flat `count`/`total_count`/`next_page` fields and the `rows` arrays of the
+  analytics reports are replaced, not duplicated.
+- **Descriptions are plain text.** The `[Category]` prefixes and
+  "AUTHENTICATION REQUIRED" markers are removed from every tool description;
+  success texts name the canonical object ("Created team member", "Deleted
+  appointment").
+- **Repository hygiene.** The stdio-to-HTTP bridge script and the local
+  `.npmrc` are removed; a hosted deployment is reached directly over Streamable
+  HTTP. Runtime documents are `docs/product-logic.md` and
+  `docs/onboarding-guide.md`. Live tests read the target location from
+  `ALTEGIO_E2E_LOCATION_ID` instead of a hard-coded id.
+
 ## [0.4.0-alpha.0]
 
 ### Fixed — report download isolation
@@ -31,7 +79,6 @@ is declared stable.
 - Private deployment inventory, demo-agent scripts, research notes, and obsolete
   editor guidance have been removed. Tests pin the public generated inventory
   rather than duplicate counts in agent instruction prose.
-
 
 ### Fixed — onboarding results rejected by SDK-based hosts
 
@@ -234,7 +281,7 @@ the server instructions describe the narrower views as this server's address
 plus `/ops`, `/catalog`, … — a relative `/mcp/<view>` pointed customers at
 `/pro/mcp/…`, which is the staff lane on the customer domain. A deployment
 behind a proxy that keeps `/mcp` sets the base to e.g.
-`https://mcp.altegio.dev/pro/mcp`.
+`https://mcp.example.com/pro/mcp`.
 
 ### Fixed — authorization boundaries and legacy team-member identity
 

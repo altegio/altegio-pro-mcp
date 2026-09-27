@@ -18,8 +18,8 @@ import { DEFAULT_FACET, READONLY_VIEW, viewUrl } from '../tools/facets.js';
  * customer addresses onto this server's `/mcp` and `/mcp/<view>`. It is only
  * ever used to name an address in text a model reads: the read-only view's
  * refusal and its `initialize` instructions. Override with
- * `MCP_PUBLIC_BASE_URL` behind a proxy that keeps the `/mcp` segment (the
- * internal lane is `https://mcp.altegio.dev/pro/mcp`).
+ * `MCP_PUBLIC_BASE_URL` behind a proxy that keeps the `/mcp` segment (for
+ * example `https://mcp.example.com/pro/mcp`).
  */
 export const DEFAULT_PUBLIC_BASE_URL = 'https://mcp.alteg.io/pro';
 export const DEFAULT_LEGACY_WEB_BASE = 'https://app.alteg.io';

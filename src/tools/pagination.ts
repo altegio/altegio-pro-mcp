@@ -174,9 +174,9 @@ export function collectionSchema(
  * the collection and a `page` object with `total_count` — onto this contract.
  * Keys the dialect does not have are left untouched.
  */
-export function standardizeCollection<T extends { structuredContent?: unknown }>(
-  result: T
-): T {
+export function standardizeCollection<
+  T extends { structuredContent?: unknown },
+>(result: T): T {
   const content = result.structuredContent;
   if (!content || typeof content !== 'object' || Array.isArray(content)) {
     return result;
@@ -196,8 +196,7 @@ export function standardizeCollection<T extends { structuredContent?: unknown }>
     const items = Array.isArray(rows) ? rows.length : 0;
     const total = typeof total_count === 'number' ? total_count : null;
     const current = typeof pageNumber === 'number' ? pageNumber : 1;
-    const size =
-      typeof page_size === 'number' ? page_size : Math.max(items, 1);
+    const size = typeof page_size === 'number' ? page_size : Math.max(items, 1);
     const hasMore =
       typeof has_more === 'boolean'
         ? has_more

@@ -1,6 +1,6 @@
-# Demo-management API contract notes
+# V1 API contract notes
 
-This document records API behavior that materially affects safe demo-location
+This document records API behavior that materially affects safe location
 management. Curated MCP tools use public B2B V1 only; internal V2 endpoints are
 not used.
 

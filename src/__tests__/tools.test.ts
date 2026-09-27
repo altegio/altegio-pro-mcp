@@ -209,7 +209,9 @@ describe('schedules_get', () => {
       date_to: '2025-10-28',
     });
 
-    expect(result.content[0]?.text).toContain('2 schedule entries for team member 456');
+    expect(result.content[0]?.text).toContain(
+      '2 schedule entries for team member 456'
+    );
     expect(result.content[0]?.text).toContain('2025-10-27 09:00-13:00');
   });
 });

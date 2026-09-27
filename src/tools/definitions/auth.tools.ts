@@ -7,7 +7,7 @@ export const loginTool = defineTool({
   name: 'auth_login',
   category: 'Auth',
   description:
-    '[Auth] Exchange an Altegio email and password the user has already chosen to provide for a user token, which is then reused for administrative operations (locations_list with my=1, appointments, and the rest of the business-management surface). Only for local stdio use: a hosted deployment gets its identity from the host and does not need this tool. Do not ask the user for a password, and do not offer this tool as a way to unblock a failed call — say what access is missing and let the user decide how to authenticate.',
+    'Exchange an Altegio email and password the user has already chosen to provide for a user token, which is then reused for administrative operations (locations_list, appointments and the rest of the business-management surface). Only for local stdio use: a hosted deployment gets its identity from the host and does not need this tool. Do not ask the user for a password, and do not offer this tool as a way to unblock a failed call — say what access is missing and let the user decide how to authenticate.',
   annotations: {
     title: 'Login to Altegio',
     destructiveHint: false,
@@ -44,7 +44,7 @@ export const loginTool = defineTool({
 export const logoutTool = defineTool({
   name: 'auth_logout',
   category: 'Auth',
-  description: '[Auth] Logout from Altegio and clear stored credentials.',
+  description: 'Logout from Altegio and clear stored credentials.',
   annotations: {
     title: 'Logout from Altegio',
     destructiveHint: false,

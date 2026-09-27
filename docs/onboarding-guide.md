@@ -7,6 +7,7 @@ Complete guide for using the conversational onboarding assistant to set up your 
 The onboarding wizard provides **12 specialized tools** to help new users quickly configure their business platform through natural conversation or bulk data import. Perfect for first-time setup with positions, staff, services, schedules, and client databases.
 
 **Key Features:**
+
 - Hybrid input: conversational or CSV/JSON bulk import
 - Checkpoint/resume: automatically recover from errors
 - Persistent state: track progress across sessions
@@ -21,31 +22,33 @@ Positions come first so staff can reference `position_id`. Work schedules come a
 ### New steps
 
 **Add positions (before staff):**
+
 ```typescript
 onboarding_add_positions({
   location_id: 123456,
   positions: [
-    { title: "Senior Stylist" },
-    { title: "Manicurist" },
-    { title: "Receptionist" }
-  ]
-})
+    { title: 'Senior Stylist' },
+    { title: 'Manicurist' },
+    { title: 'Receptionist' },
+  ],
+});
 // Response lists created position IDs — use them as position_id when adding staff.
 // CSV form: "title\nSenior Stylist\nManicurist"
 ```
 
 **Set work schedules (after staff):**
+
 ```typescript
 onboarding_set_schedules({
   location_id: 123456,
   schedules: [
     {
-      team_member_id: 101,                       // from onboarding_add_team_members_batch response
-      dates: ["2026-08-01", "2026-08-02"],
-      slots: [{ from: "09:00", to: "18:00" }]
-    }
-  ]
-})
+      team_member_id: 101, // from onboarding_add_team_members_batch response
+      dates: ['2026-08-01', '2026-08-02'],
+      slots: [{ from: '09:00', to: '18:00' }],
+    },
+  ],
+});
 ```
 
 ## Quick Start
@@ -56,14 +59,14 @@ onboarding_set_schedules({
 // Public HTTP is already authorized with Altegio OAuth.
 // In local stdio mode only, authenticate if needed:
 auth_login({
-  email: "your-email@example.com",
-  password: "your-password"
-})
+  email: 'your-email@example.com',
+  password: 'your-password',
+});
 
 // Start onboarding for your location
 onboarding_start({
-  location_id: 123456
-})
+  location_id: 123456,
+});
 // Response: "Onboarding session initialized for location 123456
 //           State saved under the current principal and location
 //           Next steps: Add service categories, then staff and services"
@@ -75,11 +78,11 @@ onboarding_start({
 onboarding_add_categories({
   location_id: 123456,
   categories: [
-    { title: "Hair Services", external_id: "hair", sort_weight: 1 },
-    { title: "Nail Services", external_id: "nails", sort_weight: 2 },
-    { title: "Spa Treatments", external_id: "spa", sort_weight: 3 }
-  ]
-})
+    { title: 'Hair Services', external_id: 'hair', sort_weight: 1 },
+    { title: 'Nail Services', external_id: 'nails', sort_weight: 2 },
+    { title: 'Spa Treatments', external_id: 'spa', sort_weight: 3 },
+  ],
+});
 // Response: "Successfully created 3 categories
 //           IDs: [501, 502, 503]
 //           Checkpoint saved at phase: categories"
@@ -106,35 +109,37 @@ batch-level `has_paid_seat` / `has_schedule_access` when the owner gave one
 answer for everybody. A row's own answer wins over the batch-level one.
 
 **Option A: JSON Array**
+
 ```typescript
 onboarding_add_team_members_batch({
   location_id: 123456,
   team_members: [
     {
-      name: "Alice Johnson",
-      specialization: "Senior Stylist",
+      name: 'Alice Johnson',
+      specialization: 'Senior Stylist',
       has_paid_seat: true,
-      has_schedule_access: true
+      has_schedule_access: true,
     },
     {
-      name: "Bob Smith",
-      specialization: "Receptionist",
+      name: 'Bob Smith',
+      specialization: 'Receptionist',
       has_paid_seat: false,
-      has_schedule_access: false
-    }
-  ]
-})
+      has_schedule_access: false,
+    },
+  ],
+});
 ```
 
 **Option B: CSV String** (answers as `true`/`false`, `yes`/`no` or `1`/`0`)
+
 ```typescript
 onboarding_add_team_members_batch({
   location_id: 123456,
   team_members: `name,specialization,has_paid_seat,has_schedule_access
 Alice Johnson,Senior Stylist,yes,yes
 Bob Smith,Nail Technician,yes,yes
-Carol White,Massage Therapist,yes,yes`
-})
+Carol White,Massage Therapist,yes,yes`,
+});
 
 // Response: "Staff batch processing complete:
 //           ✓ 3 staff members created (3 on a paid seat, 3 in the work schedule)
@@ -142,6 +147,7 @@ Carol White,Massage Therapist,yes,yes`
 ```
 
 **Option C: one answer for the whole list**
+
 ```typescript
 onboarding_add_team_members_batch({
   location_id: 123456,
@@ -149,16 +155,17 @@ onboarding_add_team_members_batch({
 Alice Johnson,Senior Stylist
 Bob Smith,Nail Technician`,
   has_paid_seat: true,
-  has_schedule_access: true
-})
+  has_schedule_access: true,
+});
 ```
 
 **Missing answer — nothing is created:**
+
 ```typescript
 onboarding_add_team_members_batch({
   location_id: 123456,
-  team_members: [{ name: "Alice Johnson" }]
-})
+  team_members: [{ name: 'Alice Johnson' }],
+});
 
 // Response (error): "Refused: nothing was created. 1 of 1 team members have no
 //           answer for the paid seat or the work schedule:
@@ -180,23 +187,23 @@ onboarding_add_services_batch({
       title: "Women's Haircut",
       price_min: 50,
       duration_seconds: 3600,
-      category_id: 501  // Hair Services
+      category_id: 501, // Hair Services
     },
     {
-      title: "Hair Coloring",
+      title: 'Hair Coloring',
       price_min: 80,
       price_max: 150,
       duration_seconds: 7200,
-      category_id: 501
+      category_id: 501,
     },
     {
-      title: "Manicure",
+      title: 'Manicure',
       price_min: 30,
       duration_seconds: 2700,
-      category_id: 502  // Nail Services
-    }
-  ]
-})
+      category_id: 502, // Nail Services
+    },
+  ],
+});
 // Response: "Successfully created 3 services
 //           Created IDs: [201, 202, 203]
 //           Checkpoint saved at phase: services"
@@ -210,8 +217,8 @@ onboarding_import_clients({
   clients_csv: `name,phone,email,surname,comment
 Sarah Miller,+1234560001,sarah@example.com,Miller,VIP client
 John Davis,+1234560002,john@example.com,Davis,
-Emma Wilson,+1234560003,,Wilson,Prefers email contact`
-})
+Emma Wilson,+1234560003,,Wilson,Prefers email contact`,
+});
 
 // Response: "Successfully imported 3 clients
 //           Created IDs: [1001, 1002, 1003]
@@ -224,8 +231,8 @@ Emma Wilson,+1234560003,,Wilson,Prefers email contact`
 ```typescript
 onboarding_create_test_appointments({
   location_id: 123456,
-  count: 5
-})
+  count: 5,
+});
 
 // Response: "Successfully created 5 test appointments
 //           Appointment IDs: [301, 302, 303, 304, 305]
@@ -239,8 +246,8 @@ onboarding_create_test_appointments({
 
 ```typescript
 onboarding_status({
-  location_id: 123456
-})
+  location_id: 123456,
+});
 
 // Response: "Onboarding Status for Location 123456
 //           Current phase: complete
@@ -272,6 +279,7 @@ every row unless passed once for the batch
 **Optional fields:** `specialization`, `position_id`
 
 **Notes:**
+
 - Answers: `true`/`false`, `yes`/`no` or `1`/`0`, in any case. A blank cell is
   no answer, never `false`.
 - `phone`, `email` and `external_id` columns are accepted and ignored — nothing
@@ -293,6 +301,7 @@ Swedish Massage,70,90,90,503,massage-sw
 **Optional fields:** `price_max`, `category_id`, `external_id`
 
 **Notes:**
+
 - Prices: numeric values (no currency symbols)
 - Duration: minutes as integer
 - Category ID: use IDs from `onboarding_add_categories` response
@@ -310,6 +319,7 @@ Emma Wilson,,emma@example.com,Wilson,Email contact only
 **Optional fields:** `surname`, `comment`
 
 **Notes:**
+
 - Deduplication: automatically skips existing phone/email combinations
 - Phone format: any format accepted, but international recommended
 - Comment: free-text notes about client preferences
@@ -322,11 +332,11 @@ Check data parsing and validation without creating entities:
 
 ```typescript
 onboarding_preview_data({
-  data_type: "staff",
+  data_type: 'staff',
   raw_input: `name,specialization,has_paid_seat,has_schedule_access
 Alice Johnson,Senior Stylist,yes,yes
-Bob Smith,Nail Technician,,`
-})
+Bob Smith,Nail Technician,,`,
+});
 
 // Response: "Preview of staff data:
 //           Total rows: 2
@@ -347,8 +357,8 @@ If an error interrupts the onboarding process:
 // local stdio calls auth_login first only when its session is absent)
 
 onboarding_resume({
-  location_id: 123456
-})
+  location_id: 123456,
+});
 
 // Response: "Onboarding session resumed for location 123456
 //           Current phase: services
@@ -368,8 +378,8 @@ Undo a phase and delete created entities:
 ```typescript
 onboarding_rollback_phase({
   location_id: 123456,
-  phase_name: "test_appointments"
-})
+  phase_name: 'test_appointments',
+});
 
 // Response: "Rollback preview for phase: test_appointments
 //           Entities to delete: 5 appointments
@@ -385,6 +395,7 @@ onboarding_rollback_phase({
 ```
 
 **Rollback order (reverse dependency):**
+
 1. `test_appointments` (depends on staff, services, clients) — deleted via API
 2. `clients` (standalone) — deleted via API
 3. `schedules` (depends on staff) — deleted via API
@@ -410,12 +421,27 @@ If some entries fail during batch import:
 onboarding_add_team_members_batch({
   location_id: 123456,
   team_members: [
-    { name: "Alice", specialization: "Stylist", has_paid_seat: true, has_schedule_access: true },
+    {
+      name: 'Alice',
+      specialization: 'Stylist',
+      has_paid_seat: true,
+      has_schedule_access: true,
+    },
     // Per-seat licensing: a non-paid team member cannot be in the work schedule
-    { name: "Dana", specialization: "Assistant", has_paid_seat: false, has_schedule_access: true },
-    { name: "Bob", specialization: "Barber", has_paid_seat: true, has_schedule_access: true }
-  ]
-})
+    {
+      name: 'Dana',
+      specialization: 'Assistant',
+      has_paid_seat: false,
+      has_schedule_access: true,
+    },
+    {
+      name: 'Bob',
+      specialization: 'Barber',
+      has_paid_seat: true,
+      has_schedule_access: true,
+    },
+  ],
+});
 
 // Response: "Staff batch processing complete:
 //           ✓ 2 staff members created (2 on a paid seat, 2 in the work schedule)
@@ -436,7 +462,7 @@ Automatic checkpoint before error, allowing safe resume:
 // System automatically saves checkpoint with created IDs before throwing error
 
 // Resume in new session:
-onboarding_resume({ location_id: 123456 })
+onboarding_resume({ location_id: 123456 });
 // Response shows which entities were successfully created before error
 ```
 
@@ -468,6 +494,7 @@ callers onboarding the same location never share checkpoints:
 ```
 
 **Example state file:**
+
 ```json
 {
   "company_id": 123456,
@@ -519,19 +546,19 @@ Full onboarding from scratch to operational platform:
 ```typescript
 // 1. Public HTTP: connect with Altegio OAuth.
 //    Local stdio only: log in if needed.
-auth_login({ email: "owner@salon.com", password: "secure123" })
+auth_login({ email: 'owner@salon.com', password: 'secure123' });
 
 // 2. Start onboarding
-onboarding_start({ location_id: 123456 })
+onboarding_start({ location_id: 123456 });
 
 // 3. Create service categories
 onboarding_add_categories({
   location_id: 123456,
   categories: [
-    { title: "Hair Services", sort_weight: 1 },
-    { title: "Nail Services", sort_weight: 2 }
-  ]
-})
+    { title: 'Hair Services', sort_weight: 1 },
+    { title: 'Nail Services', sort_weight: 2 },
+  ],
+});
 // Note category IDs: [501, 502]
 
 // 4. Import staff from CSV (paid seat and work schedule answered by the owner)
@@ -540,8 +567,8 @@ onboarding_add_team_members_batch({
   team_members: `name,specialization,has_paid_seat,has_schedule_access
 Alice Johnson,Senior Stylist,yes,yes
 Bob Smith,Nail Technician,yes,yes
-Carol White,Manicurist,yes,yes`
-})
+Carol White,Manicurist,yes,yes`,
+});
 // Created staff IDs: [101, 102, 103]
 
 // 5. Add services
@@ -551,8 +578,8 @@ onboarding_add_services_batch({
 Women's Haircut,50,60,60,501
 Hair Coloring,80,150,120,501
 Manicure,30,40,45,502
-Pedicure,45,60,60,502`
-})
+Pedicure,45,60,60,502`,
+});
 // Created service IDs: [201, 202, 203, 204]
 
 // 6. Import clients
@@ -561,19 +588,19 @@ onboarding_import_clients({
   clients_csv: `name,phone,email,surname
 Sarah Miller,+1234560001,sarah@example.com,Miller
 John Davis,+1234560002,john@example.com,Davis
-Emma Wilson,+1234560003,emma@example.com,Wilson`
-})
+Emma Wilson,+1234560003,emma@example.com,Wilson`,
+});
 // Created client IDs: [1001, 1002, 1003]
 
 // 7. Generate test appointments
 onboarding_create_test_appointments({
   location_id: 123456,
-  count: 5
-})
+  count: 5,
+});
 // Created appointment IDs: [301, 302, 303, 304, 305]
 
 // 8. Verify completion
-onboarding_status({ location_id: 123456 })
+onboarding_status({ location_id: 123456 });
 // Status: complete
 // Total entities: 3 categories, 3 staff, 4 services, 3 clients, 5 appointments
 ```
@@ -583,16 +610,21 @@ onboarding_status({ location_id: 123456 })
 ## Troubleshooting
 
 ### Error: "Authentication required"
+
 **Solution:** reconnect public HTTP with Altegio OAuth, or run `auth_login()` in local stdio mode
 
 ### Error: "Category ID not found"
+
 **Solution:** Run `onboarding_add_categories()` before `onboarding_add_services_batch()`
 
 ### Error: "No staff or services available for test appointments"
+
 **Solution:** Create at least 1 staff member and 1 service before generating test appointments
 
 ### CSV parsing fails with quoted fields
+
 **Solution:** Use double quotes for fields containing commas:
+
 ```csv
 name,comment
 Alice,"Specializes in coloring, cutting, and styling"
@@ -600,6 +632,7 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 ```
 
 ### Rate limit errors during large imports
+
 **Solution:** Import in smaller batches (50-100 rows at a time) or let the system auto-retry after delay
 
 ## API Reference
@@ -607,16 +640,19 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 ### Control Tools
 
 **`onboarding_start(location_id)`**
+
 - Initialize new onboarding session
 - Creates state file with `phase: "init"`
 - Returns: session ID and next steps
 
 **`onboarding_resume(location_id)`**
+
 - Load existing state from file
 - Display progress summary
 - Suggest next action based on current phase
 
 **`onboarding_status(location_id)`**
+
 - Show current phase, completed steps, entity counts
 - Display checkpoint timestamps
 - Read-only, no state changes
@@ -624,16 +660,19 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 ### Data Input Tools
 
 **`onboarding_add_categories(location_id, categories)`**
+
 - Create service category hierarchy
 - Input: `[{title, external_id?, sort_weight?}, ...]`
 - Returns: created category IDs
 
 **`onboarding_add_positions(location_id, positions)`**
+
 - Bulk create staff positions/roles from JSON array or CSV string
 - Required: `title`
 - Run before staff so staff can reference `position_id`
 
 **`onboarding_add_team_members_batch(location_id, team_members, has_paid_seat?, has_schedule_access?)`**
+
 - Bulk add staff from JSON array or CSV string
 - Required: `name`, plus the owner's `has_paid_seat` and `has_schedule_access`
   answers per row or once for the batch (a missing answer refuses the batch)
@@ -641,23 +680,27 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 - Ignored: `phone`, `email`, `external_id`
 
 **`onboarding_add_services_batch(location_id, services)`**
+
 - Bulk add services from JSON array or CSV string
 - Required: `title`, `price_min`, `duration_seconds`
 - Optional: `price_max`, `category_id`, `external_id`
 
 **`onboarding_set_schedules(location_id, schedules)`**
+
 - Set work schedules (working hours) for staff members
 - Each entry: `team_member_id`, `dates` (YYYY-MM-DD[]), `slots` (`[{from, to}]` in HH:MM)
 - Use staff IDs returned by `onboarding_add_team_members_batch`
 - Without schedules the appointment grid stays empty
 
 **`onboarding_import_clients(location_id, clients_csv)`**
+
 - Import client database from CSV
 - Required: `name` + (`phone` OR `email`)
 - Optional: `surname`, `comment`
 - Deduplicates by phone/email
 
 **`onboarding_create_test_appointments(location_id, count?)`**
+
 - Generate sample appointments (default: 5)
 - Requires: at least 1 staff + 1 service
 - Distributes across next 7 days
@@ -665,11 +708,13 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 ### Utility Tools
 
 **`onboarding_preview_data(data_type, raw_input)`**
+
 - Parse and validate without creating entities
 - Types: 'staff', 'services', 'clients', 'categories'
 - Shows structured preview with validation errors
 
 **`onboarding_rollback_phase(location_id, phase_name)`**
+
 - Delete entities from specified phase
 - Reset state to previous checkpoint
 - Confirmation required for destructive action
@@ -677,20 +722,23 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 ## Best Practices
 
 1. **Always preview large datasets** before importing:
+
    ```typescript
-   onboarding_preview_data({ data_type: "staff", raw_input: csv_data })
+   onboarding_preview_data({ data_type: 'staff', raw_input: csv_data });
    ```
 
 2. **Create categories first** before services (services depend on category IDs)
 
 3. **Use meaningful external_ids** for external integrations:
+
    ```typescript
    { title: "Haircut", external_id: "service-haircut-001" }
    ```
 
 4. **Check status regularly** during multi-step onboarding:
+
    ```typescript
-   onboarding_status({ location_id: 123456 })
+   onboarding_status({ location_id: 123456 });
    ```
 
 5. **Test with small batches** before full import (10-20 rows)
@@ -701,7 +749,7 @@ Bob,"Prefers morning shifts, available Mon-Fri"
    the exception: public V1 cannot delete them, so the rollback reports and
    retains their IDs:
    ```typescript
-   onboarding_rollback_phase({ location_id: 123456, phase_name: "staff" })
+   onboarding_rollback_phase({ location_id: 123456, phase_name: 'staff' });
    ```
 
 ## Next Steps
@@ -709,10 +757,11 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 After completing onboarding:
 
 1. **Verify data:** Use existing tools to check created entities
+
    ```typescript
-   team_members_list({ location_id: 123456 })
-   services_list({ location_id: 123456 })
-   appointments_list({ location_id: 123456 })
+   team_members_list({ location_id: 123456 });
+   services_list({ location_id: 123456 });
+   appointments_list({ location_id: 123456 });
    ```
 
 2. **Customize settings:** Update staff schedules, service configurations

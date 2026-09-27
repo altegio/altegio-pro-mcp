@@ -152,7 +152,9 @@ export const createServiceTool = defineTool({
     active: z
       .boolean()
       .default(true)
-      .describe('true (default) creates an active service; false a hidden draft'),
+      .describe(
+        'true (default) creates an active service; false a hidden draft'
+      ),
   }),
   outputSchema: serviceEntityOutput,
   handler: async ({ input, client }) => {
@@ -176,7 +178,7 @@ export const updateServiceTool = defineTool({
   name: 'services_update',
   category: 'Services',
   description:
-    '[Services] Safely update an existing service. AUTHENTICATION REQUIRED. Provide only fields to change; the tool reads the current service and preserves all unchanged writable fields and team-member links before sending the documented V1 PUT.',
+    'Safely update an existing service. AUTHENTICATION REQUIRED. Provide only fields to change; the tool reads the current service and preserves all unchanged writable fields and team-member links before sending the documented V1 PUT.',
   annotations: {
     title: 'Update Service',
     destructiveHint: false,
@@ -240,7 +242,7 @@ export const deleteServiceTool = defineTool({
   name: 'services_delete',
   category: 'Services',
   description:
-    '[Services] Permanently delete a service. AUTHENTICATION REQUIRED. This removes the service entirely; to merely hide it from booking, use services_update with active=0 instead.',
+    'Permanently delete a service. AUTHENTICATION REQUIRED. This removes the service entirely; to merely hide it from booking, use services_update with active=0 instead.',
   annotations: {
     title: 'Delete Service',
     destructiveHint: true,
@@ -282,7 +284,7 @@ export const linkServiceTeamMemberTool = defineTool({
   name: 'services_link_team_member',
   category: 'Services',
   description:
-    '[Services] Link a team member to a service so they can perform it. AUTHENTICATION REQUIRED. Required to create appointments: without the link, appointments_create fails with HTTP 400 "team member does not provide the selected services". If the link already exists, use services_update_team_member_link to change its duration.',
+    'Link a team member to a service so they can perform it. AUTHENTICATION REQUIRED. Required to create appointments: without the link, appointments_create fails with HTTP 400 "team member does not provide the selected services". If the link already exists, use services_update_team_member_link to change its duration.',
   annotations: {
     title: 'Link Team Member to Service',
     destructiveHint: false,
@@ -323,7 +325,7 @@ export const updateServiceTeamMemberTool = defineTool({
   name: 'services_update_team_member_link',
   category: 'Services',
   description:
-    '[Services] Update an existing team member ↔ service link (session duration or tech card). AUTHENTICATION REQUIRED. Use services_link_team_member to create the link first.',
+    'Update an existing team member ↔ service link (session duration or tech card). AUTHENTICATION REQUIRED. Use services_link_team_member to create the link first.',
   annotations: {
     title: 'Update Team Member Service Link',
     destructiveHint: false,
@@ -368,7 +370,7 @@ export const unlinkServiceTeamMemberTool = defineTool({
   name: 'services_unlink_team_member',
   category: 'Services',
   description:
-    '[Services] Remove the link between a team member and a service (they stop offering it). AUTHENTICATION REQUIRED.',
+    'Remove the link between a team member and a service (they stop offering it). AUTHENTICATION REQUIRED.',
   annotations: {
     title: 'Unlink Team Member from Service',
     destructiveHint: true,
@@ -414,7 +416,7 @@ export const linkTeamMemberServicesTool = defineTool({
   name: 'team_members_link_services',
   category: 'Services',
   description:
-    '[Services] Bulk-link ONE team member to MANY services in a single call. AUTHENTICATION REQUIRED. Applies the same session_length to every service. Reports per-service success/failure (already-linked services fail individually without stopping the rest).',
+    'Bulk-link ONE team member to MANY services in a single call. AUTHENTICATION REQUIRED. Applies the same session_length to every service. Reports per-service success/failure (already-linked services fail individually without stopping the rest).',
   annotations: {
     title: 'Link Team Member to Multiple Services',
     destructiveHint: false,

@@ -100,7 +100,9 @@ describe('the reasons', () => {
   it('names the mechanism that withheld each tool from `/mcp`', () => {
     const reasonOn = (name: string) =>
       surface.cell(name, DEFAULT_FACET)?.reason;
-    expect(reasonOn('locations_remove_user')).toBe('default-view-excluded-tool');
+    expect(reasonOn('locations_remove_user')).toBe(
+      'default-view-excluded-tool'
+    );
     expect(reasonOn('analytics_get_daily_series')).toBe(
       'default-view-excluded-prefix'
     );

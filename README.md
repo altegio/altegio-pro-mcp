@@ -90,17 +90,16 @@ The public vocabulary is **location**, **team member**, **appointment**, and
 `onboarding_add_team_members_batch`. See [CHANGELOG.md](CHANGELOG.md) for breaking
 changes. Upstream V1 wire names remain inside adapters where required.
 
-Reference lists of team members, services, categories, positions, resources, and
-booking forms accept `page` (1-based) and `count` (default 25, maximum 300).
-Output includes `items`, returned `count`, `page`, `page_size`, `next_page` (null
-at the end), and exact `total`. Unpaged V1 reference lists are sorted by ID and
-paged locally. Each request reads current data, so concurrent changes can shift
-page boundaries.
-
-Appointments and locations use upstream paging with the same defaults and
-continuation fields. A full last page may require an extra empty request; no
-unknown total is fabricated. Analytics and client tools expose source-specific
-pagination, coverage, units, and limitations through their schemas.
+Every collection result uses one pagination contract. Inputs are `page`
+(1-based) and `page_size` (default 25, maximum 300 unless a tool documents a
+lower cap). Output carries the rows in `items` and a `pagination` object with
+`page`, `page_size`, `returned`, `total` (exact count, or `null` when the source
+does not report one), `has_more` and `next_page` (`null` on the last page).
+Unpaged V1 reference lists are sorted by id and paged locally; appointments and
+locations use upstream paging, so a full last page can be followed by one empty
+page and no unknown total is invented. Date-windowed histories return
+`pagination.next_date_from` / `next_date_to` instead of a page number. Each
+request reads current data, so concurrent changes can shift page boundaries.
 
 Client contacts are opt-in where supported: pass `include_contacts: true` when
 contact details are needed. Business names and comments are untrusted data.

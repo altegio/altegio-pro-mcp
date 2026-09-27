@@ -50,7 +50,10 @@ const listPageInput = {
 function pageOf<T>(entries: readonly T[], input: PageInput) {
   const start = (input.page - 1) * input.page_size;
   const items = entries.slice(start, start + input.page_size);
-  return { items, pagination: pageMetadata(input, items.length, entries.length) };
+  return {
+    items,
+    pagination: pageMetadata(input, items.length, entries.length),
+  };
 }
 /** V1 inventory transaction type of a sale. */
 const SALE_TRANSACTION_TYPE = 1;
@@ -201,7 +204,7 @@ async function saleEvidence(
 export const clientsGetMembershipPurchasesTool = defineTool({
   name: 'clients_get_membership_purchases',
   category: 'Clients',
-  description: `[Clients] Inspect up to ${MEMBERSHIP_LIMIT} memberships of one client. Memberships are found by the client’s current phone, and each is verified against the client-specific membership history before it is reported. Where permitted, follows the linked sale transaction and sale document. A membership creation date is not a sale date, the current membership type price is not a purchase price, and the recorded unit price is not a proven paid amount; paid_amount stays null because a sale document does not attribute payment to one item. Returns explicit evidence status per membership and may miss memberships sold under an earlier phone.`,
+  description: `Inspect up to ${MEMBERSHIP_LIMIT} memberships of one client. Memberships are found by the client’s current phone, and each is verified against the client-specific membership history before it is reported. Where permitted, follows the linked sale transaction and sale document. A membership creation date is not a sale date, the current membership type price is not a purchase price, and the recorded unit price is not a proven paid amount; paid_amount stays null because a sale document does not attribute payment to one item. Returns explicit evidence status per membership and may miss memberships sold under an earlier phone.`,
   annotations: { title: 'Client membership purchases', ...READ_ONLY },
   input: z.object({ location_id: locationId, client_id: clientId }),
   outputSchema: objectSchema({
@@ -401,7 +404,7 @@ export const clientsAddCommentTool = defineTool({
   name: 'clients_add_comment',
   category: 'Clients',
   description:
-    '[Clients] Add one text comment to a client card. A form URL stays text; use clients_upload_file to attach a completed file.',
+    'Add one text comment to a client card. A form URL stays text; use clients_upload_file to attach a completed file.',
   annotations: {
     title: 'Add client comment',
     readOnlyHint: false,
@@ -531,7 +534,7 @@ export const clientsUploadFileTool = defineTool({
   name: 'clients_upload_file',
   category: 'Clients',
   description:
-    '[Clients] Attach one completed file to a client card. Supply the actual file bytes as raw base64, not a URL or data URI. Allowed extensions: jpeg, jpg, png, gif, doc, docx, pdf, xls, xlsx, txt; nonempty file strictly below 12 MiB. Requires client and file-upload rights. Returns the client’s file list after the upload; the upload also adds a file entry to the card’s comments.',
+    'Attach one completed file to a client card. Supply the actual file bytes as raw base64, not a URL or data URI. Allowed extensions: jpeg, jpg, png, gif, doc, docx, pdf, xls, xlsx, txt; nonempty file strictly below 12 MiB. Requires client and file-upload rights. Returns the client’s file list after the upload; the upload also adds a file entry to the card’s comments.',
   annotations: {
     title: 'Upload client file',
     readOnlyHint: false,

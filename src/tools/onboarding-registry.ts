@@ -12,7 +12,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_start',
     description:
-      '[Onboarding] Initialize new onboarding session for a location. Creates persistent state and guides through platform setup workflow.',
+      'Initialize new onboarding session for a location. Creates persistent state and guides through platform setup workflow.',
     annotations: {
       title: 'Start Onboarding',
       // Resets the local wizard checkpoint file for this location; it never
@@ -38,7 +38,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_resume',
     description:
-      '[Onboarding] Resume existing onboarding session and show progress. Displays completed phases and next steps.',
+      'Resume existing onboarding session and show progress. Displays completed phases and next steps.',
     annotations: {
       title: 'Resume Onboarding',
       readOnlyHint: true,
@@ -74,7 +74,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_add_positions',
     description:
-      '[Onboarding] Bulk create staff positions/roles (e.g. Manager, Stylist, Receptionist) from a JSON array or CSV string. Create positions BEFORE staff so staff can reference position_id. The documented public V1 operation accepts title only. Created IDs are checkpointed for audit, but public V1 has no position delete operation, so this phase cannot be automatically rolled back.',
+      'Bulk create positions (for example Manager, Stylist, Receptionist) from a JSON array or CSV string. Create positions before team members so each team member can reference position_id. The documented public V1 operation accepts title only. Created IDs are checkpointed for audit, but public V1 has no position delete operation, so this phase cannot be automatically rolled back.',
     annotations: {
       title: 'Batch Add Positions',
       destructiveHint: false,
@@ -112,7 +112,7 @@ export const onboardingTools: McpToolSpec[] = [
     description:
       'Bulk add team members from a JSON array or CSV string. Reads name, specialization, position_id, has_paid_seat and has_schedule_access. Every team member needs an explicit has_paid_seat (takes a paid seat — billed on per-seat licensing) and has_schedule_access (in the work schedule, able to have working hours and take appointments; per-seat licensing allows it only for a paid seat). Ask the location owner for both and never choose them yourself; give them per row, or once for the whole list with the batch-level fields when the owner gave one answer for everybody. A row without an answer refuses the whole batch before anything is created. Team members are created without user accounts; phone, email and external_id columns are ignored, because the create operation stores none of them (use team_members_create with user_phone or user_email to link a user). Creates checkpoint for rollback.',
     annotations: {
-      title: 'Batch Add Staff',
+      title: 'Batch Add Team Members',
       destructiveHint: false,
       openWorldHint: true,
       idempotentHint: false,
@@ -209,7 +209,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_set_schedules',
     description:
-      '[Onboarding] Set work schedules (working hours) for staff members. AUTHENTICATION REQUIRED. Accepts an array of { team_member_id, dates[], slots[{from,to}] }. Use the team member IDs returned by onboarding_add_team_members_batch. Without schedules the appointment grid stays empty. Creates checkpoint for rollback.',
+      'Set work schedules (working hours) for team members. Accepts an array of { team_member_id, dates[], slots[{from,to}] }. Use the team member IDs returned by onboarding_add_team_members_batch. Without schedules the appointment grid stays empty. Creates checkpoint for rollback.',
     annotations: {
       title: 'Set Work Schedules',
       destructiveHint: false,
@@ -300,7 +300,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_import_clients',
     description:
-      '[Onboarding] Import client database from CSV string. CSV must have headers: name,phone,email,surname,comment. Either phone or email is required. Creates checkpoint for rollback.',
+      'Import client database from CSV string. CSV must have headers: name,phone,email,surname,comment. Either phone or email is required. Creates checkpoint for rollback.',
     annotations: {
       title: 'Import Clients',
       destructiveHint: false,
@@ -324,7 +324,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_create_test_appointments',
     description:
-      'Generate test appointments using previously created staff and services. Distributes appointments across next 1-7 days. Marks onboarding as complete.',
+      'Generate test appointments using previously created team members and services. Distributes appointments across next 1-7 days. Marks onboarding as complete.',
     annotations: {
       title: 'Create Test Appointments',
       destructiveHint: false,

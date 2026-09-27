@@ -12,7 +12,7 @@ import { AltegioClient } from '../../../providers/altegio-client.js';
 import { V1LegacyAnalyticsAdapter } from '../legacy-analytics-adapter.js';
 
 const LIVE = process.env.ALTEGIO_E2E === '1';
-const DEMO_LOCATION_ID = 4564;
+const DEMO_LOCATION_ID = Number(process.env.ALTEGIO_E2E_LOCATION_ID);
 const CREDENTIALS_DIR = process.env.CREDENTIALS_DIR ?? '/tmp/altegio-mcp-live';
 const describeLive = LIVE ? describe : describe.skip;
 

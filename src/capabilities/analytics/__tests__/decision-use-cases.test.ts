@@ -47,7 +47,9 @@ function expectDecisionContract(tool: DefinedTool, structuredContent: unknown) {
   const validate = new Ajv2020({ strict: false, allErrors: true }).compile(
     tool.toMcpTool().outputSchema!
   );
-  const published = standardizeCollection({ structuredContent }).structuredContent;
+  const published = standardizeCollection({
+    structuredContent,
+  }).structuredContent;
   if (!validate(published)) {
     throw new Error(JSON.stringify(validate.errors, null, 2));
   }
