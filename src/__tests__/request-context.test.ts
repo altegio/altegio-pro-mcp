@@ -23,7 +23,7 @@ describe('request-context', () => {
     it('parses a user identity', () => {
       const identity = parseIdentityHeaders({
         'x-mcp-auth-kind': 'user',
-        'x-mcp-auth-email': 'giorgio.a@alteg.io',
+        'x-mcp-auth-email': 'staff.user@example.com',
         'x-mcp-auth-sub': 'auth0|123',
         'x-mcp-auth-client-id': 'client-abc',
         'x-mcp-auth-scope': 'mcp:pro:read mcp:pro:write',
@@ -31,7 +31,7 @@ describe('request-context', () => {
 
       expect(identity).toEqual({
         kind: 'user',
-        email: 'giorgio.a@alteg.io',
+        email: 'staff.user@example.com',
         sub: 'auth0|123',
         clientId: 'client-abc',
         scope: 'mcp:pro:read mcp:pro:write',
