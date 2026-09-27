@@ -1,7 +1,7 @@
 import { describeOperation, terminologyNotes } from '../describe.js';
 import { acceptedNames, canonicalName, getOperation } from '../catalog.js';
 
-describe('altegio_describe_operation', () => {
+describe('api_describe_operation', () => {
   it('describes a curated read with its parameters, auth and response', () => {
     const { found, text, structuredContent } = describeOperation(
       'get_team_member_list'
@@ -97,7 +97,7 @@ describe('altegio_describe_operation', () => {
     const { text, structuredContent } = describeOperation('update_appointment');
     expect(structuredContent.callable_by_executor).toBe(false);
     expect(text).toContain('is a write');
-    expect(text).toContain('update_appointment');
+    expect(text).toContain('appointments_update');
   });
 
   it('marks a V3 preview operation as not callable yet', () => {
@@ -129,7 +129,7 @@ describe('altegio_describe_operation', () => {
     const result = describeOperation('get_team_member_lst');
     expect(result.found).toBe(false);
     expect(result.text).toContain('No operation `get_team_member_lst`');
-    expect(result.text).toContain('altegio_search_operations');
+    expect(result.text).toContain('api_search_operations');
     expect(result.structuredContent.suggestions).toContain(
       'get_team_member_list'
     );

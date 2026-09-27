@@ -100,13 +100,15 @@ describe('the reasons', () => {
   it('names the mechanism that withheld each tool from `/mcp`', () => {
     const reasonOn = (name: string) =>
       surface.cell(name, DEFAULT_FACET)?.reason;
-    expect(reasonOn('remove_location_user')).toBe('default-view-excluded-tool');
+    expect(reasonOn('locations_remove_user')).toBe(
+      'default-view-excluded-tool'
+    );
     expect(reasonOn('analytics_get_daily_series')).toBe(
       'default-view-excluded-prefix'
     );
     expect(reasonOn('analytics_get_overview')).toBe('default-view-extra-tool');
-    expect(reasonOn('altegio_login')).toBe('password-login-not-exposed');
-    expect(reasonOn('list_locations')).toBe('facet-base-tool');
+    expect(reasonOn('auth_login')).toBe('password-login-not-exposed');
+    expect(reasonOn('locations_list')).toBe('facet-base-tool');
     expect(reasonOn('team_members_list')).toBe('default-view-not-excluded');
     expect(reasonOn('analytics_run_report')).toBe('disabled-everywhere');
   });
@@ -118,7 +120,7 @@ describe('the reasons', () => {
     expect(surface.cell('clients_search', 'ops')?.reason).toBe(
       'facet-rule-prefix'
     );
-    expect(surface.cell('list_locations', 'marketing')?.reason).toBe(
+    expect(surface.cell('locations_list', 'marketing')?.reason).toBe(
       'facet-base-tool'
     );
     expect(surface.cell('team_members_list', 'ops')?.reason).toBe(
@@ -218,8 +220,8 @@ describe('the gates', () => {
       surface
         .cell(name, 'all')!
         .gates.some((gate) => gate.kind === 'executor-read-only');
-    expect(readsOnly('altegio_call_operation')).toBe(true);
-    expect(readsOnly('altegio_describe_operation')).toBe(false);
+    expect(readsOnly('api_call_operation')).toBe(true);
+    expect(readsOnly('api_describe_operation')).toBe(false);
     expect(readsOnly('team_members_list')).toBe(false);
   });
 

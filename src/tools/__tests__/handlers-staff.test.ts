@@ -31,14 +31,12 @@ describe('ToolHandlers - Staff CRUD', () => {
         position_id: 1,
         user_email: 'john@example.com',
         user_phone: '1234567890',
-        is_user_invite: true,
-        is_paid_staff: true,
-        has_timetable_access: true,
+        invite_user: true,
+        has_paid_seat: true,
+        has_schedule_access: true,
       });
 
-      expect(result.content[0]?.text).toContain(
-        'Successfully created team member'
-      );
+      expect(result.content[0]?.text).toContain('Created team member');
       expect(result.content[0]?.text).toContain('John Doe');
       expect(mockClient.createStaff).toHaveBeenCalledWith(456, {
         name: 'John Doe',
@@ -63,8 +61,8 @@ describe('ToolHandlers - Staff CRUD', () => {
         name: 'Demo Stylist',
         specialization: 'Stylist',
         position_id: null,
-        is_paid_staff: false,
-        has_timetable_access: false,
+        has_paid_seat: false,
+        has_schedule_access: false,
       });
 
       expect(result.isError).toBeUndefined();
@@ -83,8 +81,8 @@ describe('ToolHandlers - Staff CRUD', () => {
     });
 
     it.each([
-      ['is_paid_staff', { has_timetable_access: true }, 'paid staff seat'],
-      ['has_timetable_access', { is_paid_staff: true }, 'work schedule'],
+      ['has_paid_seat', { has_schedule_access: true }, 'paid seat'],
+      ['has_schedule_access', { has_paid_seat: true }, 'work schedule'],
     ])(
       'refuses a missing %s and tells the model to ask the owner',
       async (field, answered, topic) => {
@@ -110,13 +108,13 @@ describe('ToolHandlers - Staff CRUD', () => {
         name: 'Alice',
         specialization: 'Stylist',
         position_id: null,
-        is_paid_staff: 'yes',
-        has_timetable_access: true,
+        has_paid_seat: 'yes',
+        has_schedule_access: true,
       });
 
       expect(result.isError).toBe(true);
       const text = (result.content[0] as { text: string }).text;
-      expect(text).toContain('is_paid_staff');
+      expect(text).toContain('has_paid_seat');
       expect(text).not.toContain('Ask the location owner');
       expect(mockClient.createStaff).not.toHaveBeenCalled();
     });
@@ -133,8 +131,8 @@ describe('ToolHandlers - Staff CRUD', () => {
         specialization: 'Stylist',
         position_id: null,
         phone_number: '15550001234',
-        is_paid_staff: true,
-        has_timetable_access: true,
+        has_paid_seat: true,
+        has_schedule_access: true,
       });
 
       expect(result.isError).toBe(true);
@@ -144,7 +142,7 @@ describe('ToolHandlers - Staff CRUD', () => {
 
     it('should handle errors', async () => {
       mockClient.createStaff.mockRejectedValue(
-        new AuthenticationError('Not authenticated. Call altegio_login first.')
+        new AuthenticationError('Not authenticated. Call auth_login first.')
       );
 
       const result = await handlers.createStaff({
@@ -154,13 +152,13 @@ describe('ToolHandlers - Staff CRUD', () => {
         position_id: 1,
         user_email: 'john@example.com',
         user_phone: '1234567890',
-        is_user_invite: true,
-        is_paid_staff: true,
-        has_timetable_access: true,
+        invite_user: true,
+        has_paid_seat: true,
+        has_schedule_access: true,
       });
 
       expect(result.content[0]?.text).toContain('Authentication required');
-      expect(result.content[0]?.text).toContain('altegio_login');
+      expect(result.content[0]?.text).toContain('auth_login');
     });
   });
 
@@ -177,9 +175,7 @@ describe('ToolHandlers - Staff CRUD', () => {
         name: 'John Smith',
       });
 
-      expect(result.content[0]?.text).toContain(
-        'Successfully updated team member'
-      );
+      expect(result.content[0]?.text).toContain('Updated team member');
       expect(mockClient.updateStaff).toHaveBeenCalledWith(456, 123, {
         name: 'John Smith',
       });
@@ -195,9 +191,7 @@ describe('ToolHandlers - Staff CRUD', () => {
         team_member_id: 123,
       });
 
-      expect(result.content[0]?.text).toContain(
-        'Successfully deleted team member'
-      );
+      expect(result.content[0]?.text).toContain('Deleted team member');
       expect(mockClient.deleteStaff).toHaveBeenCalledWith(456, 123);
     });
   });

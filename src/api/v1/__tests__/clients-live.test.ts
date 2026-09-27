@@ -21,7 +21,7 @@ import { callClients } from '../clients-http.js';
 import { V1ClientsAdapter } from '../clients-adapter.js';
 
 const LIVE = process.env.ALTEGIO_E2E === '1';
-let liveLocationId = 4564;
+let liveLocationId = Number(process.env.ALTEGIO_E2E_LOCATION_ID);
 const FIXTURES = path.join(__dirname, 'fixtures', 'live');
 const CREDENTIALS_DIR = process.env.CREDENTIALS_DIR ?? '/tmp/altegio-mcp-live';
 

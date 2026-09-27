@@ -14,8 +14,8 @@ export const PRODUCT_LOGIC_URI = 'altegio://docs/product-logic';
 export const GLOSSARY_URI = 'altegio://docs/glossary';
 export const ONBOARDING_GUIDE_URI = 'altegio://docs/onboarding-guide';
 
-const PRODUCT_LOGIC_FILE = 'Altegio API and Product Logic Documentation.md';
-const ONBOARDING_GUIDE_FILE = 'ONBOARDING_GUIDE.md';
+const PRODUCT_LOGIC_FILE = 'product-logic.md';
+const ONBOARDING_GUIDE_FILE = 'onboarding-guide.md';
 
 export const docsResources: ResourceModule = {
   resources: [

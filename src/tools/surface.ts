@@ -42,14 +42,14 @@ import type { ToolScope } from './scopes.js';
 /**
  * Tools whose handler refuses part of its own input regardless of the view.
  *
- * `altegio_call_operation` reaches the whole catalog under one tool name and
+ * `api_call_operation` reaches the whole catalog under one tool name and
  * performs documented GETs only; any other method is refused with a pointer to
  * the curated tool (ADR-001 D2, and §8 open decision 5, answered: the executor
  * stays read-only). It is listed here because a reader asking "what can still
  * refuse this call" deserves the same answer for a tool-internal policy as for
  * a server-wide gate.
  */
-const EXECUTOR_READ_ONLY_TOOLS: readonly string[] = ['altegio_call_operation'];
+const EXECUTOR_READ_ONLY_TOOLS: readonly string[] = ['api_call_operation'];
 
 // ==========================================================================
 // The cell

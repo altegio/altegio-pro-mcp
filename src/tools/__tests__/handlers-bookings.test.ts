@@ -154,9 +154,7 @@ describe('ToolHandlers - Appointments CRUD', () => {
         client: { name: 'Jane', phone: '9876543210' },
       });
 
-      expect(result.content[0]?.text).toContain(
-        'Successfully created appointment'
-      );
+      expect(result.content[0]?.text).toContain('Created appointment');
       expect(result.content[0]?.text).toContain('999');
       expect(mockClient.createBooking).toHaveBeenCalledWith(456, {
         staff_id: 123,
@@ -169,7 +167,7 @@ describe('ToolHandlers - Appointments CRUD', () => {
 
     it('should handle errors', async () => {
       mockClient.createBooking.mockRejectedValue(
-        new AuthenticationError('Not authenticated. Call altegio_login first.')
+        new AuthenticationError('Not authenticated. Call auth_login first.')
       );
 
       const result = await handlers.createAppointment({
@@ -198,9 +196,7 @@ describe('ToolHandlers - Appointments CRUD', () => {
         datetime: '2025-11-02T10:00:00',
       });
 
-      expect(result.content[0]?.text).toContain(
-        'Successfully updated appointment'
-      );
+      expect(result.content[0]?.text).toContain('Updated appointment');
       expect(mockClient.updateBooking).toHaveBeenCalledWith(456, 999, {
         datetime: '2025-11-02T10:00:00',
       });

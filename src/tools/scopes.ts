@@ -183,13 +183,13 @@ type ScopeRequirement = ToolScope | readonly ToolScope[] | null;
  * - **Service ↔ team-member links are service writes.** All four go to
  *   `POST|PUT|DELETE /company/{id}/services/{service_id}/staff…`, and the
  *   catalog notes staff bindings travel in the body of S3/S4.
- * - **`create_appointment` needs `appointments:create`, not
+ * - **`appointments_create` needs `appointments:create`, not
  *   `appointments:write`.** The catalog makes `create` an action-scope that is
  *   never implied by `write` (AP1 vs AP4–AP6).
- * - **`remove_location_user` needs `team_members:manage_access`** — the high-
+ * - **`locations_remove_user` needs `team_members:manage_access`** — the high-
  *   risk scope for T8–T12, never implied by `team_members:write` ("write
  *   карточки сотрудника ≠ раздача логинов").
- * - **`altegio_login` / `altegio_logout` are ungated.** They obtain the V1
+ * - **`auth_login` / `auth_logout` are ungated.** They obtain the V1
  *   user token itself; gating the act of authenticating on a scope the token
  *   would have to already carry is circular. They are withheld from the public
  *   HTTP surface by `PASSWORD_LOGIN_TOOLS` instead.
@@ -204,7 +204,7 @@ type ScopeRequirement = ToolScope | readonly ToolScope[] | null;
  *   redaction — so a caller with `clients:read` still sees whatever V1
  *   returns. Enforcing it as an endpoint scope would over-restrict; pretending
  *   it is enforced would be worse. It belongs to the V3 adapter work.
- * - **`altegio_call_operation` is coarse.** One tool name reaches every
+ * - **`api_call_operation` is coarse.** One tool name reaches every
  *   documented GET, so it is mapped to the `api:read` placeholder: a caller
  *   scoped to `clients:read` alone is refused the executor outright rather
  *   than being handed a route around its own scope. The real fix is resolving
@@ -213,63 +213,63 @@ type ScopeRequirement = ToolScope | readonly ToolScope[] | null;
  */
 export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   // --- Auth: establishes the credential, so it cannot require one ----------
-  altegio_login: null,
-  altegio_logout: null,
+  auth_login: null,
+  auth_logout: null,
 
   // --- Universal executor --------------------------------------------------
   // Catalog metadata only: these two describe the API, they never read
   // business data, and refusing them would break discovery for every caller.
-  altegio_search_operations: null,
-  altegio_describe_operation: null,
-  altegio_call_operation: 'api:read',
+  api_search_operations: null,
+  api_describe_operation: null,
+  api_call_operation: 'api:read',
 
   // --- Location and its settings -------------------------------------------
-  list_locations: 'locations:read',
-  diagnose_location_access: 'locations:read',
-  update_location: 'locations:write',
-  get_appointment_settings: 'locations:read',
-  update_appointment_settings: 'locations:write',
-  get_online_booking_settings: 'locations:read',
-  update_online_booking_settings: 'locations:write',
-  get_booking_forms: 'locations:read',
-  create_booking_form: 'locations:write',
-  delete_booking_form: 'locations:write',
-  get_resources: 'locations:read',
+  locations_list: 'locations:read',
+  locations_diagnose_access: 'locations:read',
+  locations_update: 'locations:write',
+  settings_get_appointment_calendar: 'locations:read',
+  settings_update_appointment_calendar: 'locations:write',
+  settings_get_online_booking: 'locations:read',
+  settings_update_online_booking: 'locations:write',
+  booking_forms_list: 'locations:read',
+  booking_forms_create: 'locations:write',
+  booking_forms_delete: 'locations:write',
+  resources_list: 'locations:read',
 
   // --- Team members, positions, schedules ----------------------------------
   team_members_list: 'team_members:read',
   team_members_create: 'team_members:write',
   team_members_update: 'team_members:write',
   team_members_delete: 'team_members:write',
-  get_positions: 'team_members:read',
-  create_position: 'team_members:write',
-  get_schedule: 'team_members:read',
-  create_schedule: 'team_members:write',
-  update_schedule: 'team_members:write',
-  delete_schedule: 'team_members:write',
+  positions_list: 'team_members:read',
+  positions_create: 'team_members:write',
+  schedules_get: 'team_members:read',
+  schedules_create: 'team_members:write',
+  schedules_update: 'team_members:write',
+  schedules_delete: 'team_members:write',
 
   // --- Access management (dangerous, never implied by team_members:write) ---
-  remove_location_user: 'team_members:manage_access',
+  locations_remove_user: 'team_members:manage_access',
 
   // --- Services and categories ---------------------------------------------
-  get_services: 'services:read',
-  create_service: 'services:write',
-  update_service: 'services:write',
-  delete_service: 'services:write',
-  link_service_team_member: 'services:write',
-  link_team_member_services: 'services:write',
-  update_service_team_member: 'services:write',
-  unlink_service_team_member: 'services:write',
-  get_service_categories: 'services:read',
-  delete_service_category: 'services:write',
+  services_list: 'services:read',
+  services_create: 'services:write',
+  services_update: 'services:write',
+  services_delete: 'services:write',
+  services_link_team_member: 'services:write',
+  team_members_link_services: 'services:write',
+  services_update_team_member_link: 'services:write',
+  services_unlink_team_member: 'services:write',
+  service_categories_list: 'services:read',
+  service_categories_delete: 'services:write',
 
   // --- Appointments ---------------------------------------------------------
-  get_appointments: 'appointments:read',
+  appointments_list: 'appointments:read',
   appointments_preview_attendance: 'appointments:read',
   appointments_apply_attendance: 'appointments:write',
-  create_appointment: 'appointments:create',
-  update_appointment: 'appointments:write',
-  delete_appointment: 'appointments:write',
+  appointments_create: 'appointments:create',
+  appointments_update: 'appointments:write',
+  appointments_delete: 'appointments:write',
 
   // --- Client base ----------------------------------------------------------
   clients_search: 'clients:read',
@@ -406,13 +406,13 @@ export function requiredScopesFor(toolName: string): readonly ToolScope[] {
  * vocabulary cannot express it — there are two grades for the entire service
  * and no third grant anyone can be issued. Refusing to imply the action-scopes
  * would therefore not be strictness, it would be a permanently dead tool:
- * `create_appointment` and `onboarding_create_test_appointments` would be
+ * `appointments_create` and `onboarding_create_test_appointments` would be
  * unreachable for every caller on every address, forever — the same failure
  * this rule exists to undo, only narrower. The consent a user actually gave
  * for `mcp:pro:write` reads "bookings, staff, clients and services (read and
  * write)", a full change grant on the service, which is precisely what
  * creating an appointment is. `manage_access` is the uncomfortable member and
- * is admitted with open eyes: `remove_location_user` is already withheld from
+ * is admitted with open eyes: `locations_remove_user` is already withheld from
  * the default `/mcp` view and reachable only where a deployment chose to serve
  * it, so the narrowing that matters for it is the address, not this rule. When
  * v3 issues tokens that carry the fine distinction, this branch stops being

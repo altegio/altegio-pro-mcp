@@ -43,7 +43,7 @@ const appointmentHistory = z
       .array(z.number().int().positive())
       .optional()
       .describe(
-        'Only appointments that include these services (get_services for ids).'
+        'Only appointments that include these services (services_list for ids).'
       ),
     service_category_ids: z
       .array(z.number().int().positive())

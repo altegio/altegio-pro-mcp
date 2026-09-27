@@ -14,6 +14,20 @@ const seanceLengthSchema = z
     'Duration this team member needs for the service, in seconds (min 300, max 86100)'
   );
 
+const durationSecondsArg = z
+  .number()
+  .int()
+  .positive()
+  .optional()
+  .describe('Default duration of the service in seconds');
+
+const prepaidArg = z
+  .enum(['forbidden', 'allowed', 'required'])
+  .optional()
+  .describe(
+    'Online prepayment: forbidden, allowed (client chooses) or required'
+  );
+
 function servicePrice(service: AltegioService): {
   min: number | null;
   max: number | null;
@@ -51,10 +65,10 @@ function projectService(service: AltegioService) {
 }
 
 export const getServicesTool = defineTool({
-  name: 'get_services',
+  name: 'services_list',
   category: 'Services',
   description:
-    '[Services] Get list of services available at a location. AUTHENTICATION REQUIRED - administrative access to view all services with full pricing, settings, and configuration (not just public online-booking info). User must be logged in and have access to the location. Returns a stable page ordered by ID, with next_page and total. Default 25 rows.',
+    'List the services of a location with prices, duration, category, active flag and the team members linked to each. Paged and ordered by id: 25 per page by default; pagination.total is exact and pagination.next_page is null on the last page.',
   annotations: {
     title: 'Get Services',
     readOnlyHint: true,
@@ -104,18 +118,17 @@ export const getServicesTool = defineTool({
       text: withUntrustedBlock(lines.join('\n'), untrusted, { maxChars: 200 }),
       structuredContent: {
         items: services.map(projectService),
-        count: services.length,
-        ...pagination,
+        pagination,
       },
     };
   },
 });
 
 export const createServiceTool = defineTool({
-  name: 'create_service',
+  name: 'services_create',
   category: 'Services',
   description:
-    '[Services] Create a new service. AUTHENTICATION REQUIRED. Required fields: title, category_id. Services are active and usable by default; pass active=0 only to create a hidden draft. Link at least one team member before booking it.',
+    'Create a service in a category. Required: title and category_id. The service is active by default; pass active=false for a hidden draft. Link at least one team member (services_link_team_member) before it can be booked.',
   annotations: {
     title: 'Create Service',
     destructiveHint: false,
@@ -134,36 +147,38 @@ export const createServiceTool = defineTool({
       .optional()
       .describe('Discount percentage'),
     comment: z.string().optional().describe('Service description'),
-    duration: z.number().positive().optional().describe('Duration in seconds'),
-    prepaid: z.string().optional().describe('Prepaid option'),
+    duration_seconds: durationSecondsArg,
+    prepaid: prepaidArg,
     active: z
-      .number()
-      .int()
-      .min(0)
-      .max(1)
-      .optional()
-      .default(1)
-      .describe('1 (default) creates an active service; 0 creates a draft'),
+      .boolean()
+      .default(true)
+      .describe(
+        'true (default) creates an active service; false a hidden draft'
+      ),
   }),
   outputSchema: serviceEntityOutput,
   handler: async ({ input, client }) => {
-    const { location_id, ...serviceData } = input;
-    const service = await client.createService(location_id, serviceData);
+    const { location_id, duration_seconds, active, ...serviceData } = input;
+    const service = await client.createService(location_id, {
+      ...serviceData,
+      ...(duration_seconds !== undefined ? { duration: duration_seconds } : {}),
+      active: active ? 1 : 0,
+    });
     return {
-      text:
-        `Successfully created service:\nID: ${service.id}\nTitle: ${service.title}\n` +
-        `Category: ${service.category_id ?? 'not reported'}\n` +
-        `Active: ${service.active === undefined ? 'not reported by create response' : Boolean(Number(service.active))}`,
+      text: withUntrustedBlock(
+        `Created service ${service.id} in category ${service.category_id ?? 'not reported'}; active: ${service.active === undefined ? 'not reported by the create response' : Boolean(Number(service.active))}.`,
+        [{ label: 'title', value: service.title }]
+      ),
       structuredContent: projectService(service),
     };
   },
 });
 
 export const updateServiceTool = defineTool({
-  name: 'update_service',
+  name: 'services_update',
   category: 'Services',
   description:
-    '[Services] Safely update an existing service. AUTHENTICATION REQUIRED. Provide only fields to change; the tool reads the current service and preserves all unchanged writable fields and team-member links before sending the documented V1 PUT.',
+    'Safely update an existing service. AUTHENTICATION REQUIRED. Provide only fields to change; the tool reads the current service and preserves all unchanged writable fields and team-member links before sending the documented V1 PUT.',
   annotations: {
     title: 'Update Service',
     destructiveHint: false,
@@ -188,12 +203,22 @@ export const updateServiceTool = defineTool({
       .optional()
       .describe('Discount percentage'),
     comment: z.string().optional().describe('Service description'),
-    duration: z.number().positive().optional().describe('Duration in seconds'),
-    active: z.number().int().min(0).max(1).optional().describe('0 or 1'),
+    duration_seconds: durationSecondsArg,
+    prepaid: prepaidArg,
+    active: z
+      .boolean()
+      .optional()
+      .describe('false hides the service from booking without deleting it'),
   }),
   outputSchema: serviceEntityOutput,
   handler: async ({ input, client }) => {
-    const { location_id, service_id, ...updateData } = input;
+    const { location_id, service_id, duration_seconds, active, ...rest } =
+      input;
+    const updateData = {
+      ...rest,
+      ...(duration_seconds !== undefined ? { duration: duration_seconds } : {}),
+      ...(active !== undefined ? { active: active ? 1 : 0 } : {}),
+    };
     const service = await client.updateService(
       location_id,
       service_id,
@@ -214,10 +239,10 @@ export const updateServiceTool = defineTool({
 });
 
 export const deleteServiceTool = defineTool({
-  name: 'delete_service',
+  name: 'services_delete',
   category: 'Services',
   description:
-    '[Services] Permanently delete a service. AUTHENTICATION REQUIRED. This removes the service entirely; to merely hide it from booking, use update_service with active=0 instead.',
+    'Permanently delete a service. AUTHENTICATION REQUIRED. This removes the service entirely; to merely hide it from booking, use services_update with active=0 instead.',
   annotations: {
     title: 'Delete Service',
     destructiveHint: true,
@@ -243,7 +268,7 @@ export const deleteServiceTool = defineTool({
       return `service "${service.title}", id ${service.id}${linked}, at location ${input.location_id}`;
     },
     consequence:
-      'The service is removed from the location together with every team-member link and its place in the online-booking menu. Appointments already booked keep the service name they were booked with. To merely take it off sale instead, cancel here and call update_service with active=0.',
+      'The service is removed from the location together with every team-member link and its place in the online-booking menu. Appointments already booked keep the service name they were booked with. To merely take it off sale instead, cancel here and call services_update with active=0.',
   },
   handler: async ({ input, client }) => {
     await client.deleteService(input.location_id, input.service_id);
@@ -256,10 +281,10 @@ export const deleteServiceTool = defineTool({
 // ========== Service ↔ Team Member Links ==========
 
 export const linkServiceTeamMemberTool = defineTool({
-  name: 'link_service_team_member',
+  name: 'services_link_team_member',
   category: 'Services',
   description:
-    '[Services] Link a team member to a service so they can perform it. AUTHENTICATION REQUIRED. Required to create appointments: without the link, create_appointment fails with HTTP 400 "team member does not provide the selected services". If the link already exists, use update_service_team_member to change its duration.',
+    'Link a team member to a service so they can perform it. AUTHENTICATION REQUIRED. Required to create appointments: without the link, appointments_create fails with HTTP 400 "team member does not provide the selected services". If the link already exists, use services_update_team_member_link to change its duration.',
   annotations: {
     title: 'Link Team Member to Service',
     destructiveHint: false,
@@ -297,10 +322,10 @@ export const linkServiceTeamMemberTool = defineTool({
 });
 
 export const updateServiceTeamMemberTool = defineTool({
-  name: 'update_service_team_member',
+  name: 'services_update_team_member_link',
   category: 'Services',
   description:
-    '[Services] Update an existing team member ↔ service link (session duration or tech card). AUTHENTICATION REQUIRED. Use link_service_team_member to create the link first.',
+    'Update an existing team member ↔ service link (session duration or tech card). AUTHENTICATION REQUIRED. Use services_link_team_member to create the link first.',
   annotations: {
     title: 'Update Team Member Service Link',
     destructiveHint: false,
@@ -342,10 +367,10 @@ export const updateServiceTeamMemberTool = defineTool({
 });
 
 export const unlinkServiceTeamMemberTool = defineTool({
-  name: 'unlink_service_team_member',
+  name: 'services_unlink_team_member',
   category: 'Services',
   description:
-    '[Services] Remove the link between a team member and a service (they stop offering it). AUTHENTICATION REQUIRED.',
+    'Remove the link between a team member and a service (they stop offering it). AUTHENTICATION REQUIRED.',
   annotations: {
     title: 'Unlink Team Member from Service',
     destructiveHint: true,
@@ -373,7 +398,7 @@ export const unlinkServiceTeamMemberTool = defineTool({
       return `${member.name} (id ${member.id}) from service "${service.title}" (id ${service.id}) at location ${input.location_id}`;
     },
     consequence:
-      'They stop offering this service: the pair disappears from online booking and create_appointment rejects it with HTTP 400 "team member does not provide the selected services". Appointments already booked for the pair are kept.',
+      'They stop offering this service: the pair disappears from online booking and appointments_create rejects it with HTTP 400 "team member does not provide the selected services". Appointments already booked for the pair are kept.',
   },
   handler: async ({ input, client }) => {
     await client.removeServiceFromStaff(
@@ -388,10 +413,10 @@ export const unlinkServiceTeamMemberTool = defineTool({
 });
 
 export const linkTeamMemberServicesTool = defineTool({
-  name: 'link_team_member_services',
+  name: 'team_members_link_services',
   category: 'Services',
   description:
-    '[Services] Bulk-link ONE team member to MANY services in a single call. AUTHENTICATION REQUIRED. Applies the same session_length to every service. Reports per-service success/failure (already-linked services fail individually without stopping the rest).',
+    'Bulk-link ONE team member to MANY services in a single call. AUTHENTICATION REQUIRED. Applies the same session_length to every service. Reports per-service success/failure (already-linked services fail individually without stopping the rest).',
   annotations: {
     title: 'Link Team Member to Multiple Services',
     destructiveHint: false,

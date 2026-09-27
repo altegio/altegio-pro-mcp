@@ -6,8 +6,8 @@
  * spec repository, no network and no parsing cost beyond the JSON import that
  * `tsc` copies into `dist/generated/`.
  *
- * The catalog backs the three executor tools — `altegio_search_operations`,
- * `altegio_describe_operation`, `altegio_call_operation` — and will back the
+ * The catalog backs the three executor tools — `api_search_operations`,
+ * `api_describe_operation`, `api_call_operation` — and will back the
  * generated domain packs.
  */
 import catalogJson from '../../generated/catalog.json' with { type: 'json' };

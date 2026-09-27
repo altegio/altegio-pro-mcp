@@ -1,8 +1,22 @@
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
-import { scheduleOutput, scheduleEntityOutput } from '../output-schemas.js';
+import { scheduleOutput, scheduleWriteOutput } from '../output-schemas.js';
+import { completeCollection } from '../pagination.js';
+import type { AltegioScheduleEntry } from '../../types/altegio.types.js';
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+function projectEntry(entry: AltegioScheduleEntry) {
+  const slots = entry.slots ?? [];
+  return {
+    date: entry.date,
+    slots,
+    is_working:
+      entry.is_working === undefined
+        ? slots.length > 0
+        : Boolean(entry.is_working),
+  };
+}
 
 const slotSchema = z.object({
   from: z
@@ -16,10 +30,10 @@ const slotSchema = z.object({
 });
 
 export const getScheduleTool = defineTool({
-  name: 'get_schedule',
+  name: 'schedules_get',
   category: 'Schedule',
   description:
-    '[Schedule] Get staff member schedule for a date range. AUTHENTICATION REQUIRED - administrative access to view staff working schedule. User must be logged in and have access to the location. Returns schedule entries with dates, times, and session lengths.',
+    "Read a team member's work schedule for a date range: one entry per day with its working intervals and whether it is a working day. The range is returned whole; keep it to a few weeks.",
   annotations: {
     title: 'Get Schedule',
     readOnlyHint: true,
@@ -28,56 +42,45 @@ export const getScheduleTool = defineTool({
   input: z.object({
     location_id: z.number().int().positive().describe('Location ID'),
     team_member_id: z.number().int().positive().describe('Team member ID'),
-    start_date: z.string().describe('Start date (YYYY-MM-DD format)'),
-    end_date: z.string().describe('End date (YYYY-MM-DD format)'),
+    date_from: dateSchema.describe('First day of the range, YYYY-MM-DD'),
+    date_to: dateSchema.describe('Last day of the range, YYYY-MM-DD'),
   }),
   outputSchema: scheduleOutput,
   handler: async ({ input, client }) => {
     const schedule = await client.getSchedule(
       input.location_id,
       input.team_member_id,
-      input.start_date,
-      input.end_date
+      input.date_from,
+      input.date_to
     );
+    const entries = schedule.map(projectEntry);
 
-    const items = schedule.map((s) => ({
-      date: s.date,
-      time: s.time,
-      session_length: s.seance_length,
-      slots: s.slots,
-      is_working:
-        s.is_working === undefined ? undefined : Boolean(s.is_working),
-    }));
-
-    // The schedule endpoint returns working intervals as `slots`; fall back to
-    // the legacy time/session_length shape for older payloads.
-    const describe = (s: (typeof items)[number]): string => {
-      if (s.slots && s.slots.length > 0) {
-        return s.slots.map((sl) => `${sl.from}-${sl.to}`).join(', ');
-      }
-      if (s.time !== undefined) {
-        return `at ${s.time}${s.session_length !== undefined ? ` (${s.session_length} min)` : ''}`;
-      }
-      return s.is_working === false ? 'day off' : 'no slots';
-    };
-
-    const summary = `Found ${items.length} schedule ${items.length === 1 ? 'entry' : 'entries'} for team member ${input.team_member_id}:\n\n`;
-    const scheduleList = items
-      .map((s, idx) => `${idx + 1}. ${s.date} ${describe(s)}`)
+    const describe = (entry: (typeof entries)[number]): string =>
+      entry.slots.length > 0
+        ? entry.slots.map((slot) => `${slot.from}-${slot.to}`).join(', ')
+        : 'day off';
+    const summary = `${entries.length} schedule ${entries.length === 1 ? 'entry' : 'entries'} for team member ${input.team_member_id}, ${input.date_from} to ${input.date_to}:\n\n`;
+    const scheduleList = entries
+      .map((entry, idx) => `${idx + 1}. ${entry.date} ${describe(entry)}`)
       .join('\n');
 
     return {
       text: summary + scheduleList,
-      structuredContent: { items, count: items.length },
+      structuredContent: {
+        team_member_id: input.team_member_id,
+        date_from: input.date_from,
+        date_to: input.date_to,
+        ...completeCollection(entries),
+      },
     };
   },
 });
 
 export const createScheduleTool = defineTool({
-  name: 'create_schedule',
+  name: 'schedules_create',
   category: 'Schedule',
   description:
-    '[Schedule] Create staff member work schedule. AUTHENTICATION REQUIRED - administrative access to create staff working schedule. Defines when a staff member is available to work (e.g., "Monday 9:00-18:00"). Use this to set up or modify work hours.',
+    "Set a team member's working hours: the given intervals apply to every listed date. Use it to open the booking grid for new dates.",
   annotations: {
     title: 'Create Schedule',
     destructiveHint: false,
@@ -98,7 +101,7 @@ export const createScheduleTool = defineTool({
       .min(1)
       .describe('Working time intervals for each date'),
   }),
-  outputSchema: scheduleEntityOutput,
+  outputSchema: scheduleWriteOutput,
   handler: async ({ input, client }) => {
     const schedule = await client.setSchedule(input.location_id, {
       schedules_to_set: [
@@ -109,25 +112,25 @@ export const createScheduleTool = defineTool({
         },
       ],
     });
-
-    const items = schedule.map((s) => ({
-      date: s.date,
-      slots: s.slots ?? [],
-      is_working: true,
-    }));
+    const entries = schedule.map(projectEntry);
     const slotsStr = input.slots.map((s) => `${s.from}-${s.to}`).join(', ');
     return {
-      text: `Successfully created schedule for team member ${input.team_member_id} on ${input.dates.join(', ')}:\nSlots: ${slotsStr}\nEntries returned: ${items.length}`,
-      structuredContent: { items, count: items.length },
+      text: `Set the schedule of team member ${input.team_member_id} on ${input.dates.join(', ')} to ${slotsStr}; ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} returned.`,
+      structuredContent: {
+        team_member_id: input.team_member_id,
+        dates: input.dates,
+        slots: input.slots,
+        entries,
+      },
     };
   },
 });
 
 export const updateScheduleTool = defineTool({
-  name: 'update_schedule',
+  name: 'schedules_update',
   category: 'Schedule',
   description:
-    '[Schedule] Update staff member work schedule. AUTHENTICATION REQUIRED - administrative access to modify staff working schedule. Replaces work hours for specified dates.',
+    "Replace a team member's working hours on the given dates with new intervals.",
   annotations: {
     title: 'Update Schedule',
     destructiveHint: false,
@@ -146,7 +149,7 @@ export const updateScheduleTool = defineTool({
       .min(1)
       .describe('New working time intervals for each date'),
   }),
-  outputSchema: scheduleEntityOutput,
+  outputSchema: scheduleWriteOutput,
   handler: async ({ input, client }) => {
     const schedule = await client.setSchedule(input.location_id, {
       schedules_to_set: [
@@ -157,24 +160,24 @@ export const updateScheduleTool = defineTool({
         },
       ],
     });
-
-    const items = schedule.map((s) => ({
-      date: s.date,
-      slots: s.slots ?? [],
-      is_working: true,
-    }));
+    const entries = schedule.map(projectEntry);
     return {
-      text: `Successfully updated schedule for team member ${input.team_member_id} on ${input.dates.join(', ')}\nEntries returned: ${items.length}`,
-      structuredContent: { items, count: items.length },
+      text: `Updated the schedule of team member ${input.team_member_id} on ${input.dates.join(', ')}; ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} returned.`,
+      structuredContent: {
+        team_member_id: input.team_member_id,
+        dates: input.dates,
+        slots: input.slots,
+        entries,
+      },
     };
   },
 });
 
 export const deleteScheduleTool = defineTool({
-  name: 'delete_schedule',
+  name: 'schedules_delete',
   category: 'Schedule',
   description:
-    '[Schedule] Delete staff member work schedule for specified dates. AUTHENTICATION REQUIRED - administrative access to remove staff working schedule. Makes the specified dates non-working days.',
+    'Make the given dates non-working days for a team member by deleting their schedule there. Asks for confirmation first.',
   annotations: {
     title: 'Delete Schedule',
     destructiveHint: true,
@@ -214,7 +217,7 @@ export const deleteScheduleTool = defineTool({
     });
 
     return {
-      text: `Successfully deleted schedule for team member ${input.team_member_id} on ${input.dates.join(', ')}`,
+      text: `Deleted the schedule of team member ${input.team_member_id} on ${input.dates.join(', ')}.`,
     };
   },
 });

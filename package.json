@@ -1,6 +1,6 @@
 {
   "name": "@altegio/mcp-server-pro",
-  "version": "0.4.0-alpha.0",
+  "version": "0.5.0-alpha.0",
   "description": "Professional B2B MCP (Model Context Protocol) server for Altegio.Pro business management and admin operations",
   "keywords": [
     "mcp",
@@ -50,8 +50,8 @@
     "dist",
     "README.md",
     "LICENSE",
-    "docs/Altegio API and Product Logic Documentation.md",
-    "docs/ONBOARDING_GUIDE.md"
+    "docs/product-logic.md",
+    "docs/onboarding-guide.md"
   ],
   "scripts": {
     "build": "tsc",

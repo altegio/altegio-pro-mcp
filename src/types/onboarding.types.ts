@@ -60,7 +60,7 @@ const BooleanCellSchema = z.preprocess(
 
 /**
  * One team member row. Only what quick-create stores is read: a `phone`,
- * `email` or `api_id` column is dropped, since the operation has no field for
+ * `email` or `external_id` column is dropped, since the operation has no field for
  * a team member's own contacts or external id, and a user link is not made
  * from an imported file. The paid-seat and work-schedule answers may come per
  * row or once for the batch; `addStaffBatch` refuses a row with neither.
@@ -69,17 +69,17 @@ export const StaffBatchItemSchema = z.object({
   name: z.string().min(1),
   specialization: z.string().optional(),
   position_id: z.coerce.number().optional(),
-  is_paid_staff: BooleanCellSchema,
-  has_timetable_access: BooleanCellSchema,
+  has_paid_seat: BooleanCellSchema,
+  has_schedule_access: BooleanCellSchema,
 });
 
 export const ServiceBatchItemSchema = z.object({
   title: z.string().min(1),
   price_min: z.coerce.number(),
   price_max: z.coerce.number().optional(),
-  duration: z.coerce.number(),
+  duration_seconds: z.coerce.number(),
   category_id: z.coerce.number().optional(),
-  api_id: z.string().optional(),
+  external_id: z.string().optional(),
 });
 
 export const ClientBatchItemSchema = z
@@ -96,8 +96,8 @@ export const ClientBatchItemSchema = z
 
 export const CategoryBatchItemSchema = z.object({
   title: z.string().min(1),
-  api_id: z.string().optional(),
-  weight: z.number().optional(),
+  external_id: z.string().optional(),
+  sort_weight: z.number().optional(),
 });
 
 export const PositionBatchItemSchema = z.object({

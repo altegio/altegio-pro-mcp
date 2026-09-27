@@ -63,8 +63,8 @@ describe('Onboarding E2E Flow', () => {
       const categoriesResult = await handlers.addCategories({
         location_id: companyId,
         categories: [
-          { title: 'Hair Services', weight: 1 },
-          { title: 'Nail Services', weight: 2 },
+          { title: 'Hair Services', sort_weight: 1 },
+          { title: 'Nail Services', sort_weight: 2 },
         ],
       });
       expect(categoriesResult.content[0]?.text).toContain(
@@ -95,16 +95,16 @@ describe('Onboarding E2E Flow', () => {
           specialization: 'Massage Therapist',
         });
 
-      const staffCSV = `name,specialization,is_paid_staff,has_timetable_access
+      const staffCSV = `name,specialization,has_paid_seat,has_schedule_access
 Alice Johnson,Hairdresser,yes,yes
 Bob Smith,Nail Technician,yes,yes
 Carol White,Massage Therapist,no,no`;
 
       const staffResult = await handlers.addStaffBatch({
         location_id: companyId,
-        staff_data: staffCSV,
+        team_members: staffCSV,
       });
-      expect(staffResult.content[0]?.text).toContain('3 staff members created');
+      expect(staffResult.content[0]?.text).toContain('3 team members created');
       expect(mockClient.createStaff).toHaveBeenCalledTimes(3);
 
       state = await stateManager.load(companyId);
@@ -130,23 +130,33 @@ Carol White,Massage Therapist,no,no`;
 
       const servicesResult = await handlers.addServicesBatch({
         location_id: companyId,
-        services_data: [
+        services: [
           {
             title: "Women's Haircut",
             price_min: 60,
             price_max: 80,
-            duration: 2700,
+            duration_seconds: 2700,
             category_id: 10,
           },
           {
             title: "Men's Haircut",
             price_min: 40,
             price_max: 50,
-            duration: 1800,
+            duration_seconds: 1800,
             category_id: 10,
           },
-          { title: 'Manicure', price_min: 35, duration: 1800, category_id: 11 },
-          { title: 'Pedicure', price_min: 45, duration: 2400, category_id: 11 },
+          {
+            title: 'Manicure',
+            price_min: 35,
+            duration_seconds: 1800,
+            category_id: 11,
+          },
+          {
+            title: 'Pedicure',
+            price_min: 45,
+            duration_seconds: 2400,
+            category_id: 11,
+          },
         ],
       });
       expect(servicesResult.content[0]?.text).toContain('4 services created');
@@ -265,9 +275,9 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValue({ id: 1, name: 'Test' });
       await handlers.addStaffBatch({
         location_id: companyId,
-        is_paid_staff: true,
-        has_timetable_access: true,
-        staff_data: [{ name: 'Test Staff', specialization: 'Test' }],
+        has_paid_seat: true,
+        has_schedule_access: true,
+        team_members: [{ name: 'Test Staff', specialization: 'Test' }],
       });
       expect((await stateManager.load(companyId))?.phase).toBe('categories');
 
@@ -277,8 +287,8 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValue({ id: 20, title: 'Test' });
       await handlers.addServicesBatch({
         location_id: companyId,
-        services_data: [
-          { title: 'Test Service', price_min: 50, duration: 1800 },
+        services: [
+          { title: 'Test Service', price_min: 50, duration_seconds: 1800 },
         ],
       });
       expect((await stateManager.load(companyId))?.phase).toBe('schedules');
@@ -329,9 +339,9 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
 
       await handlers.addStaffBatch({
         location_id: companyId,
-        is_paid_staff: true,
-        has_timetable_access: true,
-        staff_data: [
+        has_paid_seat: true,
+        has_schedule_access: true,
+        team_members: [
           { name: 'Alice', specialization: 'Test' },
           { name: 'Bob', specialization: 'Test' },
         ],
@@ -390,9 +400,9 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValueOnce({ id: 3, name: 'Staff3' });
       await handlers.addStaffBatch({
         location_id: companyId,
-        is_paid_staff: true,
-        has_timetable_access: true,
-        staff_data: [
+        has_paid_seat: true,
+        has_schedule_access: true,
+        team_members: [
           { name: 'Staff1' },
           { name: 'Staff2' },
           { name: 'Staff3' },
@@ -404,7 +414,9 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValueOnce({ id: 20, title: 'Service1' });
       await handlers.addServicesBatch({
         location_id: companyId,
-        services_data: [{ title: 'Service1', price_min: 50, duration: 1800 }],
+        services: [
+          { title: 'Service1', price_min: 50, duration_seconds: 1800 },
+        ],
       });
 
       // Resume and check progress
@@ -471,9 +483,9 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValueOnce({ id: 2, name: 'Staff2' });
       await handlers.addStaffBatch({
         location_id: companyId,
-        is_paid_staff: true,
-        has_timetable_access: true,
-        staff_data: [{ name: 'Staff' }, { name: 'Staff2' }],
+        has_paid_seat: true,
+        has_schedule_access: true,
+        team_members: [{ name: 'Staff' }, { name: 'Staff2' }],
       });
 
       mockClient.createService = jest
@@ -483,10 +495,10 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValueOnce({ id: 22, title: 'Service3' });
       await handlers.addServicesBatch({
         location_id: companyId,
-        services_data: [
-          { title: 'Service', price_min: 50, duration: 1800 },
-          { title: 'Service2', price_min: 60, duration: 1800 },
-          { title: 'Service3', price_min: 70, duration: 1800 },
+        services: [
+          { title: 'Service', price_min: 50, duration_seconds: 1800 },
+          { title: 'Service2', price_min: 60, duration_seconds: 1800 },
+          { title: 'Service3', price_min: 70, duration_seconds: 1800 },
         ],
       });
 
@@ -513,16 +525,16 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
 
       const result = await handlers.addStaffBatch({
         location_id: companyId,
-        is_paid_staff: true,
-        has_timetable_access: true,
-        staff_data: [
+        has_paid_seat: true,
+        has_schedule_access: true,
+        team_members: [
           { name: 'Alice', specialization: 'Hair' },
           { name: 'Bob', specialization: 'Nails' },
           { name: 'Carol', specialization: 'Massage' },
         ],
       });
 
-      expect(result.content[0]?.text).toContain('2 staff members created');
+      expect(result.content[0]?.text).toContain('2 team members created');
       expect(result.content[0]?.text).toContain('1 failed');
       expect(result.content[0]?.text).toContain('Network error');
 
@@ -542,9 +554,9 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValueOnce({ id: 1, name: 'Staff1' });
       await handlers.addStaffBatch({
         location_id: companyId,
-        is_paid_staff: true,
-        has_timetable_access: true,
-        staff_data: [{ name: 'Staff1' }],
+        has_paid_seat: true,
+        has_schedule_access: true,
+        team_members: [{ name: 'Staff1' }],
       });
 
       // Continue to next phase
@@ -602,9 +614,9 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValue({ id: 1, name: 'Staff' });
       await handlers.addStaffBatch({
         location_id: companyId,
-        is_paid_staff: true,
-        has_timetable_access: true,
-        staff_data: [{ name: 'Staff' }],
+        has_paid_seat: true,
+        has_schedule_access: true,
+        team_members: [{ name: 'Staff' }],
       });
 
       // Still should fail without services
@@ -733,9 +745,9 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
         .mockResolvedValue({ id: 1, name: 'Staff' });
       await handlers.addStaffBatch({
         location_id: companyId2,
-        is_paid_staff: true,
-        has_timetable_access: true,
-        staff_data: [{ name: 'Staff' }],
+        has_paid_seat: true,
+        has_schedule_access: true,
+        team_members: [{ name: 'Staff' }],
       });
 
       // Verify independent states

@@ -30,22 +30,22 @@ describe('Tool Registration', () => {
     });
 
     // Core tools (16)
-    expect(toolNames).toContain('altegio_login');
-    expect(toolNames).toContain('altegio_logout');
-    expect(toolNames).toContain('list_locations');
-    expect(toolNames).toContain('get_appointments');
+    expect(toolNames).toContain('auth_login');
+    expect(toolNames).toContain('auth_logout');
+    expect(toolNames).toContain('locations_list');
+    expect(toolNames).toContain('appointments_list');
     expect(toolNames).toContain('team_members_list');
-    expect(toolNames).toContain('get_services');
-    expect(toolNames).toContain('get_service_categories');
-    expect(toolNames).toContain('get_schedule');
+    expect(toolNames).toContain('services_list');
+    expect(toolNames).toContain('service_categories_list');
+    expect(toolNames).toContain('schedules_get');
     expect(toolNames).toContain('team_members_create');
     expect(toolNames).toContain('team_members_update');
     expect(toolNames).toContain('team_members_delete');
-    expect(toolNames).toContain('create_service');
-    expect(toolNames).toContain('update_service');
-    expect(toolNames).toContain('create_appointment');
-    expect(toolNames).toContain('update_appointment');
-    expect(toolNames).toContain('delete_appointment');
+    expect(toolNames).toContain('services_create');
+    expect(toolNames).toContain('services_update');
+    expect(toolNames).toContain('appointments_create');
+    expect(toolNames).toContain('appointments_update');
+    expect(toolNames).toContain('appointments_delete');
 
     // Onboarding tools (12)
     expect(toolNames).toContain('onboarding_start');
@@ -62,47 +62,47 @@ describe('Tool Registration', () => {
     expect(toolNames).toContain('onboarding_rollback_phase');
 
     // Schedule management tools
-    expect(toolNames).toContain('create_schedule');
-    expect(toolNames).toContain('update_schedule');
-    expect(toolNames).toContain('delete_schedule');
+    expect(toolNames).toContain('schedules_create');
+    expect(toolNames).toContain('schedules_update');
+    expect(toolNames).toContain('schedules_delete');
 
     // Position management tools
-    expect(toolNames).toContain('get_positions');
-    expect(toolNames).toContain('create_position');
+    expect(toolNames).toContain('positions_list');
+    expect(toolNames).toContain('positions_create');
     expect(toolNames).not.toContain('update_position');
     expect(toolNames).not.toContain('delete_position');
 
     // Location settings tools (6)
-    expect(toolNames).toContain('get_appointment_settings');
-    expect(toolNames).toContain('update_appointment_settings');
-    expect(toolNames).toContain('get_online_booking_settings');
-    expect(toolNames).toContain('update_online_booking_settings');
-    expect(toolNames).toContain('get_booking_forms');
-    expect(toolNames).toContain('create_booking_form');
-    expect(toolNames).toContain('delete_booking_form');
+    expect(toolNames).toContain('settings_get_appointment_calendar');
+    expect(toolNames).toContain('settings_update_appointment_calendar');
+    expect(toolNames).toContain('settings_get_online_booking');
+    expect(toolNames).toContain('settings_update_online_booking');
+    expect(toolNames).toContain('booking_forms_list');
+    expect(toolNames).toContain('booking_forms_create');
+    expect(toolNames).toContain('booking_forms_delete');
 
     // Resources tool (1)
-    expect(toolNames).toContain('get_resources');
+    expect(toolNames).toContain('resources_list');
 
     // Service delete + service ↔ team member links
-    expect(toolNames).toContain('delete_service');
-    expect(toolNames).toContain('delete_service_category');
-    expect(toolNames).toContain('link_service_team_member');
-    expect(toolNames).toContain('update_service_team_member');
-    expect(toolNames).toContain('unlink_service_team_member');
-    expect(toolNames).toContain('link_team_member_services');
+    expect(toolNames).toContain('services_delete');
+    expect(toolNames).toContain('service_categories_delete');
+    expect(toolNames).toContain('services_link_team_member');
+    expect(toolNames).toContain('services_update_team_member_link');
+    expect(toolNames).toContain('services_unlink_team_member');
+    expect(toolNames).toContain('team_members_link_services');
 
     // Location update
-    expect(toolNames).toContain('update_location');
+    expect(toolNames).toContain('locations_update');
 
     // Exact-ID demo cleanup tools
     expect(toolNames).toContain('clients_delete');
-    expect(toolNames).toContain('remove_location_user');
+    expect(toolNames).toContain('locations_remove_user');
 
     // Universal executor over the generated API catalog (3, ADR-001 D2)
-    expect(toolNames).toContain('altegio_search_operations');
-    expect(toolNames).toContain('altegio_describe_operation');
-    expect(toolNames).toContain('altegio_call_operation');
+    expect(toolNames).toContain('api_search_operations');
+    expect(toolNames).toContain('api_describe_operation');
+    expect(toolNames).toContain('api_call_operation');
 
     // Analytics pack (9 served; the 6 report-builder tools are withheld,
     // see src/tools/disabled-tools.ts)
@@ -167,8 +167,8 @@ describe('Tool Registration', () => {
     await callHandler!(
       {
         params: {
-          name: 'list_locations',
-          arguments: { my: 1, count: 1 },
+          name: 'locations_list',
+          arguments: { managed_only: true, page_size: 1 },
         },
       },
       {
@@ -184,21 +184,19 @@ describe('Tool Registration', () => {
   });
 });
 
-describe('get_schedule', () => {
+describe('schedules_get', () => {
   it('should format schedule entries', async () => {
     const mockClient = {
       getSchedule: jest.fn().mockResolvedValue([
         {
+          team_member_id: 456,
           date: '2025-10-27',
-          time: '09:00',
-          seance_length: 30,
-          datetime: '2025-10-27T09:00:00',
+          slots: [{ from: '09:00', to: '13:00' }],
         },
         {
-          date: '2025-10-27',
-          time: '10:00',
-          seance_length: 60,
-          datetime: '2025-10-27T10:00:00',
+          team_member_id: 456,
+          date: '2025-10-28',
+          slots: [],
         },
       ]),
     } as unknown as jest.Mocked<AltegioClient>;
@@ -207,11 +205,13 @@ describe('get_schedule', () => {
     const result = await handlers.getSchedule({
       location_id: 123,
       team_member_id: 456,
-      start_date: '2025-10-27',
-      end_date: '2025-10-28',
+      date_from: '2025-10-27',
+      date_to: '2025-10-28',
     });
 
-    expect(result.content[0]?.text).toContain('Found 2 schedule entries');
-    expect(result.content[0]?.text).toContain('2025-10-27 at 09:00 (30 min)');
+    expect(result.content[0]?.text).toContain(
+      '2 schedule entries for team member 456'
+    );
+    expect(result.content[0]?.text).toContain('2025-10-27 09:00-13:00');
   });
 });

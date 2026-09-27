@@ -56,7 +56,8 @@ for (const [name, rel] of Object.entries(SPECS)) {
       if (!op) continue;
       ops++;
       const tags = (op.tags ?? []).join('|');
-      for (const t of op.tags ?? []) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
+      for (const t of op.tags ?? [])
+        tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
       rows.push([
         name,
         m.toUpperCase(),
@@ -68,7 +69,9 @@ for (const [name, rel] of Object.entries(SPECS)) {
       ]);
     }
   }
-  console.log(`${name.padEnd(12)} paths=${String(Object.keys(doc.paths ?? {}).length).padStart(4)}  ops=${String(ops).padStart(4)}`);
+  console.log(
+    `${name.padEnd(12)} paths=${String(Object.keys(doc.paths ?? {}).length).padStart(4)}  ops=${String(ops).padStart(4)}`
+  );
   if (name === 'b2b-v1') {
     console.log('  by tag:');
     [...tagCounts.entries()]

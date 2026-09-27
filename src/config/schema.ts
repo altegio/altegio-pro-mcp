@@ -18,8 +18,8 @@ import { DEFAULT_FACET, READONLY_VIEW, viewUrl } from '../tools/facets.js';
  * customer addresses onto this server's `/mcp` and `/mcp/<view>`. It is only
  * ever used to name an address in text a model reads: the read-only view's
  * refusal and its `initialize` instructions. Override with
- * `MCP_PUBLIC_BASE_URL` behind a proxy that keeps the `/mcp` segment (the
- * internal lane is `https://mcp.altegio.dev/pro/mcp`).
+ * `MCP_PUBLIC_BASE_URL` behind a proxy that keeps the `/mcp` segment (for
+ * example `https://mcp.example.com/pro/mcp`).
  */
 export const DEFAULT_PUBLIC_BASE_URL = 'https://mcp.alteg.io/pro';
 export const DEFAULT_LEGACY_WEB_BASE = 'https://app.alteg.io';
@@ -44,8 +44,8 @@ export const DEFAULT_SERVER_INSTRUCTIONS = [
   'profitability, team-member sales, occupancy, forecasts and the day-end',
   'report — there is no ad-hoc report builder), location settings,',
   'resources, and a guided onboarding walkthrough. Use the delegated Altegio identity or direct user token already',
-  'provided by the host; in local stdio mode call altegio_login if needed. Then',
-  'call list_locations for a location_id. This server’s address serves the',
+  'provided by the host; in local stdio mode call auth_login if needed. Then',
+  'call locations_list for a location_id. This server’s address serves the',
   'general surface plus analytics entry points; the complete analytics pack and',
   'other narrower static views live at the same address plus',
   '/ops, /catalog, /finance, /marketing, /analytics and',
@@ -153,7 +153,7 @@ export const EnvSchema = z.object({
   // request. Anonymous requests get no user token and cannot login.
   REQUIRE_DELEGATED_IDENTITY: BooleanFlagSchema,
 
-  // Serve altegio_login / altegio_logout on the HTTP views. Off by default:
+  // Serve auth_login / auth_logout on the HTTP views. Off by default:
   // the public endpoint authenticates through OAuth, so a tool that tells the
   // model to collect an email and a password there is only an injection
   // target. Turn it on for the closed staff deployment (Google OIDC), which

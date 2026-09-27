@@ -133,7 +133,7 @@ correctly.
 ${CONTACTS_OPT_IN_RULE}
 
 It applies to \`clients_get_card\`, \`clients_lookup\`, \`clients_search\` and
-\`get_appointments\` alike; \`clients_search\` also drops \`phone\` and \`email\`
+\`appointments_list\` alike; \`clients_search\` also drops \`phone\` and \`email\`
 from the advanced \`fields\` list without that flag. Segmenting, counting and
 ranking the base never needs contacts.
 

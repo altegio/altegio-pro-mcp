@@ -11,6 +11,7 @@ import {
 } from '../decision-use-cases.js';
 import { clearTimezoneCache } from '../location-timezone.js';
 import { Ajv2020 } from 'ajv/dist/2020.js';
+import { standardizeCollection } from '../../../tools/pagination.js';
 import {
   analyticsGetCapacityHeatmapTool,
   analyticsGetInventoryReorderRisksTool,
@@ -37,11 +38,19 @@ const periodClient = Object.assign(
 beforeEach(() => clearTimezoneCache());
 afterEach(() => jest.restoreAllMocks());
 
+/**
+ * Validate a capability result against the tool's published output schema.
+ * The tool layer brings the report dialect (`rows`, `page`) onto the shared
+ * pagination contract, so the same conversion is applied here.
+ */
 function expectDecisionContract(tool: DefinedTool, structuredContent: unknown) {
   const validate = new Ajv2020({ strict: false, allErrors: true }).compile(
     tool.toMcpTool().outputSchema!
   );
-  if (!validate(structuredContent)) {
+  const published = standardizeCollection({
+    structuredContent,
+  }).structuredContent;
+  if (!validate(published)) {
     throw new Error(JSON.stringify(validate.errors, null, 2));
   }
   return validate;

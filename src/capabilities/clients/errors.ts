@@ -37,7 +37,7 @@ export class ClientsUnavailableError extends AltegioApiError {
 
 const NO_ACCESS =
   'The signed-in user cannot read the client base in this location. ' +
-  'Ask a location owner to grant access to clients, or call list_locations to pick a location the user can work with.';
+  'Ask a location owner to grant access to clients, or call locations_list to pick a location the user can work with.';
 
 function backendMessage(body: unknown): string | undefined {
   const meta = (body as { meta?: { message?: unknown } })?.meta;
@@ -69,7 +69,7 @@ export function mapClientsHttpError(
 ): AltegioApiError {
   if (status === 401) {
     return new AuthenticationError(
-      `Session expired while trying to ${context}. Call altegio_login to re-authenticate.`
+      `Session expired while trying to ${context}. Call auth_login to re-authenticate.`
     );
   }
   if (status === 403) {
@@ -83,7 +83,7 @@ export function mapClientsHttpError(
   }
   if (status === 404) {
     return new ClientsUnavailableError(
-      `Not found while trying to ${context}. Verify the location id with list_locations and the client id with clients_search.`,
+      `Not found while trying to ${context}. Verify the location id with locations_list and the client id with clients_search.`,
       404
     );
   }

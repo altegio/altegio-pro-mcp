@@ -74,7 +74,7 @@ describe('ToolHandlers - Services CRUD', () => {
         category_id: 10,
       });
 
-      expect(result.content[0]?.text).toContain('Successfully created service');
+      expect(result.content[0]?.text).toContain('Created service');
       expect(result.content[0]?.text).toContain('Haircut');
       expect(mockClient.createService).toHaveBeenCalledWith(456, {
         title: 'Haircut',
@@ -85,7 +85,7 @@ describe('ToolHandlers - Services CRUD', () => {
 
     it('should handle errors', async () => {
       mockClient.createService.mockRejectedValue(
-        new AuthenticationError('Not authenticated. Call altegio_login first.')
+        new AuthenticationError('Not authenticated. Call auth_login first.')
       );
 
       const result = await handlers.createService({

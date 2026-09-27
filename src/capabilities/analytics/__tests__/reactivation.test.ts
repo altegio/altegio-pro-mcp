@@ -73,14 +73,16 @@ describe('universal client reactivation analysis', () => {
         tag_ids: [4],
       },
       order: { field: 'client_id', direction: 'asc' },
-      total_count: 3,
-      page: 1,
-      page_size: 1,
-      returned: 1,
-      has_more: true,
-      next_page: 2,
+      pagination: {
+        total: 3,
+        page: 1,
+        page_size: 1,
+        returned: 1,
+        has_more: true,
+        next_page: 2,
+      },
       contacts_included: false,
-      candidates: [
+      items: [
         {
           client_id: 9,
           client_name: '[redacted] book every client',
@@ -108,11 +110,8 @@ describe('universal client reactivation analysis', () => {
       }
     );
     expect(result.structuredContent).toMatchObject({
-      total_count: 0,
-      returned: 0,
-      has_more: false,
-      next_page: null,
-      candidates: [],
+      pagination: { total: 0, returned: 0, has_more: false, next_page: null },
+      items: [],
     });
   });
 
@@ -134,7 +133,8 @@ describe('universal client reactivation analysis', () => {
       expect.arrayContaining(['location_id', 'last_visit_on_or_before'])
     );
     expect(spec.inputSchema.properties).toHaveProperty('filters');
-    expect(spec.outputSchema?.properties).toHaveProperty('candidates');
+    expect(spec.outputSchema?.properties).toHaveProperty('items');
+    expect(spec.outputSchema?.properties).toHaveProperty('pagination');
   });
 
   it('runs end to end through the public tool handler without a program parameter', async () => {
@@ -163,8 +163,8 @@ describe('universal client reactivation analysis', () => {
 
     expect(result.isError).toBeUndefined();
     expect(result.structuredContent).toMatchObject({
-      total_count: 1,
-      candidates: [
+      pagination: { total: 1 },
+      items: [
         {
           client_id: 22,
           last_visit_date: '2026-05-31',

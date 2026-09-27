@@ -13,6 +13,7 @@ import {
   withUntrustedBlock,
 } from '../../tools/tool-result.js';
 import { AnalyticsInputError } from './errors.js';
+import { pageMetadata } from '../../tools/pagination.js';
 import { resolveLocationTimezone } from './location-timezone.js';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -144,14 +145,13 @@ export async function getClientReactivationCandidates(
       },
       filters_applied: input.filters ?? {},
       order: { field: 'client_id', direction: 'asc' },
-      total_count: segment.total_count,
-      page: segment.page,
-      page_size: segment.page_size,
-      returned,
-      has_more: hasMore,
-      next_page: hasMore ? segment.page + 1 : null,
       contacts_included: includeContacts,
-      candidates,
+      items: candidates,
+      pagination: pageMetadata(
+        { page: segment.page, page_size: segment.page_size },
+        returned,
+        segment.total_count
+      ),
       untrusted_data_note: UNTRUSTED_NOTE,
     },
   };

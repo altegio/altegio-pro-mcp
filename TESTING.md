@@ -28,7 +28,8 @@ Live suites are explicitly opt-in. Read the environment guards at the top of
 `src/__tests__/*live.test.ts` and `src/api/v1/__tests__/analytics-live.test.ts`
 before running them. Use a dedicated disposable location and credentials with
 appropriate rights. Appointment suites create and remove real entities; cleanup
-can fail when upstream access is lost. Never enable live flags in default CI.
+can fail when upstream access is lost. They read the target location from
+`ALTEGIO_E2E_LOCATION_ID`. Never enable live flags in default CI.
 
 ## Transport checks
 

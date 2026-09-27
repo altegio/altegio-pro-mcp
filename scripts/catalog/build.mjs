@@ -8,8 +8,8 @@
  * `src/generated/catalog.json` — one entry per operation.
  *
  * The catalog is the source of truth for the executor tools
- * (`altegio_search_operations`, `altegio_describe_operation`,
- * `altegio_call_operation`) and, later, for generated domain tool packs.
+ * (`api_search_operations`, `api_describe_operation`,
+ * `api_call_operation`) and, later, for generated domain tool packs.
  *
  * Usage:
  *   node scripts/catalog/build.mjs [--docs <spec repo>] [--out <file>] [--overlay <dir>]
@@ -35,7 +35,12 @@ export const CATALOG_VERSION = 1;
 const MAX_SCHEMA_DEPTH = 3;
 
 /** Schema keys dropped on the way into the catalog (D8: context economy). */
-const SCHEMA_DROP_KEYS = new Set(['example', 'examples', 'title', 'externalDocs']);
+const SCHEMA_DROP_KEYS = new Set([
+  'example',
+  'examples',
+  'title',
+  'externalDocs',
+]);
 
 /** Longest schema `description` kept, in characters. */
 const MAX_SCHEMA_DESCRIPTION = 200;
@@ -43,7 +48,7 @@ const MAX_SCHEMA_DESCRIPTION = 200;
 /**
  * Serialized-byte budget for one request/response schema. A schema over budget
  * is rebuilt one depth level shallower until it fits, so no single operation can
- * push an `altegio_describe_operation` result past the per-result token budget
+ * push an `api_describe_operation` result past the per-result token budget
  * (ADR-001 D8). ~8 KB of JSON is roughly 2k tokens.
  */
 const MAX_SCHEMA_BYTES = 8000;
@@ -455,7 +460,10 @@ function extractSecurity(operation, rootDoc) {
 }
 
 function pickParameters(pathItem, operation, ctx) {
-  const merged = [...(pathItem.parameters ?? []), ...(operation.parameters ?? [])];
+  const merged = [
+    ...(pathItem.parameters ?? []),
+    ...(operation.parameters ?? []),
+  ];
   const seen = new Set();
   const out = [];
 
@@ -528,7 +536,7 @@ function resolveTopSchema(schema, ctx) {
 
 /**
  * The V1 `{success, data, meta}` wrapper is transport, not payload: the client
- * unwraps it and so does `altegio_call_operation`. Storing `data` directly keeps
+ * unwraps it and so does `api_call_operation`. Storing `data` directly keeps
  * the catalog describing what a caller actually receives and spends the depth
  * budget on the payload instead of the envelope.
  */
@@ -950,6 +958,9 @@ function main(argv) {
   return 0;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))
+) {
   process.exit(main(process.argv.slice(2)));
 }

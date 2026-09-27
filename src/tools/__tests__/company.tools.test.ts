@@ -1,7 +1,7 @@
 import { updateLocationTool } from '../definitions/company.tools.js';
 import type { AltegioClient } from '../../providers/altegio-client.js';
 
-describe('update_location verification', () => {
+describe('locations_update verification', () => {
   it('does not claim a phone update that the location read-back contradicts', async () => {
     const client = {
       updateLocation: jest.fn().mockResolvedValue({

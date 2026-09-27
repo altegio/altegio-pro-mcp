@@ -7,7 +7,7 @@ export const completeMonthsInput = {
     .int()
     .positive()
     .describe(
-      'Location to report on. Call list_locations when the id is unknown.'
+      'Location to report on. Call locations_list when the id is unknown.'
     ),
   date_from: z
     .string()

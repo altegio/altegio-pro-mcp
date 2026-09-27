@@ -2,10 +2,10 @@ import { z } from 'zod';
 import { defineTool } from '../factory.js';
 
 export const removeLocationUserTool = defineTool({
-  name: 'remove_location_user',
+  name: 'locations_remove_user',
   category: 'Users',
   description:
-    '[Users] Remove one specifically identified user from one location. AUTHENTICATION REQUIRED and subject to the caller’s user-management permission. First read get_location_users with altegio_call_operation, verify that the access is safe to revoke, and supply the same exact ID twice. Do not infer that an owner, administrator, human, CI identity, or integration is obsolete from its display name.',
+    'Remove one specifically identified user from one location. AUTHENTICATION REQUIRED and subject to the caller’s user-management permission. First read get_location_users with api_call_operation, verify that the access is safe to revoke, and supply the same exact ID twice. Do not infer that an owner, administrator, human, CI identity, or integration is obsolete from its display name.',
   annotations: {
     title: 'Remove Location User',
     destructiveHint: true,

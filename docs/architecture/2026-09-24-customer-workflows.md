@@ -6,7 +6,7 @@ contracts. The adapters use only documented B2B V1 routes. V3 remains preview.
 
 ## Access diagnosis
 
-`diagnose_location_access` reads the current user's Location via
+`locations_diagnose_access` reads the current user's Location via
 `GET /company/{location_id}?my=1` and effective rights via
 `GET /user/permissions/{location_id}`. The optional Marketplace application
 read is the developers-contract

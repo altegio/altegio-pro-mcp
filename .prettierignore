@@ -1,3 +1,10 @@
 # Generated catalog (scripts/catalog/build.mjs) — deterministic by its own
 # serializer; prettier would reformat it and break `npm run catalog:check`.
 src/generated/
+
+# Golden fixtures are byte-exact copies of upstream responses; tests match
+# their raw markup and prettier must not touch them.
+**/fixtures/**
+**/__fixtures__/**
+# Generated tool surface (scripts/surface/build.ts); pinned by surface:check.
+docs/architecture/tool-surface.md

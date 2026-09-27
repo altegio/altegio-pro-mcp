@@ -93,7 +93,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     what: 'filenames and download URLs in the complete upload response',
     coveredBy: 'src/tools/__tests__/client-card.test.ts',
   },
-  altegio_call_operation: {
+  api_call_operation: {
     what: 'the entire API response — one tool reaches every documented GET, so the payload is fenced whole, with no field list to enumerate',
     canary: {
       args: {
@@ -118,7 +118,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     },
   },
 
-  list_locations: {
+  locations_list: {
     what: 'location name, address and phone, typed by its owner — and the public list is not limited to locations this user manages',
     canary: {
       args: {},
@@ -135,7 +135,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     },
   },
 
-  update_location: {
+  locations_update: {
     what: 'the location name read back after the update, which is whatever the location now stores',
     canary: {
       args: { location_id: 1, title: 'New name' },
@@ -180,7 +180,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     },
   },
 
-  get_services: {
+  services_list: {
     what: 'service title and comment',
     canary: {
       args: { location_id: 1 },
@@ -193,7 +193,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     },
   },
 
-  update_service: {
+  services_update: {
     what: 'the service title read back; a partial update returns a title this call never sent',
     canary: {
       args: { location_id: 1, service_id: 3, price_min: 100 },
@@ -214,7 +214,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     },
   },
 
-  get_service_categories: {
+  service_categories_list: {
     what: 'category title',
     canary: {
       args: { location_id: 1 },
@@ -227,7 +227,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     },
   },
 
-  get_positions: {
+  positions_list: {
     what: 'position title',
     canary: {
       args: { location_id: 1 },
@@ -240,7 +240,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     },
   },
 
-  get_resources: {
+  resources_list: {
     what: 'resource title (a cabinet, a chair, a machine)',
     canary: {
       args: { location_id: 1 },
@@ -253,7 +253,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     },
   },
 
-  get_booking_forms: {
+  booking_forms_list: {
     what: 'booking-form title, which staff choose and clients are shown',
     canary: {
       args: { location_id: 1 },
@@ -266,7 +266,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     },
   },
 
-  get_appointments: {
+  appointments_list: {
     what: 'client and team-member names, service titles, and the comment a client types at online booking',
     canary: {
       args: { location_id: 1 },
@@ -531,7 +531,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
 // ===========================================================================
 
 const NO_FREE_TEXT: Record<string, string> = {
-  diagnose_location_access:
+  locations_diagnose_access:
     'statuses and caller-selected permission keys; application slugs are API vocabulary',
   clients_add_comment:
     'created comment ID and timestamp only; the supplied text is not echoed',
@@ -540,44 +540,44 @@ const NO_FREE_TEXT: Record<string, string> = {
   appointments_apply_attendance:
     'ids, canonical statuses and our own outcome labels only',
   // --- authentication ---
-  altegio_login:
+  auth_login:
     'two fixed sentences; the API’s own wording on a failure goes through upstreamDetail',
-  altegio_logout: 'one fixed sentence',
+  auth_logout: 'one fixed sentence',
 
   // --- the catalog half of the executor ---
-  altegio_search_operations:
+  api_search_operations:
     'summaries and paths from src/generated/catalog.json — a committed build artifact reviewed in PRs, not business data',
-  altegio_describe_operation: 'the same catalog, one operation at a time',
+  api_describe_operation: 'the same catalog, one operation at a time',
 
   // --- writes that echo back only what this same call sent ---
   team_members_create: 'name and specialization as supplied by this call',
-  create_position: 'title as supplied by this call',
-  create_service: 'title as supplied by this call',
-  create_booking_form: 'title as supplied by this call',
-  create_appointment: 'ids and the datetime; no name or comment is read back',
-  update_appointment: 'ids and the datetime; no name or comment is read back',
+  positions_create: 'title as supplied by this call',
+  services_create: 'title as supplied by this call',
+  booking_forms_create: 'title as supplied by this call',
+  appointments_create: 'ids and the datetime; no name or comment is read back',
+  appointments_update: 'ids and the datetime; no name or comment is read back',
 
   // --- ids, dates, numbers and our own vocabulary ---
-  get_schedule: 'dates, times and slot boundaries',
-  create_schedule: 'the ids and dates this call sent back as confirmation',
-  update_schedule: 'the ids and dates this call sent back as confirmation',
-  delete_schedule: 'ids and dates',
+  schedules_get: 'dates, times and slot boundaries',
+  schedules_create: 'the ids and dates this call sent back as confirmation',
+  schedules_update: 'the ids and dates this call sent back as confirmation',
+  schedules_delete: 'ids and dates',
   team_members_delete: 'ids',
-  delete_service: 'ids',
-  delete_service_category: 'ids',
-  delete_appointment: 'ids',
-  delete_booking_form: 'ids',
+  services_delete: 'ids',
+  service_categories_delete: 'ids',
+  appointments_delete: 'ids',
+  booking_forms_delete: 'ids',
   clients_delete: 'ids',
-  remove_location_user: 'ids',
-  link_service_team_member: 'ids and a duration',
-  update_service_team_member: 'ids and a duration',
-  unlink_service_team_member: 'ids',
-  link_team_member_services:
+  locations_remove_user: 'ids',
+  services_link_team_member: 'ids and a duration',
+  services_update_team_member_link: 'ids and a duration',
+  services_unlink_team_member: 'ids',
+  team_members_link_services:
     'ids, plus per-service failures whose API wording already came through upstreamDetail in the client',
-  get_appointment_settings: 'an enum and a seat count',
-  update_appointment_settings: 'an enum and a seat count',
-  get_online_booking_settings: 'booleans and numbers',
-  update_online_booking_settings: 'booleans and numbers',
+  settings_get_appointment_calendar: 'an enum and a seat count',
+  settings_update_appointment_calendar: 'an enum and a seat count',
+  settings_get_online_booking: 'booleans and numbers',
+  settings_update_online_booking: 'booleans and numbers',
 
   // --- analytics that reports numbers only ---
   analytics_get_overview: 'money, counts and percentages',

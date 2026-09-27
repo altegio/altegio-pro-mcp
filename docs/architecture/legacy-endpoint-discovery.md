@@ -26,7 +26,7 @@ decision over thin wrappers around report pages.
 Check the existing surface first:
 
 1. Search tool names and descriptions in `src/tools/definitions/`.
-2. Search the generated catalog with `altegio_search_operations` or
+2. Search the generated catalog with `api_search_operations` or
    `src/generated/catalog.json`.
 3. Pull and inspect the v1 and V3 preview OpenAPI specifications.
 4. Read the analytics coverage, glossary and relevant source-audit documents.

@@ -11,6 +11,7 @@ By participating, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md
 ### Reporting Bugs
 
 Before creating bug reports, check existing issues. Include:
+
 - Clear title and description
 - Steps to reproduce
 - Expected vs actual behavior
@@ -20,6 +21,7 @@ Before creating bug reports, check existing issues. Include:
 ### Suggesting Features
 
 Feature requests are tracked as GitHub issues. Include:
+
 - Clear description of the proposed functionality
 - Why this would be useful
 - Alternatives you've considered
@@ -128,6 +130,7 @@ describe('Feature', () => {
 ```
 
 Run tests:
+
 ```bash
 npm test              # All tests
 npm run test:watch    # Watch mode
@@ -145,6 +148,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 ```
 
 **Types:**
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation only
@@ -154,6 +158,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 - `ci`: CI/CD changes
 
 **Examples:**
+
 ```
 feat: add support for client management tools
 fix: handle expired token refresh correctly
@@ -181,6 +186,7 @@ async login(email: string, password: string): Promise<AltegioLoginResponse>
 ### README Updates
 
 Update README.md when:
+
 - Adding new tools
 - Changing configuration options
 - Modifying installation steps
@@ -197,6 +203,7 @@ Update README.md when:
 ## CI/CD
 
 Push to `main` triggers:
+
 1. GitHub Actions CI (lint, test, build, security audit)
 2. VM auto-deploy within 2 minutes (git pull + docker compose rebuild)
 

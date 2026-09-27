@@ -28,7 +28,7 @@ stdio. The `analytics:read` execution scope and request location boundary apply.
   Therefore `manual_cost` is a pre-loyalty delivered-line price. The tools do
   not call it cash or recognized accounting revenue and never multiply it by
   quantity again.
-- `GET /services/{location_id}` provides *current* category IDs and
+- `GET /services/{location_id}` provides _current_ category IDs and
   `GET /service_categories/{location_id}/0` current category titles. Neither
   establishes the category at the historic visit. Services missing from the
   current catalog remain in an unattributed category.

@@ -13,7 +13,7 @@ export const ONBOARDING_WALKTHROUGH_PROMPT = 'onboarding_walkthrough';
 function walkthrough(locationId?: string): string {
   const target = locationId
     ? `Set up location ${locationId}.`
-    : 'Ask which location to set up: call list_locations and let me pick one, then use that location_id everywhere below.';
+    : 'Ask which location to set up: call locations_list and let me pick one, then use that location_id everywhere below.';
 
   return [
     'Walk me through setting up my location in Altegio for the first time.',
@@ -23,7 +23,7 @@ function walkthrough(locationId?: string): string {
     '',
     target,
     '',
-    'Use the host-provided Altegio identity if present; otherwise, in local stdio mode, call altegio_login if I am not authenticated yet. Then',
+    'Use the host-provided Altegio identity if present; otherwise, in local stdio mode, call auth_login if I am not authenticated yet. Then',
     'onboarding_start for the location (onboarding_resume instead if a session',
     'already exists — onboarding_status tells you which).',
     '',
@@ -34,10 +34,10 @@ function walkthrough(locationId?: string): string {
     '2. Team members — onboarding_add_team_members_batch. Ask me for names and',
     '   positions, or take a CSV or JSON list if I have one. For every team',
     '   member also ask me two questions, and never answer them yourself:',
-    '   does this person take a paid staff seat (is_paid_staff — a paid seat',
+    '   does this person take a paid seat (has_paid_seat — a paid seat',
     '   is billed on per-seat licensing), and should they be in the work',
     '   schedule, able to have working hours and take appointments',
-    '   (has_timetable_access — per-seat licensing allows it only on a paid',
+    '   (has_schedule_access — per-seat licensing allows it only on a paid',
     '   seat)? If I give one answer for everybody, pass it once for the batch.',
     '   The import refuses a team member without both answers.',
     '3. Service categories — onboarding_add_categories.',
@@ -45,7 +45,7 @@ function walkthrough(locationId?: string): string {
     '   price and duration.',
     '5. Work schedules — onboarding_set_schedules. Without these the digital',
     '   schedule stays empty and clients cannot be booked, so do not skip it.',
-    '   Only team members with has_timetable_access=true can get one.',
+    '   Only team members with has_schedule_access=true can get one.',
     '6. Clients — onboarding_import_clients, if I have an existing client list.',
     '7. Test appointments — onboarding_create_test_appointments, so I can see',
     '   the digital schedule with something in it.',

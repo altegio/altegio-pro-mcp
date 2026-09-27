@@ -346,7 +346,11 @@ describe('HTTP server facet wiring, end to end', () => {
       const ops = await toolNamesOn(port, '/mcp/ops');
       expect([...ops].sort()).toEqual([
         'appointments_apply_attendance',
+        'appointments_create',
+        'appointments_delete',
+        'appointments_list',
         'appointments_preview_attendance',
+        'appointments_update',
         'clients_add_comment',
         'clients_delete',
         'clients_get_card',
@@ -359,11 +363,7 @@ describe('HTTP server facet wiring, end to end', () => {
         'clients_lookup',
         'clients_search',
         'clients_upload_file',
-        'create_appointment',
-        'delete_appointment',
-        'get_appointments',
-        'list_locations',
-        'update_appointment',
+        'locations_list',
       ]);
 
       const all = await toolNamesOn(port, '/mcp');
@@ -385,7 +385,7 @@ describe('HTTP server facet wiring, end to end', () => {
     const server = app.listen(0);
     try {
       const { port } = server.address() as AddressInfo;
-      const withheld = ['altegio_login', 'altegio_logout'];
+      const withheld = ['auth_login', 'auth_logout'];
 
       for (const path of ['/mcp', ...FACET_NAMES.map((f) => `/mcp/${f}`)]) {
         const names = await toolNamesOn(port, path);
@@ -396,10 +396,10 @@ describe('HTTP server facet wiring, end to end', () => {
       // Access management stays on the facet a deployment opts into, but not
       // on the default path a generic agent lands on.
       expect(await toolNamesOn(port, '/mcp')).not.toContain(
-        'remove_location_user'
+        'locations_remove_user'
       );
       expect(await toolNamesOn(port, '/mcp/catalog')).toContain(
-        'remove_location_user'
+        'locations_remove_user'
       );
     } finally {
       server.close();

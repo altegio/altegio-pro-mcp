@@ -3,18 +3,26 @@ services:
     build: .
     container_name: altegio-mcp-local
     ports:
-      - "3000:3000"
+      - '3000:3000'
     env_file:
       - .env
     environment:
-      PORT: "3000"
-      NODE_ENV: "development"
-      LOG_LEVEL: "debug"
+      PORT: '3000'
+      NODE_ENV: 'development'
+      LOG_LEVEL: 'debug'
     volumes:
       - ~/.altegio-mcp:/home/nodejs/.altegio-mcp
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      test:
+        [
+          'CMD',
+          'wget',
+          '--quiet',
+          '--tries=1',
+          '--spider',
+          'http://localhost:3000/health',
+        ]
       interval: 30s
       timeout: 10s
       retries: 3

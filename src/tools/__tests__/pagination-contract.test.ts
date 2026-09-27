@@ -31,7 +31,7 @@ describe('legacy list pagination contract', () => {
       };
       expect(schema.properties.page?.exclusiveMinimum).toBe(0);
       expect(schema.properties.page?.description).toContain('1-based');
-      expect(schema.properties.count?.maximum).toBe(300);
+      expect(schema.properties.page_size?.maximum).toBe(300);
     }
   );
 
@@ -76,17 +76,19 @@ describe('reference collection traversal', () => {
       expect(result.isError).toBeUndefined();
       const data = result.structuredContent as {
         items: { id: number }[];
-        count: number;
-        page_size: number;
-        total: number;
-        next_page: number | null;
+        pagination: {
+          returned: number;
+          page_size: number;
+          total: number;
+          next_page: number | null;
+        };
       };
-      expect(data.count).toBe(data.items.length);
-      expect(data.count).toBeLessThanOrEqual(25);
-      expect(data.page_size).toBe(25);
-      expect(data.total).toBe(57);
+      expect(data.pagination.returned).toBe(data.items.length);
+      expect(data.pagination.returned).toBeLessThanOrEqual(25);
+      expect(data.pagination.page_size).toBe(25);
+      expect(data.pagination.total).toBe(57);
       ids.push(...data.items.map((row) => row.id));
-      page = data.next_page;
+      page = data.pagination.next_page;
       expect(ids.length).toBeLessThanOrEqual(57);
     }
     expect(ids).toEqual(Array.from({ length: 57 }, (_, i) => i + 1));
@@ -101,10 +103,7 @@ describe('reference collection traversal', () => {
     });
     expect(result.structuredContent).toMatchObject({
       items: [],
-      count: 0,
-      total: 1,
-      next_page: null,
-      page: 2,
+      pagination: { returned: 0, total: 1, next_page: null, page: 2 },
     });
   });
 
@@ -115,12 +114,14 @@ describe('reference collection traversal', () => {
     });
     expect(client.getBookings).toHaveBeenCalledWith(1, { page: 1, count: 25 });
     expect(result.structuredContent).toMatchObject({
-      count: 0,
-      next_page: null,
-      page: 1,
-      page_size: 25,
+      pagination: {
+        returned: 0,
+        next_page: null,
+        page: 1,
+        page_size: 25,
+        total: null,
+      },
     });
-    expect(result.structuredContent).not.toHaveProperty('total');
   });
 });
 
@@ -128,10 +129,10 @@ it('rejects misspelled arguments before any upstream read', async () => {
   const client = { getStaff: jest.fn() };
   const result = await getStaffTool.createHandler(client as never)({
     location_id: 1,
-    page_size: 10,
+    count: 10,
   });
   expect(result.isError).toBe(true);
-  expect(result.content[0]?.text).toContain('page_size');
+  expect(result.content[0]?.text).toContain('count');
   expect(client.getStaff).not.toHaveBeenCalled();
   expect(getStaffTool.toMcpTool().inputSchema.additionalProperties).toBe(false);
 });

@@ -16,10 +16,10 @@ import {
 // ========== Appointment calendar settings ==========
 
 export const getAppointmentSettingsTool = defineTool({
-  name: 'get_appointment_settings',
+  name: 'settings_get_appointment_calendar',
   category: 'Settings',
   description:
-    '[Settings] Get appointment calendar settings for a location. AUTHENTICATION REQUIRED. Returns the default appointment type (0 mixed, 1 individual, 2 group event) and the maximum number of seats in a group event.',
+    'Get appointment calendar settings for a location. AUTHENTICATION REQUIRED. Returns the default appointment type (0 mixed, 1 individual, 2 group event) and the maximum number of seats in a group event.',
   annotations: {
     title: 'Get Appointment Settings',
     readOnlyHint: true,
@@ -48,10 +48,10 @@ export const getAppointmentSettingsTool = defineTool({
 });
 
 export const updateAppointmentSettingsTool = defineTool({
-  name: 'update_appointment_settings',
+  name: 'settings_update_appointment_calendar',
   category: 'Settings',
   description:
-    '[Settings] Update appointment calendar settings. AUTHENTICATION REQUIRED. Sets the default appointment type and the maximum number of seats per group event.',
+    'Update appointment calendar settings. AUTHENTICATION REQUIRED. Sets the default appointment type and the maximum number of seats per group event.',
   annotations: {
     title: 'Update Appointment Settings',
     destructiveHint: false,
@@ -121,10 +121,10 @@ export const updateAppointmentSettingsTool = defineTool({
 // ========== Online booking settings ==========
 
 export const getOnlineBookingSettingsTool = defineTool({
-  name: 'get_online_booking_settings',
+  name: 'settings_get_online_booking',
   category: 'Settings',
   description:
-    '[Settings] Get online booking settings for a location. AUTHENTICATION REQUIRED. Returns "any team member" mode, SMS confirmation flag, delay before the next session, and max seats per group event.',
+    'Get online booking settings for a location. AUTHENTICATION REQUIRED. Returns "any team member" mode, SMS confirmation flag, delay before the next session, and max seats per group event.',
   annotations: {
     title: 'Get Online Booking Settings',
     readOnlyHint: true,
@@ -155,10 +155,10 @@ export const getOnlineBookingSettingsTool = defineTool({
 });
 
 export const updateOnlineBookingSettingsTool = defineTool({
-  name: 'update_online_booking_settings',
+  name: 'settings_update_online_booking',
   category: 'Settings',
   description:
-    '[Settings] Update online booking settings. AUTHENTICATION REQUIRED. Controls "any team member" mode, SMS number confirmation, the delay before the next available session, and group-event capacity.',
+    'Update online booking settings. AUTHENTICATION REQUIRED. Controls "any team member" mode, SMS number confirmation, the delay before the next available session, and group-event capacity.',
   annotations: {
     title: 'Update Online Booking Settings',
     destructiveHint: false,
@@ -220,10 +220,10 @@ export const updateOnlineBookingSettingsTool = defineTool({
 // ========== Booking (appointment) forms ==========
 
 export const getBookingFormsTool = defineTool({
-  name: 'get_booking_forms',
+  name: 'booking_forms_list',
   category: 'Settings',
   description:
-    '[Settings] Get the list of online booking (appointment) forms/widgets for a location. AUTHENTICATION REQUIRED.',
+    'Get the list of online booking (appointment) forms/widgets for a location. AUTHENTICATION REQUIRED.',
   annotations: {
     title: 'Get Booking Forms',
     readOnlyHint: true,
@@ -266,18 +266,17 @@ export const getBookingFormsTool = defineTool({
           title: f.title,
           is_default: f.is_default,
         })),
-        count: forms.length,
-        ...pagination,
+        pagination,
       },
     };
   },
 });
 
 export const createBookingFormTool = defineTool({
-  name: 'create_booking_form',
+  name: 'booking_forms_create',
   category: 'Settings',
   description:
-    '[Settings] Create an online booking (appointment) form/widget for a location. AUTHENTICATION REQUIRED. Only a title is required; other options use platform defaults.',
+    'Create an online booking (appointment) form/widget for a location. AUTHENTICATION REQUIRED. Only a title is required; other options use platform defaults.',
   annotations: {
     title: 'Create Booking Form',
     destructiveHint: false,
@@ -318,10 +317,10 @@ export const createBookingFormTool = defineTool({
 });
 
 export const deleteBookingFormTool = defineTool({
-  name: 'delete_booking_form',
+  name: 'booking_forms_delete',
   category: 'Settings',
   description:
-    '[Settings] Permanently delete one specifically identified online booking form/widget. AUTHENTICATION REQUIRED. Read the forms first with get_booking_forms and take extra care before deleting the default form.',
+    'Permanently delete one specifically identified online booking form/widget. AUTHENTICATION REQUIRED. Read the forms first with booking_forms_list and take extra care before deleting the default form.',
   annotations: {
     title: 'Delete Booking Form',
     destructiveHint: true,

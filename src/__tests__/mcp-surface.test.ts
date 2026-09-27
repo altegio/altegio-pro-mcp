@@ -89,7 +89,11 @@ describe('tools/list per facet', () => {
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name).sort()).toEqual([
       'appointments_apply_attendance',
+      'appointments_create',
+      'appointments_delete',
+      'appointments_list',
       'appointments_preview_attendance',
+      'appointments_update',
       'clients_add_comment',
       'clients_delete',
       'clients_get_card',
@@ -102,11 +106,7 @@ describe('tools/list per facet', () => {
       'clients_lookup',
       'clients_search',
       'clients_upload_file',
-      'create_appointment',
-      'delete_appointment',
-      'get_appointments',
-      'list_locations',
-      'update_appointment',
+      'locations_list',
     ]);
     await client.close();
   });
@@ -163,7 +163,7 @@ describe('the read-only view', () => {
     );
     await expect(
       client.callTool({
-        name: 'create_appointment',
+        name: 'appointments_create',
         arguments: { location_id: 1 },
       })
     ).rejects.toThrow(/no confirmation, no wider scope and no retry/);
@@ -175,7 +175,7 @@ describe('the read-only view', () => {
     // Reaches the handler, which refuses because nobody is authenticated —
     // proof the view check did not intercept it.
     const result = await client.callTool({
-      name: 'get_appointments',
+      name: 'appointments_list',
       arguments: { location_id: 1 },
     });
     expect(result.isError).toBe(true);
@@ -225,14 +225,14 @@ describe('tools/call outside the facet', () => {
     const client = await connect();
     await expect(
       client.callTool({
-        name: 'altegio_login',
+        name: 'auth_login',
         arguments: { email: 'someone@example.com', password: 'hunter2' },
       })
     ).rejects.toThrow(/not served by the "default" view/);
     // Hidden is not enough: the refusal must not advertise another path, and
     // must not fall back to suggesting /mcp, which does not serve it either.
     await expect(
-      client.callTool({ name: 'altegio_logout', arguments: {} })
+      client.callTool({ name: 'auth_logout', arguments: {} })
     ).rejects.toThrow(/This deployment does not serve it\./);
     await client.close();
   });
@@ -241,7 +241,7 @@ describe('tools/call outside the facet', () => {
     const client = await connect();
     await expect(
       client.callTool({
-        name: 'remove_location_user',
+        name: 'locations_remove_user',
         arguments: { location_id: 1, user_id: 2, confirm_user_id: 2 },
       })
     ).rejects.toThrow(
@@ -253,7 +253,7 @@ describe('tools/call outside the facet', () => {
   it('serves password login and access management on the unfiltered view stdio uses', async () => {
     const client = await connect('all');
     const names = (await client.listTools()).tools.map((tool) => tool.name);
-    for (const name of [...PASSWORD_LOGIN_TOOLS, 'remove_location_user']) {
+    for (const name of [...PASSWORD_LOGIN_TOOLS, 'locations_remove_user']) {
       expect(names).toContain(name);
     }
     await client.close();
@@ -272,7 +272,7 @@ describe('tools/call outside the facet', () => {
     // Reaches the handler, which refuses because nobody is authenticated —
     // proof the facet check did not intercept it.
     const result = await client.callTool({
-      name: 'get_appointments',
+      name: 'appointments_list',
       arguments: { location_id: 1 },
     });
     expect(result.isError).toBe(true);
@@ -286,7 +286,7 @@ describe('server instructions', () => {
     const instructions = client.getInstructions() ?? '';
 
     expect(instructions).toContain('Altegio Pro');
-    expect(instructions).toContain('altegio_login');
+    expect(instructions).toContain('auth_login');
     // Views are named relative to the server's own address, so the text is
     // right on the short customer address and on the internal /mcp lane.
     expect(instructions).toContain('same address plus');
@@ -498,7 +498,7 @@ describe('prompts', () => {
         ? result.messages[0].content.text
         : ''
     );
-    expect(text).toContain('list_locations');
+    expect(text).toContain('locations_list');
     await client.close();
   });
 
@@ -545,7 +545,7 @@ describe('the ALTEGIO_EXPOSE_PASSWORD_LOGIN switch', () => {
     setFlag('true');
     const client = await connect();
     const names = (await client.listTools()).tools.map((tool) => tool.name);
-    expect(names).not.toContain('remove_location_user');
+    expect(names).not.toContain('locations_remove_user');
     await client.close();
   });
 

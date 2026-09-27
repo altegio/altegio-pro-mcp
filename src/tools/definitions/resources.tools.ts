@@ -5,10 +5,10 @@ import { resourcesOutput } from '../output-schemas.js';
 import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
 
 export const getResourcesTool = defineTool({
-  name: 'get_resources',
+  name: 'resources_list',
   category: 'Resources',
   description:
-    '[Resources] Get the list of resources at a location (e.g. cabinets, chairs, equipment). AUTHENTICATION REQUIRED. Read-only: the API does not expose resource creation.',
+    'Get the list of resources at a location (e.g. cabinets, chairs, equipment). AUTHENTICATION REQUIRED. Read-only: the API does not expose resource creation.',
   annotations: {
     title: 'Get Resources',
     readOnlyHint: true,
@@ -49,8 +49,7 @@ export const getResourcesTool = defineTool({
       text: withUntrustedBlock(lines.join('\n'), untrusted, { maxChars: 200 }),
       structuredContent: {
         items: resources.map((r) => ({ id: r.id, title: r.title })),
-        count: resources.length,
-        ...pagination,
+        pagination,
       },
     };
   },

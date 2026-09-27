@@ -133,7 +133,7 @@ export function visitHistorySummary(history: VisitHistory): string {
 
   if (history.has_more) {
     lines.push(
-      `More visits before this page: pass date_to=${history.next_to ?? '(next_to)'} to continue.`
+      `More visits before this page: pass date_to=${history.next_to ?? '(pagination.next_date_to)'} to continue.`
     );
   }
   return withUntrustedBlock(lines.join('\n'), detail, { maxChars: 200 });

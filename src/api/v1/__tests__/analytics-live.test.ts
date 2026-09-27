@@ -32,7 +32,7 @@ import { callAnalytics } from '../analytics-http.js';
 import { resolveLocationTimezone } from '../../../capabilities/analytics/location-timezone.js';
 
 const LIVE = process.env.ALTEGIO_E2E === '1';
-const DEMO_LOCATION_ID = 4564;
+const DEMO_LOCATION_ID = Number(process.env.ALTEGIO_E2E_LOCATION_ID);
 const FIXTURES = path.join(__dirname, 'fixtures', 'live');
 const CREDENTIALS_DIR = process.env.CREDENTIALS_DIR ?? '/tmp/altegio-mcp-live';
 

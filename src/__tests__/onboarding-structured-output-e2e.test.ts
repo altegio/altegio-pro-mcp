@@ -265,11 +265,11 @@ describe('onboarding results through an SDK client', () => {
 
       const staff = await call('onboarding_add_team_members_batch', {
         location_id: LOCATION,
-        staff_data: [{ name: 'Alice' }, { name: 'Bob' }],
+        team_members: [{ name: 'Alice' }, { name: 'Bob' }],
         // The owner's one answer for the whole list (the batch refuses a row
         // without one).
-        is_paid_staff: true,
-        has_timetable_access: true,
+        has_paid_seat: true,
+        has_schedule_access: true,
       });
       const staffResult = structured(staff) as {
         created_ids: number[];
@@ -298,11 +298,11 @@ describe('onboarding results through an SDK client', () => {
 
       await call('onboarding_add_services_batch', {
         location_id: LOCATION,
-        services_data: [
+        services: [
           {
             title: 'Haircut',
             price_min: 50,
-            duration: 3600,
+            duration_seconds: 3600,
             category_id: categoryId,
           },
         ],

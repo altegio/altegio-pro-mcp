@@ -100,8 +100,8 @@ describe('HTTP direct-token propagation, end to end', () => {
           id: 2,
           method: 'tools/call',
           params: {
-            name: 'list_locations',
-            arguments: { my: 1, count: 1 },
+            name: 'locations_list',
+            arguments: { managed_only: true, page_size: 1 },
           },
         },
         sessionId as string

@@ -74,7 +74,7 @@ describe('requireUserToken', () => {
       AuthenticationError
     );
     expect(() => requireUserToken(http(false), 'read key metrics')).toThrow(
-      /altegio_login before trying to read key metrics/
+      /auth_login before trying to read key metrics/
     );
   });
 });

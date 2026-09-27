@@ -57,7 +57,7 @@ describe('defineTool factory', () => {
     const res = await authTool.createHandler(mockClient())({});
     expect(res.isError).toBe(true);
     expect(res.content[0]?.text).toContain(
-      'Authentication required. Call altegio_login before using auth_demo'
+      'Authentication required. Call auth_login before using auth_demo'
     );
   });
 

@@ -1,8 +1,8 @@
 /**
- * Operation description — backs `altegio_describe_operation`.
+ * Operation description — backs `api_describe_operation`.
  *
  * Renders one catalog entry into the contract a caller needs before invoking
- * `altegio_call_operation`: parameters with types and requiredness, request and
+ * `api_call_operation`: parameters with types and requiredness, request and
  * response shapes, authentication, deprecation, spec source, the curated tool
  * that may already do the job, and the canonical-terminology notes that say
  * which legacy parameter names the API accepts under canonical spellings.
@@ -23,7 +23,7 @@ export interface DescribedParameter {
   name: string;
   /** Spec spelling, when the spec still uses a legacy name. */
   spec_name?: string;
-  /** Every spelling `altegio_call_operation` accepts for this parameter. */
+  /** Every spelling `api_call_operation` accepts for this parameter. */
   accepted_names?: string[];
   in: string;
   required: boolean;
@@ -123,7 +123,7 @@ function notFound(operationId: string): DescribeOutput {
       (suggestions
         ? `Closest matches:\n${suggestions}\n`
         : 'No close matches.\n') +
-      'Use `altegio_search_operations` to find the operation you need.',
+      'Use `api_search_operations` to find the operation you need.',
     structuredContent: {
       operation_id: operationId,
       found: false,
@@ -156,7 +156,7 @@ export function describeOperation(operationId: string): DescribeOutput {
       required: op.security.required,
       schemes: op.security.schemes,
       note: op.security.required
-        ? 'Requires a logged-in session — call `altegio_login` first.'
+        ? 'Requires a logged-in session — call `auth_login` first.'
         : 'Partner token only; no user session needed.',
     },
     parameters,
@@ -200,13 +200,13 @@ function renderText(
   );
   lines.push(
     op.security.required
-      ? 'Auth: logged-in session required (call `altegio_login` first).'
+      ? 'Auth: logged-in session required (call `auth_login` first).'
       : 'Auth: partner token only.'
   );
 
   if (op.method !== 'GET') {
     lines.push(
-      `Not callable through \`altegio_call_operation\`: ${op.method} is a write. ` +
+      `Not callable through \`api_call_operation\`: ${op.method} is a write. ` +
         (op.curation?.tool_name
           ? `Use the curated tool \`${op.curation.tool_name}\`.`
           : 'Writes are available through curated tools only.')

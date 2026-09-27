@@ -53,7 +53,7 @@ export type AnalyticsEndpointKind =
 
 const NO_ACCESS =
   'The signed-in user has no Analytics access right in this location. ' +
-  'Ask a location owner to grant the Analytics access right, or call list_locations to pick a location the user can report on.';
+  'Ask a location owner to grant the Analytics access right, or call locations_list to pick a location the user can report on.';
 
 const NO_DAY_END_ACCESS =
   'The signed-in user has no Analytics access right for the day-end report in this location. ' +
@@ -160,7 +160,7 @@ export function mapAnalyticsHttpError(
       return new AnalyticsUnavailableError(FORECAST_OFF, status);
     }
     return new AnalyticsUnavailableError(
-      `${context} is not available for this location. Verify the location id with list_locations.`,
+      `${context} is not available for this location. Verify the location id with locations_list.`,
       status
     );
   }

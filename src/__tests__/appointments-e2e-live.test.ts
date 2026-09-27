@@ -7,7 +7,7 @@
  * `ALTEGIO_API_TOKEN` (or one of its live-test aliases) plus either an existing
  * `ALTEGIO_USER_TOKEN` or demo credentials in `ALTEGIO_TEST_LOGIN` /
  * `ALTEGIO_TEST_PASSWORD` — from the environment, never a file in this public
- * repo. Runs against the Demo Location (4564), where content writes are
+ * repo. Runs against the location named by `ALTEGIO_E2E_LOCATION_ID`, where content writes are
  * permitted, and cleans up everything it creates.
  *
  *   ALTEGIO_E2E=1 CREDENTIALS_DIR=/tmp/altegio-mcp-live \
@@ -17,7 +17,7 @@
 import { AltegioClient } from '../providers/altegio-client.js';
 
 const LIVE = process.env.ALTEGIO_E2E === '1';
-const DEMO_LOCATION_ID = 4564;
+const DEMO_LOCATION_ID = Number(process.env.ALTEGIO_E2E_LOCATION_ID);
 const CREDENTIALS_DIR = process.env.CREDENTIALS_DIR ?? '/tmp/altegio-mcp-live';
 
 const describeLive = LIVE ? describe : describe.skip;

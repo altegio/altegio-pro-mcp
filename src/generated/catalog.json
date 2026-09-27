@@ -2278,7 +2278,7 @@
       "curation": {
         "domain": "auth",
         "tier": "core",
-        "tool_name": "altegio_login",
+        "tool_name": "auth_login",
         "write_allowed": false,
         "notes": "Exchanges email and password for a V1 user token. Deprecated the day V3 OAuth is live (ADR-001 D6) — never route this through the executor.\n"
       }
@@ -9256,7 +9256,7 @@
           "marketing",
           "onboarding"
         ],
-        "tool_name": "list_locations",
+        "tool_name": "locations_list",
         "projection": [
           "id",
           "title",
@@ -11717,7 +11717,7 @@
           "catalog",
           "onboarding"
         ],
-        "tool_name": "get_booking_forms",
+        "tool_name": "booking_forms_list",
         "write_allowed": false
       }
     },
@@ -12070,7 +12070,7 @@
           "catalog",
           "onboarding"
         ],
-        "tool_name": "create_booking_form",
+        "tool_name": "booking_forms_create",
         "write_allowed": false
       }
     },
@@ -12734,7 +12734,7 @@
           "catalog",
           "onboarding"
         ],
-        "tool_name": "delete_booking_form",
+        "tool_name": "booking_forms_delete",
         "write_allowed": false
       }
     },
@@ -14758,7 +14758,7 @@
           "catalog",
           "onboarding"
         ],
-        "tool_name": "create_position",
+        "tool_name": "positions_create",
         "write_allowed": false,
         "notes": "Deprecated but still the only public V1 position create operation. Public V1 has no supported position update or delete; do not use internal V2.\n"
       }
@@ -19803,7 +19803,7 @@
           "catalog",
           "onboarding"
         ],
-        "tool_name": "get_online_booking_settings",
+        "tool_name": "settings_get_online_booking",
         "write_allowed": false
       }
     },
@@ -19915,7 +19915,7 @@
           "catalog",
           "onboarding"
         ],
-        "tool_name": "update_online_booking_settings",
+        "tool_name": "settings_update_online_booking",
         "write_allowed": false
       }
     },
@@ -20083,7 +20083,7 @@
           "catalog",
           "onboarding"
         ],
-        "tool_name": "get_appointment_settings",
+        "tool_name": "settings_get_appointment_calendar",
         "write_allowed": false,
         "notes": "Appointment-calendar defaults, NOT the location's working hours — real working hours come from team member schedules.\n"
       }
@@ -20184,7 +20184,7 @@
           "catalog",
           "onboarding"
         ],
-        "tool_name": "update_appointment_settings",
+        "tool_name": "settings_update_appointment_calendar",
         "write_allowed": false
       }
     },
@@ -20395,7 +20395,7 @@
           "catalog",
           "onboarding"
         ],
-        "tool_name": "get_positions",
+        "tool_name": "positions_list",
         "projection": [
           "id",
           "title"
@@ -20818,9 +20818,9 @@
           "catalog",
           "onboarding"
         ],
-        "tool_name": "create_schedule",
+        "tool_name": "schedules_create",
         "write_allowed": false,
-        "notes": "One PUT backs three tools: create_schedule and update_schedule send `schedules_to_set`, delete_schedule sends `schedules_to_delete`.\n"
+        "notes": "One PUT backs three tools: schedules_create and schedules_update send `schedules_to_set`, schedules_delete sends `schedules_to_delete`.\n"
       }
     },
     {
@@ -20952,7 +20952,7 @@
         "facets": [
           "catalog"
         ],
-        "tool_name": "remove_location_user",
+        "tool_name": "locations_remove_user",
         "write_allowed": false,
         "notes": "Exact user ID is required twice as a destructive safeguard."
       }
@@ -28949,7 +28949,7 @@
         "facets": [
           "ops"
         ],
-        "tool_name": "update_appointment",
+        "tool_name": "appointments_update",
         "param_renames": {
           "record_id": "appointment_id",
           "staff_id": "team_member_id"
@@ -29020,7 +29020,7 @@
         "facets": [
           "ops"
         ],
-        "tool_name": "delete_appointment",
+        "tool_name": "appointments_delete",
         "param_renames": {
           "record_id": "appointment_id"
         },
@@ -29505,7 +29505,7 @@
         "facets": [
           "ops"
         ],
-        "tool_name": "get_appointments",
+        "tool_name": "appointments_list",
         "param_renames": {
           "staff_id": "team_member_id"
         },
@@ -30040,7 +30040,7 @@
         "facets": [
           "ops"
         ],
-        "tool_name": "create_appointment",
+        "tool_name": "appointments_create",
         "param_renames": {
           "staff_id": "team_member_id"
         },
@@ -30411,7 +30411,7 @@
         "facets": [
           "catalog"
         ],
-        "tool_name": "get_resources",
+        "tool_name": "resources_list",
         "projection": [
           "id",
           "title"
@@ -30589,7 +30589,7 @@
           "ops",
           "catalog"
         ],
-        "tool_name": "get_schedule",
+        "tool_name": "schedules_get",
         "param_renames": {
           "staff_id": "team_member_id"
         },
@@ -30877,7 +30877,7 @@
           "catalog",
           "onboarding"
         ],
-        "tool_name": "get_service_categories",
+        "tool_name": "service_categories_list",
         "projection": [
           "id",
           "title",
@@ -31139,7 +31139,7 @@
           "catalog",
           "onboarding"
         ],
-        "tool_name": "delete_service_category",
+        "tool_name": "service_categories_delete",
         "write_allowed": false
       }
     },
@@ -31280,7 +31280,7 @@
           "ops",
           "catalog"
         ],
-        "tool_name": "get_services",
+        "tool_name": "services_list",
         "projection": [
           "id",
           "title",
@@ -31509,7 +31509,7 @@
           "catalog",
           "onboarding"
         ],
-        "tool_name": "create_service",
+        "tool_name": "services_create",
         "write_allowed": false
       }
     },
@@ -31861,7 +31861,7 @@
         "facets": [
           "catalog"
         ],
-        "tool_name": "update_service",
+        "tool_name": "services_update",
         "write_allowed": false,
         "notes": "PUT is replacement-shaped. The curated client reads and merges the current service so unchanged fields and team-member links survive.\n"
       }

@@ -1,5 +1,5 @@
 /**
- * `[Analytics]` tool pack — the reporting surface of one location.
+ * Analytics tool pack — the reporting surface of one location.
  *
  * Every tool here reads: key metrics with period comparison, daily series,
  * breakdowns, receptionist performance, loyalty results, the day-end report,
@@ -30,6 +30,7 @@ import * as decisionAnalytics from '../../capabilities/analytics/decision-use-ca
 import * as reactivationAnalytics from '../../capabilities/analytics/reactivation.js';
 import * as serviceMix from '../../capabilities/analytics/service-mix.js';
 import { includeContactsArg } from '../contacts.js';
+import { paginationOutput, standardizeCollection } from '../pagination.js';
 import { clientFiltersSchema } from './client-filters.schema.js';
 
 // ========== shared input pieces ==========
@@ -39,7 +40,7 @@ const locationId = z
   .int()
   .positive()
   .describe(
-    'Location to report on. Call list_locations when the id is unknown.'
+    'Location to report on. Call locations_list when the id is unknown.'
   );
 
 const periodFields = {
@@ -80,7 +81,7 @@ const segmentFields = {
     .positive()
     .optional()
     .describe(
-      'Report on every team member holding one position (for example every stylist). Call get_positions for the ids.'
+      'Report on every team member holding one position (for example every stylist). Call positions_list for the ids.'
     ),
   created_by_user_id: z
     .number()
@@ -207,7 +208,7 @@ export const analyticsGetOverviewTool = defineTool({
   name: 'analytics_get_overview',
   category: 'Analytics',
   description:
-    '[Analytics] Key metrics of one location for a period, each next to the same metric in the previous period of equal length: total revenue and its services and products split, average check (average ticket), occupancy, appointments by outcome, and new, returning, active and lost clients. Start here for "how did we do last month", "is revenue up", "how many new clients", "what is our average check", "how busy were we". Optional filters narrow it to one team member, one position or one receptionist. For day-by-day numbers use analytics_get_daily_series; to split the same headline across the team call it again with position_id or team_member_id; for today’s till totals use analytics_get_day_end_report. Needs the Analytics access right in this location.',
+    'Key metrics of one location for a period, each next to the same metric in the previous period of equal length: total revenue and its services and products split, average check (average ticket), occupancy, appointments by outcome, and new, returning, active and lost clients. Start here for "how did we do last month", "is revenue up", "how many new clients", "what is our average check", "how busy were we". Optional filters narrow it to one team member, one position or one receptionist. For day-by-day numbers use analytics_get_daily_series; to split the same headline across the team call it again with position_id or team_member_id; for today’s till totals use analytics_get_day_end_report. Needs the Analytics access right in this location.',
   annotations: { title: 'Analytics: key metrics', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -257,7 +258,7 @@ export const analyticsGetDailySeriesTool = defineTool({
   name: 'analytics_get_daily_series',
   category: 'Analytics',
   description:
-    '[Analytics] One metric family as a day-by-day series: revenue (total, services, products), appointments (total, online bookings, from new clients), occupancy (booked share and the no-show share of working time), or clients (total, new, returning). Use it for trends, charts, "which day was busiest", "how did sales move through the month", "how much of our time do no-shows burn". Values come back as compact [date, value] pairs in the location’s timezone. For period totals use analytics_get_overview instead.',
+    'One metric family as a day-by-day series: revenue (total, services, products), appointments (total, online bookings, from new clients), occupancy (booked share and the no-show share of working time), or clients (total, new, returning). Use it for trends, charts, "which day was busiest", "how did sales move through the month", "how much of our time do no-shows burn". Values come back as compact [date, value] pairs in the location’s timezone. For period totals use analytics_get_overview instead.',
   annotations: { title: 'Analytics: daily series', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -299,7 +300,7 @@ export const analyticsGetAppointmentsBreakdownTool = defineTool({
   name: 'analytics_get_appointments_breakdown',
   category: 'Analytics',
   description:
-    '[Analytics] Appointments of a period split either by source — online booking, the client app, a receptionist, the API — or by visit status: waiting, confirmed, arrived, no_show, cancelled. Answers "how many bookings came from the website", "what is our no-show rate", "how many appointments were cancelled", "is online booking growing". Each slice carries a count and its share of the total. There is no online-booking funnel anywhere in the product; this split by source is the closest thing to one.',
+    'Appointments of a period split either by source — online booking, the client app, a receptionist, the API — or by visit status: waiting, confirmed, arrived, no_show, cancelled. Answers "how many bookings came from the website", "what is our no-show rate", "how many appointments were cancelled", "is online booking growing". Each slice carries a count and its share of the total. There is no online-booking funnel anywhere in the product; this split by source is the closest thing to one.',
   annotations: { title: 'Analytics: appointment breakdown', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -336,7 +337,7 @@ export const analyticsGetReceptionistPerformanceTool = defineTool({
   name: 'analytics_get_receptionist_performance',
   category: 'Analytics',
   description:
-    '[Analytics] How the front desk performed in a period: how many clients the receptionists booked, how many appointments they closed and settled, how much revenue is attributed to them, and their rebooking rate — the share of clients who left with a new appointment after a visit, and the share won back after a no-show. Answers "who at the front desk books the most", "do we rebook clients before they leave", "how good is our follow-up on no-shows". Pass created_by_user_id to see one location user only; a receptionist without the Analytics access right can still read their own numbers that way.',
+    'How the front desk performed in a period: how many clients the receptionists booked, how many appointments they closed and settled, how much revenue is attributed to them, and their rebooking rate — the share of clients who left with a new appointment after a visit, and the share won back after a no-show. Answers "who at the front desk books the most", "do we rebook clients before they leave", "how good is our follow-up on no-shows". Pass created_by_user_id to see one location user only; a receptionist without the Analytics access right can still read their own numbers that way.',
   annotations: { title: 'Analytics: front-desk performance', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -390,7 +391,7 @@ export const analyticsGetLoyaltyProgramResultsTool = defineTool({
   name: 'analytics_get_loyalty_program_results',
   category: 'Analytics',
   description:
-    '[Analytics] Results of one loyalty program in a period: how many clients it touched split into new and already-known, how many came back, how many were lost, the revenue it produced in total and from returning clients, day-by-day client and revenue series, and the same client counts per team member. Answers "is the loyalty program bringing people back", "how much revenue does the bonus program generate", "which team members sell the program". Requires loyalty_program_id — the location’s programs are listed by the loyalty tools of the product, not by this pack.',
+    'Results of one loyalty program in a period: how many clients it touched split into new and already-known, how many came back, how many were lost, the revenue it produced in total and from returning clients, day-by-day client and revenue series, and the same client counts per team member. Answers "is the loyalty program bringing people back", "how much revenue does the bonus program generate", "which team members sell the program". Requires loyalty_program_id — the location’s programs are listed by the loyalty tools of the product, not by this pack.',
   annotations: { title: 'Analytics: loyalty program results', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -433,7 +434,7 @@ export const analyticsGetForecastTool = defineTool({
   name: 'analytics_get_forecast',
   category: 'Analytics',
   description:
-    '[Analytics] Model forecast of revenue and visit count next to what actually happened, so the owner can see whether the location is running ahead of or behind expectation. Answers "are we on track this month", "what revenue should we expect". This is a forecast comparison, not client segmentation. The forecast is an optional module: when it is switched off for the location, or when there is not enough visit history yet, the tool says so instead of failing — use analytics_get_overview for the actuals in that case.',
+    'Model forecast of revenue and visit count next to what actually happened, so the owner can see whether the location is running ahead of or behind expectation. Answers "are we on track this month", "what revenue should we expect". This is a forecast comparison, not client segmentation. The forecast is an optional module: when it is switched off for the location, or when there is not enough visit history yet, the tool says so instead of failing — use analytics_get_overview for the actuals in that case.',
   annotations: {
     title: 'Analytics: revenue and visits forecast',
     ...READ_ONLY,
@@ -462,7 +463,7 @@ export const analyticsGetDayEndReportTool = defineTool({
   name: 'analytics_get_day_end_report',
   category: 'Analytics',
   description:
-    '[Analytics] Day-end report for one day or a short range: clients served, appointments, services and products sold with their revenue, memberships and gift cards sold, money actually taken per account (the cash-versus-card split), and everything written off as discounts, loyalty bonuses, memberships or gift cards. This is the report a receptionist closes the day with. Answers "what did we take today", "how much cash is in the till", "how much did we discount". Per-client detail is off by default because it is large; include_details=true adds it with ids and amounts only, never names or phone numbers. Needs the finance reporting right. Historical values are withheld when the source cannot prove its effective period, so silently clamped data is never labelled as the requested range.',
+    'Day-end report for one day or a short range: clients served, appointments, services and products sold with their revenue, memberships and gift cards sold, money actually taken per account (the cash-versus-card split), and everything written off as discounts, loyalty bonuses, memberships or gift cards. This is the report a receptionist closes the day with. Answers "what did we take today", "how much cash is in the till", "how much did we discount". Per-client detail is off by default because it is large; include_details=true adds it with ids and amounts only, never names or phone numbers. Needs the finance reporting right. Historical values are withheld when the source cannot prove its effective period, so silently clamped data is never labelled as the requested range.',
   annotations: { title: 'Analytics: day-end report', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -519,7 +520,7 @@ export const analyticsGetTeamMemberOccupancyTool = defineTool({
   name: 'analytics_get_team_member_occupancy',
   category: 'Analytics',
   description:
-    '[Analytics] Day-by-day occupancy for up to ten named team members: the share of each one’s scheduled working time that is booked. Answers "who has free capacity this week", "is anyone overloaded", "how full is a given stylist". A team member with no work schedule shows no occupancy at all, because occupancy is measured against scheduled time. For the whole location at once use analytics_get_daily_series with metric=occupancy; for hours and idle time per team member use the "Occupancy" report template. Needs access to the work schedule of the location.',
+    'Day-by-day occupancy for up to ten named team members: the share of each one’s scheduled working time that is booked. Answers "who has free capacity this week", "is anyone overloaded", "how full is a given stylist". A team member with no work schedule shows no occupancy at all, because occupancy is measured against scheduled time. For the whole location at once use analytics_get_daily_series with metric=occupancy; for hours and idle time per team member use the "Occupancy" report template. Needs access to the work schedule of the location.',
   annotations: { title: 'Analytics: team member occupancy', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -553,7 +554,7 @@ export const analyticsGetClientVisitStatsTool = defineTool({
   name: 'analytics_get_client_visit_stats',
   category: 'Analytics',
   description:
-    '[Analytics] Visit history figures for one client in this location: visits attended, visits missed, total spent, total paid, the balance on their client account, and the date of their last attended visit. Answers "is this client reliable", "how much has this client spent with us", "does this client have money on account" while looking at a client card. For a table of many clients at once run the "Revenue and visits by client" report template instead. Needs access to client cards in this location.',
+    'Visit history figures for one client in this location: visits attended, visits missed, total spent, total paid, the balance on their client account, and the date of their last attended visit. Answers "is this client reliable", "how much has this client spent with us", "does this client have money on account" while looking at a client card. For a table of many clients at once run the "Revenue and visits by client" report template instead. Needs access to client cards in this location.',
   annotations: { title: 'Analytics: client visit history', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -577,14 +578,6 @@ export const analyticsGetClientVisitStatsTool = defineTool({
 });
 
 // ========== temporary stable legacy reports ===============================
-
-const legacyPageOutput = objectSchema({
-  page: { type: 'integer' as const },
-  page_size: { type: 'integer' as const },
-  total_count: { type: 'integer' as const },
-  returned: { type: 'integer' as const },
-  has_more: { type: 'boolean' as const },
-});
 
 const paymentBreakdownOutput = objectSchema({
   discount: num,
@@ -616,7 +609,7 @@ export const analyticsGetClientSalesTool = defineTool({
   name: 'analytics_get_client_sales',
   category: 'Analytics',
   description:
-    '[Analytics] Revenue and visit totals by client from the stable sales-by-client report: client id, revenue, share of location revenue, average check and visit count. Use it for “top clients this month” and per-client sales analysis; use clients_search for lifetime segmentation instead. Results are source-paginated. Client phone and email are withheld unless include_contacts=true. Temporary legacy-report adapter pending V3; it never creates a saved report. Needs the Sales by clients report permission.',
+    'Revenue and visit totals by client from the stable sales-by-client report: client id, revenue, share of location revenue, average check and visit count. Use it for “top clients this month” and per-client sales analysis; use clients_search for lifetime segmentation instead. Results are source-paginated. Client phone and email are withheld unless include_contacts=true. Temporary legacy-report adapter pending V3; it never creates a saved report. Needs the Sales by clients report permission.',
   annotations: { title: 'Analytics: sales by client', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -640,7 +633,7 @@ export const analyticsGetClientSalesTool = defineTool({
     location_id: { type: 'integer' as const },
     period: periodSchema,
     currency: str,
-    rows: {
+    items: {
       type: 'array' as const,
       items: objectSchema({
         client_id: { type: 'integer' as const },
@@ -654,19 +647,19 @@ export const analyticsGetClientSalesTool = defineTool({
       }),
     },
     totals: objectSchema({ revenue: num }),
-    page: legacyPageOutput,
+    pagination: paginationOutput,
     contacts_included: { type: 'boolean' as const },
     untrusted_data_note: { type: 'string' as const },
   }),
   handler: async ({ input, client }) =>
-    legacyAnalytics.getClientSales(client, input),
+    standardizeCollection(await legacyAnalytics.getClientSales(client, input)),
 });
 
 export const analyticsGetClientRetentionTool = defineTool({
   name: 'analytics_get_client_retention',
   category: 'Analytics',
   description:
-    '[Analytics] Client retention by team member for a period: unique, new and returning clients, the clients considered lost before the period, how many returned, and the retention percentage. Optionally restrict to one service. Legacy rows are matched to a current team-member id only when name and position identify exactly one member; stale or ambiguous identities return a null id and explicit status. Use it for “which team members bring clients back”; use analytics_get_client_sales for revenue by client. Temporary stable legacy-report adapter pending V3; it never creates a saved report. Needs the Client retention report permission.',
+    'Client retention by team member for a period: unique, new and returning clients, the clients considered lost before the period, how many returned, and the retention percentage. Optionally restrict to one service. Legacy rows are matched to a current team-member id only when name and position identify exactly one member; stale or ambiguous identities return a null id and explicit status. Use it for “which team members bring clients back”; use analytics_get_client_sales for revenue by client. Temporary stable legacy-report adapter pending V3; it never creates a saved report. Needs the Client retention report permission.',
   annotations: { title: 'Analytics: client retention', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -682,7 +675,7 @@ export const analyticsGetClientRetentionTool = defineTool({
     location_id: { type: 'integer' as const },
     period: periodSchema,
     service_id: int,
-    rows: {
+    items: {
       type: 'array' as const,
       items: objectSchema({
         team_member_id: int,
@@ -700,14 +693,16 @@ export const analyticsGetClientRetentionTool = defineTool({
     untrusted_data_note: { type: 'string' as const },
   }),
   handler: async ({ input, client }) =>
-    legacyAnalytics.getClientRetention(client, input),
+    standardizeCollection(
+      await legacyAnalytics.getClientRetention(client, input)
+    ),
 });
 
 export const analyticsGetClientForecastTool = defineTool({
   name: 'analytics_get_client_forecast',
   category: 'Analytics',
   description:
-    '[Analytics] Per-client RFM forecast from the location’s stable forecast export: average check, predicted visits and revenue, expected return window, prior return visits and last visit date. Use analytics_get_forecast for aggregate location forecast versus actuals. The legacy workbook does not expose client ids, so client_id is explicitly null and never guessed. Results are paginated after a size-bounded workbook read; contacts are withheld unless include_contacts=true. Temporary adapter pending V3; it never creates a saved report. Needs Analytics, client-export and forecast-module access.',
+    'Per-client RFM forecast from the location’s stable forecast export: average check, predicted visits and revenue, expected return window, prior return visits and last visit date. Use analytics_get_forecast for aggregate location forecast versus actuals. The legacy workbook does not expose client ids, so client_id is explicitly null and never guessed. Results are paginated after a size-bounded workbook read; contacts are withheld unless include_contacts=true. Temporary adapter pending V3; it never creates a saved report. Needs Analytics, client-export and forecast-module access.',
   annotations: { title: 'Analytics: client forecast', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -737,7 +732,7 @@ export const analyticsGetClientForecastTool = defineTool({
     location_id: { type: 'integer' as const },
     prediction_date: str,
     currency: str,
-    rows: {
+    items: {
       type: 'array' as const,
       items: objectSchema({
         client_id: { type: 'null' as const },
@@ -752,20 +747,22 @@ export const analyticsGetClientForecastTool = defineTool({
         email: str,
       }),
     },
-    page: legacyPageOutput,
+    pagination: paginationOutput,
     contacts_included: { type: 'boolean' as const },
     client_identity_status: { type: 'string' as const },
     untrusted_data_note: { type: 'string' as const },
   }),
   handler: async ({ input, client }) =>
-    legacyAnalytics.getClientForecast(client, input),
+    standardizeCollection(
+      await legacyAnalytics.getClientForecast(client, input)
+    ),
 });
 
 export const analyticsGetServiceProfitabilityTool = defineTool({
   name: 'analytics_get_service_profitability',
   category: 'Analytics',
   description:
-    '[Analytics] Service contribution by service or service category: rendered-service count, discounts and loyalty write-offs, client-account and cash/card revenue, consumables cost, team-member compensation, contribution result and share of revenue. Filter by one team member or service category and paginate at source. Temporary stable legacy-report adapter pending V3; it never creates a saved report. Needs the Sales by services report permission.',
+    'Service contribution by service or service category: rendered-service count, discounts and loyalty write-offs, client-account and cash/card revenue, consumables cost, team-member compensation, contribution result and share of revenue. Filter by one team member or service category and paginate at source. Temporary stable legacy-report adapter pending V3; it never creates a saved report. Needs the Sales by services report permission.',
   annotations: { title: 'Analytics: service profitability', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -792,7 +789,7 @@ export const analyticsGetServiceProfitabilityTool = defineTool({
     period: periodSchema,
     currency: str,
     group_by: { type: 'string' as const },
-    rows: {
+    items: {
       type: 'array' as const,
       items: objectSchema({
         service_id: int,
@@ -816,18 +813,20 @@ export const analyticsGetServiceProfitabilityTool = defineTool({
       team_member_compensation: num,
       contribution_result: num,
     }),
-    page: legacyPageOutput,
+    pagination: paginationOutput,
     untrusted_data_note: { type: 'string' as const },
   }),
   handler: async ({ input, client }) =>
-    legacyAnalytics.getServiceProfitability(client, input),
+    standardizeCollection(
+      await legacyAnalytics.getServiceProfitability(client, input)
+    ),
 });
 
 export const analyticsGetServiceMixTrendTool = defineTool({
   name: 'analytics_get_service_mix_trend',
   category: 'Analytics',
   description:
-    '[Analytics] Monthly delivered service value from attended appointment service lines, grouped by service, current category, team member, assigned resource, or assigned device versus current category with service drilldown. Scans every appointment page of the period (at most 30,000 appointments) or refuses the call. Delivered service value is the recorded service-line total before loyalty deductions, not cash received or accounting revenue; charge_after_loyalty is the line charge after them. All lines on a visit with one known resource type are attributed to it. When several resource types are assigned, their ids are reported but line value remains unattributed; it is never duplicated across devices. Product sales and client-account top-ups are excluded; for cash use analytics_get_client_cash_receipts.',
+    'Monthly delivered service value from attended appointment service lines, grouped by service, current category, team member, assigned resource, or assigned device versus current category with service drilldown. Scans every appointment page of the period (at most 30,000 appointments) or refuses the call. Delivered service value is the recorded service-line total before loyalty deductions, not cash received or accounting revenue; charge_after_loyalty is the line charge after them. All lines on a visit with one known resource type are attributed to it. When several resource types are assigned, their ids are reported but line value remains unattributed; it is never duplicated across devices. Product sales and client-account top-ups are excluded; for cash use analytics_get_client_cash_receipts.',
   annotations: { title: 'Analytics: service mix trend', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -870,7 +869,7 @@ export const analyticsGetServiceMixTrendTool = defineTool({
     currency: str,
     group_by: { type: 'string' },
     team_member_id: int,
-    rows: {
+    items: {
       type: 'array',
       items: objectSchema({
         month: { type: 'string' },
@@ -892,20 +891,20 @@ export const analyticsGetServiceMixTrendTool = defineTool({
         attribution: { type: 'string' },
       }),
     },
-    page: { type: 'object' },
+    pagination: paginationOutput,
     totals: { type: 'object' },
     provenance: { type: 'object' },
     untrusted_data_note: { type: 'string' },
   }),
   handler: async ({ input, client }) =>
-    serviceMix.getServiceMixTrend(client, input),
+    standardizeCollection(await serviceMix.getServiceMixTrend(client, input)),
 });
 
 export const analyticsGetClientServicePenetrationTool = defineTool({
   name: 'analytics_get_client_service_penetration',
   category: 'Analytics',
   description:
-    '[Analytics] Distinct attended clients who used target services, current categories or resources assigned to appointments over up to 365 days. Every recorded resource type on an attended service visit counts for resource adoption, including visits with multiple resources; delivered value is not duplicated across them. Returns top service and group adoption, confirmed mono-group clients (one known group only), co-occurrence, delivered-value cohort gaps and a paged list of client ids from the source group who did not use the target (cross-sell candidates; all non-adopters when no source is given). Every percentage uses the identified active attended-client denominator. Resource assignment is an operational usage proxy, not an immutable usage audit; cohorts rank delivered service value, not cash — for cash-ranked clients use analytics_get_client_payer_cohorts.',
+    'Distinct attended clients who used target services, current categories or resources assigned to appointments over up to 365 days. Every recorded resource type on an attended service visit counts for resource adoption, including visits with multiple resources; delivered value is not duplicated across them. Returns top service and group adoption, confirmed mono-group clients (one known group only), co-occurrence, delivered-value cohort gaps and a paged list of client ids from the source group who did not use the target (cross-sell candidates; all non-adopters when no source is given). Every percentage uses the identified active attended-client denominator. Resource assignment is an operational usage proxy, not an immutable usage audit; cohorts rank delivered service value, not cash — for cash-ranked clients use analytics_get_client_payer_cohorts.',
   annotations: { title: 'Analytics: client service penetration', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -915,7 +914,7 @@ export const analyticsGetClientServicePenetrationTool = defineTool({
       .max(30)
       .optional()
       .describe(
-        'Source group: clients who used any of these services (get_services for ids). Leave all source filters empty to use every active client.'
+        'Source group: clients who used any of these services (services_list for ids). Leave all source filters empty to use every active client.'
       ),
     source_category_ids: z
       .array(z.number().int().positive())
@@ -929,7 +928,7 @@ export const analyticsGetClientServicePenetrationTool = defineTool({
       .max(30)
       .optional()
       .describe(
-        'Source group: clients with an appointment assigned to any of these resources (get_resources for ids).'
+        'Source group: clients with an appointment assigned to any of these resources (resources_list for ids).'
       ),
     target_service_ids: z
       .array(z.number().int().positive())
@@ -1050,20 +1049,22 @@ export const analyticsGetClientServicePenetrationTool = defineTool({
       clients_with_unattributed_lines: { type: 'integer' },
       confirmed_mono_group_clients: { type: 'integer' },
     }),
-    candidate_client_ids: { type: 'array', items: { type: 'integer' } },
-    page: { type: 'object' },
+    items: { type: 'array', items: { type: 'integer' } },
+    pagination: paginationOutput,
     provenance: { type: 'object' },
     untrusted_data_note: { type: 'string' },
   }),
   handler: async ({ input, client }) =>
-    serviceMix.getClientServicePenetration(client, input),
+    standardizeCollection(
+      await serviceMix.getClientServicePenetration(client, input)
+    ),
 });
 
 export const analyticsGetTeamMemberSalesTool = defineTool({
   name: 'analytics_get_team_member_sales',
   category: 'Analytics',
   description:
-    '[Analytics] Sales by team member: total revenue, service and product revenue and quantities, discounts and loyalty write-offs, client-account payments, upcoming-appointment revenue, worked hours, revenue per worked hour and share of location revenue. Legacy rows are matched to a current team-member id only when name and position identify exactly one member; stale or ambiguous identities return a null id and explicit status. Supports the source report’s filters for positions, services, service categories, products and product categories. Temporary stable legacy-report adapter pending V3; it never creates a saved report. Needs the Sales by team members report permission.',
+    'Sales by team member: total revenue, service and product revenue and quantities, discounts and loyalty write-offs, client-account payments, upcoming-appointment revenue, worked hours, revenue per worked hour and share of location revenue. Legacy rows are matched to a current team-member id only when name and position identify exactly one member; stale or ambiguous identities return a null id and explicit status. Supports the source report’s filters for positions, services, service categories, products and product categories. Temporary stable legacy-report adapter pending V3; it never creates a saved report. Needs the Sales by team members report permission.',
   annotations: { title: 'Analytics: sales by team member', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -1104,7 +1105,7 @@ export const analyticsGetTeamMemberSalesTool = defineTool({
         items: { type: 'integer' as const },
       },
     }),
-    rows: {
+    items: {
       type: 'array' as const,
       items: objectSchema({
         team_member_id: int,
@@ -1139,7 +1140,9 @@ export const analyticsGetTeamMemberSalesTool = defineTool({
     untrusted_data_note: { type: 'string' as const },
   }),
   handler: async ({ input, client }) =>
-    legacyAnalytics.getTeamMemberSales(client, input),
+    standardizeCollection(
+      await legacyAnalytics.getTeamMemberSales(client, input)
+    ),
 });
 
 // ========== task-oriented decision analytics ==========
@@ -1302,7 +1305,7 @@ export const analyticsGetProfitAndLossStatementTool = defineTool({
   name: 'analytics_get_profit_and_loss_statement',
   category: 'Analytics',
   description:
-    '[Analytics] Explain how much this location earned during a period without overstating accounting completeness. Returns sales streams, posted finance income and expense categories, service consumables, attributed team-member compensation, a service contribution result, and a tracked operating result. It never labels the result net profit when taxes, rent, external payroll, product cost or unposted expenses cannot be proven complete. Use analytics_get_day_end_report for one day’s till reconciliation and analytics_get_service_profitability for service-level detail.',
+    'Explain how much this location earned during a period without overstating accounting completeness. Returns sales streams, posted finance income and expense categories, service consumables, attributed team-member compensation, a service contribution result, and a tracked operating result. It never labels the result net profit when taxes, rent, external payroll, product cost or unposted expenses cannot be proven complete. Use analytics_get_day_end_report for one day’s till reconciliation and analytics_get_service_profitability for service-level detail.',
   annotations: {
     title: 'Analytics: profit and loss statement',
     ...READ_ONLY,
@@ -1490,7 +1493,7 @@ export const analyticsGetCapacityHeatmapTool = defineTool({
   name: 'analytics_get_capacity_heatmap',
   category: 'Analytics',
   description:
-    '[Analytics] Show when scheduled capacity is overloaded or underused. Buckets scheduled, booked, completed-utilized and idle hours, appointment outcomes, attributable completed revenue and revenue per scheduled hour. Schedule time is always the denominator; appointment and group-event busy intervals are unioned so overlaps count once, and unscheduled time is never called idle. Use hour_of_day for recurring daily patterns, weekday for weekly patterns, or date_hour for a detailed range of at most 31 days.',
+    'Show when scheduled capacity is overloaded or underused. Buckets scheduled, booked, completed-utilized and idle hours, appointment outcomes, attributable completed revenue and revenue per scheduled hour. Schedule time is always the denominator; appointment and group-event busy intervals are unioned so overlaps count once, and unscheduled time is never called idle. Use hour_of_day for recurring daily patterns, weekday for weekly patterns, or date_hour for a detailed range of at most 31 days.',
   annotations: { title: 'Analytics: capacity heatmap', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -1568,7 +1571,7 @@ export const analyticsGetRevenueLeakageTool = defineTool({
   name: 'analytics_get_revenue_leakage',
   category: 'Analytics',
   description:
-    '[Analytics] Identify revenue reductions and opportunity risk without combining unlike concepts. Reports no-show and cancelled appointments, completed visits not marked paid, observed service discounts, and scheduled-but-unbooked capacity. Actual reductions stay separate from estimated opportunity; every category carries its own formula, denominator, source coverage and quality flag. Use analytics_get_appointments_breakdown for simple outcome shares and analytics_get_capacity_heatmap for detailed time buckets.',
+    'Identify revenue reductions and opportunity risk without combining unlike concepts. Reports no-show and cancelled appointments, completed visits not marked paid, observed service discounts, and scheduled-but-unbooked capacity. Actual reductions stay separate from estimated opportunity; every category carries its own formula, denominator, source coverage and quality flag. Use analytics_get_appointments_breakdown for simple outcome shares and analytics_get_capacity_heatmap for detailed time buckets.',
   annotations: { title: 'Analytics: revenue leakage', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -1639,7 +1642,7 @@ export const analyticsGetTeamMemberServiceMatrixTool = defineTool({
   name: 'analytics_get_team_member_service_matrix',
   category: 'Analytics',
   description:
-    '[Analytics] Compare genuine team-member × service performance cells from a report grouped by both dimensions. Returns delivered service lines, cash-or-card revenue, average check, compensation, consumables, contribution result, shares within each team member and within each service, plus honest nulls for unavailable pair metrics. Rankings exclude statistically tiny cells by default while the paged canonical matrix keeps every cell. At most ten team members are evaluated per call.',
+    'Compare genuine team-member × service performance cells from a report grouped by both dimensions. Returns delivered service lines, cash-or-card revenue, average check, compensation, consumables, contribution result, shares within each team member and within each service, plus honest nulls for unavailable pair metrics. Rankings exclude statistically tiny cells by default while the paged canonical matrix keeps every cell. At most ten team members are evaluated per call.',
   annotations: {
     title: 'Analytics: team member service matrix',
     ...READ_ONLY,
@@ -1702,14 +1705,8 @@ export const analyticsGetTeamMemberServiceMatrixTool = defineTool({
     location_id: requiredInteger,
     period: strictPeriodSchema,
     currency: str,
-    rows: { type: 'array' as const, items: matrixRowOutput },
-    page: closedObjectSchema({
-      page: requiredInteger,
-      page_size: requiredInteger,
-      total_count: requiredInteger,
-      returned: requiredInteger,
-      has_more: bool,
-    }),
+    items: { type: 'array' as const, items: matrixRowOutput },
+    pagination: { ...paginationOutput, additionalProperties: false },
     top_cells: { type: 'array' as const, items: matrixRowOutput },
     bottom_cells: {
       type: 'array' as const,
@@ -1760,14 +1757,16 @@ export const analyticsGetTeamMemberServiceMatrixTool = defineTool({
     untrusted_data_note: requiredString,
   }),
   handler: async ({ input, client }) =>
-    decisionAnalytics.getTeamMemberServiceMatrix(client, input),
+    standardizeCollection(
+      await decisionAnalytics.getTeamMemberServiceMatrix(client, input)
+    ),
 });
 
 export const analyticsGetInventoryReorderRisksTool = defineTool({
   name: 'analytics_get_inventory_reorder_risks',
   category: 'Analytics',
   description:
-    '[Analytics] Show products likely to run out, need reordering, move slowly or be overstocked from the authenticated inventory-turnover report. Uses current stock and period sales velocity with bounded lead-time and safety-stock assumptions. Recommendations are analytical guidance only and never create purchase orders or change inventory. Zero sales, negative stock, fractional units and an all-inventories aggregate are handled explicitly; unavailable codes, reservations, costs and last-sale dates stay null with reasons.',
+    'Show products likely to run out, need reordering, move slowly or be overstocked from the authenticated inventory-turnover report. Uses current stock and period sales velocity with bounded lead-time and safety-stock assumptions. Recommendations are analytical guidance only and never create purchase orders or change inventory. Zero sales, negative stock, fractional units and an all-inventories aggregate are handled explicitly; unavailable codes, reservations, costs and last-sale dates stay null with reasons.',
   annotations: { title: 'Analytics: inventory reorder risks', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -1834,15 +1833,16 @@ export const analyticsGetInventoryReorderRisksTool = defineTool({
       lead_time_days: requiredInteger,
       safety_stock_days: requiredInteger,
     }),
-    rows: { type: 'array' as const, items: inventoryRiskRowOutput },
-    page: closedObjectSchema({
-      page: requiredInteger,
-      page_size: requiredInteger,
-      total_count: requiredInteger,
-      returned: requiredInteger,
-      has_more: bool,
-      returned_after_risk_filter: requiredInteger,
-    }),
+    items: { type: 'array' as const, items: inventoryRiskRowOutput },
+    pagination: {
+      ...paginationOutput,
+      properties: {
+        ...paginationOutput.properties,
+        returned_after_risk_filter: requiredInteger,
+      },
+      required: [...paginationOutput.required, 'returned_after_risk_filter'],
+      additionalProperties: false,
+    },
     formulae: closedObjectSchema({
       average_daily_sales: requiredString,
       days_of_cover: requiredString,
@@ -1885,7 +1885,9 @@ export const analyticsGetInventoryReorderRisksTool = defineTool({
     untrusted_data_note: requiredString,
   }),
   handler: async ({ input, client }) =>
-    decisionAnalytics.getInventoryReorderRisks(client, input),
+    standardizeCollection(
+      await decisionAnalytics.getInventoryReorderRisks(client, input)
+    ),
 });
 
 // ========== report builder ==========
@@ -1898,7 +1900,7 @@ export const analyticsListReportTemplatesTool = defineTool({
   name: 'analytics_list_report_templates',
   category: 'Analytics',
   description:
-    '[Analytics] Built-in report templates the location can run, each with the business question it answers, its dataset and whether it is a flat table or a time series. Includes revenue by team member, by service and by client, client retention, occupancy, appointment sources, group event attendance, memberships and gift cards, income and expenses, P&L, and the dynamics templates. Call this first when the owner asks for something analytics_get_overview does not cover, then run the chosen template with analytics_run_report. Needs the Analytics access right and an active subscription.',
+    'Built-in report templates the location can run, each with the business question it answers, its dataset and whether it is a flat table or a time series. Includes revenue by team member, by service and by client, client retention, occupancy, appointment sources, group event attendance, memberships and gift cards, income and expenses, P&L, and the dynamics templates. Call this first when the owner asks for something analytics_get_overview does not cover, then run the chosen template with analytics_run_report. Needs the Analytics access right and an active subscription.',
   annotations: { title: 'Analytics: report templates', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -1931,7 +1933,7 @@ export const analyticsListReportFieldsTool = defineTool({
   name: 'analytics_list_report_fields',
   category: 'Analytics',
   description:
-    '[Analytics] Fields available in one report-builder dataset, as canonical field keys you can pass to analytics_run_report: metrics such as revenue_total, average_check_per_visit, occupancy_percent, new_clients_count, products_margin; dimensions such as team_member_name, service_or_product, client_name, account; and the day, week, month and year granularities. The four datasets are sales (services and products sold, visits, clients, occupancy), financial_transactions (income and expenses, cash versus non-cash), loyalty (memberships and gift cards) and team_member_schedules (scheduled, booked and idle hours). Returns the curated set by default; include_derived=true adds every mechanical sum, average, minimum, maximum and count variant.',
+    'Fields available in one report-builder dataset, as canonical field keys you can pass to analytics_run_report: metrics such as revenue_total, average_check_per_visit, occupancy_percent, new_clients_count, products_margin; dimensions such as team_member_name, service_or_product, client_name, account; and the day, week, month and year granularities. The four datasets are sales (services and products sold, visits, clients, occupancy), financial_transactions (income and expenses, cash versus non-cash), loyalty (memberships and gift cards) and team_member_schedules (scheduled, booked and idle hours). Returns the curated set by default; include_derived=true adds every mechanical sum, average, minimum, maximum and count variant.',
   annotations: { title: 'Analytics: report fields', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -2003,7 +2005,7 @@ const reportTableOutput = objectSchema({
 export const analyticsRunReportTool = defineTool({
   name: 'analytics_run_report',
   category: 'Analytics',
-  description: `[Analytics] Run a report and get a table back: either a built-in template by template_id, or an ad-hoc report built from a dataset, the fields you want and what to group them by. This is how you answer "revenue by team member last month", "top services by revenue", "sales per client", "income and expenses by month", "P&L for the quarter", "occupancy hours per stylist". Get template_id from analytics_list_report_templates and field keys from analytics_list_report_fields. At most ${REPORT_ROW_CAP} rows come back inline; a longer table is attached as a CSV resource link that stays readable for 30 minutes. The tool reuses a ready "[Altegio Assistant] …" report when one exists and never lets a failed duplicate shadow it. Failed or obsolete assistant reports can be removed with analytics_delete_assistant_report. Period overrides require the location's new report-data API; on the legacy API an existing report can be read only for its stored period. Needs the Analytics access right and an active subscription.`,
+  description: `Run a report and get a table back: either a built-in template by template_id, or an ad-hoc report built from a dataset, the fields you want and what to group them by. This is how you answer "revenue by team member last month", "top services by revenue", "sales per client", "income and expenses by month", "P&L for the quarter", "occupancy hours per stylist". Get template_id from analytics_list_report_templates and field keys from analytics_list_report_fields. At most ${REPORT_ROW_CAP} rows come back inline; a longer table is attached as a CSV resource link that stays readable for 30 minutes. The tool reuses a ready "[Altegio Assistant] …" report when one exists and never lets a failed duplicate shadow it. Failed or obsolete assistant reports can be removed with analytics_delete_assistant_report. Period overrides require the location's new report-data API; on the legacy API an existing report can be read only for its stored period. Needs the Analytics access right and an active subscription.`,
   annotations: {
     title: 'Analytics: run a report',
     // Not marked read-only on purpose: running a template requires a stored
@@ -2067,7 +2069,7 @@ export const analyticsListSavedReportsTool = defineTool({
   name: 'analytics_list_saved_reports',
   category: 'Analytics',
   description:
-    '[Analytics] Reports already saved in this location’s report builder, whether the owner built them or this assistant did. Use it to re-run something the owner recognises by name — "run my weekly sales report" — instead of rebuilding it, then pass its report_id to analytics_run_saved_report with the period you want. Reports whose name starts with "[Altegio Assistant]" were created by this assistant.',
+    'Reports already saved in this location’s report builder, whether the owner built them or this assistant did. Use it to re-run something the owner recognises by name — "run my weekly sales report" — instead of rebuilding it, then pass its report_id to analytics_run_saved_report with the period you want. Reports whose name starts with "[Altegio Assistant]" were created by this assistant.',
   annotations: { title: 'Analytics: saved reports', ...READ_ONLY },
   input: z.object({ location_id: locationId }),
   outputSchema: objectSchema({
@@ -2093,7 +2095,7 @@ export const analyticsDeleteAssistantReportTool = defineTool({
   name: 'analytics_delete_assistant_report',
   category: 'Analytics',
   description:
-    '[Analytics] Permanently delete one report created by this assistant. The report must have a name beginning with "[Altegio Assistant]"; reports created or named by the owner are refused. Get the exact report_id from analytics_list_saved_reports. Use this to remove failed, obsolete or duplicate assistant artifacts without touching reports the location’s own users created.',
+    'Permanently delete one report created by this assistant. The report must have a name beginning with "[Altegio Assistant]"; reports created or named by the owner are refused. Get the exact report_id from analytics_list_saved_reports. Use this to remove failed, obsolete or duplicate assistant artifacts without touching reports the location’s own users created.',
   annotations: {
     title: 'Analytics: delete an assistant report',
     readOnlyHint: false,
@@ -2130,7 +2132,7 @@ export const analyticsDeleteAssistantReportTool = defineTool({
 export const analyticsRunSavedReportTool = defineTool({
   name: 'analytics_run_saved_report',
   category: 'Analytics',
-  description: `[Analytics] Run a report that already exists in the location’s report builder and get the table back. Get report_id from analytics_list_saved_reports. Locations with the new report-data API can override the period per run without changing the report; locations on the legacy API can safely read only the report’s stored period and reject a different range instead of returning mislabeled data. At most ${REPORT_ROW_CAP} rows come back inline; a longer table is attached as a CSV resource link readable for 30 minutes. Needs the Analytics access right and an active subscription.`,
+  description: `Run a report that already exists in the location’s report builder and get the table back. Get report_id from analytics_list_saved_reports. Locations with the new report-data API can override the period per run without changing the report; locations on the legacy API can safely read only the report’s stored period and reject a different range instead of returning mislabeled data. At most ${REPORT_ROW_CAP} rows come back inline; a longer table is attached as a CSV resource link readable for 30 minutes. Needs the Analytics access right and an active subscription.`,
   annotations: { title: 'Analytics: run a saved report', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -2188,12 +2190,12 @@ export const analyticsGetTeamMemberCapacityTool = defineTool({
   name: 'analytics_get_team_member_capacity',
   category: 'Analytics',
   description:
-    '[Analytics] Working days and hours, booked hours, idle hours, occupancy percentage and upcoming appointments by team member, with source totals. Use for capacity planning; analytics_get_team_member_occupancy gives daily occupancy. Temporary read-only report pending V3. Requires team occupancy report permission. Narrow the period if the result is too large.',
+    'Working days and hours, booked hours, idle hours, occupancy percentage and upcoming appointments by team member, with source totals. Use for capacity planning; analytics_get_team_member_occupancy gives daily occupancy. Temporary read-only report pending V3. Requires team occupancy report permission. Narrow the period if the result is too large.',
   annotations: { title: 'Analytics: team-member capacity', ...READ_ONLY },
   input: z.object({ location_id: locationId, ...periodFields }),
   outputSchema: objectSchema({
     ...nextBaseOutput,
-    rows: {
+    items: {
       type: 'array' as const,
       items: objectSchema({
         team_member_id: int,
@@ -2205,13 +2207,15 @@ export const analyticsGetTeamMemberCapacityTool = defineTool({
     totals: objectSchema(capacityMetricsOutput),
   }),
   handler: async ({ input, client }) =>
-    legacyAnalytics.getTeamMemberCapacity(client, input),
+    standardizeCollection(
+      await legacyAnalytics.getTeamMemberCapacity(client, input)
+    ),
 });
 export const analyticsGetClientReactivationCandidatesTool = defineTool({
   name: 'analytics_get_client_reactivation_candidates',
   category: 'Analytics',
   description:
-    '[Analytics] Build a universal client-reactivation audience from the location client base. A candidate has prior arrived visits on or before an inclusive last-visit cutoff and no arrived visit after it. Qualify by minimum historical visits and optional lifetime spend, then narrow with the same canonical client filters as clients_search (tags, importance, age, birthday, memberships, gift cards, balances, app use and consent). Returns stable client ids, first/last visit dates, lifetime visit count and spend. Results are ordered by client_id ascending for deterministic bounded pagination. Contacts are withheld unless include_contacts=true. Needs access to clients in this location.',
+    'Build a universal client-reactivation audience from the location client base. A candidate has prior arrived visits on or before an inclusive last-visit cutoff and no arrived visit after it. Qualify by minimum historical visits and optional lifetime spend, then narrow with the same canonical client filters as clients_search (tags, importance, age, birthday, memberships, gift cards, balances, app use and consent). Returns stable client ids, first/last visit dates, lifetime visit count and spend. Results are ordered by client_id ascending for deterministic bounded pagination. Contacts are withheld unless include_contacts=true. Needs access to clients in this location.',
   annotations: {
     title: 'Analytics: client reactivation candidates',
     ...READ_ONLY,
@@ -2267,15 +2271,10 @@ export const analyticsGetClientReactivationCandidatesTool = defineTool({
       field: { type: 'string' as const },
       direction: { type: 'string' as const },
     }),
-    total_count: { type: 'integer' as const },
-    page: { type: 'integer' as const },
-    page_size: { type: 'integer' as const },
-    returned: { type: 'integer' as const },
-    has_more: { type: 'boolean' as const },
-    next_page: { type: ['integer', 'null'] as const },
+    pagination: paginationOutput,
     contacts_included: { type: 'boolean' as const },
     untrusted_data_note: { type: 'string' as const },
-    candidates: {
+    items: {
       type: 'array' as const,
       items: objectSchema({
         client_id: { type: 'integer' as const },
@@ -2301,7 +2300,7 @@ export const analyticsGetGroupEventPerformanceTool = defineTool({
   name: 'analytics_get_group_event_performance',
   category: 'Analytics',
   description:
-    '[Analytics] Group events with capacity, booked participants, attended and fully paid clients, appointment value and aggregate fill, attendance, payment and average occupancy metrics. Appointment value is not collected revenue. Source dates retain their display format; service ids are unavailable. Team-member ids are matched only when name and position identify one current member; stale/deleted or ambiguous identities remain null with an explicit status. Filter by team member, service, service category, label and active/deleted status; deleted does not imply cancelled. Requires group-event dashboard access. Temporary read-only report pending V3, paginated at source.',
+    'Group events with capacity, booked participants, attended and fully paid clients, appointment value and aggregate fill, attendance, payment and average occupancy metrics. Appointment value is not collected revenue. Source dates retain their display format; service ids are unavailable. Team-member ids are matched only when name and position identify one current member; stale/deleted or ambiguous identities remain null with an explicit status. Filter by team member, service, service category, label and active/deleted status; deleted does not imply cancelled. Requires group-event dashboard access. Temporary read-only report pending V3, paginated at source.',
   annotations: { title: 'Analytics: group-event performance', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -2321,7 +2320,7 @@ export const analyticsGetGroupEventPerformanceTool = defineTool({
   outputSchema: objectSchema({
     ...nextBaseOutput,
     currency: str,
-    page: legacyPageOutput,
+    pagination: paginationOutput,
     metrics: {
       anyOf: [
         objectSchema({
@@ -2333,7 +2332,7 @@ export const analyticsGetGroupEventPerformanceTool = defineTool({
         { type: 'null' as const },
       ],
     },
-    rows: {
+    items: {
       type: 'array' as const,
       items: objectSchema({
         group_event_id: int,
@@ -2360,7 +2359,9 @@ export const analyticsGetGroupEventPerformanceTool = defineTool({
     },
   }),
   handler: async ({ input, client }) =>
-    legacyAnalytics.getGroupEventPerformance(client, input),
+    standardizeCollection(
+      await legacyAnalytics.getGroupEventPerformance(client, input)
+    ),
 });
 const productAmountsOutput = {
   quantity: num,
@@ -2373,7 +2374,7 @@ export const analyticsGetProductSalesTool = defineTool({
   name: 'analytics_get_product_sales',
   category: 'Analytics',
   description:
-    '[Analytics] Product sales by product or product category with quantity, SKU, barcode, unit, total cost, total markup, markup percentage and revenue including client-account payments. Total cost is for the sold quantity, not unit cost; missing cost permission produces nulls. Category costs are always withheld because the source category report does not enforce that permission. Category rows include hierarchy and must not be summed; use totals. Product pages come from source; category pagination is local. Requires inventory sales-report access, not export access. Temporary read-only report pending V3.',
+    'Product sales by product or product category with quantity, SKU, barcode, unit, total cost, total markup, markup percentage and revenue including client-account payments. Total cost is for the sold quantity, not unit cost; missing cost permission produces nulls. Category costs are always withheld because the source category report does not enforce that permission. Category rows include hierarchy and must not be summed; use totals. Product pages come from source; category pagination is local. Requires inventory sales-report access, not export access. Temporary read-only report pending V3.',
   annotations: { title: 'Analytics: product sales', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -2404,8 +2405,8 @@ export const analyticsGetProductSalesTool = defineTool({
       type: 'string' as const,
       enum: ['upstream', 'local'],
     },
-    page: legacyPageOutput,
-    rows: {
+    pagination: paginationOutput,
+    items: {
       type: 'array' as const,
       items: objectSchema({
         product_id: int,
@@ -2420,13 +2421,13 @@ export const analyticsGetProductSalesTool = defineTool({
     totals: objectSchema(productAmountsOutput),
   }),
   handler: async ({ input, client }) =>
-    legacyAnalytics.getProductSales(client, input),
+    standardizeCollection(await legacyAnalytics.getProductSales(client, input)),
 });
 export const analyticsGetCashFlowBreakdownTool = defineTool({
   name: 'analytics_get_cash_flow_breakdown',
   category: 'Analytics',
   description:
-    '[Analytics] Period cash movement by payment item, day, cash-account type and returned account columns, with signed inflow/outflow and net movement totals. Net movement is not an opening or closing account balance. Amount arrays align with columns; account and type views overlap and must not be summed. Source account ids are unavailable. Supports account, team-member, supplier, payment-item, service and product filters. Requires finance period-report access, not export access. Temporary read-only report pending V3; narrow the period or filters for large tables.',
+    'Period cash movement by payment item, day, cash-account type and returned account columns, with signed inflow/outflow and net movement totals. Net movement is not an opening or closing account balance. Amount arrays align with columns; account and type views overlap and must not be summed. Source account ids are unavailable. Supports account, team-member, supplier, payment-item, service and product filters. Requires finance period-report access, not export access. Temporary read-only report pending V3; narrow the period or filters for large tables.',
   annotations: { title: 'Analytics: cash-flow breakdown', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -2506,7 +2507,7 @@ export const analyticsGetCashFlowBreakdownTool = defineTool({
         cash_account_title: str,
       }),
     },
-    rows: {
+    items: {
       type: 'array' as const,
       items: objectSchema({
         payment_item_id: int,
@@ -2523,5 +2524,7 @@ export const analyticsGetCashFlowBreakdownTool = defineTool({
     totals: objectSchema({ inflow: num, outflow: num, net_movement: num }),
   }),
   handler: async ({ input, client }) =>
-    legacyAnalytics.getCashFlowBreakdown(client, input),
+    standardizeCollection(
+      await legacyAnalytics.getCashFlowBreakdown(client, input)
+    ),
 });

@@ -28,11 +28,33 @@ import {
   asRecords,
   asText,
 } from '../../api/v1/wire-values.js';
+import {
+  pageArg,
+  pageMetadata,
+  pageSizeArg,
+  paginationOutput,
+  type PageInput,
+} from '../pagination.js';
 
 /** Memberships inspected per call; each costs up to three reads. */
 const MEMBERSHIP_LIMIT = 20;
-/** Comments or files projected per call. */
+/** Largest page of comments or files; the source returns the whole list. */
 const LIST_LIMIT = 50;
+
+const listPageInput = {
+  page: pageArg,
+  page_size: pageSizeArg(LIST_LIMIT, LIST_LIMIT),
+};
+
+/** One page of an unpaged source list, in source order. */
+function pageOf<T>(entries: readonly T[], input: PageInput) {
+  const start = (input.page - 1) * input.page_size;
+  const items = entries.slice(start, start + input.page_size);
+  return {
+    items,
+    pagination: pageMetadata(input, items.length, entries.length),
+  };
+}
 /** V1 inventory transaction type of a sale. */
 const SALE_TRANSACTION_TYPE = 1;
 
@@ -41,7 +63,7 @@ const locationId = z
   .int()
   .positive()
   .describe(
-    'Location whose client card to work with. Call list_locations when the id is unknown.'
+    'Location whose client card to work with. Call locations_list when the id is unknown.'
   );
 const clientId = z
   .number()
@@ -64,10 +86,8 @@ const evidenceGaps = ['forbidden', 'not_found', 'unavailable'];
 const fileListOutput = objectSchema({
   location_id: int,
   client_id: int,
-  total_count: int,
-  returned: int,
-  complete: { type: 'boolean' },
-  files: {
+  pagination: paginationOutput,
+  items: {
     type: 'array',
     items: objectSchema({
       id: nullableInt,
@@ -184,7 +204,7 @@ async function saleEvidence(
 export const clientsGetMembershipPurchasesTool = defineTool({
   name: 'clients_get_membership_purchases',
   category: 'Clients',
-  description: `[Clients] Inspect up to ${MEMBERSHIP_LIMIT} memberships of one client. Memberships are found by the client’s current phone, and each is verified against the client-specific membership history before it is reported. Where permitted, follows the linked sale transaction and sale document. A membership creation date is not a sale date, the current membership type price is not a purchase price, and the recorded unit price is not a proven paid amount; paid_amount stays null because a sale document does not attribute payment to one item. Returns explicit evidence status per membership and may miss memberships sold under an earlier phone.`,
+  description: `Inspect up to ${MEMBERSHIP_LIMIT} memberships of one client. Memberships are found by the client’s current phone, and each is verified against the client-specific membership history before it is reported. Where permitted, follows the linked sale transaction and sale document. A membership creation date is not a sale date, the current membership type price is not a purchase price, and the recorded unit price is not a proven paid amount; paid_amount stays null because a sale document does not attribute payment to one item. Returns explicit evidence status per membership and may miss memberships sold under an earlier phone.`,
   annotations: { title: 'Client membership purchases', ...READ_ONLY },
   input: z.object({ location_id: locationId, client_id: clientId }),
   outputSchema: objectSchema({
@@ -321,16 +341,18 @@ export const clientsGetMembershipPurchasesTool = defineTool({
 export const clientsListCommentsTool = defineTool({
   name: 'clients_list_comments',
   category: 'Clients',
-  description: `[Clients] List up to ${LIST_LIMIT} comments on a client card, including the history entries that file uploads create. Comment text is written by clients or team members; a URL in it is only text. Requires client and comment-list rights.`,
+  description: `List the comments on a client card, ${LIST_LIMIT} per page, including the history entries that file uploads create. Comment text is written by clients or team members; a URL in it is only text. Requires client and comment-list rights.`,
   annotations: { title: 'List client comments', ...READ_ONLY },
-  input: z.object({ location_id: locationId, client_id: clientId }),
+  input: z.object({
+    location_id: locationId,
+    client_id: clientId,
+    ...listPageInput,
+  }),
   outputSchema: objectSchema({
     location_id: int,
     client_id: int,
-    total_count: int,
-    returned: int,
-    complete: { type: 'boolean' },
-    comments: {
+    pagination: paginationOutput,
+    items: {
       type: 'array',
       items: objectSchema({
         id: nullableInt,
@@ -350,7 +372,8 @@ export const clientsListCommentsTool = defineTool({
         )
       ).data
     );
-    const comments = all.slice(0, LIST_LIMIT).map((entry) => ({
+    const page = pageOf(all, input);
+    const comments = page.items.map((entry) => ({
       id: asInteger(entry.id),
       type: entry.type === 'default' ? 'text' : asText(entry.type),
       created_at: asText(entry.create_date),
@@ -359,7 +382,7 @@ export const clientsListCommentsTool = defineTool({
     }));
     return {
       text: withUntrustedBlock(
-        `${all.length} comment(s) on client ${input.client_id}; returned ${comments.length}.`,
+        `${all.length} comment(s) on client ${input.client_id}; page ${input.page} holds ${comments.length}.`,
         comments.map((c) => ({
           label: `comment ${c.id ?? '?'} (${c.created_at ?? 'no date'})`,
           value: c.text,
@@ -368,10 +391,8 @@ export const clientsListCommentsTool = defineTool({
       structuredContent: sanitizeUntrustedDeep({
         location_id: input.location_id,
         client_id: input.client_id,
-        total_count: all.length,
-        returned: comments.length,
-        complete: all.length <= LIST_LIMIT,
-        comments,
+        items: comments,
+        pagination: page.pagination,
       }),
     };
   },
@@ -383,7 +404,7 @@ export const clientsAddCommentTool = defineTool({
   name: 'clients_add_comment',
   category: 'Clients',
   description:
-    '[Clients] Add one text comment to a client card. A form URL stays text; use clients_upload_file to attach a completed file.',
+    'Add one text comment to a client card. A form URL stays text; use clients_upload_file to attach a completed file.',
   annotations: {
     title: 'Add client comment',
     readOnlyHint: false,
@@ -450,11 +471,16 @@ function clientFileDownloadUrl(value: unknown): string | null {
 
 /** One file-list page as the model sees it, from list and upload alike. */
 function fileListResult(
-  input: { location_id: number; client_id: number },
+  input: { location_id: number; client_id: number } & Partial<PageInput>,
   entries: Record<string, unknown>[],
   lead: string
 ) {
-  const files = entries.slice(0, LIST_LIMIT).map((entry) => ({
+  const pageInput = {
+    page: input.page ?? 1,
+    page_size: input.page_size ?? LIST_LIMIT,
+  };
+  const page = pageOf(entries, pageInput);
+  const files = page.items.map((entry) => ({
     id: asInteger(entry.id),
     name: asText(entry.name),
     created_at: asText(entry.date_create),
@@ -463,7 +489,7 @@ function fileListResult(
   }));
   return {
     text: withUntrustedBlock(
-      `${lead} Client ${input.client_id} has ${entries.length} file(s); returned ${files.length}.`,
+      `${lead} Client ${input.client_id} has ${entries.length} file(s); page ${pageInput.page} holds ${files.length}.`,
       files.flatMap((f) => [
         { label: `file ${f.id ?? '?'}`, value: f.name },
         { label: `file ${f.id ?? '?'} link`, value: f.download_url },
@@ -472,10 +498,8 @@ function fileListResult(
     structuredContent: sanitizeUntrustedDeep({
       location_id: input.location_id,
       client_id: input.client_id,
-      total_count: entries.length,
-      returned: files.length,
-      complete: entries.length <= LIST_LIMIT,
-      files,
+      items: files,
+      pagination: page.pagination,
     }),
   };
 }
@@ -483,9 +507,13 @@ function fileListResult(
 export const clientsListFilesTool = defineTool({
   name: 'clients_list_files',
   category: 'Clients',
-  description: `[Clients] List up to ${LIST_LIMIT} files attached to a client card, with download links. A comment containing a form URL is not an attached file. Requires client and file-list rights.`,
+  description: `List the files attached to a client card, ${LIST_LIMIT} per page, with download links. A comment containing a form URL is not an attached file. Requires client and file-list rights.`,
   annotations: { title: 'List client files', ...READ_ONLY },
-  input: z.object({ location_id: locationId, client_id: clientId }),
+  input: z.object({
+    location_id: locationId,
+    client_id: clientId,
+    ...listPageInput,
+  }),
   outputSchema: fileListOutput,
   handler: async ({ input, client }) =>
     fileListResult(
@@ -506,7 +534,7 @@ export const clientsUploadFileTool = defineTool({
   name: 'clients_upload_file',
   category: 'Clients',
   description:
-    '[Clients] Attach one completed file to a client card. Supply the actual file bytes as raw base64, not a URL or data URI. Allowed extensions: jpeg, jpg, png, gif, doc, docx, pdf, xls, xlsx, txt; nonempty file strictly below 12 MiB. Requires client and file-upload rights. Returns the client’s file list after the upload; the upload also adds a file entry to the card’s comments.',
+    'Attach one completed file to a client card. Supply the actual file bytes as raw base64, not a URL or data URI. Allowed extensions: jpeg, jpg, png, gif, doc, docx, pdf, xls, xlsx, txt; nonempty file strictly below 12 MiB. Requires client and file-upload rights. Returns the client’s file list after the upload; the upload also adds a file entry to the card’s comments.',
   annotations: {
     title: 'Upload client file',
     readOnlyHint: false,

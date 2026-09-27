@@ -507,9 +507,9 @@ describe('Spec Compliance', () => {
       const executor = new Set(executorTools);
       for (const tool of unmappedTools) {
         if (executor.has(tool)) continue;
-        expect(
-          tool === 'altegio_logout' || tool.startsWith('onboarding_')
-        ).toBe(true);
+        expect(tool === 'auth_logout' || tool.startsWith('onboarding_')).toBe(
+          true
+        );
       }
     });
 
@@ -533,7 +533,7 @@ describe('Spec Compliance', () => {
     for (const [toolName, mapping] of allApiMappings()) {
       it(`${toolName} → client uses ${mapping.method.toUpperCase()}`, () => {
         // This is a static check — validates our mapping is internally consistent
-        if (toolName.startsWith('get_') || toolName === 'list_locations') {
+        if (toolName.startsWith('get_') || toolName === 'locations_list') {
           expect(mapping.method).toBe('get');
         }
         if (toolName.startsWith('create_')) {

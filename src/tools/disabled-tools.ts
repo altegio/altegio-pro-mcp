@@ -48,8 +48,8 @@ export function isToolDisabled(name: string): boolean {
 
 /**
  * The same closure applied to the API catalog: the report-builder routes are
- * hidden from `altegio_search_operations`, `altegio_describe_operation` and
- * `altegio_call_operation`, so a session cannot walk back into the builder
+ * hidden from `api_search_operations`, `api_describe_operation` and
+ * `api_call_operation`, so a session cannot walk back into the builder
  * through the universal executor. The routes stay documented in
  * `catalog/extended/analytics.yaml` — this hides them, it does not forget them.
  */

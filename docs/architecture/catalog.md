@@ -31,17 +31,17 @@ See [ADR-001](2026-09-07-mcp-platform-architecture.md) D2 (tool tiers), D4
 The build reads both specs, resolves `$ref`-ed path items and local/relative
 schema refs, and writes one entry per operation:
 
-| Field | Notes |
-| --- | --- |
-| `operationId` | Spec-native identifier; unique across both specs (the build fails on a clash). |
-| `method`, `path` | The real HTTP method and path, with the spec's own parameter spelling. |
-| `displayPath` | The same path with legacy segments renamed to canonical ones (`{record_id}` → `{appointment_id}`). What the model is shown; `path` is what gets called. |
-| `summary`, `description`, `tags`, `domain` | `domain` comes from the OpenAPI tag, or from the overlay when it overrides it. |
-| `deprecated`, `security` | Auth requirement and scheme names. |
-| `parameters` | Name, `in`, required, one-line description, shallow schema. Transport plumbing (`Accept`, `Authorization`, `Content-Type`, `User-Token`) is dropped by name — several V1 path files declare those as *query* parameters, two of them misspelled. |
-| `requestBody`, `response` | Dereferenced to a bounded depth (see below). The V1 `{success, data, meta}` envelope is unwrapped, so the schema describes the payload a caller actually receives. |
-| `source`, `status` | `v1` is live; `v3` is the preview contract, carrying `x-altegio-status`. |
-| `curation` | Whatever the overlay says about this operation. |
+| Field                                      | Notes                                                                                                                                                                                                                                            |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `operationId`                              | Spec-native identifier; unique across both specs (the build fails on a clash).                                                                                                                                                                   |
+| `method`, `path`                           | The real HTTP method and path, with the spec's own parameter spelling.                                                                                                                                                                           |
+| `displayPath`                              | The same path with legacy segments renamed to canonical ones (`{record_id}` → `{appointment_id}`). What the model is shown; `path` is what gets called.                                                                                          |
+| `summary`, `description`, `tags`, `domain` | `domain` comes from the OpenAPI tag, or from the overlay when it overrides it.                                                                                                                                                                   |
+| `deprecated`, `security`                   | Auth requirement and scheme names.                                                                                                                                                                                                               |
+| `parameters`                               | Name, `in`, required, one-line description, shallow schema. Transport plumbing (`Accept`, `Authorization`, `Content-Type`, `User-Token`) is dropped by name — several V1 path files declare those as _query_ parameters, two of them misspelled. |
+| `requestBody`, `response`                  | Dereferenced to a bounded depth (see below). The V1 `{success, data, meta}` envelope is unwrapped, so the schema describes the payload a caller actually receives.                                                                               |
+| `source`, `status`                         | `v1` is live; `v3` is the preview contract, carrying `x-altegio-status`.                                                                                                                                                                         |
+| `curation`                                 | Whatever the overlay says about this operation.                                                                                                                                                                                                  |
 
 ### Bounded depth (D8)
 
@@ -49,7 +49,7 @@ Schemas are dereferenced to `MAX_SCHEMA_DEPTH` levels. Anything deeper collapses
 to `{"x-truncated": true}`; a reference cycle collapses to `{"x-circular": …}`.
 A schema that still serializes to more than `MAX_SCHEMA_BYTES` is rebuilt one
 level shallower until it fits, and the level it settled on is recorded as
-`x-depth-limited`. This is what keeps an `altegio_describe_operation` result
+`x-depth-limited`. This is what keeps an `api_describe_operation` result
 inside the per-result token budget.
 
 A `properties` map is not itself a depth level — otherwise truncation would erase
@@ -84,7 +84,7 @@ what makes it work inside a git worktree.
 
 The spec repository is private and CI does not clone it. When it is absent both
 commands print a notice and exit 0 — `catalog:check` is **skipped with a notice
-in CI**, and only fails when the spec *is* present and the committed catalog is
+in CI**, and only fails when the spec _is_ present and the committed catalog is
 stale. Practically that means the drift gate runs on a developer machine (and in
 the `scripts/catalog/__tests__/build.test.ts` suite, which skips the same way);
 CI protects against nothing worse than a missed rebuild, which the reviewer sees
@@ -140,7 +140,7 @@ JSON-Schema engine. The catalog stores path and query parameter schemas one leve
 deep, so every value the executor validates is a scalar or a list of scalars;
 adding `ajv` + `ajv-formats` as runtime dependencies to a public server in order
 to check `type: integer` is not a trade worth making. When the executor write
-allowlist lands, request *bodies* will need real schema validation — that is the
+allowlist lands, request _bodies_ will need real schema validation — that is the
 point to reconsider, and the decision should be revisited then, not now.
 
 ## How generated packs will consume it

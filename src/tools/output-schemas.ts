@@ -3,6 +3,7 @@
  * Each schema describes the shape of `structuredContent` returned by a tool.
  */
 import { AGENT_ONBOARDING_PHASES } from '../types/onboarding.types.js';
+import { collectionSchema } from './pagination.js';
 
 // Reusable property definitions
 const idProp = { type: 'number' as const };
@@ -18,26 +19,14 @@ function listSchema(
   itemRequired?: string[],
   extraProps?: Record<string, object>
 ) {
-  return {
-    type: 'object' as const,
-    properties: {
-      items: {
-        type: 'array' as const,
-        items: {
-          type: 'object' as const,
-          properties: itemProps,
-          ...(itemRequired ? { required: itemRequired } : {}),
-        },
-      },
-      count: { type: 'integer', minimum: 0 },
-      page: { type: 'integer', minimum: 1 },
-      page_size: { type: 'integer', minimum: 1, maximum: 300 },
-      next_page: { type: ['integer', 'null'], minimum: 1 },
-      total: { type: 'integer', minimum: 0 },
-      ...(extraProps ?? {}),
+  return collectionSchema(
+    {
+      type: 'object' as const,
+      properties: itemProps,
+      ...(itemRequired ? { required: itemRequired } : {}),
     },
-    required: ['items', 'count'],
-  };
+    extraProps
+  );
 }
 
 function entitySchema(props: Record<string, object>, required?: string[]) {
@@ -147,8 +136,8 @@ export const staffListOutput = listSchema(
     rating: numProp,
     position_id: numProp,
     position_title: strProp,
-    hidden: numProp,
-    fired: numProp,
+    hidden_from_online_booking: nullableBoolProp,
+    dismissed: nullableBoolProp,
   },
   ['id', 'name']
 );
@@ -198,15 +187,16 @@ const slotsProp = {
   },
 };
 
+const scheduleEntryProps = {
+  date: strProp,
+  slots: slotsProp,
+  is_working: boolProp,
+};
+
 export const scheduleOutput = listSchema(
-  {
-    date: strProp,
-    time: strProp,
-    session_length: numProp,
-    slots: slotsProp,
-    is_working: boolProp,
-  },
-  ['date']
+  scheduleEntryProps,
+  ['date', 'slots', 'is_working'],
+  { team_member_id: idProp, date_from: strProp, date_to: strProp }
 );
 
 // ========== Single entity (CREATE/UPDATE) ==========
@@ -246,19 +236,26 @@ export const positionEntityOutput = entitySchema(
   ['id', 'title']
 );
 
-export const scheduleEntityOutput = listSchema(
+export const scheduleWriteOutput = entitySchema(
   {
-    date: strProp,
-    time: strProp,
-    session_length: numProp,
+    team_member_id: idProp,
+    dates: { type: 'array' as const, items: strProp },
     slots: slotsProp,
-    is_working: boolProp,
+    entries: {
+      type: 'array' as const,
+      items: entitySchema(scheduleEntryProps, ['date', 'slots', 'is_working']),
+    },
   },
-  ['date']
+  ['team_member_id', 'dates', 'slots', 'entries']
 );
 
 export const bookingEntityOutput = entitySchema(
-  { id: idProp, team_member_id: numProp, datetime: strProp, date: strProp },
+  {
+    id: idProp,
+    team_member_id: nullableNumProp,
+    datetime: nullableStrProp,
+    date: nullableStrProp,
+  },
   ['id']
 );
 

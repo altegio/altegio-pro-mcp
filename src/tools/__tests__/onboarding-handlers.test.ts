@@ -113,25 +113,25 @@ describe('Onboarding Handlers', () => {
 
       const result = await handlers.addStaffBatch({
         location_id: 123,
-        staff_data: [
+        team_members: [
           {
             name: 'Alice',
             specialization: 'Hairdresser',
-            is_paid_staff: true,
-            has_timetable_access: true,
+            has_paid_seat: true,
+            has_schedule_access: true,
           },
           {
             name: 'Bob',
             specialization: 'Receptionist',
-            is_paid_staff: false,
-            has_timetable_access: false,
+            has_paid_seat: false,
+            has_schedule_access: false,
           },
         ],
       });
 
       const text = result.content[0]?.text;
-      expect(text).toContain('2 staff members created');
-      expect(text).toContain('1 on a paid staff seat, 1 in the work schedule');
+      expect(text).toContain('2 team members created');
+      expect(text).toContain('1 on a paid seat, 1 in the work schedule');
       expect(mockClient.createStaff).toHaveBeenNthCalledWith(
         1,
         123,
@@ -160,14 +160,14 @@ describe('Onboarding Handlers', () => {
         .mockResolvedValue({ id: 1, name: 'Alice' });
 
       const csv =
-        'name,specialization,is_paid_staff,has_timetable_access\nAlice,Hairdresser,yes,YES';
+        'name,specialization,has_paid_seat,has_schedule_access\nAlice,Hairdresser,yes,YES';
 
       const result = await handlers.addStaffBatch({
         location_id: 123,
-        staff_data: csv,
+        team_members: csv,
       });
 
-      expect(result.content[0]?.text).toContain('1 staff member');
+      expect(result.content[0]?.text).toContain('1 team members created');
       expect(mockClient.createStaff).toHaveBeenCalledWith(
         123,
         expect.objectContaining({
@@ -193,7 +193,7 @@ describe('Onboarding Handlers', () => {
 
         await handlers.addStaffBatch({
           location_id: 123,
-          staff_data: `name,is_paid_staff,has_timetable_access\nAlice,${paidCell},${accessCell}`,
+          team_members: `name,has_paid_seat,has_schedule_access\nAlice,${paidCell},${accessCell}`,
         });
 
         expect(mockClient.createStaff).toHaveBeenCalledWith(
@@ -212,9 +212,9 @@ describe('Onboarding Handlers', () => {
 
       const result = await handlers.addStaffBatch({
         location_id: 123,
-        staff_data: [
-          { name: 'Alice', is_paid_staff: true, has_timetable_access: true },
-          { name: 'Bob', is_paid_staff: true },
+        team_members: [
+          { name: 'Alice', has_paid_seat: true, has_schedule_access: true },
+          { name: 'Bob', has_paid_seat: true },
           { name: 'Carol' },
         ],
       });
@@ -223,8 +223,8 @@ describe('Onboarding Handlers', () => {
       const text = result.content[0]?.text ?? '';
       expect(text).toContain('Refused: nothing was created');
       expect(text).toContain('2 of 3 team members');
-      expect(text).toContain('row 2 (has_timetable_access)');
-      expect(text).toContain('row 3 (is_paid_staff, has_timetable_access)');
+      expect(text).toContain('row 2 (has_schedule_access)');
+      expect(text).toContain('row 3 (has_paid_seat, has_schedule_access)');
       expect(text).toContain('Ask the location owner');
       expect(text).toContain('never choose for them');
       // Names come from the owner's file and are not echoed.
@@ -241,11 +241,11 @@ describe('Onboarding Handlers', () => {
 
       const result = await handlers.addStaffBatch({
         location_id: 123,
-        staff_data: 'name,is_paid_staff,has_timetable_access\nAlice,,no',
+        team_members: 'name,has_paid_seat,has_schedule_access\nAlice,,no',
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0]?.text).toContain('row 1 (is_paid_staff)');
+      expect(result.content[0]?.text).toContain('row 1 (has_paid_seat)');
       expect(mockClient.createStaff).not.toHaveBeenCalled();
     });
 
@@ -255,11 +255,11 @@ describe('Onboarding Handlers', () => {
 
       const result = await handlers.addStaffBatch({
         location_id: 123,
-        staff_data: 'name,is_paid_staff,has_timetable_access\nAlice,maybe,yes',
+        team_members: 'name,has_paid_seat,has_schedule_access\nAlice,maybe,yes',
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0]?.text).toContain('is_paid_staff');
+      expect(result.content[0]?.text).toContain('has_paid_seat');
       expect(mockClient.createStaff).not.toHaveBeenCalled();
     });
 
@@ -272,12 +272,12 @@ describe('Onboarding Handlers', () => {
 
       const result = await handlers.addStaffBatch({
         location_id: 123,
-        staff_data: [
+        team_members: [
           { name: 'Alice' },
-          { name: 'Bob', is_paid_staff: false, has_timetable_access: false },
+          { name: 'Bob', has_paid_seat: false, has_schedule_access: false },
         ],
-        is_paid_staff: true,
-        has_timetable_access: true,
+        has_paid_seat: true,
+        has_schedule_access: true,
       });
 
       expect(result.isError).toBeUndefined();
@@ -309,23 +309,23 @@ describe('Onboarding Handlers', () => {
 
       await handlers.addStaffBatch({
         location_id: 123,
-        staff_data: [
+        team_members: [
           {
             name: 'Alice',
             specialization: 'Hairdresser',
             phone: '420777000111',
             email: 'alice@example.com',
-            api_id: 'alice-1',
+            external_id: 'alice-1',
           },
           { name: 'Bob', specialization: 'Nail Tech' },
         ],
-        is_paid_staff: true,
-        has_timetable_access: true,
+        has_paid_seat: true,
+        has_schedule_access: true,
       });
 
       // An unknown user without an invitation is refused upstream, and an
       // empty string fails validation, so neither row may send one. Phone,
-      // email and api_id have nowhere to go on quick-create.
+      // email and external_id have nowhere to go on quick-create.
       for (const [, request] of (mockClient.createStaff as jest.Mock).mock
         .calls) {
         expect(request).toMatchObject({
@@ -334,7 +334,7 @@ describe('Onboarding Handlers', () => {
           is_user_invite: false,
         });
         expect(request).not.toHaveProperty('phone_number');
-        expect(request).not.toHaveProperty('api_id');
+        expect(request).not.toHaveProperty('external_id');
       }
     });
   });
@@ -351,8 +351,8 @@ describe('Onboarding Handlers', () => {
       const result = await handlers.addCategories({
         location_id: 123,
         categories: [
-          { title: 'Hair Services', weight: 1 },
-          { title: 'Nail Services', weight: 2 },
+          { title: 'Hair Services', sort_weight: 1 },
+          { title: 'Nail Services', sort_weight: 2 },
         ],
       });
 
@@ -373,9 +373,19 @@ describe('Onboarding Handlers', () => {
 
       const result = await handlers.addServicesBatch({
         location_id: 123,
-        services_data: [
-          { title: 'Haircut', price_min: 50, duration: 1800, category_id: 10 },
-          { title: 'Manicure', price_min: 30, duration: 1200, category_id: 10 },
+        services: [
+          {
+            title: 'Haircut',
+            price_min: 50,
+            duration_seconds: 1800,
+            category_id: 10,
+          },
+          {
+            title: 'Manicure',
+            price_min: 30,
+            duration_seconds: 1200,
+            category_id: 10,
+          },
         ],
       });
 
@@ -462,23 +472,23 @@ describe('Onboarding Handlers', () => {
       const result = await handlers.previewData({
         data_type: 'staff',
         raw_input:
-          'name,is_paid_staff,has_timetable_access\nAlice,yes,yes\nBob,,no\nCarol,no,',
+          'name,has_paid_seat,has_schedule_access\nAlice,yes,yes\nBob,,no\nCarol,no,',
       });
 
       const textContent = result.content[0]?.text ?? '';
       const [summary] = textContent.split('<<<UNTRUSTED');
       expect(summary).toContain(
-        '2 of 3 row(s) have no is_paid_staff or has_timetable_access answer'
+        '2 of 3 row(s) have no has_paid_seat or has_schedule_access answer'
       );
       expect(summary).toContain('ask the location owner');
-      expect(summary).toContain('batch-level is_paid_staff');
+      expect(summary).toContain('batch-level has_paid_seat');
     });
 
     it('adds no seat note when every staff row is answered', async () => {
       const result = await handlers.previewData({
         data_type: 'staff',
         raw_input: JSON.stringify([
-          { name: 'Alice', is_paid_staff: true, has_timetable_access: false },
+          { name: 'Alice', has_paid_seat: true, has_schedule_access: false },
         ]),
       });
 
@@ -816,9 +826,9 @@ describe('Onboarding Handlers', () => {
 
       const result = await handlers.addStaffBatch({
         location_id: 123,
-        staff_data: [{ name: 'Alice' }, { name: 'Bob' }],
-        is_paid_staff: true,
-        has_timetable_access: true,
+        team_members: [{ name: 'Alice' }, { name: 'Bob' }],
+        has_paid_seat: true,
+        has_schedule_access: true,
       });
 
       expect(result.structuredContent).toEqual({
@@ -1003,9 +1013,9 @@ describe('Onboarding Handlers', () => {
         () =>
           handlers.addStaffBatch({
             location_id: 123,
-            staff_data: [{ name: CANARY }],
-            is_paid_staff: true,
-            has_timetable_access: true,
+            team_members: [{ name: CANARY }],
+            has_paid_seat: true,
+            has_schedule_access: true,
           }),
       ],
       [
@@ -1023,7 +1033,9 @@ describe('Onboarding Handlers', () => {
         () =>
           handlers.addServicesBatch({
             location_id: 123,
-            services_data: [{ title: CANARY, price_min: 10, duration: 1800 }],
+            services: [
+              { title: CANARY, price_min: 10, duration_seconds: 1800 },
+            ],
           }),
       ],
       [
@@ -1093,8 +1105,13 @@ describe('Onboarding Handlers', () => {
 
       await handlers.addServicesBatch({
         location_id: 123,
-        services_data: [
-          { title: 'Haircut', price_min: 50, duration: 1800, category_id: 10 },
+        services: [
+          {
+            title: 'Haircut',
+            price_min: 50,
+            duration_seconds: 1800,
+            category_id: 10,
+          },
         ],
       });
 

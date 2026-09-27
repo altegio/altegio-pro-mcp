@@ -3,6 +3,7 @@ import type { AltegioClient } from '../../providers/altegio-client.js';
 import { V1LegacyAnalyticsAdapter } from '../../api/v1/legacy-analytics-adapter.js';
 import { LegacyAnalyticsParseError } from '../../api/v1/legacy-analytics-parser.js';
 import { AnalyticsAccessError, AnalyticsInputError } from './errors.js';
+import { pageMetadata } from '../../tools/pagination.js';
 import {
   INCOME_CATEGORY_IDS,
   assertFinanceReportAccess,
@@ -259,6 +260,9 @@ export async function getClientPayerCohorts(
   )!;
   const page = input.page ?? 1;
   const pageSize = input.page_size ?? 50;
+  const targetClientIds = selected.members
+    .slice((page - 1) * pageSize, page * pageSize)
+    .map(([id]) => id);
   return {
     text: `${ranked.length} identified clients had positive net cash receipts across ${details.length} selected finance transactions. ${unattributedCents / 100} ${source.currency ?? 'currency units'} could not be tied to a client.`,
     structuredContent: {
@@ -276,15 +280,12 @@ export async function getClientPayerCohorts(
       unattributed_cash_net: unattributedCents / 100,
       cohorts: cohortRows,
       target_cohort: selected.name,
-      target_client_ids: selected.members
-        .slice((page - 1) * pageSize, page * pageSize)
-        .map(([id]) => id),
-      page: {
-        page,
-        page_size: pageSize,
-        total_count: selected.members.length,
-        has_more: page * pageSize < selected.members.length,
-      },
+      items: targetClientIds,
+      pagination: pageMetadata(
+        { page, page_size: pageSize },
+        targetClientIds.length,
+        selected.members.length
+      ),
       completeness: {
         status: 'reconciled_bounded_scan',
         selected_transaction_count: details.length,
