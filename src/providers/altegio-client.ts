@@ -8,6 +8,7 @@ import type {
   AltegioStaff,
   AltegioService,
   AltegioServiceCategory,
+  AltegioCurrentUser,
   AltegioPosition,
   AltegioScheduleEntry,
   AltegioBookingParams,
@@ -706,6 +707,21 @@ export class AltegioClient {
     return this.handleResponse<AltegioServiceCategory[]>(
       response,
       'fetch service categories'
+    );
+  }
+
+  /**
+   * The signed-in person's own profile (`GET /user/data`, requires user auth).
+   * Not a location read: the declared company scope does not apply.
+   */
+  async getCurrentUser(): Promise<AltegioCurrentUser> {
+    this.requireAuth();
+
+    const response = await this.apiRequest('/user/data', {}, null);
+
+    return this.handleResponse<AltegioCurrentUser>(
+      response,
+      'fetch current user'
     );
   }
 

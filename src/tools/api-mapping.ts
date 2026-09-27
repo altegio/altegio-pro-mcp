@@ -89,6 +89,17 @@ export const apiMapping: Record<string, ApiMapping> = {
   // auth_logout: no API endpoint, local credential clear only
 
   // ==========================================
+  // Users
+  // ==========================================
+  users_get_current: {
+    path: '/user/data',
+    method: 'get',
+    operationId: 'get_current_user',
+    pathParams: [],
+    source: 'extended',
+  },
+
+  // ==========================================
   // Locations
   // ==========================================
   locations_list: {

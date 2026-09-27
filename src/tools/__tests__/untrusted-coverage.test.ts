@@ -135,6 +135,19 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     },
   },
 
+  users_get_current: {
+    what: 'the display name the signed-in person typed for themselves',
+    canary: {
+      args: {},
+      routes: [
+        {
+          match: /\/user\/data/,
+          body: ok(envelope({ id: 1, name: CANARY, lang: 'pl' })),
+        },
+      ],
+    },
+  },
+
   locations_update: {
     what: 'the location name read back after the update, which is whatever the location now stores',
     canary: {

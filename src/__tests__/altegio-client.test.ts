@@ -347,6 +347,50 @@ describe('AltegioClient', () => {
     });
   });
 
+  describe('getCurrentUser', () => {
+    it('should throw AuthenticationError when not authenticated', async () => {
+      await expect(client.getCurrentUser()).rejects.toThrow(
+        'Not authenticated. Call auth_login first.'
+      );
+    });
+
+    it('reads the signed-in profile with the user credential', async () => {
+      (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: { user_token: 'test-user-token' },
+        }),
+      } as Response);
+      await client.login('test@example.com', 'password123');
+
+      (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: { id: 42, name: 'Owner', lang: 'hu', is_approved: true },
+        }),
+      } as Response);
+
+      const user = await client.getCurrentUser();
+
+      expect(user).toEqual({
+        id: 42,
+        name: 'Owner',
+        lang: 'hu',
+        is_approved: true,
+      });
+      expect(fetch).toHaveBeenLastCalledWith(
+        'https://api.alteg.io/api/v1/user/data',
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: 'Bearer test-partner-token, User test-user-token',
+          }),
+        })
+      );
+    });
+  });
+
   describe('getCompanies', () => {
     it('should throw AuthenticationError when not authenticated', async () => {
       await expect(client.getCompanies()).rejects.toThrow(

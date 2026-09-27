@@ -42,6 +42,24 @@ export interface AltegioLoginResponse {
   };
 }
 
+/**
+ * The signed-in person, as `GET /user/data` returns them. `lang` is the
+ * interface language chosen in Altegio (ISO 639-1); older API builds omit it.
+ */
+export interface AltegioCurrentUser {
+  id: number;
+  name?: string;
+  login?: string;
+  email?: string;
+  phone?: string;
+  avatar?: string;
+  is_approved?: boolean;
+  is_email_confirmed?: boolean;
+  lang?: string;
+  /** The user's own API hash. Never returned by a tool. */
+  user_token?: string;
+}
+
 export interface AltegioCompany {
   id: number;
   title: string;

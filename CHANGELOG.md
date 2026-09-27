@@ -6,6 +6,15 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — `users_get_current`
+
+- **`users_get_current`** returns the signed-in person: id, display name,
+  approval state and `language`, the interface language they chose in Altegio
+  (ISO 639-1, `null` while the API build predates the `lang` field). It reads
+  `GET /user/data`, needs no `location_id`, and is a **base tool**: every facet
+  and the read-only view serve it, so a host mounted on `/pro/analytics` can
+  speak the user's Altegio language. Reference host: altegio-analytics-agent.
+
 ## [0.5.0-alpha.0]
 
 ### Breaking changes — one public contract before the open-source alpha

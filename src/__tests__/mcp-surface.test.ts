@@ -107,6 +107,7 @@ describe('tools/list per facet', () => {
       'clients_search',
       'clients_upload_file',
       'locations_list',
+      'users_get_current',
     ]);
     await client.close();
   });

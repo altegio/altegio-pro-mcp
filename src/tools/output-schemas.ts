@@ -43,6 +43,18 @@ export const loginOutput = entitySchema({ success: boolProp, error: strProp }, [
   'success',
 ]);
 
+// ========== Users ==========
+
+export const currentUserOutput = entitySchema(
+  {
+    id: idProp,
+    name: nullableStrProp,
+    language: nullableStrProp,
+    is_approved: nullableBoolProp,
+  },
+  ['id', 'language']
+);
+
 // ========== Lists (GET) ==========
 
 export const companiesOutput = listSchema(
