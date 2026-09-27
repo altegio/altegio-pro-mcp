@@ -144,7 +144,7 @@ describe('ToolHandlers - Staff CRUD', () => {
 
     it('should handle errors', async () => {
       mockClient.createStaff.mockRejectedValue(
-        new AuthenticationError('Not authenticated. Call altegio_login first.')
+        new AuthenticationError('Not authenticated. Call auth_login first.')
       );
 
       const result = await handlers.createStaff({
@@ -160,7 +160,7 @@ describe('ToolHandlers - Staff CRUD', () => {
       });
 
       expect(result.content[0]?.text).toContain('Authentication required');
-      expect(result.content[0]?.text).toContain('altegio_login');
+      expect(result.content[0]?.text).toContain('auth_login');
     });
   });
 

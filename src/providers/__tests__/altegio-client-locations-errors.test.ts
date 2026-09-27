@@ -178,14 +178,14 @@ describe('AltegioClient - API error surfacing', () => {
       json: async () => ({
         success: false,
         data: null,
-        meta: { message: 'create_service is denied for this role' },
+        meta: { message: 'services_create is denied for this role' },
       }),
     });
 
     const error = await client.getBookings(4564).catch((e) => e);
     expect(error).toBeInstanceOf(AltegioApiError);
     expect((error as AltegioApiError).message).toContain(
-      'create_service is denied for this role'
+      'services_create is denied for this role'
     );
     expect((error as AltegioApiError).message).toContain('403');
   });

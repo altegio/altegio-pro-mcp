@@ -262,7 +262,7 @@ export class OnboardingHandlers {
   private requireAuth(): void {
     if (!this.client.isAuthenticated()) {
       throw new AuthenticationError(
-        'Not authenticated. Call altegio_login first.'
+        'Not authenticated. Call auth_login first.'
       );
     }
   }

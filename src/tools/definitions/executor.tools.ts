@@ -46,15 +46,15 @@ const searchOutput = {
 };
 
 export const searchOperationsTool = defineTool({
-  name: 'altegio_search_operations',
+  name: 'api_search_operations',
   category: 'API',
   description:
     '[API] Find the API operations behind a business question — "who worked last Tuesday", ' +
     '"loyalty card balance", "cash register shifts" — when no dedicated tool covers it. ' +
     'Returns up to 10 operations with their operationId, method, canonical path, one-line ' +
     'summary and domain, and names the curated tool when one already exists (prefer that ' +
-    'tool over the executor). Use this first, then `altegio_describe_operation` to read the ' +
-    'contract and `altegio_call_operation` to run a read. Searches the whole documented API ' +
+    'tool over the executor). Use this first, then `api_describe_operation` to read the ' +
+    'contract and `api_call_operation` to run a read. Searches the whole documented API ' +
     `(${catalog.operationCount} operations); results are ranked locally, no data leaves the server.`,
   annotations: {
     title: 'Search API Operations',
@@ -137,8 +137,8 @@ export const searchOperationsTool = defineTool({
       text:
         `${result.totalMatches} operation(s) match "${input.query}"; showing ${result.hits.length}:\n\n` +
         `${lines.join('\n\n')}\n\n` +
-        'Next: `altegio_describe_operation` for the full contract, then ' +
-        '`altegio_call_operation` to run a GET.',
+        'Next: `api_describe_operation` for the full contract, then ' +
+        '`api_call_operation` to run a GET.',
       structuredContent: {
         matches: result.hits,
         count: result.hits.length,
@@ -150,15 +150,15 @@ export const searchOperationsTool = defineTool({
 });
 
 export const describeOperationTool = defineTool({
-  name: 'altegio_describe_operation',
+  name: 'api_describe_operation',
   category: 'API',
   description:
     '[API] Read the full contract of one API operation before calling it: every parameter ' +
     'with type, requiredness and description, the request body shape, the response shape, ' +
     'whether a logged-in session is needed, whether it is deprecated, which spec it comes ' +
     'from, and which legacy parameter names are accepted under canonical ones (for example ' +
-    '`staff_id` is accepted as `team_member_id`). Use it after `altegio_search_operations` ' +
-    'and before `altegio_call_operation`. Reads the built-in catalog only — no API call.',
+    '`staff_id` is accepted as `team_member_id`). Use it after `api_search_operations` ' +
+    'and before `api_call_operation`. Reads the built-in catalog only — no API call.',
   annotations: {
     title: 'Describe API Operation',
     readOnlyHint: true,
@@ -169,7 +169,7 @@ export const describeOperationTool = defineTool({
       .string()
       .min(1)
       .describe(
-        'The operationId from `altegio_search_operations`, e.g. `get_team_member_list`.'
+        'The operationId from `api_search_operations`, e.g. `get_team_member_list`.'
       ),
   }),
   handler: async ({ input }) => {
@@ -182,16 +182,16 @@ export const describeOperationTool = defineTool({
 });
 
 export const callOperationTool = defineTool({
-  name: 'altegio_call_operation',
+  name: 'api_call_operation',
   category: 'API',
   description:
     '[API] Run a documented read against the Altegio API when no curated tool covers it. ' +
-    'Give the operationId from `altegio_search_operations` and its parameters under `params`; ' +
+    'Give the operationId from `api_search_operations` and its parameters under `params`; ' +
     'canonical names are accepted (`location_id`, `team_member_id`, `appointment_id`, ' +
     '`product_id`), required parameters are validated against the spec, and the result comes ' +
     'back projected and inside the size budget. READS ONLY: a POST, PUT, PATCH or DELETE ' +
     'operation is refused — writes go through the curated tools. Prefer a curated tool ' +
-    'whenever `altegio_search_operations` names one. AUTHENTICATION REQUIRED.',
+    'whenever `api_search_operations` names one. AUTHENTICATION REQUIRED.',
   annotations: {
     title: 'Call API Operation (read-only)',
     readOnlyHint: true,
@@ -209,7 +209,7 @@ export const callOperationTool = defineTool({
       .optional()
       .describe(
         'Path and query parameters by name, e.g. {"location_id": 4564, "count": 30}. ' +
-          'Call `altegio_describe_operation` for the accepted names and types.'
+          'Call `api_describe_operation` for the accepted names and types.'
       ),
   }),
   handler: async ({ input, client }) => {

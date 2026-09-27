@@ -1,5 +1,5 @@
 /**
- * Catalog-driven execution — backs `altegio_call_operation`.
+ * Catalog-driven execution — backs `api_call_operation`.
  *
  * Policy (ADR-001 D2): any documented **read** is callable; writes are not,
  * until the overlay's `write_allowed` allowlist is wired to a curated policy.
@@ -256,7 +256,7 @@ export function buildRequest(
     }
     for (const problem of problems) lines.push(`  ${problem}`);
     lines.push(
-      'Call `altegio_describe_operation` for the full parameter list with types.'
+      'Call `api_describe_operation` for the full parameter list with types.'
     );
     throw new ExecutorRefusalError(lines.join('\n'), {
       operationId: op.operationId,
@@ -406,7 +406,7 @@ export async function callOperation(
   if (!op) {
     throw new ExecutorRefusalError(
       `No operation \`${operationId}\` in the API catalog. ` +
-        'Use `altegio_search_operations` to find the right operationId.',
+        'Use `api_search_operations` to find the right operationId.',
       { operationId }
     );
   }

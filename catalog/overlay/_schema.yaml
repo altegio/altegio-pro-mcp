@@ -31,7 +31,7 @@ operation_entry:
         Tool surface tier (ADR-001 D2). `core` — always loaded, task-shaped;
         `pack` — generated domain tool, deferred or reachable through a facet;
         `executor-only` — no generated tool, reachable only through
-        `altegio_call_operation`.
+        `api_call_operation`.
 
     facets:
       type: array
@@ -89,7 +89,7 @@ operation_entry:
       type: boolean
       description: >
         Executor write allowlist (ADR-001 D2). Only operations with
-        `write_allowed: true` may ever be executed by `altegio_call_operation`
+        `write_allowed: true` may ever be executed by `api_call_operation`
         with a non-GET method. Defaults to false; the current executor
         iteration refuses every non-GET regardless.
 

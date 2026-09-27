@@ -24,7 +24,7 @@ const locationId = z
   .int()
   .positive()
   .describe(
-    'Location whose client base to work with. Call list_locations when the id is unknown.'
+    'Location whose client base to work with. Call locations_list when the id is unknown.'
   );
 
 // ========== output schema pieces ==========

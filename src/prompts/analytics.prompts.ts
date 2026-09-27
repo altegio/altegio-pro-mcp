@@ -34,7 +34,7 @@ export interface PromptResult {
 
 const locationArgument: PromptArgument = {
   name: 'location_id',
-  description: 'Location to report on. Use list_locations if it is unknown.',
+  description: 'Location to report on. Use locations_list if it is unknown.',
   required: true,
 };
 

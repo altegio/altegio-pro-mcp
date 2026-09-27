@@ -1,7 +1,7 @@
 /**
  * Reading notes for the universal executor.
  *
- * `altegio_describe_operation` renders the raw spec of an operation, which still
+ * `api_describe_operation` renders the raw spec of an operation, which still
  * speaks the legacy dialect (`record`, `attendance`, `paid_full`, `is_mobile`)
  * and rarely spells out what its coded fields mean. A capable model fills the
  * gaps; a weaker one guesses. These notes bridge the gap: for the domains that

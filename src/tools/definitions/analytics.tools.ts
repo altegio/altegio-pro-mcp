@@ -39,7 +39,7 @@ const locationId = z
   .int()
   .positive()
   .describe(
-    'Location to report on. Call list_locations when the id is unknown.'
+    'Location to report on. Call locations_list when the id is unknown.'
   );
 
 const periodFields = {
@@ -80,7 +80,7 @@ const segmentFields = {
     .positive()
     .optional()
     .describe(
-      'Report on every team member holding one position (for example every stylist). Call get_positions for the ids.'
+      'Report on every team member holding one position (for example every stylist). Call positions_list for the ids.'
     ),
   created_by_user_id: z
     .number()
@@ -915,7 +915,7 @@ export const analyticsGetClientServicePenetrationTool = defineTool({
       .max(30)
       .optional()
       .describe(
-        'Source group: clients who used any of these services (get_services for ids). Leave all source filters empty to use every active client.'
+        'Source group: clients who used any of these services (services_list for ids). Leave all source filters empty to use every active client.'
       ),
     source_category_ids: z
       .array(z.number().int().positive())
@@ -929,7 +929,7 @@ export const analyticsGetClientServicePenetrationTool = defineTool({
       .max(30)
       .optional()
       .describe(
-        'Source group: clients with an appointment assigned to any of these resources (get_resources for ids).'
+        'Source group: clients with an appointment assigned to any of these resources (resources_list for ids).'
       ),
     target_service_ids: z
       .array(z.number().int().positive())

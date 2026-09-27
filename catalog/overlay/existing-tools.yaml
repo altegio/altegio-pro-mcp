@@ -4,7 +4,7 @@
 # the seed; the generator inverts it"). Recording the taken tool names here keeps
 # a future generated pack from claiming a name a hand-written tool already owns,
 # and marks these operations as `core` so the executor can point the model at the
-# curated tool instead of `altegio_call_operation`.
+# curated tool instead of `api_call_operation`.
 #
 # Format: catalog/overlay/_schema.yaml. Tiers here are all `core` — every one of
 # these tools is in today's always-loaded surface.
@@ -16,7 +16,7 @@ operations:
   authorize_user:
     domain: auth
     tier: core
-    tool_name: altegio_login
+    tool_name: auth_login
     write_allowed: false
     notes: >
       Exchanges email and password for a V1 user token. Deprecated the day V3
@@ -27,7 +27,7 @@ operations:
     domain: locations
     tier: core
     facets: [ops, catalog, finance, marketing, onboarding]
-    tool_name: list_locations
+    tool_name: locations_list
     projection: [id, title, city, address, timezone_name]
     write_allowed: false
 
@@ -36,7 +36,7 @@ operations:
     domain: appointments
     tier: core
     facets: [ops]
-    tool_name: get_appointments
+    tool_name: appointments_list
     param_renames:
       staff_id: team_member_id
     write_allowed: false
@@ -44,7 +44,7 @@ operations:
     domain: appointments
     tier: core
     facets: [ops]
-    tool_name: create_appointment
+    tool_name: appointments_create
     param_renames:
       staff_id: team_member_id
     write_allowed: false
@@ -52,7 +52,7 @@ operations:
     domain: appointments
     tier: core
     facets: [ops]
-    tool_name: update_appointment
+    tool_name: appointments_update
     param_renames:
       record_id: appointment_id
       staff_id: team_member_id
@@ -61,7 +61,7 @@ operations:
     domain: appointments
     tier: core
     facets: [ops]
-    tool_name: delete_appointment
+    tool_name: appointments_delete
     param_renames:
       record_id: appointment_id
     write_allowed: false
@@ -102,14 +102,14 @@ operations:
     domain: positions
     tier: core
     facets: [catalog, onboarding]
-    tool_name: get_positions
+    tool_name: positions_list
     projection: [id, title]
     write_allowed: false
   create_position_quick:
     domain: positions
     tier: core
     facets: [catalog, onboarding]
-    tool_name: create_position
+    tool_name: positions_create
     write_allowed: false
     notes: >
       Deprecated but still the only public V1 position create operation. Public
@@ -120,20 +120,20 @@ operations:
     domain: services
     tier: core
     facets: [ops, catalog]
-    tool_name: get_services
+    tool_name: services_list
     projection: [id, title, category_id, price_min, price_max, duration]
     write_allowed: false
   create_service:
     domain: services
     tier: core
     facets: [catalog, onboarding]
-    tool_name: create_service
+    tool_name: services_create
     write_allowed: false
   deprecated_update_service_by_id:
     domain: services
     tier: core
     facets: [catalog]
-    tool_name: update_service
+    tool_name: services_update
     write_allowed: false
     notes: >
       PUT is replacement-shaped. The curated client reads and merges the
@@ -142,7 +142,7 @@ operations:
     domain: services
     tier: core
     facets: [catalog, onboarding]
-    tool_name: delete_service_category
+    tool_name: service_categories_delete
     write_allowed: false
   delete_client:
     domain: clients
@@ -154,20 +154,20 @@ operations:
     domain: online_booking
     tier: core
     facets: [catalog, onboarding]
-    tool_name: delete_booking_form
+    tool_name: booking_forms_delete
     write_allowed: false
   remove_user_from_location:
     domain: users
     tier: pack
     facets: [catalog]
-    tool_name: remove_location_user
+    tool_name: locations_remove_user
     write_allowed: false
     notes: Exact user ID is required twice as a destructive safeguard.
   deprecated_get_service_category_list:
     domain: services
     tier: core
     facets: [catalog, onboarding]
-    tool_name: get_service_categories
+    tool_name: service_categories_list
     projection: [id, title, weight]
     write_allowed: false
     notes: >
@@ -179,7 +179,7 @@ operations:
     domain: schedule
     tier: core
     facets: [ops, catalog]
-    tool_name: get_schedule
+    tool_name: schedules_get
     param_renames:
       staff_id: team_member_id
     write_allowed: false
@@ -187,18 +187,18 @@ operations:
     domain: schedule
     tier: core
     facets: [catalog, onboarding]
-    tool_name: create_schedule
+    tool_name: schedules_create
     write_allowed: false
     notes: >
-      One PUT backs three tools: create_schedule and update_schedule send
-      `schedules_to_set`, delete_schedule sends `schedules_to_delete`.
+      One PUT backs three tools: schedules_create and schedules_update send
+      `schedules_to_set`, schedules_delete sends `schedules_to_delete`.
 
   # --- location settings ---------------------------------------------------
   get_appointment_calendar_settings:
     domain: settings
     tier: core
     facets: [catalog, onboarding]
-    tool_name: get_appointment_settings
+    tool_name: settings_get_appointment_calendar
     write_allowed: false
     notes: >
       Appointment-calendar defaults, NOT the location's working hours — real
@@ -207,31 +207,31 @@ operations:
     domain: settings
     tier: core
     facets: [catalog, onboarding]
-    tool_name: update_appointment_settings
+    tool_name: settings_update_appointment_calendar
     write_allowed: false
   get_online_booking_settings:
     domain: online_booking
     tier: core
     facets: [catalog, onboarding]
-    tool_name: get_online_booking_settings
+    tool_name: settings_get_online_booking
     write_allowed: false
   update_online_booking_settings:
     domain: online_booking
     tier: core
     facets: [catalog, onboarding]
-    tool_name: update_online_booking_settings
+    tool_name: settings_update_online_booking
     write_allowed: false
   get_booking_widget_list:
     domain: online_booking
     tier: core
     facets: [catalog, onboarding]
-    tool_name: get_booking_forms
+    tool_name: booking_forms_list
     write_allowed: false
   create_booking_widget:
     domain: online_booking
     tier: core
     facets: [catalog, onboarding]
-    tool_name: create_booking_form
+    tool_name: booking_forms_create
     write_allowed: false
 
   # --- resources -----------------------------------------------------------
@@ -239,7 +239,7 @@ operations:
     domain: resources
     tier: core
     facets: [catalog]
-    tool_name: get_resources
+    tool_name: resources_list
     projection: [id, title]
     write_allowed: false
     notes: Read-only — the V1 API has no create endpoint for resources.

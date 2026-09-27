@@ -62,7 +62,7 @@ export async function withErrorHandling(
         .join('; ');
       message = `Invalid parameters for ${toolName}: ${issues}`;
     } else if (error instanceof AuthenticationError) {
-      message = `Authentication required. Call altegio_login before using ${toolName}.`;
+      message = `Authentication required. Call auth_login before using ${toolName}.`;
     } else if (error instanceof ExecutorRefusalError) {
       // Already phrased as the instruction the caller needs; do not decorate.
       message = error.message;
@@ -206,7 +206,7 @@ const TOO_DEEP = '[nested value omitted]';
  * Clean a whole parsed payload — every string leaf and every object key — and
  * return it with its shape intact.
  *
- * This is for the one caller that cannot name its fields: `altegio_call_operation`
+ * This is for the one caller that cannot name its fields: `api_call_operation`
  * reaches every documented GET, so the response schema is not known until it
  * arrives and there is nothing to enumerate. The whole payload is therefore
  * treated as untrusted, which is also the honest reading of it.

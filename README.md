@@ -40,7 +40,7 @@ npm start
 ```
 
 Obtain a partner token through [Altegio developer account](https://developer.alteg.io).
-Local stdio can use `ALTEGIO_USER_TOKEN` or the `altegio_login` tool. Credentials
+Local stdio can use `ALTEGIO_USER_TOKEN` or the `auth_login` tool. Credentials
 are stored in the configured credential directory. Keep `.env` and credential
 files outside version control.
 

@@ -371,7 +371,7 @@ export class AltegioClient {
     switch (response.status) {
       case 401:
         throw new AuthenticationError(
-          `Session expired while trying to ${context}. Call altegio_login to re-authenticate.`
+          `Session expired while trying to ${context}. Call auth_login to re-authenticate.`
         );
       case 403:
         // A permission problem and a plain validation refusal both arrive as
@@ -437,7 +437,7 @@ export class AltegioClient {
   private requireAuth(): void {
     if (!this.resolveUserToken()) {
       throw new AuthenticationError(
-        'Not authenticated. Call altegio_login first.'
+        'Not authenticated. Call auth_login first.'
       );
     }
   }
@@ -561,7 +561,7 @@ export class AltegioClient {
       response,
       'fetch locations'
     );
-    // Confine `list_locations` to the declared company scope: a request scoped
+    // Confine `locations_list` to the declared company scope: a request scoped
     // via `X-Altegio-Company-Id` only ever sees its own locations, so a shared
     // user token cannot enumerate the other salons it happens to reach. Unscoped
     // requests see everything (no-op).

@@ -194,7 +194,7 @@ describe('token scopes gate execution, end to end', () => {
   it('runs a read under the grant the proxy actually sends', async () => {
     const session = await openSession(PROXY_FULL_GRANT);
     const payload = await parseSse<JsonRpcToolResult>(
-      await session.call('list_locations', { my: 1, count: 1 })
+      await session.call('locations_list', { my: 1, count: 1 })
     );
 
     expect(payload.result.isError).not.toBe(true);
@@ -204,7 +204,7 @@ describe('token scopes gate execution, end to end', () => {
   it('runs a write under the full proxy grant', async () => {
     const session = await openSession(PROXY_FULL_GRANT);
     const payload = await parseSse<JsonRpcToolResult>(
-      await session.call('update_location', {
+      await session.call('locations_update', {
         location_id: 4564,
         title: 'Renamed by the scope e2e',
       })
@@ -226,7 +226,7 @@ describe('token scopes gate execution, end to end', () => {
   it('refuses a write on a read-only proxy grant, on the full surface', async () => {
     const session = await openSession(PROXY_READ_GRANT);
 
-    const denied = await session.call('update_location', {
+    const denied = await session.call('locations_update', {
       location_id: 4564,
       title: 'Should never reach Altegio',
     });
@@ -235,7 +235,7 @@ describe('token scopes gate execution, end to end', () => {
 
     expect(payload.result.isError).toBe(true);
     const text = payload.result.content[0]!.text;
-    expect(text).toContain('update_location');
+    expect(text).toContain('locations_update');
     expect(text).toContain('locations:write');
     expect(text).toContain('mcp:pro:read');
     // Nothing was written: the gate runs before the handler.
@@ -243,7 +243,7 @@ describe('token scopes gate execution, end to end', () => {
 
     // Reads on the same session still work — this narrows, it does not break.
     const allowed = await parseSse<JsonRpcToolResult>(
-      await session.call('list_locations', { my: 1, count: 1 })
+      await session.call('locations_list', { my: 1, count: 1 })
     );
     expect(allowed.result.isError).not.toBe(true);
     expect(upstreamCalls).toHaveLength(1);
@@ -252,7 +252,7 @@ describe('token scopes gate execution, end to end', () => {
   it('fails closed when the grant is in a vocabulary this build cannot read', async () => {
     const session = await openSession('openid email profile');
     const payload = await parseSse<JsonRpcToolResult>(
-      await session.call('list_locations', { my: 1, count: 1 })
+      await session.call('locations_list', { my: 1, count: 1 })
     );
 
     expect(payload.result.isError).toBe(true);
@@ -263,7 +263,7 @@ describe('token scopes gate execution, end to end', () => {
   it('lets a caller that declares no scopes through unchanged', async () => {
     const session = await openSession();
     const payload = await parseSse<JsonRpcToolResult>(
-      await session.call('list_locations', { my: 1, count: 1 })
+      await session.call('locations_list', { my: 1, count: 1 })
     );
 
     expect(payload.result.isError).not.toBe(true);
@@ -273,7 +273,7 @@ describe('token scopes gate execution, end to end', () => {
   it('refuses in band when the token lacks the scope, and keeps the session', async () => {
     const session = await openSession('appointments:read clients:read');
 
-    const denied = await session.call('list_locations', { my: 1, count: 1 });
+    const denied = await session.call('locations_list', { my: 1, count: 1 });
     // In band: a 200 carrying a JSON-RPC result, not an HTTP 403 and not a
     // protocol error — the session must survive a denial.
     expect(denied.status).toBe(200);
@@ -281,7 +281,7 @@ describe('token scopes gate execution, end to end', () => {
 
     expect(payload.result.isError).toBe(true);
     const text = payload.result.content[0]!.text;
-    expect(text).toContain('list_locations');
+    expect(text).toContain('locations_list');
     expect(text).toContain('locations:read');
     expect(text).toContain('appointments:read, clients:read');
     expect(text).toContain('Do not retry');
@@ -303,7 +303,7 @@ describe('token scopes gate execution, end to end', () => {
   it('lets the call through when the token carries the scope', async () => {
     const session = await openSession('locations:read team_members:read');
     const payload = await parseSse<JsonRpcToolResult>(
-      await session.call('list_locations', { my: 1, count: 1 })
+      await session.call('locations_list', { my: 1, count: 1 })
     );
 
     expect(payload.result.isError).not.toBe(true);
@@ -313,7 +313,7 @@ describe('token scopes gate execution, end to end', () => {
   it('honours write ⊇ read across the wire', async () => {
     const session = await openSession('locations:write');
     const payload = await parseSse<JsonRpcToolResult>(
-      await session.call('list_locations', { my: 1, count: 1 })
+      await session.call('locations_list', { my: 1, count: 1 })
     );
 
     expect(payload.result.isError).not.toBe(true);
@@ -338,6 +338,6 @@ describe('token scopes gate execution, end to end', () => {
     expect(await names(narrow)).toEqual(baseline);
     expect(await names(wide)).toEqual(baseline);
     // Listed for the narrow caller, and refused only on execution.
-    expect(baseline).toContain('list_locations');
+    expect(baseline).toContain('locations_list');
   });
 });

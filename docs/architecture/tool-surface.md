@@ -108,9 +108,9 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 
 | Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `altegio_call_operation` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `-` | `-` | `-` | api:read, reads-only |
-| `altegio_describe_operation` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `-` | `-` | `-` | — |
-| `altegio_search_operations` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `-` | `-` | `-` | — |
+| `api_call_operation` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `-` | `-` | `-` | api:read, reads-only |
+| `api_describe_operation` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `-` | `-` | `-` | — |
+| `api_search_operations` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `-` | `-` | `-` | — |
 
 ### Analytics
 
@@ -156,25 +156,25 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `appointments_apply_attendance` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:write, confirm |
+| `appointments_create` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:create |
+| `appointments_delete` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:write, confirm |
+| `appointments_list` | `all` | `dflt` | `ro` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:read |
 | `appointments_preview_attendance` | `all` | `dflt` | `ro` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:read |
-| `create_appointment` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:create |
-| `delete_appointment` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:write, confirm |
-| `get_appointments` | `all` | `dflt` | `ro` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:read |
-| `update_appointment` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:write |
+| `appointments_update` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:write |
 
 ### Auth
 
 | Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `altegio_login` | `all` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | — |
-| `altegio_logout` | `all` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | — |
+| `auth_login` | `all` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | — |
+| `auth_logout` | `all` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | `-pwd` | — |
 
 ### Categories
 
 | Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `delete_service_category` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write, confirm |
-| `get_service_categories` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | services:read |
+| `service_categories_delete` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write, confirm |
+| `service_categories_list` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | services:read |
 
 ### Clients
 
@@ -197,9 +197,9 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 
 | Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `diagnose_location_access` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
-| `list_locations` | `all` | `base` | `ro` | `base` | `base` | `base` | `base` | `base` | `base` | locations:read |
-| `update_location` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write |
+| `locations_diagnose_access` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
+| `locations_list` | `all` | `base` | `ro` | `base` | `base` | `base` | `base` | `base` | `base` | locations:read |
+| `locations_update` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write |
 
 ### Onboarding
 
@@ -222,48 +222,48 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 
 | Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `create_position` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write |
-| `get_positions` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:read |
+| `positions_create` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write |
+| `positions_list` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:read |
 
 ### Resources
 
 | Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `get_resources` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
+| `resources_list` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
 
 ### Schedule
 
 | Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `create_schedule` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write |
-| `delete_schedule` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write, confirm |
-| `get_schedule` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:read |
-| `update_schedule` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write |
+| `schedules_create` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write |
+| `schedules_delete` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write, confirm |
+| `schedules_get` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:read |
+| `schedules_update` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write |
 
 ### Services
 
 | Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `create_service` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write |
-| `delete_service` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write, confirm |
-| `get_services` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | services:read |
-| `link_service_team_member` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write |
-| `link_team_member_services` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write |
-| `unlink_service_team_member` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write, confirm |
-| `update_service` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write |
-| `update_service_team_member` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write |
+| `services_create` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write |
+| `services_delete` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write, confirm |
+| `services_link_team_member` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write |
+| `services_list` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | services:read |
+| `services_unlink_team_member` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write, confirm |
+| `services_update` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write |
+| `services_update_team_member_link` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write |
+| `team_members_link_services` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | services:write |
 
 ### Settings
 
 | Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `create_booking_form` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write |
-| `delete_booking_form` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write, confirm |
-| `get_appointment_settings` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
-| `get_booking_forms` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
-| `get_online_booking_settings` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
-| `update_appointment_settings` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write |
-| `update_online_booking_settings` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write |
+| `booking_forms_create` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write |
+| `booking_forms_delete` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write, confirm |
+| `booking_forms_list` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
+| `settings_get_appointment_calendar` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
+| `settings_get_online_booking` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
+| `settings_update_appointment_calendar` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write |
+| `settings_update_online_booking` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write |
 
 ### Team members
 
@@ -278,7 +278,7 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 
 | Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `remove_location_user` | `all` | `-name` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:manage_access, confirm |
+| `locations_remove_user` | `all` | `-name` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:manage_access, confirm |
 
 ## Deployment switches
 
@@ -287,13 +287,13 @@ onboarding on `/mcp`. Two environment switches change it.
 
 `ALTEGIO_EXPOSE_PASSWORD_LOGIN=true` (the closed staff deployment):
 
-- `/mcp` — +`altegio_login`, +`altegio_logout`
-- `/mcp/ops` — +`altegio_login`, +`altegio_logout`
-- `/mcp/catalog` — +`altegio_login`, +`altegio_logout`
-- `/mcp/finance` — +`altegio_login`, +`altegio_logout`
-- `/mcp/marketing` — +`altegio_login`, +`altegio_logout`
-- `/mcp/analytics` — +`altegio_login`, +`altegio_logout`
-- `/mcp/onboarding` — +`altegio_login`, +`altegio_logout`
+- `/mcp` — +`auth_login`, +`auth_logout`
+- `/mcp/ops` — +`auth_login`, +`auth_logout`
+- `/mcp/catalog` — +`auth_login`, +`auth_logout`
+- `/mcp/finance` — +`auth_login`, +`auth_logout`
+- `/mcp/marketing` — +`auth_login`, +`auth_logout`
+- `/mcp/analytics` — +`auth_login`, +`auth_logout`
+- `/mcp/onboarding` — +`auth_login`, +`auth_logout`
 
 `MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING=true`:
 

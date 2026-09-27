@@ -1,7 +1,7 @@
 import { getScheduleTool } from '../definitions/schedule.tools.js';
 import type { AltegioClient } from '../../providers/altegio-client.js';
 
-describe('get_schedule handler', () => {
+describe('schedules_get handler', () => {
   it('normalizes legacy 0/1 working flags to booleans in structured output', async () => {
     const client = {
       getSchedule: jest.fn().mockResolvedValue([

@@ -146,7 +146,7 @@ describe('AltegioClient', () => {
           AuthenticationError
         );
         await expect(client.getCompanies()).rejects.toThrow(
-          'Not authenticated. Call altegio_login first.'
+          'Not authenticated. Call auth_login first.'
         );
       });
 
@@ -179,7 +179,7 @@ describe('AltegioClient', () => {
           statusText: 'Unauthorized',
           json: async () => ({ meta: { message: 'Token expired' } }),
         } as unknown as Response);
-        await expect(client.getCompanies()).rejects.toThrow(/altegio_login/);
+        await expect(client.getCompanies()).rejects.toThrow(/auth_login/);
       });
 
       it('should throw AltegioApiError on 404 response', async () => {
@@ -350,7 +350,7 @@ describe('AltegioClient', () => {
   describe('getCompanies', () => {
     it('should throw AuthenticationError when not authenticated', async () => {
       await expect(client.getCompanies()).rejects.toThrow(
-        'Not authenticated. Call altegio_login first.'
+        'Not authenticated. Call auth_login first.'
       );
     });
 
@@ -548,7 +548,7 @@ describe('AltegioClient', () => {
   describe('getBookings', () => {
     it('should throw AuthenticationError when not authenticated', async () => {
       await expect(client.getBookings(1)).rejects.toThrow(
-        'Not authenticated. Call altegio_login first.'
+        'Not authenticated. Call auth_login first.'
       );
     });
 
@@ -698,7 +698,7 @@ describe('AltegioClient', () => {
         );
 
         await expect(client.getStaff(4564)).rejects.toThrow(
-          'Not authenticated. Call altegio_login first.'
+          'Not authenticated. Call auth_login first.'
         );
       });
 
@@ -810,7 +810,7 @@ describe('AltegioClient', () => {
         );
 
         await expect(client.getServices(4564)).rejects.toThrow(
-          'Not authenticated. Call altegio_login first.'
+          'Not authenticated. Call auth_login first.'
         );
       });
 
@@ -1155,7 +1155,7 @@ describe('AltegioClient', () => {
     });
 
     describe('declared company-ID set confinement', () => {
-      it('list_locations returns only IDs in the declared set (multi)', async () => {
+      it('locations_list returns only IDs in the declared set (multi)', async () => {
         mockOnce({
           success: true,
           data: { id: 4564, title: 'Demo Location' },
@@ -1186,7 +1186,7 @@ describe('AltegioClient', () => {
         ).toBe(false);
       });
 
-      it('list_locations returns all locations when no set is declared', async () => {
+      it('locations_list returns all locations when no set is declared', async () => {
         const all = [{ id: 4564 }, { id: 720441 }, { id: 999 }];
         mockOnce({ success: true, data: all });
         const companies = await runWithContext(

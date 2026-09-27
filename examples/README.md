@@ -98,11 +98,11 @@ await mcpServer.start();
 The MCP server exposes these tools:
 
 ### Authentication
-- `altegio_login` - Login with email/password
-- `altegio_logout` - Logout and clear credentials
+- `auth_login` - Login with email/password
+- `auth_logout` - Logout and clear credentials
 
 ### Locations
-- `list_locations` - Get all accessible locations
+- `locations_list` - Get all accessible locations
 
 ### Appointments
 - `list_appointments` - List appointments with filters
@@ -163,7 +163,7 @@ Optional:
 - Ensure your account has API access enabled
 
 **"Location not found"**
-- Run `list_locations` to see available locations
+- Run `locations_list` to see available locations
 - Verify the location ID is correct
 - Check that your user has access to the location
 

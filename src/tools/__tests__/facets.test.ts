@@ -103,11 +103,11 @@ describe('static views', () => {
         'clients_list_files',
         'clients_upload_file',
         'clients_search',
-        'create_appointment',
-        'delete_appointment',
-        'get_appointments',
-        'list_locations',
-        'update_appointment',
+        'appointments_create',
+        'appointments_delete',
+        'appointments_list',
+        'locations_list',
+        'appointments_update',
       ].sort()
     );
   });
@@ -115,10 +115,10 @@ describe('static views', () => {
   it('serves the catalog domains on catalog', () => {
     const index = buildFacetIndex(tools);
     expect(index.includes('catalog', 'team_members_list')).toBe(true);
-    expect(index.includes('catalog', 'get_schedule')).toBe(true);
-    expect(index.includes('catalog', 'get_online_booking_settings')).toBe(true);
-    expect(index.includes('catalog', 'get_resources')).toBe(true);
-    expect(index.includes('catalog', 'get_appointments')).toBe(false);
+    expect(index.includes('catalog', 'schedules_get')).toBe(true);
+    expect(index.includes('catalog', 'settings_get_online_booking')).toBe(true);
+    expect(index.includes('catalog', 'resources_list')).toBe(true);
+    expect(index.includes('catalog', 'appointments_list')).toBe(false);
   });
 
   it('serves the whole wizard on onboarding and nothing else', () => {
@@ -139,8 +139,8 @@ describe('static views', () => {
   it('points an out-of-facet tool at the facets that serve it', () => {
     const index = buildFacetIndex(tools);
     expect(index.facetsProviding('team_members_list')).toEqual(['catalog']);
-    expect(index.facetsProviding('get_appointments')).toEqual(['ops']);
-    expect(index.facetsProviding('list_locations')).toEqual([...FACET_NAMES]);
+    expect(index.facetsProviding('appointments_list')).toEqual(['ops']);
+    expect(index.facetsProviding('locations_list')).toEqual([...FACET_NAMES]);
   });
 
   it('ignores facet rules for tools that do not exist', () => {
@@ -162,13 +162,13 @@ describe('static views', () => {
   });
 
   describe('the password login switch', () => {
-    // altegio_login instructs the model to collect an email and a password.
+    // auth_login instructs the model to collect an email and a password.
     // The public HTTP endpoint authenticates through OAuth and never needs
     // them, so the switch is off by default and no HTTP view carries the tools.
     it('names both halves of the password login pair', () => {
       expect([...PASSWORD_LOGIN_TOOLS].sort()).toEqual([
-        'altegio_login',
-        'altegio_logout',
+        'auth_login',
+        'auth_logout',
       ]);
       for (const name of PASSWORD_LOGIN_TOOLS) {
         expect(names).toContain(name);
@@ -224,18 +224,18 @@ describe('static views', () => {
   describe('access management on the default view', () => {
     // Handing out and revoking location access is a dangerous right that the
     // default endpoint does not offer a generic agent (v3 authorization RFC).
-    it('withholds remove_location_user from /mcp', () => {
+    it('withholds locations_remove_user from /mcp', () => {
       const index = buildFacetIndex(tools);
-      expect(index.includes(DEFAULT_FACET, 'remove_location_user')).toBe(false);
+      expect(index.includes(DEFAULT_FACET, 'locations_remove_user')).toBe(false);
     });
 
     it('keeps it reachable on the catalog facet and on stdio', () => {
       const index = buildFacetIndex(tools);
-      expect(index.includes('catalog', 'remove_location_user')).toBe(true);
-      expect(index.includes(ALL_TOOLS_FACET, 'remove_location_user')).toBe(
+      expect(index.includes('catalog', 'locations_remove_user')).toBe(true);
+      expect(index.includes(ALL_TOOLS_FACET, 'locations_remove_user')).toBe(
         true
       );
-      expect(index.facetsProviding('remove_location_user')).toEqual([
+      expect(index.facetsProviding('locations_remove_user')).toEqual([
         'catalog',
       ]);
     });
@@ -451,9 +451,9 @@ describe('the read-only view', () => {
   });
 
   it('does not force-admit the base tools the way a facet does', () => {
-    // list_locations is on this view because it reads, not because it is a
+    // locations_list is on this view because it reads, not because it is a
     // base tool. If it ever stopped reading it would have to drop out.
-    expect(members).toContain('list_locations');
+    expect(members).toContain('locations_list');
     const hypothetical = tools.map((tool) =>
       FACET_BASE_TOOLS.includes(tool.name) ? { ...tool, readOnly: false } : tool
     );
@@ -481,9 +481,9 @@ describe('the read-only view', () => {
   it('carries no destructive tool and no password login', () => {
     for (const name of [
       'team_members_delete',
-      'delete_appointment',
+      'appointments_delete',
       'clients_delete',
-      'remove_location_user',
+      'locations_remove_user',
       'onboarding_rollback_phase',
       ...PASSWORD_LOGIN_TOOLS,
     ]) {
@@ -497,10 +497,10 @@ describe('the read-only view', () => {
   });
 
   it('serves the read-only executor, which refuses writes itself', () => {
-    expect(index.includes(READONLY_VIEW, 'altegio_search_operations')).toBe(
+    expect(index.includes(READONLY_VIEW, 'api_search_operations')).toBe(
       true
     );
-    expect(index.includes(READONLY_VIEW, 'altegio_call_operation')).toBe(true);
+    expect(index.includes(READONLY_VIEW, 'api_call_operation')).toBe(true);
   });
 
   it('is deterministic and keeps the registry order (ADR-001 D7)', () => {

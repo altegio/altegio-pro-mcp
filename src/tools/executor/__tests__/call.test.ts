@@ -23,7 +23,7 @@ function fetchedUrl(): string {
   return (global.fetch as jest.Mock).mock.calls[0]?.[0] as string;
 }
 
-describe('altegio_call_operation', () => {
+describe('api_call_operation', () => {
   let client: AltegioClient;
 
   beforeEach(() => {
@@ -252,7 +252,7 @@ describe('altegio_call_operation', () => {
     it('points at describe_operation when arguments do not fit', async () => {
       await expect(
         callOperation(client, 'get_team_member_list', {})
-      ).rejects.toThrow(/altegio_describe_operation/);
+      ).rejects.toThrow(/api_describe_operation/);
     });
 
     it('forwards an undocumented parameter and says so', async () => {
@@ -290,7 +290,7 @@ describe('altegio_call_operation', () => {
     it('names the curated tool in the refusal when one exists', async () => {
       await expect(
         callOperation(client, 'create_appointment', { location_id: 4564 })
-      ).rejects.toThrow(/curated tool `create_appointment`/);
+      ).rejects.toThrow(/curated tool `appointments_create`/);
     });
 
     it('refuses a V3 preview read, which the live API does not serve yet', async () => {
@@ -303,7 +303,7 @@ describe('altegio_call_operation', () => {
     it('refuses an unknown operationId and points at search', async () => {
       await expect(
         callOperation(client, 'no_such_operation', {})
-      ).rejects.toThrow(/altegio_search_operations/);
+      ).rejects.toThrow(/api_search_operations/);
     });
   });
 

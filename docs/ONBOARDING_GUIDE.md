@@ -55,7 +55,7 @@ onboarding_set_schedules({
 ```typescript
 // Public HTTP is already authorized with Altegio OAuth.
 // In local stdio mode only, authenticate if needed:
-altegio_login({
+auth_login({
   email: "your-email@example.com",
   password: "your-password"
 })
@@ -344,7 +344,7 @@ If an error interrupts the onboarding process:
 
 ```typescript
 // Later, in a new session (public HTTP reconnects with Altegio OAuth;
-// local stdio calls altegio_login first only when its session is absent)
+// local stdio calls auth_login first only when its session is absent)
 
 onboarding_resume({
   location_id: 123456
@@ -519,7 +519,7 @@ Full onboarding from scratch to operational platform:
 ```typescript
 // 1. Public HTTP: connect with Altegio OAuth.
 //    Local stdio only: log in if needed.
-altegio_login({ email: "owner@salon.com", password: "secure123" })
+auth_login({ email: "owner@salon.com", password: "secure123" })
 
 // 2. Start onboarding
 onboarding_start({ location_id: 123456 })
@@ -583,7 +583,7 @@ onboarding_status({ location_id: 123456 })
 ## Troubleshooting
 
 ### Error: "Authentication required"
-**Solution:** reconnect public HTTP with Altegio OAuth, or run `altegio_login()` in local stdio mode
+**Solution:** reconnect public HTTP with Altegio OAuth, or run `auth_login()` in local stdio mode
 
 ### Error: "Category ID not found"
 **Solution:** Run `onboarding_add_categories()` before `onboarding_add_services_batch()`
@@ -711,13 +711,13 @@ After completing onboarding:
 1. **Verify data:** Use existing tools to check created entities
    ```typescript
    team_members_list({ location_id: 123456 })
-   get_services({ location_id: 123456 })
-   get_appointments({ location_id: 123456 })
+   services_list({ location_id: 123456 })
+   appointments_list({ location_id: 123456 })
    ```
 
 2. **Customize settings:** Update staff schedules, service configurations
 
-3. **Start operations:** Create real appointments using `create_appointment()`
+3. **Start operations:** Create real appointments using `appointments_create()`
 
 4. **Monitor performance:** Check appointment patterns, popular services
 

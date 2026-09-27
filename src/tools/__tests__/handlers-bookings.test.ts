@@ -169,7 +169,7 @@ describe('ToolHandlers - Appointments CRUD', () => {
 
     it('should handle errors', async () => {
       mockClient.createBooking.mockRejectedValue(
-        new AuthenticationError('Not authenticated. Call altegio_login first.')
+        new AuthenticationError('Not authenticated. Call auth_login first.')
       );
 
       const result = await handlers.createAppointment({

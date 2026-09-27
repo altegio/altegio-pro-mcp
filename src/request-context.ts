@@ -147,7 +147,7 @@ const PARTNER_TOKEN_HEADER = 'x-altegio-partner-token';
  *
  *  - **UC1 — human via a generic agent (header ABSENT):** the server signs
  *    upstream calls with its OWN partner token (`ALTEGIO_API_TOKEN`) and the
- *    caller reaches Altegio through `altegio_login` (email + password → user
+ *    caller reaches Altegio through `auth_login` (email + password → user
  *    token).
  *  - **UC2 — application agent (header PRESENT):** the caller is itself an
  *    Altegio application and sends its own partner token per request, alongside
@@ -177,7 +177,7 @@ const COMPANY_ID_HEADER = 'x-altegio-company-id';
  * The set is trusted exactly as declared: the server does not validate,
  * compute, or resolve which companies belong to the caller — deciding that is
  * the caller's responsibility. Every operation is then confined to this set
- * (`assertCompanyAllowed`, and the `list_locations` filter).
+ * (`assertCompanyAllowed`, and the `locations_list` filter).
  *
  * Returns `undefined` only when the header is absent, meaning "no scope
  * declared". A present but blank or wholly invalid header returns an empty set,
@@ -306,7 +306,7 @@ export function getRequestCompanyIds(): ReadonlySet<number> | undefined {
  *
  * `true` when no scope is declared (stdio, or a request without the header), so
  * every existing caller is unaffected; otherwise `true` only for a company in
- * the declared set. Used to filter `list_locations` down to the allowed set.
+ * the declared set. Used to filter `locations_list` down to the allowed set.
  */
 export function isCompanyAllowed(companyId: number): boolean {
   const scope = getRequestCompanyIds();

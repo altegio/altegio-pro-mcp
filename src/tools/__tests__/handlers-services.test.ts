@@ -85,7 +85,7 @@ describe('ToolHandlers - Services CRUD', () => {
 
     it('should handle errors', async () => {
       mockClient.createService.mockRejectedValue(
-        new AuthenticationError('Not authenticated. Call altegio_login first.')
+        new AuthenticationError('Not authenticated. Call auth_login first.')
       );
 
       const result = await handlers.createService({

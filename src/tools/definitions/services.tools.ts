@@ -51,7 +51,7 @@ function projectService(service: AltegioService) {
 }
 
 export const getServicesTool = defineTool({
-  name: 'get_services',
+  name: 'services_list',
   category: 'Services',
   description:
     '[Services] Get list of services available at a location. AUTHENTICATION REQUIRED - administrative access to view all services with full pricing, settings, and configuration (not just public online-booking info). User must be logged in and have access to the location. Returns a stable page ordered by ID, with next_page and total. Default 25 rows.',
@@ -112,7 +112,7 @@ export const getServicesTool = defineTool({
 });
 
 export const createServiceTool = defineTool({
-  name: 'create_service',
+  name: 'services_create',
   category: 'Services',
   description:
     '[Services] Create a new service. AUTHENTICATION REQUIRED. Required fields: title, category_id. Services are active and usable by default; pass active=0 only to create a hidden draft. Link at least one team member before booking it.',
@@ -160,7 +160,7 @@ export const createServiceTool = defineTool({
 });
 
 export const updateServiceTool = defineTool({
-  name: 'update_service',
+  name: 'services_update',
   category: 'Services',
   description:
     '[Services] Safely update an existing service. AUTHENTICATION REQUIRED. Provide only fields to change; the tool reads the current service and preserves all unchanged writable fields and team-member links before sending the documented V1 PUT.',
@@ -214,10 +214,10 @@ export const updateServiceTool = defineTool({
 });
 
 export const deleteServiceTool = defineTool({
-  name: 'delete_service',
+  name: 'services_delete',
   category: 'Services',
   description:
-    '[Services] Permanently delete a service. AUTHENTICATION REQUIRED. This removes the service entirely; to merely hide it from booking, use update_service with active=0 instead.',
+    '[Services] Permanently delete a service. AUTHENTICATION REQUIRED. This removes the service entirely; to merely hide it from booking, use services_update with active=0 instead.',
   annotations: {
     title: 'Delete Service',
     destructiveHint: true,
@@ -243,7 +243,7 @@ export const deleteServiceTool = defineTool({
       return `service "${service.title}", id ${service.id}${linked}, at location ${input.location_id}`;
     },
     consequence:
-      'The service is removed from the location together with every team-member link and its place in the online-booking menu. Appointments already booked keep the service name they were booked with. To merely take it off sale instead, cancel here and call update_service with active=0.',
+      'The service is removed from the location together with every team-member link and its place in the online-booking menu. Appointments already booked keep the service name they were booked with. To merely take it off sale instead, cancel here and call services_update with active=0.',
   },
   handler: async ({ input, client }) => {
     await client.deleteService(input.location_id, input.service_id);
@@ -256,10 +256,10 @@ export const deleteServiceTool = defineTool({
 // ========== Service ↔ Team Member Links ==========
 
 export const linkServiceTeamMemberTool = defineTool({
-  name: 'link_service_team_member',
+  name: 'services_link_team_member',
   category: 'Services',
   description:
-    '[Services] Link a team member to a service so they can perform it. AUTHENTICATION REQUIRED. Required to create appointments: without the link, create_appointment fails with HTTP 400 "team member does not provide the selected services". If the link already exists, use update_service_team_member to change its duration.',
+    '[Services] Link a team member to a service so they can perform it. AUTHENTICATION REQUIRED. Required to create appointments: without the link, appointments_create fails with HTTP 400 "team member does not provide the selected services". If the link already exists, use services_update_team_member_link to change its duration.',
   annotations: {
     title: 'Link Team Member to Service',
     destructiveHint: false,
@@ -297,10 +297,10 @@ export const linkServiceTeamMemberTool = defineTool({
 });
 
 export const updateServiceTeamMemberTool = defineTool({
-  name: 'update_service_team_member',
+  name: 'services_update_team_member_link',
   category: 'Services',
   description:
-    '[Services] Update an existing team member ↔ service link (session duration or tech card). AUTHENTICATION REQUIRED. Use link_service_team_member to create the link first.',
+    '[Services] Update an existing team member ↔ service link (session duration or tech card). AUTHENTICATION REQUIRED. Use services_link_team_member to create the link first.',
   annotations: {
     title: 'Update Team Member Service Link',
     destructiveHint: false,
@@ -342,7 +342,7 @@ export const updateServiceTeamMemberTool = defineTool({
 });
 
 export const unlinkServiceTeamMemberTool = defineTool({
-  name: 'unlink_service_team_member',
+  name: 'services_unlink_team_member',
   category: 'Services',
   description:
     '[Services] Remove the link between a team member and a service (they stop offering it). AUTHENTICATION REQUIRED.',
@@ -373,7 +373,7 @@ export const unlinkServiceTeamMemberTool = defineTool({
       return `${member.name} (id ${member.id}) from service "${service.title}" (id ${service.id}) at location ${input.location_id}`;
     },
     consequence:
-      'They stop offering this service: the pair disappears from online booking and create_appointment rejects it with HTTP 400 "team member does not provide the selected services". Appointments already booked for the pair are kept.',
+      'They stop offering this service: the pair disappears from online booking and appointments_create rejects it with HTTP 400 "team member does not provide the selected services". Appointments already booked for the pair are kept.',
   },
   handler: async ({ input, client }) => {
     await client.removeServiceFromStaff(
@@ -388,7 +388,7 @@ export const unlinkServiceTeamMemberTool = defineTool({
 });
 
 export const linkTeamMemberServicesTool = defineTool({
-  name: 'link_team_member_services',
+  name: 'team_members_link_services',
   category: 'Services',
   description:
     '[Services] Bulk-link ONE team member to MANY services in a single call. AUTHENTICATION REQUIRED. Applies the same session_length to every service. Reports per-service success/failure (already-linked services fail individually without stopping the rest).',

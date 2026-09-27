@@ -266,8 +266,8 @@ async function startHTTPServer(): Promise<void> {
     // state it in the boot log instead of leaving it to be inferred.
     logger.info(
       config.env.ALTEGIO_EXPOSE_PASSWORD_LOGIN
-        ? 'Password login (altegio_login/altegio_logout) is SERVED on the HTTP views — intended only for the closed staff deployment (ALTEGIO_EXPOSE_PASSWORD_LOGIN=true)'
-        : 'Password login (altegio_login/altegio_logout) is withheld from the HTTP views; callers authenticate through the proxy'
+        ? 'Password login (auth_login/auth_logout) is SERVED on the HTTP views — intended only for the closed staff deployment (ALTEGIO_EXPOSE_PASSWORD_LOGIN=true)'
+        : 'Password login (auth_login/auth_logout) is withheld from the HTTP views; callers authenticate through the proxy'
     );
     logger.info(
       `Read-only view on /mcp/${READONLY_VIEW}: serves only tools annotated readOnlyHint, and refuses every other tool by name. Addresses named to callers are based on ${config.env.MCP_PUBLIC_BASE_URL}`

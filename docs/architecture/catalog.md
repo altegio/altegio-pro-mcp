@@ -49,7 +49,7 @@ Schemas are dereferenced to `MAX_SCHEMA_DEPTH` levels. Anything deeper collapses
 to `{"x-truncated": true}`; a reference cycle collapses to `{"x-circular": …}`.
 A schema that still serializes to more than `MAX_SCHEMA_BYTES` is rebuilt one
 level shallower until it fits, and the level it settled on is recorded as
-`x-depth-limited`. This is what keeps an `altegio_describe_operation` result
+`x-depth-limited`. This is what keeps an `api_describe_operation` result
 inside the per-result token budget.
 
 A `properties` map is not itself a depth level — otherwise truncation would erase

@@ -1,6 +1,6 @@
 /**
  * Keyword search over the generated API catalog — backs
- * `altegio_search_operations`.
+ * `api_search_operations`.
  *
  * Deterministic and local: a small weighted term index over each operation's
  * id, summary, tags, domain, path, parameter names and description. No

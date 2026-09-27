@@ -5,7 +5,7 @@ import { MAX_SEARCH_RESULTS, queryTerms, searchOperations } from '../search.js';
  * is deterministic by design (ADR-001 D9), so these are real regression tests:
  * a change to the weights that breaks a question fails here.
  */
-describe('altegio_search_operations ranking', () => {
+describe('api_search_operations ranking', () => {
   const cases: Array<{ query: string; expect: string }> = [
     { query: 'team member schedule', expect: 'get_team_member_schedule' },
     { query: 'staff list', expect: 'get_team_member_list' },

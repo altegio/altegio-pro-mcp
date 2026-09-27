@@ -5,7 +5,7 @@ import { resourcesOutput } from '../output-schemas.js';
 import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
 
 export const getResourcesTool = defineTool({
-  name: 'get_resources',
+  name: 'resources_list',
   category: 'Resources',
   description:
     '[Resources] Get the list of resources at a location (e.g. cabinets, chairs, equipment). AUTHENTICATION REQUIRED. Read-only: the API does not expose resource creation.',

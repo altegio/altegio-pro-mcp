@@ -59,7 +59,7 @@ export function httpFromClient(client: AltegioClient): AltegioHttp {
 export function requireUserToken(http: AltegioHttp, action: string): void {
   if (!http.isAuthenticated()) {
     throw new AuthenticationError(
-      `Not authenticated. Call altegio_login before trying to ${action}.`
+      `Not authenticated. Call auth_login before trying to ${action}.`
     );
   }
 }

@@ -167,16 +167,16 @@ Add to config (use double backslashes):
 After setup, Claude Desktop will have:
 
 **Authentication:**
-- `altegio_login` - Login with email/password
-- `altegio_logout` - Clear credentials
+- `auth_login` - Login with email/password
+- `auth_logout` - Clear credentials
 
 **Business Management:**
-- `list_locations` - Get managed locations
-- `get_appointments` - View appointments
+- `locations_list` - Get managed locations
+- `appointments_list` - View appointments
 - `team_members_list` - View all staff (B2B)
-- `get_services` - View services (B2B)
-- `get_service_categories` - View categories
-- `get_schedule` - View staff member schedules
+- `services_list` - View services (B2B)
+- `service_categories_list` - View categories
+- `schedules_get` - View staff member schedules
 
 ---
 
@@ -205,7 +205,7 @@ Should connect via stdio.
 
 ### Authentication issues
 
-After `altegio_login`, credentials are saved to `~/.altegio-mcp/credentials.json`. Check this file exists and has valid token.
+After `auth_login`, credentials are saved to `~/.altegio-mcp/credentials.json`. Check this file exists and has valid token.
 
 ### Path issues
 
@@ -260,8 +260,8 @@ Optional configuration in `claude_desktop_config.json`:
 In Claude Desktop, try:
 
 ```
-"Use altegio_login to authenticate with my credentials"
-"List my locations using list_locations"
+"Use auth_login to authenticate with my credentials"
+"List my locations using locations_list"
 "Show staff for location ID 123"
 ```
 

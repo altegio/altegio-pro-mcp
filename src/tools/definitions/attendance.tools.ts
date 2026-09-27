@@ -8,7 +8,7 @@
  * when the token does not match the current snapshot, writes once per visit
  * group and re-reads after each write. Earlier groups are never rolled back.
  *
- * Statuses use the canonical appointment vocabulary of `get_appointments`
+ * Statuses use the canonical appointment vocabulary of `appointments_list`
  * (waiting, confirmed, arrived, no_show); the V1 attendance codes stay here.
  */
 import { z } from 'zod';
@@ -62,7 +62,7 @@ const selectionInput = z.object({
     .int()
     .positive()
     .describe(
-      'Location of the appointments. Call list_locations when the id is unknown.'
+      'Location of the appointments. Call locations_list when the id is unknown.'
     ),
   appointment_ids: z
     .array(z.number().int().positive())
@@ -73,7 +73,7 @@ const selectionInput = z.object({
       'Appointment ids must be unique.'
     )
     .describe(
-      `1–${MAX_APPOINTMENTS} distinct appointment ids, from get_appointments.`
+      `1–${MAX_APPOINTMENTS} distinct appointment ids, from appointments_list.`
     ),
   target_status: z
     .enum(STATUSES)
@@ -124,14 +124,14 @@ async function readSnapshot(
       asInteger(record.company_id) !== locationId
     )
       throw new ExecutorRefusalError(
-        `Appointment ${id} does not belong to location ${locationId}. Check the id with get_appointments.`
+        `Appointment ${id} does not belong to location ${locationId}. Check the id with appointments_list.`
       );
     const code = asInteger(record.attendance ?? record.visit_attendance);
     const status =
       code === null ? undefined : OUTCOME_FROM_ATTENDANCE_CODE[code];
     if (!status)
       throw new ExecutorRefusalError(
-        `Appointment ${id} has an attendance status this workflow does not know. Inspect it with get_appointments.`
+        `Appointment ${id} has an attendance status this workflow does not know. Inspect it with appointments_list.`
       );
     snapshot.push({
       id,
@@ -351,7 +351,7 @@ export const appointmentsApplyAttendanceTool = defineTool({
           outcome: 'write_unverified',
         });
         return stopped(
-          `The write for ${group} was accepted, but re-reading its appointments did not confirm status ${input.target_status}. Inspect the visit with get_appointments before retrying; earlier groups cannot be rolled back automatically.`
+          `The write for ${group} was accepted, but re-reading its appointments did not confirm status ${input.target_status}. Inspect the visit with appointments_list before retrying; earlier groups cannot be rolled back automatically.`
         );
       }
       outcomes.push({ group, appointment_id: pending.id, outcome: 'updated' });

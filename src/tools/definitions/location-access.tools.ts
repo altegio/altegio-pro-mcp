@@ -25,7 +25,7 @@ const objectSchema = (properties: Record<string, object>) => ({
 });
 
 export const diagnoseLocationAccessTool = defineTool({
-  name: 'diagnose_location_access',
+  name: 'locations_diagnose_access',
   category: 'Location',
   description:
     '[Location] Diagnose an HTTP 403 for the current Altegio credential pair at a location. Reads location access and the user’s effective permission groups with the same request credential. Optionally reads an application’s declared permissions, which do not prove installation or effective system-user rights. Partner-token grants cannot be inspected by this API, so a 403 alone cannot isolate the failing grant. No permissions are changed.',
@@ -40,7 +40,7 @@ export const diagnoseLocationAccessTool = defineTool({
       .int()
       .positive()
       .describe(
-        'Location where the failing operation was refused. Call list_locations when the id is unknown.'
+        'Location where the failing operation was refused. Call locations_list when the id is unknown.'
       ),
     permission_keys: z
       .array(z.string().regex(/^[a-z_]+\.[a-z_]+$/))
@@ -126,7 +126,7 @@ export const diagnoseLocationAccessTool = defineTool({
       location.status === 'forbidden'
         ? 'This partner-and-user credential pair cannot read the location. The API does not identify whether the user, application or partner grant caused this 403.'
         : location.status === 'not_found'
-          ? 'The location was not found for this credential pair. Verify location_id with list_locations.'
+          ? 'The location was not found for this credential pair. Verify location_id with locations_list.'
           : location.status === 'unavailable'
             ? 'The location could not be read right now; retry before drawing conclusions about access.'
             : permissions.status === 'ok'

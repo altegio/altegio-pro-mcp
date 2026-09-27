@@ -13,7 +13,7 @@ export const ONBOARDING_WALKTHROUGH_PROMPT = 'onboarding_walkthrough';
 function walkthrough(locationId?: string): string {
   const target = locationId
     ? `Set up location ${locationId}.`
-    : 'Ask which location to set up: call list_locations and let me pick one, then use that location_id everywhere below.';
+    : 'Ask which location to set up: call locations_list and let me pick one, then use that location_id everywhere below.';
 
   return [
     'Walk me through setting up my location in Altegio for the first time.',
@@ -23,7 +23,7 @@ function walkthrough(locationId?: string): string {
     '',
     target,
     '',
-    'Use the host-provided Altegio identity if present; otherwise, in local stdio mode, call altegio_login if I am not authenticated yet. Then',
+    'Use the host-provided Altegio identity if present; otherwise, in local stdio mode, call auth_login if I am not authenticated yet. Then',
     'onboarding_start for the location (onboarding_resume instead if a session',
     'already exists — onboarding_status tells you which).',
     '',

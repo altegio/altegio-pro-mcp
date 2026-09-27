@@ -16,7 +16,7 @@ const slotSchema = z.object({
 });
 
 export const getScheduleTool = defineTool({
-  name: 'get_schedule',
+  name: 'schedules_get',
   category: 'Schedule',
   description:
     '[Schedule] Get staff member schedule for a date range. AUTHENTICATION REQUIRED - administrative access to view staff working schedule. User must be logged in and have access to the location. Returns schedule entries with dates, times, and session lengths.',
@@ -74,7 +74,7 @@ export const getScheduleTool = defineTool({
 });
 
 export const createScheduleTool = defineTool({
-  name: 'create_schedule',
+  name: 'schedules_create',
   category: 'Schedule',
   description:
     '[Schedule] Create staff member work schedule. AUTHENTICATION REQUIRED - administrative access to create staff working schedule. Defines when a staff member is available to work (e.g., "Monday 9:00-18:00"). Use this to set up or modify work hours.',
@@ -124,7 +124,7 @@ export const createScheduleTool = defineTool({
 });
 
 export const updateScheduleTool = defineTool({
-  name: 'update_schedule',
+  name: 'schedules_update',
   category: 'Schedule',
   description:
     '[Schedule] Update staff member work schedule. AUTHENTICATION REQUIRED - administrative access to modify staff working schedule. Replaces work hours for specified dates.',
@@ -171,7 +171,7 @@ export const updateScheduleTool = defineTool({
 });
 
 export const deleteScheduleTool = defineTool({
-  name: 'delete_schedule',
+  name: 'schedules_delete',
   category: 'Schedule',
   description:
     '[Schedule] Delete staff member work schedule for specified dates. AUTHENTICATION REQUIRED - administrative access to remove staff working schedule. Makes the specified dates non-working days.',

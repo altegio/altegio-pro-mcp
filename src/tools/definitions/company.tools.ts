@@ -13,7 +13,7 @@ function sameValue(requested: unknown, observed: unknown): boolean {
 }
 
 export const listLocationsTool = defineTool({
-  name: 'list_locations',
+  name: 'locations_list',
   category: 'Location',
   description:
     '[Location] Get list of locations. AUTHENTICATION REQUIRED. Use my=1 for locations managed by the current user. If user asks about "their" or "my" locations, use my=1 and ensure user is logged in first. After getting user locations, ask which location they want to work with if not specified. Returns 25 rows by default. Follow next_page until null; a full final page may require one empty request.',
@@ -70,7 +70,7 @@ export const listLocationsTool = defineTool({
 });
 
 export const updateLocationTool = defineTool({
-  name: 'update_location',
+  name: 'locations_update',
   category: 'Location',
   description:
     '[Location] Update a location — rename it or change documented address, city/country, website, coordinates, description, business type, or phone fields. AUTHENTICATION REQUIRED (admin access to the location). The result verifies requested fields against a documented location read. In particular, the API may accept phones without persisting them; such fields are reported as unconfirmed, never as successfully updated.',

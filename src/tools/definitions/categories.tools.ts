@@ -5,7 +5,7 @@ import { categoriesOutput } from '../output-schemas.js';
 import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
 
 export const getServiceCategoriesTool = defineTool({
-  name: 'get_service_categories',
+  name: 'service_categories_list',
   category: 'Categories',
   description:
     '[Categories] Get list of service categories at a location. PUBLIC API - NO AUTHENTICATION REQUIRED. Use this for online booking - shows how services are organized. Returns a stable page ordered by ID, with next_page and total. Default 25 rows.',
@@ -65,7 +65,7 @@ export const getServiceCategoriesTool = defineTool({
 });
 
 export const deleteServiceCategoryTool = defineTool({
-  name: 'delete_service_category',
+  name: 'service_categories_delete',
   category: 'Categories',
   description:
     '[Categories] Permanently delete one specifically identified service category. AUTHENTICATION REQUIRED. Delete or move its location-owned services first. A 403 for a chain-owned category is an ownership boundary; do not retry it at chain scope.',

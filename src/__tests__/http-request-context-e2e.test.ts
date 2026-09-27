@@ -100,7 +100,7 @@ describe('HTTP direct-token propagation, end to end', () => {
           id: 2,
           method: 'tools/call',
           params: {
-            name: 'list_locations',
+            name: 'locations_list',
             arguments: { my: 1, count: 1 },
           },
         },

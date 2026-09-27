@@ -21,7 +21,7 @@ function expectOutputContract(
     throw new Error(JSON.stringify(validate.errors, null, 2));
 }
 
-describe('diagnose_location_access', () => {
+describe('locations_diagnose_access', () => {
   it('stops at a forbidden location without guessing partner rights', async () => {
     const request = jest.fn();
     const result = await diagnoseLocationAccessTool.createHandler(
@@ -95,7 +95,7 @@ describe('diagnose_location_access', () => {
       location_access: 'not_found',
       application_declared_permissions: { status: 'not_requested' },
     });
-    expect(content(result).diagnosis).toContain('list_locations');
+    expect(content(result).diagnosis).toContain('locations_list');
   });
 
   it('reports a lost session as an authentication error, not a finding', async () => {

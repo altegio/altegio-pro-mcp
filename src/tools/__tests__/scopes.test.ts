@@ -83,7 +83,7 @@ describe('the map covers every tool', () => {
       'clients:write',
       'appointments:write',
     ]);
-    expect(requiredScopesFor('altegio_login')).toEqual([]);
+    expect(requiredScopesFor('auth_login')).toEqual([]);
     expect(requiredScopesFor('onboarding_status')).toEqual([]);
   });
 
@@ -99,7 +99,7 @@ describe('the map covers every tool', () => {
       .map((tool) => tool.meta.name)
       .sort();
     // Only the two password-login tools: they obtain the credential itself.
-    expect(ungatedWrites).toEqual(['altegio_login', 'altegio_logout']);
+    expect(ungatedWrites).toEqual(['auth_login', 'auth_logout']);
   });
 
   it('reaches the tool definition through the factory, not the definition file', () => {
@@ -109,7 +109,7 @@ describe('the map covers every tool', () => {
     expect(staff.meta.requiredScopes).toEqual(['team_members:read']);
     // Nothing in a definition module spells a scope out; the factory fills it.
     const remove = factoryTools.find(
-      (tool) => tool.meta.name === 'remove_location_user'
+      (tool) => tool.meta.name === 'locations_remove_user'
     )!;
     expect(remove.meta.requiredScopes).toEqual(['team_members:manage_access']);
   });
@@ -219,8 +219,8 @@ describe('checkToolScopes', () => {
   it('passes an ungated tool whatever the caller holds', () => {
     expect(
       checkToolScopes({
-        toolName: 'altegio_login',
-        required: requiredScopesFor('altegio_login'),
+        toolName: 'auth_login',
+        required: requiredScopesFor('auth_login'),
         granted: grants('clients:read'),
       })
     ).toBeUndefined();
@@ -293,13 +293,13 @@ describe('the platform vocabulary (mcp:pro:*)', () => {
 
   /** The gated tools a session touches first; a refusal here is an outage. */
   const gated = [
-    'list_locations',
+    'locations_list',
     'team_members_list',
-    'get_services',
-    'get_appointments',
+    'services_list',
+    'appointments_list',
     'clients_search',
     'analytics_get_overview',
-    'altegio_call_operation',
+    'api_call_operation',
   ] as const;
 
   it('declares exactly the two names routes.json issues for this service', () => {
@@ -335,10 +335,10 @@ describe('the platform vocabulary (mcp:pro:*)', () => {
     // than strictly guarded. See `scopeSatisfied` for the reasoning.
     const granted = parseScopes(PROXY_FULL_GRANT)!;
     for (const name of [
-      'update_location',
+      'locations_update',
       'team_members_delete',
-      'create_appointment',
-      'remove_location_user',
+      'appointments_create',
+      'locations_remove_user',
       'onboarding_rollback_phase',
       'analytics_delete_assistant_report',
     ]) {
@@ -371,14 +371,14 @@ describe('the platform vocabulary (mcp:pro:*)', () => {
     // address, `/mcp` included, not merely hidden from `/mcp/readonly`.
     const granted = parseScopes(PROXY_READ_GRANT)!;
     for (const name of [
-      'update_location',
+      'locations_update',
       'team_members_create',
       'team_members_delete',
-      'update_service',
-      'create_appointment',
-      'delete_appointment',
+      'services_update',
+      'appointments_create',
+      'appointments_delete',
       'clients_delete',
-      'remove_location_user',
+      'locations_remove_user',
       'onboarding_import_clients',
       'onboarding_rollback_phase',
     ]) {

@@ -124,13 +124,13 @@ export function facetToolsFromSpecs(
  * unusable. Password login is admitted per deployment instead — see
  * `PASSWORD_LOGIN_TOOLS`.
  */
-export const FACET_BASE_TOOLS: readonly string[] = ['list_locations'];
+export const FACET_BASE_TOOLS: readonly string[] = ['locations_list'];
 
 /**
  * Email + password login, admitted to the HTTP views only when the deployment
  * asks for it (`exposePasswordLogin`, set from `ALTEGIO_EXPOSE_PASSWORD_LOGIN`).
  *
- * `altegio_login` tells the model to ask the user for an email and a password.
+ * `auth_login` tells the model to ask the user for an email and a password.
  * On the public endpoint, which authenticates through OAuth and never needs
  * them, that is a standing prompt-injection target: any text the model reads
  * can try to talk it into collecting credentials. So the public HTTP surface
@@ -143,8 +143,8 @@ export const FACET_BASE_TOOLS: readonly string[] = ['list_locations'];
  *    password login is still how a V1 user token is obtained.
  */
 export const PASSWORD_LOGIN_TOOLS: readonly string[] = [
-  'altegio_login',
-  'altegio_logout',
+  'auth_login',
+  'auth_logout',
 ];
 
 interface FacetRule {
@@ -166,10 +166,10 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
    */
   ops: {
     tools: [
-      'get_appointments',
-      'create_appointment',
-      'update_appointment',
-      'delete_appointment',
+      'appointments_list',
+      'appointments_create',
+      'appointments_update',
+      'appointments_delete',
       'appointments_preview_attendance',
       'appointments_apply_attendance',
     ],
@@ -182,37 +182,37 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
    */
   catalog: {
     tools: [
-      'diagnose_location_access',
-      'update_location',
-      'get_services',
-      'create_service',
-      'update_service',
-      'delete_service',
-      'link_service_team_member',
-      'update_service_team_member',
-      'unlink_service_team_member',
-      'link_team_member_services',
-      'get_service_categories',
-      'delete_service_category',
+      'locations_diagnose_access',
+      'locations_update',
+      'services_list',
+      'services_create',
+      'services_update',
+      'services_delete',
+      'services_link_team_member',
+      'services_update_team_member_link',
+      'services_unlink_team_member',
+      'team_members_link_services',
+      'service_categories_list',
+      'service_categories_delete',
       'team_members_list',
       'team_members_create',
       'team_members_update',
       'team_members_delete',
-      'get_positions',
-      'create_position',
-      'get_schedule',
-      'create_schedule',
-      'update_schedule',
-      'delete_schedule',
-      'get_appointment_settings',
-      'update_appointment_settings',
-      'get_online_booking_settings',
-      'update_online_booking_settings',
-      'get_booking_forms',
-      'create_booking_form',
-      'delete_booking_form',
-      'get_resources',
-      'remove_location_user',
+      'positions_list',
+      'positions_create',
+      'schedules_get',
+      'schedules_create',
+      'schedules_update',
+      'schedules_delete',
+      'settings_get_appointment_calendar',
+      'settings_update_appointment_calendar',
+      'settings_get_online_booking',
+      'settings_update_online_booking',
+      'booking_forms_list',
+      'booking_forms_create',
+      'booking_forms_delete',
+      'resources_list',
+      'locations_remove_user',
     ],
     prefixes: [],
   },
@@ -269,14 +269,14 @@ export const DEFAULT_FACET_EXCLUDED_PREFIXES: readonly string[] = [
  * above this names one tool at a time, for a tool whose pack is otherwise
  * served by default.
  *
- * `remove_location_user` hands out and revokes access to a location. The v3
+ * `locations_remove_user` hands out and revokes access to a location. The v3
  * authorization RFC puts access management among the dangerous rights that no
  * integration is granted by default, so it is not part of what `/mcp` offers a
  * generic agent. It stays on `/mcp/catalog` — a path a deployment points a
  * client at deliberately — and on stdio.
  */
 export const DEFAULT_FACET_EXCLUDED_TOOLS: readonly string[] = [
-  'remove_location_user',
+  'locations_remove_user',
 ];
 
 /**

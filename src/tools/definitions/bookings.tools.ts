@@ -88,10 +88,10 @@ function projectAppointment(
 }
 
 export const getAppointmentsTool = defineTool({
-  name: 'get_appointments',
+  name: 'appointments_list',
   category: 'Appointments',
   description:
-    '[Appointments] Get appointments for a location. AUTHENTICATION REQUIRED - this is administrative data. User must be logged in and have access to the location. If location_id not known, first call list_locations with my=1 to get user locations, then ask user to choose one. Returns 25 rows by default. Follow next_page until null; a full final page may require one empty request.',
+    '[Appointments] Get appointments for a location. AUTHENTICATION REQUIRED - this is administrative data. User must be logged in and have access to the location. If location_id not known, first call locations_list with my=1 to get user locations, then ask user to choose one. Returns 25 rows by default. Follow next_page until null; a full final page may require one empty request.',
   annotations: {
     title: 'Get Appointments',
     readOnlyHint: true,
@@ -181,11 +181,11 @@ export const getAppointmentsTool = defineTool({
 });
 
 export const createAppointmentTool = defineTool({
-  name: 'create_appointment',
+  name: 'appointments_create',
   category: 'Appointments',
   description:
     '[Appointments] Create a new client appointment. AUTHENTICATION REQUIRED. Required fields: team_member_id, services, datetime, session_length, client info. ' +
-    'PREREQUISITES: the team member must be LINKED to each service (use link_service_team_member, else HTTP 400 "team member does not provide the selected services") AND scheduled/available at the datetime (use create_schedule, else HTTP 409 "time not available"). ' +
+    'PREREQUISITES: the team member must be LINKED to each service (use services_link_team_member, else HTTP 400 "team member does not provide the selected services") AND scheduled/available at the datetime (use schedules_create, else HTTP 409 "time not available"). ' +
     'To back-date a completed visit or force a booking onto a busy/off slot, pass save_if_busy=true. Set attendance=1 to mark a past visit as attended.',
   annotations: {
     title: 'Create Appointment',
@@ -260,7 +260,7 @@ export const createAppointmentTool = defineTool({
 });
 
 export const updateAppointmentTool = defineTool({
-  name: 'update_appointment',
+  name: 'appointments_update',
   category: 'Appointments',
   description:
     '[Appointments] Update existing appointment. AUTHENTICATION REQUIRED. Provide only fields to update.',
@@ -333,7 +333,7 @@ export const updateAppointmentTool = defineTool({
 });
 
 export const deleteAppointmentTool = defineTool({
-  name: 'delete_appointment',
+  name: 'appointments_delete',
   category: 'Appointments',
   description:
     '[Appointments] Delete/cancel appointment. AUTHENTICATION REQUIRED.',

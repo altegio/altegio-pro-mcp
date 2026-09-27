@@ -44,9 +44,9 @@ export interface ApiMapping {
  * does not apply to them.
  */
 export const executorTools: string[] = [
-  'altegio_search_operations',
-  'altegio_describe_operation',
-  'altegio_call_operation',
+  'api_search_operations',
+  'api_describe_operation',
+  'api_call_operation',
 ];
 
 export const apiMapping: Record<string, ApiMapping> = {
@@ -79,26 +79,26 @@ export const apiMapping: Record<string, ApiMapping> = {
   // ==========================================
   // Authentication
   // ==========================================
-  altegio_login: {
+  auth_login: {
     path: '/auth',
     method: 'post',
     operationId: 'authorize_user',
     pathParams: [],
     bodyParams: ['login', 'password'],
   },
-  // altegio_logout: no API endpoint, local credential clear only
+  // auth_logout: no API endpoint, local credential clear only
 
   // ==========================================
   // Locations
   // ==========================================
-  list_locations: {
+  locations_list: {
     path: '/companies',
     method: 'get',
     operationId: 'get_location_list',
     pathParams: [],
     queryParams: ['my', 'page', 'count'],
   },
-  update_location: {
+  locations_update: {
     path: '/company/{location_id}',
     method: 'put',
     operationId: 'update_location',
@@ -124,28 +124,28 @@ export const apiMapping: Record<string, ApiMapping> = {
   // ==========================================
   // Appointments
   // ==========================================
-  get_appointments: {
+  appointments_list: {
     path: '/records/{location_id}',
     method: 'get',
     operationId: 'get_appointment_list',
     pathParams: ['location_id'],
     queryParams: ['page', 'count', 'start_date', 'end_date'],
   },
-  create_appointment: {
+  appointments_create: {
     path: '/records/{location_id}',
     method: 'post',
     operationId: 'create_appointment',
     pathParams: ['location_id'],
     bodyParams: ['staff_id', 'services', 'datetime', 'client'],
   },
-  update_appointment: {
+  appointments_update: {
     path: '/record/{location_id}/{record_id}',
     method: 'put',
     operationId: 'update_appointment',
     pathParams: ['location_id', 'record_id'],
     bodyParams: ['staff_id', 'services', 'datetime', 'client'],
   },
-  delete_appointment: {
+  appointments_delete: {
     path: '/record/{location_id}/{record_id}',
     method: 'delete',
     operationId: 'delete_appointment',
@@ -204,14 +204,14 @@ export const apiMapping: Record<string, ApiMapping> = {
   // ==========================================
   // Services
   // ==========================================
-  get_services: {
+  services_list: {
     path: '/services/{location_id}',
     method: 'get',
     operationId: 'get_service_list',
     pathParams: ['location_id'],
     queryParams: ['page', 'count'],
   },
-  create_service: {
+  services_create: {
     path: '/services/{location_id}',
     method: 'post',
     operationId: 'create_service',
@@ -228,7 +228,7 @@ export const apiMapping: Record<string, ApiMapping> = {
       'active',
     ],
   },
-  update_service: {
+  services_update: {
     path: '/services/{location_id}/{service_id}',
     method: 'put',
     operationId: 'deprecated_update_service_by_id',
@@ -244,7 +244,7 @@ export const apiMapping: Record<string, ApiMapping> = {
       'active',
     ],
   },
-  delete_service: {
+  services_delete: {
     path: '/services/{location_id}/{service_id}',
     method: 'delete',
     operationId: 'delete_service',
@@ -254,7 +254,7 @@ export const apiMapping: Record<string, ApiMapping> = {
   // ==========================================
   // Service ↔ Team Member links
   // ==========================================
-  link_service_team_member: {
+  services_link_team_member: {
     path: '/company/{location_id}/services/{service_id}/staff',
     method: 'post',
     operationId: 'assign_service_to_team_member',
@@ -262,21 +262,21 @@ export const apiMapping: Record<string, ApiMapping> = {
     bodyParams: ['master_id', 'seance_length', 'technological_card_id'],
   },
   // Bulk variant loops the single-assign operation, so it maps to the same op.
-  link_team_member_services: {
+  team_members_link_services: {
     path: '/company/{location_id}/services/{service_id}/staff',
     method: 'post',
     operationId: 'assign_service_to_team_member',
     pathParams: ['location_id', 'service_id'],
     bodyParams: ['master_id', 'seance_length', 'technological_card_id'],
   },
-  update_service_team_member: {
+  services_update_team_member_link: {
     path: '/company/{location_id}/services/{service_id}/staff/{team_member_id}',
     method: 'put',
     operationId: 'update_service_team_member_assignment',
     pathParams: ['location_id', 'service_id', 'team_member_id'],
     bodyParams: ['seance_length', 'technological_card_id'],
   },
-  unlink_service_team_member: {
+  services_unlink_team_member: {
     path: '/company/{location_id}/services/{service_id}/staff/{team_member_id}',
     method: 'delete',
     operationId: 'remove_service_from_team_member',
@@ -286,14 +286,14 @@ export const apiMapping: Record<string, ApiMapping> = {
   // ==========================================
   // Service Categories
   // ==========================================
-  get_service_categories: {
+  service_categories_list: {
     path: '/service_categories/{location_id}/{id}',
     method: 'get',
     operationId: 'deprecated_get_service_category_list',
     pathParams: ['location_id', 'id'],
     queryParams: ['page', 'count'],
   },
-  delete_service_category: {
+  service_categories_delete: {
     path: '/service_category/{location_id}/{id}',
     method: 'delete',
     operationId: 'delete_service_category',
@@ -303,13 +303,13 @@ export const apiMapping: Record<string, ApiMapping> = {
   // ==========================================
   // Positions (deprecated V1, pending V2 migration)
   // ==========================================
-  get_positions: {
+  positions_list: {
     path: '/company/{location_id}/staff/positions',
     method: 'get',
     operationId: 'get_position_list',
     pathParams: ['location_id'],
   },
-  create_position: {
+  positions_create: {
     path: '/company/{location_id}/positions/quick',
     method: 'post',
     operationId: 'create_position_quick',
@@ -319,32 +319,32 @@ export const apiMapping: Record<string, ApiMapping> = {
   // ==========================================
   // Schedule
   // ==========================================
-  get_schedule: {
+  schedules_get: {
     path: '/schedule/{location_id}/{team_member_id}/{start_date}/{end_date}',
     method: 'get',
     operationId: 'get_team_member_schedule',
     pathParams: ['location_id', 'team_member_id', 'start_date', 'end_date'],
   },
-  // create/update/delete_schedule all funnel through client.setSchedule, which
+  // create/update/schedules_delete all funnel through client.setSchedule, which
   // PUTs the modern /company/{id}/staff/schedule endpoint. NOTE: the backend
   // expects the per-entry key `staff_id`, not the `team_member_id` the spec
   // documents — the client maps it (see AltegioClient.setSchedule). The body
   // params below name the top-level keys the spec does document.
-  create_schedule: {
+  schedules_create: {
     path: '/company/{location_id}/staff/schedule',
     method: 'put',
     operationId: 'set_team_member_schedule',
     pathParams: ['location_id'],
     bodyParams: ['schedules_to_set'],
   },
-  update_schedule: {
+  schedules_update: {
     path: '/company/{location_id}/staff/schedule',
     method: 'put',
     operationId: 'set_team_member_schedule',
     pathParams: ['location_id'],
     bodyParams: ['schedules_to_set'],
   },
-  delete_schedule: {
+  schedules_delete: {
     path: '/company/{location_id}/staff/schedule',
     method: 'put',
     operationId: 'set_team_member_schedule',
@@ -355,26 +355,26 @@ export const apiMapping: Record<string, ApiMapping> = {
   // ==========================================
   // Location settings
   // ==========================================
-  get_appointment_settings: {
+  settings_get_appointment_calendar: {
     path: '/company/{location_id}/settings/timetable',
     method: 'get',
     operationId: 'get_appointment_calendar_settings',
     pathParams: ['location_id'],
   },
-  update_appointment_settings: {
+  settings_update_appointment_calendar: {
     path: '/company/{location_id}/settings/timetable',
     method: 'patch',
     operationId: 'update_appointment_calendar_settings',
     pathParams: ['location_id'],
     bodyParams: ['record_type', 'activity_record_clients_count_max'],
   },
-  get_online_booking_settings: {
+  settings_get_online_booking: {
     path: '/company/{location_id}/settings/online',
     method: 'get',
     operationId: 'get_online_booking_settings',
     pathParams: ['location_id'],
   },
-  update_online_booking_settings: {
+  settings_update_online_booking: {
     path: '/company/{location_id}/settings/online',
     method: 'patch',
     operationId: 'update_online_booking_settings',
@@ -386,20 +386,20 @@ export const apiMapping: Record<string, ApiMapping> = {
       'activity_online_record_clients_count_max',
     ],
   },
-  get_booking_forms: {
+  booking_forms_list: {
     path: '/company/{location_id}/booking_forms',
     method: 'get',
     operationId: 'get_booking_widget_list',
     pathParams: ['location_id'],
   },
-  create_booking_form: {
+  booking_forms_create: {
     path: '/company/{location_id}/booking_forms',
     method: 'post',
     operationId: 'create_booking_widget',
     pathParams: ['location_id'],
     bodyParams: ['title'],
   },
-  delete_booking_form: {
+  booking_forms_delete: {
     path: '/company/{location_id}/booking_forms/{form_id}',
     method: 'delete',
     operationId: 'delete_booking_widget',
@@ -409,7 +409,7 @@ export const apiMapping: Record<string, ApiMapping> = {
   // ==========================================
   // Resources (read-only)
   // ==========================================
-  get_resources: {
+  resources_list: {
     path: '/resources/{location_id}',
     method: 'get',
     operationId: 'get_resource_list',
@@ -490,7 +490,7 @@ export const apiMapping: Record<string, ApiMapping> = {
   // ==========================================
   // Location users
   // ==========================================
-  remove_location_user: {
+  locations_remove_user: {
     path: '/company/{location_id}/users/{user_id}',
     method: 'delete',
     operationId: 'remove_user_from_location',
@@ -780,7 +780,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
   // The optional Marketplace application read is a developers-contract route
   // (`docs/en/developers/openapi.yaml`), outside the B2B V1 spec this map is
   // checked against, so it is not listed here.
-  diagnose_location_access: [
+  locations_diagnose_access: [
     {
       path: '/company/{location_id}',
       method: 'get',
@@ -1358,7 +1358,7 @@ export function mappingSource(mapping: ApiMapping): 'documented' | 'extended' {
  * Tools that don't map to API endpoints (local operations or orchestrators).
  */
 export const unmappedTools: string[] = [
-  'altegio_logout',
+  'auth_logout',
   // Universal executor (ADR-001 D2): these are backed by the whole generated
   // catalog rather than by one endpoint, so a 1:1 spec mapping cannot exist.
   // Their drift check is `npm run catalog:check` plus the tests in

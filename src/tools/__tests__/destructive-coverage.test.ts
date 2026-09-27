@@ -35,16 +35,16 @@ describe('destructive tools are gated', () => {
     expect(destructiveNames).toEqual([
       'analytics_delete_assistant_report',
       'appointments_apply_attendance',
+      'appointments_delete',
+      'booking_forms_delete',
       'clients_delete',
-      'delete_appointment',
-      'delete_booking_form',
-      'delete_schedule',
-      'delete_service',
-      'delete_service_category',
+      'locations_remove_user',
       'onboarding_rollback_phase',
-      'remove_location_user',
+      'schedules_delete',
+      'service_categories_delete',
+      'services_delete',
+      'services_unlink_team_member',
       'team_members_delete',
-      'unlink_service_team_member',
     ]);
   });
 
