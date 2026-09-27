@@ -8,14 +8,14 @@
 
 ### 1.1 Size of the API surface (2026-09-07)
 
-Numbers come from `scripts/api-inventory/` run against `../biz.erp.api.docs` (master) and the backend route files in `../biz.erp` (Slim route registrations, deduplicated by method + path).
+Numbers come from `scripts/api-inventory/` run against the Altegio API OpenAPI repository (`ALTEGIO_API_DOCS`, master) and from a one-off, black-box inventory of the routes the product's web client calls (deduplicated by method + path; the raw list is internal and stays out of this repository).
 
 | Surface                                    |         Routes / operations | Notes                                                                                                                    |
 | ------------------------------------------ | --------------------------: | ------------------------------------------------------------------------------------------------------------------------ |
-| Backend `/api/v1` routes                   |                   **1,176** | `api.php` 962 · `api_legacy.php` 128 · `booking.php` 58 · `backoffice.php` 28                                            |
+| Backend `/api/v1` routes                   |                   **1,176** | routes observed from the web client, all route groups                                                                    |
 | Documented v1 + public + developers        |                     **304** | v1 260 · public 24 · developers 20 (16 marked deprecated)                                                                |
 | Backend v1 routes matched by docs          |                         253 | exact method + normalized-path match                                                                                     |
-| Backend v1 routes **not documented**       |                     **923** | 788 of them in `api.php`                                                                                                 |
+| Backend v1 routes **not documented**       |                     **923** | the large majority in the main (non-legacy) route group                                                                  |
 | Documented ops with no exact backend match |                          51 | aliases (`{location_id}` vs `{salonId}`) or stale entries; needs review                                                  |
 | Backend `/api/v2` routes                   |                          54 | JSON:API, **internal ERP-web only** by API-team policy; 42 documented                                                    |
 | `/api/v3` (preview contract)               | 57 ops · 37 paths · 12 tags | all `x-altegio-status: preview`; first production release planned **October 2026** (API team flags the date as red risk) |
@@ -29,12 +29,12 @@ Where the undocumented v1 routes live (first path segments, top groups):
 | `booking/…` (locations, user, chains, search, forms, payments)                    |                  46 | public booking widget internals — out of scope (B2C)             |
 | `marketplace/…`                                                                   |                  43 | developer / application management — different persona           |
 | `medicine/{id}/…`                                                                 |                  22 | vertical module                                                  |
-| `supermod/…`, `security/…`, `translate/…`, `landing/…`, `support/…`               |                 ~60 | first-party / internal admin, never exposed                      |
+| first-party administration and internal tooling groups                            |                 ~60 | internal admin, never exposed                                    |
 | `tips`, `group`, `integration_wizard`, `client_app`, `segments`, `promo_codes`, … |                rest | mixed; triage per domain                                         |
 
 Conclusion: roughly a third of the undocumented surface is relevant to business owners and administrators (the `company/{id}` and `chain/{id}` groups plus a few utilities); the rest is internal or belongs to other personas. **Undocumented means no contract**: those routes serve the ERP web client and can change without notice.
 
-### 1.2 What the API team has already decided (biz.erp `docs/research/api-standardization/v3-plan`)
+### 1.2 What the API team has already decided (the V3 API standardization plan)
 
 - **V3 is the only new public contract.** Flat REST under `/api/v3/locations/{location_id}/…`, `problem+json` errors with stable `code`, cursor pagination, `Idempotency-Key`, `If-Match`, OpenAPI 3.1 as the contract with a CI gate in both repos (`x-altegio-status: available` requires a registered route).
 - **V2 stays internal**, V1 is legacy: no new public methods are added to V1.
@@ -67,7 +67,7 @@ Build **one product, one server, one endpoint and one OAuth audience**, not a fa
 Thematic servers look attractive for context economy, but every argument for them is solved today by tool search, static facets, and header-based routing, while their costs stay:
 
 - Business workflows cross domains constantly (booking = availability + client + team member + service + payment). Splitting servers pushes composition onto the model.
-- Each server is a separate OAuth audience in `mcp-proxy/routes.json`, a separate consent, a separate credential store, a separate deploy, a separate eval suite.
+- Each server is a separate OAuth audience at the platform's OAuth proxy, a separate consent, a separate credential store, a separate deploy, a separate eval suite.
 - Prompt caching favours one stable tool prefix per session over several servers loaded and unloaded.
 - The 2026-07-28 spec lets a gateway route by `Mcp-Name`; if we ever need to shard processes by domain, we can do it behind the endpoint without touching clients.
 
@@ -91,7 +91,7 @@ The platform proxy forwards everything under `/pro/*` to the service, so facets 
 
 **Addendum (2026-09-17) — `/mcp/readonly` is a view, not a facet.** A facet answers _how many tools fit in this host's context_; the read-only address answers _what may this agent do at all_. Same sub-path mechanism, different question and different membership rule: a facet is a hand-curated domain slice in the overlay, the read-only view is computed from each tool's own `readOnlyHint`. It therefore lives alongside `default` and `all` rather than inside `FACET_NAMES`, and is not offered as an alternative destination when a facet refuses a tool. The restriction is expressed as a separate URL because a separate URL is a separate OAuth resource — the industry pattern (GitHub, Linear, Sentry, Stripe, Notion, Atlassian, Slack) and the only form both the protocol and current hosts respect; a caller-set header (`X-MCP-Readonly`) would enforce nothing and would vary `tools/list` on one resource, which D7 forbids. Whether it is a guardrail or a boundary depends on the token, not on the address: with a full grant it constrains only what this server offers (the credential can still write, including outside MCP), so its purpose is to let the consent screen stay all-or-nothing (D6).
 
-**Correction (2026-09-17).** The sentence above originally said the boundary had to wait for V3. It does not. The platform proxy already issues `mcp:pro:read` / `mcp:pro:write` per route (`mcp-proxy/routes.json`) and forwards the granted subset as `x-mcp-auth-scope` on every `forward_identity` route — which the first version of the execution gate wrongly assumed no deployment sent. With the two vocabularies reconciled in `src/tools/scopes.ts`, a token issued as `mcp:pro:read` alone refuses every write on **every** address, `/mcp` included, before the handler runs. The read-only address is therefore the _surface_ half of the restriction and the token scope is the _rights_ half; together they are enforceable today, and V3 only replaces the coarse `mcp:pro:*` pair with the fine-grained `domain:action` names.
+**Correction (2026-09-17).** The sentence above originally said the boundary had to wait for V3. It does not. The platform proxy already issues `mcp:pro:read` / `mcp:pro:write` per route and forwards the granted subset as `x-mcp-auth-scope` on every identity-forwarding route — which the first version of the execution gate wrongly assumed no deployment sent. With the two vocabularies reconciled in `src/tools/scopes.ts`, a token issued as `mcp:pro:read` alone refuses every write on **every** address, `/mcp` included, before the handler runs. The read-only address is therefore the _surface_ half of the restriction and the token scope is the _rights_ half; together they are enforceable today, and V3 only replaces the coarse `mcp:pro:*` pair with the fine-grained `domain:action` names.
 
 ### D4 — The catalog is the source of truth; generation happens at build time
 
@@ -107,8 +107,8 @@ scripts/catalog/build.mjs  ──►  src/generated/{catalog.json, packs/*.ts}  
 
 - Build-time, not runtime: `tools/list` is reviewable in a diff, deterministic, and testable; evals catch description regressions before deploy.
 - The existing `api-mapping.ts` + spec-compliance test is the seed: it already maps tools to `operationId`s. The generator inverts it (operation → tool) and the test becomes a drift check: an operation removed or changed in the spec fails CI until the overlay is updated.
-- Undocumented routes are **not** read from `biz.erp` at build time. The route inventory (`scripts/api-inventory/`) is a triage tool: it produces the list of missing endpoints for the spec repository (V1 path files or a V3 request), and only endpoints that reach the spec — or an `extended/` stub with a contract test — become tools. The repository is public, so inventories of internal routes stay in the gitignored `.inventory/` folder.
-- Discovery and temporary adaptation of backend or ERP-web sources follows [`legacy-endpoint-discovery.md`](legacy-endpoint-discovery.md): start from an owner decision, trace routes through permissions and renderers, reject unsafe candidates, and keep every legacy detail behind a canonical tested contract.
+- Undocumented routes are **not** read from any private source at build time. The spec inventory (`scripts/api-inventory/`) is a triage tool: it produces the list of missing endpoints for the spec repository (V1 path files or a V3 request), and only endpoints that reach the spec — or an `extended/` stub with a contract test — become tools. The repository is public, so inventories of undocumented routes stay in the gitignored `.inventory/` folder.
+- Discovery and temporary adaptation of undocumented web-client sources follows [`legacy-endpoint-discovery.md`](legacy-endpoint-discovery.md): start from an owner decision, observe the route black-box through the product's web client, reject unsafe candidates, and keep every legacy detail behind a canonical tested contract.
 
 **Addendum (2026-09-17) — the surface table: the same reviewability rule, applied to the _views_.** The catalog makes `tools/list` reviewable for one view. It says nothing about the question that actually grew hard: eight mechanisms now decide whether a tool reaches a given address and whether the call it receives runs there — the report-builder closure (`DISABLED_TOOL_NAMES`), the default view's excluded prefixes, excluded names and re-admitted names, the password-login switch, the read-only rule, the token-scope map (D6 addendum) and the human-confirmation gate (D8 addendum). Each is justified on its own terms; collapsing them into one list would destroy the justifications, which is worse than six lists. What was missing was not fewer mechanisms but **one place that joins them**.
 
@@ -181,7 +181,7 @@ flowchart LR
     B[Claude Code / Agent SDK]
     C[Cursor · ChatGPT · others]
   end
-  P[mcp-proxy · OAuth 2.1 · identity headers]
+  P[OAuth proxy · OAuth 2.1 · identity headers]
   subgraph S[altegio-pro-mcp]
     T[Transport · stdio · Streamable HTTP · facets /mcp, /mcp/ops, /mcp/finance …]
     U[Tool surface · core · domain packs · executor · prompts · resources]
@@ -205,7 +205,7 @@ catalog/
   overlay/<domain>.yaml        # curation: tier, facets, descriptions, projections, allowlists
   extended/<domain>.yaml       # allowlisted undocumented endpoints + contract test refs
 scripts/
-  api-inventory/               # spec + backend route inventory (data stays in .inventory/)
+  api-inventory/               # documented-operation inventory (data stays in .inventory/)
   catalog/build.mjs            # OpenAPI + overlay → src/generated
 src/
   generated/                   # catalog.json, packs/*.ts (committed)
@@ -235,7 +235,7 @@ src/
 | Runtime-generated tools from the full OpenAPI without curation       | 300+ generated tools with API-speak descriptions; unreviewable `tools/list`; poor search hits; no projections → context blow-up. Generation is fine, but at build time with an overlay (D4). |
 | Only a universal executor ("code mode" for everything)               | Best for context, worst for reliability of writes and for hosts without code execution; also hides the product. Kept as the long-tail tier, not the product (D2).                            |
 | Dynamic per-session tool enabling (`enable_toolset` + `listChanged`) | Illegal under 2026-07-28 (`tools/list` must not vary per connection); brittle in today's hosts. Facets give the same effect statically (D3).                                                 |
-| In-process MCP inside biz.erp as _the_ MCP                           | Duplicates the agent-facing layer, couples product iteration to backend releases, PHP has no tool-search ecosystem advantage; keep the backend authoritative via REST (D10).                 |
+| In-process MCP inside the backend monolith as _the_ MCP              | Duplicates the agent-facing layer, couples product iteration to backend releases, PHP has no tool-search ecosystem advantage; keep the backend authoritative via REST (D10).                 |
 
 ## 7. Roadmap
 
@@ -259,13 +259,8 @@ src/
 
 ```bash
 npm run api:inventory                       # documented operations per spec / tag → .inventory/documented-ops.tsv
-# backend routes (private repo, local only):
-php scripts/api-inventory/dump-slim-routes.php .inventory/backend-routes.tsv \
-  ../biz.erp/src/Application/Http/Routing/Routes/api/api.php \
-  ../biz.erp/src/Application/Http/Routing/Routes/api/api_legacy.php \
-  ../biz.erp/src/Application/Http/Routing/Routes/api/booking.php \
-  ../biz.erp/src/Application/Http/Routing/Routes/api/backoffice.php
-node scripts/api-inventory/compare-routes.mjs  # summary + .inventory/undocumented-v1.tsv
 ```
+
+The undocumented side of the table came from a one-off, black-box inventory of the routes the product's web client calls, compared with the documented operations by method and normalized path. That list is internal and is not reproducible from this repository; the documented side is.
 
 `.inventory/` is gitignored on purpose: the repository is public and the backend route map is internal.

@@ -46,9 +46,8 @@ import type { ToolResult } from './tool-result.js';
 // ==========================================================================
 
 /**
- * Scope names taken verbatim from the v3 P0 scope catalog
- * (`biz.erp/docs/research/api-standardization/v3-plan/scope-catalog.md`,
- * status "обновлено 2026-09-01, не финал"). Only the ones this server's tools
+ * Scope names taken verbatim from the API team's v3 P0 scope catalog (a draft
+ * dated 2026-09-01, explicitly not final). Only the ones this server's tools
  * actually need are listed; the catalog carries more (`visits:*`,
  * `payments:*`, `finance:read`,
  * `availability:read`, `locations:create`, the four `chain_*` names) and they
@@ -110,16 +109,14 @@ export const PLACEHOLDER_ONLY_SCOPES: readonly ToolScope[] =
 /**
  * The scope names the OAuth proxy really issues for this server today.
  *
- * Traced end to end in `altegio-mcp-platform/mcp-proxy`: `routes.json`
- * declares `scopes: ["mcp:pro:read", "mcp:pro:write"]` on both routes that
- * reach this backend — the staff `/pro/mcp` (Google OIDC,
- * `forward_identity: true`) and the customer `/pro` (Altegio-IdP, alias
- * `/public/pro`); the read-only views declare `mcp:pro:read` alone.
- * `lib/as.js` filters a token's requested scope down to the resolved route's
- * declared list and `lib/rs.js` puts the surviving value on `req.auth.scope`;
- * the staff lane forwards it verbatim as `x-mcp-auth-scope`
- * (`lib/identity-headers.js`), and the customer lane forwards the OAuth
- * session's grant, or the route's own list for a raw Altegio user token. The
+ * Observed end to end through the OAuth proxy in front of this server: every
+ * route that reaches this service is declared with the pair
+ * `mcp:pro:read` / `mcp:pro:write` — the staff lane (Google OIDC, identity
+ * forwarded) and the customer lane (Altegio identity provider); the read-only
+ * views declare `mcp:pro:read` alone. The proxy filters a token's requested
+ * scope down to the route's declared list and forwards the surviving value as
+ * the `x-mcp-auth-scope` header (the customer lane forwards the OAuth
+ * session's grant, or the route's own list for a raw Altegio user token). The
  * literal string arriving at `tools/call` is therefore
  * `"mcp:pro:read mcp:pro:write"` — or `"mcp:pro:read"` alone when the token
  * was granted read only.

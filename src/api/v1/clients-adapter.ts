@@ -125,9 +125,8 @@ function cardFromWire(card: Record<string, unknown>, id: number): ClientCard {
 
 /**
  * The legacy list reads an absent `paid_max` as 0, which excludes every client
- * with a positive paid amount (`PageApiClientsController::action_read` →
- * `ClientStorage::getClientIdsBySalonIdAndPaidAmount`). A minimum alone
- * therefore goes out with this explicit ceiling.
+ * with a positive paid amount (observed live: `paid_min` alone answers the
+ * whole base). A minimum alone therefore goes out with this explicit ceiling.
  */
 const UNBOUNDED_PAID_MAX = Number.MAX_SAFE_INTEGER;
 

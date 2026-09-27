@@ -1,8 +1,9 @@
 # Customer workflow contracts (2026-09-24)
 
-Source: `biz.erp.api.docs` master after PRs #119 and #120, especially
-`docs/source-audits/attendance-client-card-workflows.md`, plus the V1 path
-contracts. The adapters use only documented B2B V1 routes. V3 remains preview.
+Source: the Altegio API OpenAPI repository (`ALTEGIO_API_DOCS`, master as of
+2026-09-24), including its source audit of the attendance and client-card
+workflows, plus the V1 path contracts. The adapters use only documented B2B V1
+routes. V3 remains preview.
 
 ## Access diagnosis
 
@@ -94,8 +95,8 @@ published V1 operation. The client adapter confines location scope before
 transport; backend checks client ownership and `clients_access` plus
 `client_files_upload_access`. The successful API response is the complete file
 list; MCP projects at most 50 entries and states whether the projection is
-complete. The proxy streams request bytes without buffering or a lower body
-limit on service routes. The public Cloud Run ingress has a 32 MiB HTTP/1
-request limit, above the bounded MCP body. Hosts must be able to submit a
+complete. The OAuth proxy in front of this server streams request bytes
+without buffering or a lower body limit on service routes, and the public
+ingress limit is above the bounded MCP body. Hosts must be able to submit a
 large string tool argument; clients that cannot supply local file bytes need
 an external file-reading step before calling this tool.

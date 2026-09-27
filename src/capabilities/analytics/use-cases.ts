@@ -786,10 +786,9 @@ export async function deleteAssistantReport(
 // ========== report builder: running reports ==========
 
 /**
- * Date column of each dataset — the one filter the backend requires on every
- * report run (`AcColumnService::DATE_FILTER_COLUMN_IDS`): a run without a
- * BETWEEN override on exactly this column is rejected, whatever other date
- * filters the report carries.
+ * Date column of each dataset — the one filter the report-data endpoint
+ * requires on every report run: a run without a BETWEEN override on exactly
+ * this column is rejected, whatever other date filters the report carries.
  */
 export const DATASET_DATE_FIELD: Readonly<Record<Dataset, string>> = {
   sales: 'date',

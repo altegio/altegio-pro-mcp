@@ -6,18 +6,15 @@
  * ID in `data-locator` and the rendered local date. Payer names, comments and
  * amounts in the same row are never read.
  *
- * Local date contract (biz.erp `templates/finances/transactions/search.php`):
- * the date cell renders `date('d.m.y', $ts)`, a `<br />`, then
- * `date('H:i:s', $ts)`, where `$ts = tsAtTimezone($transaction->getDate(),
- * $salonId)`. Both patterns are hard-coded PHP `date()` formats: they follow
- * neither the user's language nor the location's EU/US date-format setting,
- * which only decides how the route parses `start_date`/`end_date`.
- * `tsAtTimezone` is the same server-to-location shift the monthly finance
- * report applies before it assigns a transaction to a month
- * (`CTableReportPeriod::fillData` → `dateAtTimezone`), so this date is the
- * ERP's own local month assignment. The documented V1 detail `date` is the raw
- * stored server time without an offset — not location-local — and is never
- * used for the month.
+ * Local date contract (observed on the rendered list): the date cell is
+ * `DD.MM.YY`, a `<br />`, then `HH:MM:SS`, in the location's local time. Both
+ * patterns are fixed: they follow neither the user's language nor the
+ * location's EU/US date-format setting, which only decides how the route
+ * parses `start_date`/`end_date`. The shift applied to that timestamp is the
+ * same server-to-location shift the monthly finance report applies before it
+ * assigns a transaction to a month, so this date is the ERP's own local month
+ * assignment. The documented V1 detail `date` is the raw stored server time
+ * without an offset — not location-local — and is never used for the month.
  *
  * Any other cell shape is refused; an unknown format is never guessed.
  */

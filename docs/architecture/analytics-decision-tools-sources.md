@@ -1,7 +1,9 @@
 # Source audit: task-oriented analytics tools
 
-Audited against `biz.erp.api.docs` master and the read-only `biz.erp` checkout
-on 2026-09-19. These tools do not call the disabled Analytics Constructor.
+Audited on 2026-09-19 against the Altegio API OpenAPI repository
+(`ALTEGIO_API_DOCS`, master) and black-box observation of the product's web
+client on the demo location. These tools do not call the disabled Analytics
+Constructor.
 
 ## `analytics_get_profit_and_loss_statement`
 

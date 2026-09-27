@@ -468,7 +468,7 @@ paths:
     get:
       operationId: list_report_builder_columns
       summary: Field registry of the report builder
-      x-altegio-permission: none checked (worth fixing upstream); an active subscription applies
+      x-altegio-permission: an active subscription; no report-specific user right is required
       x-altegio-caveat: >-
         Database-driven, not an enum: about 565 visible rows across four
         datasets, of which roughly 165 are curated and the rest are mechanical
@@ -814,8 +814,8 @@ paths:
       summary: Run a saved report through the legacy row data API
       x-altegio-permission: reports_access, plus an active subscription
       x-altegio-caveat: >-
-        Compatibility fallback for locations without the new report-data
-        feature flag. Runtime date overrides are not reliable on this route,
+        Compatibility fallback for locations where the new report-data
+        endpoint is not available. Runtime date overrides are not reliable on this route,
         so the MCP calls it only when the requested period exactly matches the
         period already stored in the report. Returns arrays of cells rather
         than the new header/rows/summary pivot.

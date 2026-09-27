@@ -1,9 +1,9 @@
 /**
  * Canonical vocabulary served as `altegio://docs/glossary`.
  *
- * Condensed from the product glossary that governs the whole product
- * (`biz.erp` → `docs/product-glossary.md`, itself derived from the official
- * localization glossary). Only the terms an agent meets through this server's
+ * Condensed from the product glossary that governs the whole product (itself
+ * derived from the official localization glossary). Only the terms an agent
+ * meets through this server's
  * tools are listed. The "Never use" column is the point of the resource: those
  * words appear in the legacy API and in older documentation, and reusing them
  * in a reply, a report title or a new field name reintroduces the ambiguity the

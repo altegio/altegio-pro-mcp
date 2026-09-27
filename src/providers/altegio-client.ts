@@ -789,13 +789,12 @@ export class AltegioClient {
    * request.
    *
    * IMPORTANT — the backend expects the per-entry key `staff_id`, NOT the
-   * `team_member_id` the public OpenAPI documents. The controller validates the
-   * body with a strict Symfony `Collection` (no missing, no extra keys), so a
-   * `team_member_id` key is rejected as unknown AND `staff_id` is reported
-   * missing — the request fails with HTTP 422 even though it matches the spec.
-   * The MCP keeps the canonical `team_member_id` at its own boundary and maps it
-   * to `staff_id` here, confining the wire-dialect mismatch to this one place.
-   * (Backend: More\Master\Validation\SingleStaffScheduleDto.)
+   * `team_member_id` the public OpenAPI documents. The endpoint validates the
+   * body strictly (no missing, no extra keys), so a `team_member_id` key is
+   * rejected as unknown AND `staff_id` is reported missing — the request fails
+   * with HTTP 422 even though it matches the spec. The MCP keeps the canonical
+   * `team_member_id` at its own boundary and maps it to `staff_id` here,
+   * confining the wire-dialect mismatch to this one place.
    */
   async setSchedule(
     companyId: number,

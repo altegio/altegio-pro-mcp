@@ -62,13 +62,13 @@ describe('request-context', () => {
     it('parses a machine identity', () => {
       const identity = parseIdentityHeaders({
         'x-mcp-auth-kind': 'machine',
-        'x-mcp-auth-machine-name': 'smoke-probe',
+        'x-mcp-auth-machine-name': 'health-probe',
         'x-mcp-auth-scope': 'mcp:pro:read',
       });
 
       expect(identity).toEqual({
         kind: 'machine',
-        machineName: 'smoke-probe',
+        machineName: 'health-probe',
         scope: 'mcp:pro:read',
       });
     });
@@ -169,7 +169,7 @@ describe('request-context', () => {
       const b = identityKey({ kind: 'user', email: 'b@x.com' });
       const machine = identityKey({
         kind: 'machine',
-        machineName: 'smoke-probe',
+        machineName: 'health-probe',
       });
       expect(new Set([a, b, machine]).size).toBe(3);
     });
