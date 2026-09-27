@@ -16,7 +16,7 @@ The onboarding wizard provides **12 specialized tools** to help new users quickl
 **Recommended setup order:**
 `positions → staff → categories → services → schedules → clients → test_appointments`
 
-Positions come first so staff can reference `position_id`. Work schedules come after staff — without them the appointment grid stays empty and the location isn't operational. Only team members imported with `has_timetable_access: true` can get a work schedule, and each team member's paid-seat and work-schedule answers come from the owner (see step 3).
+Positions come first so staff can reference `position_id`. Work schedules come after staff — without them the appointment grid stays empty and the location isn't operational. Only team members imported with `has_schedule_access: true` can get a work schedule, and each team member's paid-seat and work-schedule answers come from the owner (see step 3).
 
 ### New steps
 
@@ -75,9 +75,9 @@ onboarding_start({
 onboarding_add_categories({
   location_id: 123456,
   categories: [
-    { title: "Hair Services", api_id: "hair", weight: 1 },
-    { title: "Nail Services", api_id: "nails", weight: 2 },
-    { title: "Spa Treatments", api_id: "spa", weight: 3 }
+    { title: "Hair Services", external_id: "hair", sort_weight: 1 },
+    { title: "Nail Services", external_id: "nails", sort_weight: 2 },
+    { title: "Spa Treatments", external_id: "spa", sort_weight: 3 }
   ]
 })
 // Response: "Successfully created 3 categories
@@ -91,36 +91,36 @@ onboarding_add_categories({
 defaults them and refuses the whole batch, before creating anyone, when a team
 member has no answer:
 
-- `is_paid_staff` — does this team member take a paid staff seat? On per-seat
+- `has_paid_seat` — does this team member take a paid seat? On per-seat
   licensing a paid seat is billed and counts against the location's team member
   limit; `false` creates a non-paid team member without a seat. Locations
   without per-seat licensing ignore it, but it is still asked.
-- `has_timetable_access` — should the team member be in the work schedule, able
+- `has_schedule_access` — should the team member be in the work schedule, able
   to have working hours and take appointments? Anyone who gets a work schedule
   or appointments later needs `true`. Per-seat licensing allows it only on a
-  paid seat (`is_paid_staff: false` with `has_timetable_access: true` is refused
+  paid seat (`has_paid_seat: false` with `has_schedule_access: true` is refused
   for that row).
 
 Give the answers per team member, or once for the whole list with the
-batch-level `is_paid_staff` / `has_timetable_access` when the owner gave one
+batch-level `has_paid_seat` / `has_schedule_access` when the owner gave one
 answer for everybody. A row's own answer wins over the batch-level one.
 
 **Option A: JSON Array**
 ```typescript
 onboarding_add_team_members_batch({
   location_id: 123456,
-  staff_data: [
+  team_members: [
     {
       name: "Alice Johnson",
       specialization: "Senior Stylist",
-      is_paid_staff: true,
-      has_timetable_access: true
+      has_paid_seat: true,
+      has_schedule_access: true
     },
     {
       name: "Bob Smith",
       specialization: "Receptionist",
-      is_paid_staff: false,
-      has_timetable_access: false
+      has_paid_seat: false,
+      has_schedule_access: false
     }
   ]
 })
@@ -130,14 +130,14 @@ onboarding_add_team_members_batch({
 ```typescript
 onboarding_add_team_members_batch({
   location_id: 123456,
-  staff_data: `name,specialization,is_paid_staff,has_timetable_access
+  team_members: `name,specialization,has_paid_seat,has_schedule_access
 Alice Johnson,Senior Stylist,yes,yes
 Bob Smith,Nail Technician,yes,yes
 Carol White,Massage Therapist,yes,yes`
 })
 
 // Response: "Staff batch processing complete:
-//           ✓ 3 staff members created (3 on a paid staff seat, 3 in the work schedule)
+//           ✓ 3 staff members created (3 on a paid seat, 3 in the work schedule)
 //           Next: Add service categories with onboarding_add_categories"
 ```
 
@@ -145,11 +145,11 @@ Carol White,Massage Therapist,yes,yes`
 ```typescript
 onboarding_add_team_members_batch({
   location_id: 123456,
-  staff_data: `name,specialization
+  team_members: `name,specialization
 Alice Johnson,Senior Stylist
 Bob Smith,Nail Technician`,
-  is_paid_staff: true,
-  has_timetable_access: true
+  has_paid_seat: true,
+  has_schedule_access: true
 })
 ```
 
@@ -157,15 +157,15 @@ Bob Smith,Nail Technician`,
 ```typescript
 onboarding_add_team_members_batch({
   location_id: 123456,
-  staff_data: [{ name: "Alice Johnson" }]
+  team_members: [{ name: "Alice Johnson" }]
 })
 
 // Response (error): "Refused: nothing was created. 1 of 1 team members have no
 //           answer for the paid seat or the work schedule:
-//           row 1 (is_paid_staff, has_timetable_access). Ask the location owner…"
+//           row 1 (has_paid_seat, has_schedule_access). Ask the location owner…"
 ```
 
-Team members are created without user accounts. `phone`, `email` and `api_id`
+Team members are created without user accounts. `phone`, `email` and `external_id`
 columns are ignored: the create operation stores no contact details or external
 id for a team member. To link or invite a user account, use `team_members_create` with
 `user_phone` or `user_email`.
@@ -175,24 +175,24 @@ id for a team member. To link or invite a user account, use `team_members_create
 ```typescript
 onboarding_add_services_batch({
   location_id: 123456,
-  services_data: [
+  services: [
     {
       title: "Women's Haircut",
       price_min: 50,
-      duration: 60,
+      duration_seconds: 3600,
       category_id: 501  // Hair Services
     },
     {
       title: "Hair Coloring",
       price_min: 80,
       price_max: 150,
-      duration: 120,
+      duration_seconds: 7200,
       category_id: 501
     },
     {
       title: "Manicure",
       price_min: 30,
-      duration: 45,
+      duration_seconds: 2700,
       category_id: 502  // Nail Services
     }
   ]
@@ -261,26 +261,26 @@ onboarding_status({
 ### Staff CSV Template
 
 ```csv
-name,specialization,position_id,is_paid_staff,has_timetable_access
+name,specialization,position_id,has_paid_seat,has_schedule_access
 Alice Johnson,Senior Stylist,11,yes,yes
 Bob Smith,Receptionist,12,no,no
 Carol White,Massage Therapist,11,yes,yes
 ```
 
-**Required fields:** `name`; `is_paid_staff` and `has_timetable_access` in
+**Required fields:** `name`; `has_paid_seat` and `has_schedule_access` in
 every row unless passed once for the batch
 **Optional fields:** `specialization`, `position_id`
 
 **Notes:**
 - Answers: `true`/`false`, `yes`/`no` or `1`/`0`, in any case. A blank cell is
   no answer, never `false`.
-- `phone`, `email` and `api_id` columns are accepted and ignored — nothing
+- `phone`, `email` and `external_id` columns are accepted and ignored — nothing
   stores them for a team member.
 
 ### Services CSV Template
 
 ```csv
-title,price_min,price_max,duration,category_id,api_id
+title,price_min,price_max,duration_seconds,category_id,external_id
 Women's Haircut,50,60,60,501,haircut-w
 Men's Haircut,35,45,45,501,haircut-m
 Hair Coloring,80,150,120,501,color
@@ -289,8 +289,8 @@ Pedicure,45,60,60,502,pedicure
 Swedish Massage,70,90,90,503,massage-sw
 ```
 
-**Required fields:** `title`, `price_min`, `duration`
-**Optional fields:** `price_max`, `category_id`, `api_id`
+**Required fields:** `title`, `price_min`, `duration_seconds`
+**Optional fields:** `price_max`, `category_id`, `external_id`
 
 **Notes:**
 - Prices: numeric values (no currency symbols)
@@ -323,7 +323,7 @@ Check data parsing and validation without creating entities:
 ```typescript
 onboarding_preview_data({
   data_type: "staff",
-  raw_input: `name,specialization,is_paid_staff,has_timetable_access
+  raw_input: `name,specialization,has_paid_seat,has_schedule_access
 Alice Johnson,Senior Stylist,yes,yes
 Bob Smith,Nail Technician,,`
 })
@@ -332,7 +332,7 @@ Bob Smith,Nail Technician,,`
 //           Total rows: 2
 //           Fields per row: 4
 //           …
-//           1 of 2 row(s) have no is_paid_staff or has_timetable_access answer.
+//           1 of 2 row(s) have no has_paid_seat or has_schedule_access answer.
 //           Before importing, ask the location owner…
 //           Proceed with onboarding_add_team_members_batch to create entities."
 //           (the rows themselves follow in a fenced block)
@@ -409,16 +409,16 @@ If some entries fail during batch import:
 ```typescript
 onboarding_add_team_members_batch({
   location_id: 123456,
-  staff_data: [
-    { name: "Alice", specialization: "Stylist", is_paid_staff: true, has_timetable_access: true },
+  team_members: [
+    { name: "Alice", specialization: "Stylist", has_paid_seat: true, has_schedule_access: true },
     // Per-seat licensing: a non-paid team member cannot be in the work schedule
-    { name: "Dana", specialization: "Assistant", is_paid_staff: false, has_timetable_access: true },
-    { name: "Bob", specialization: "Barber", is_paid_staff: true, has_timetable_access: true }
+    { name: "Dana", specialization: "Assistant", has_paid_seat: false, has_schedule_access: true },
+    { name: "Bob", specialization: "Barber", has_paid_seat: true, has_schedule_access: true }
   ]
 })
 
 // Response: "Staff batch processing complete:
-//           ✓ 2 staff members created (2 on a paid staff seat, 2 in the work schedule)
+//           ✓ 2 staff members created (2 on a paid seat, 2 in the work schedule)
 //
 //           ✗ 1 failed; each row and the reason the API gave are listed below.
 //           failed row 1: Dana: Non-billable team members cannot have schedule access
@@ -528,8 +528,8 @@ onboarding_start({ location_id: 123456 })
 onboarding_add_categories({
   location_id: 123456,
   categories: [
-    { title: "Hair Services", weight: 1 },
-    { title: "Nail Services", weight: 2 }
+    { title: "Hair Services", sort_weight: 1 },
+    { title: "Nail Services", sort_weight: 2 }
   ]
 })
 // Note category IDs: [501, 502]
@@ -537,7 +537,7 @@ onboarding_add_categories({
 // 4. Import staff from CSV (paid seat and work schedule answered by the owner)
 onboarding_add_team_members_batch({
   location_id: 123456,
-  staff_data: `name,specialization,is_paid_staff,has_timetable_access
+  team_members: `name,specialization,has_paid_seat,has_schedule_access
 Alice Johnson,Senior Stylist,yes,yes
 Bob Smith,Nail Technician,yes,yes
 Carol White,Manicurist,yes,yes`
@@ -547,7 +547,7 @@ Carol White,Manicurist,yes,yes`
 // 5. Add services
 onboarding_add_services_batch({
   location_id: 123456,
-  services_data: `title,price_min,price_max,duration,category_id
+  services: `title,price_min,price_max,duration_seconds,category_id
 Women's Haircut,50,60,60,501
 Hair Coloring,80,150,120,501
 Manicure,30,40,45,502
@@ -625,7 +625,7 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 
 **`onboarding_add_categories(location_id, categories)`**
 - Create service category hierarchy
-- Input: `[{title, api_id?, weight?}, ...]`
+- Input: `[{title, external_id?, sort_weight?}, ...]`
 - Returns: created category IDs
 
 **`onboarding_add_positions(location_id, positions)`**
@@ -633,17 +633,17 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 - Required: `title`
 - Run before staff so staff can reference `position_id`
 
-**`onboarding_add_team_members_batch(location_id, staff_data, is_paid_staff?, has_timetable_access?)`**
+**`onboarding_add_team_members_batch(location_id, team_members, has_paid_seat?, has_schedule_access?)`**
 - Bulk add staff from JSON array or CSV string
-- Required: `name`, plus the owner's `is_paid_staff` and `has_timetable_access`
+- Required: `name`, plus the owner's `has_paid_seat` and `has_schedule_access`
   answers per row or once for the batch (a missing answer refuses the batch)
 - Optional: `specialization`, `position_id`
-- Ignored: `phone`, `email`, `api_id`
+- Ignored: `phone`, `email`, `external_id`
 
-**`onboarding_add_services_batch(location_id, services_data)`**
+**`onboarding_add_services_batch(location_id, services)`**
 - Bulk add services from JSON array or CSV string
-- Required: `title`, `price_min`, `duration`
-- Optional: `price_max`, `category_id`, `api_id`
+- Required: `title`, `price_min`, `duration_seconds`
+- Optional: `price_max`, `category_id`, `external_id`
 
 **`onboarding_set_schedules(location_id, schedules)`**
 - Set work schedules (working hours) for staff members
@@ -683,9 +683,9 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 
 2. **Create categories first** before services (services depend on category IDs)
 
-3. **Use meaningful api_ids** for external integrations:
+3. **Use meaningful external_ids** for external integrations:
    ```typescript
-   { title: "Haircut", api_id: "service-haircut-001" }
+   { title: "Haircut", external_id: "service-haircut-001" }
    ```
 
 4. **Check status regularly** during multi-step onboarding:

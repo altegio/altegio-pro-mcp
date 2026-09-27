@@ -74,7 +74,7 @@ describe('ToolHandlers - Services CRUD', () => {
         category_id: 10,
       });
 
-      expect(result.content[0]?.text).toContain('Successfully created service');
+      expect(result.content[0]?.text).toContain('Created service');
       expect(result.content[0]?.text).toContain('Haircut');
       expect(mockClient.createService).toHaveBeenCalledWith(456, {
         title: 'Haircut',

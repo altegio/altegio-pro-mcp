@@ -3,7 +3,28 @@ import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import { companiesOutput, locationUpdateOutput } from '../output-schemas.js';
 import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
-import type { AltegioCompany } from '../../types/altegio.types.js';
+import type {
+  AltegioCompany,
+  UpdateLocationRequest,
+} from '../../types/altegio.types.js';
+
+/** Tool argument -> V1 field, for the few names the product glossary renames. */
+const LOCATION_WIRE_FIELDS: Readonly<Record<string, string>> = {
+  postal_code: 'zip',
+  website: 'site',
+  short_description: 'short_descr',
+};
+
+function toLocationWire(
+  requested: Record<string, unknown>
+): UpdateLocationRequest {
+  const wire: Record<string, unknown> = {};
+  for (const [field, value] of Object.entries(requested)) {
+    if (value === undefined) continue;
+    wire[LOCATION_WIRE_FIELDS[field] ?? field] = value;
+  }
+  return wire as UpdateLocationRequest;
+}
 
 function sameValue(requested: unknown, observed: unknown): boolean {
   if (Array.isArray(requested) && Array.isArray(observed)) {
@@ -16,32 +37,33 @@ export const listLocationsTool = defineTool({
   name: 'locations_list',
   category: 'Location',
   description:
-    '[Location] Get list of locations. AUTHENTICATION REQUIRED. Use my=1 for locations managed by the current user. If user asks about "their" or "my" locations, use my=1 and ensure user is logged in first. After getting user locations, ask which location they want to work with if not specified. Returns 25 rows by default. Follow next_page until null; a full final page may require one empty request.',
+    'List locations. Pass managed_only=true for the locations the signed-in user administers — the usual first call to find a location_id; when the user means "my locations", that is this. Ask which location to work with when several come back. Paged: 25 per page by default; follow pagination.next_page until it is null (a full last page may need one empty request).',
   annotations: {
     title: 'List Locations',
     readOnlyHint: true,
     openWorldHint: true,
   },
   input: z.object({
-    my: z
-      .number()
-      .int()
-      .min(0)
-      .max(1)
-      .optional()
+    managed_only: z
+      .boolean()
+      .default(false)
       .describe(
-        'Set to 1 to get only locations user has admin access to (REQUIRES LOGIN). Set to 0 for the location directory accessible to the current credentials.'
+        'true: only locations the signed-in user administers. false (default): the location directory the current credentials can see.'
       ),
     ...paginationInput,
   }),
   outputSchema: companiesOutput,
   handler: async ({ input, client }) => {
-    const locations = await client.getCompanies(input);
+    const locations = await client.getCompanies({
+      my: input.managed_only ? 1 : 0,
+      page: input.page,
+      count: input.page_size,
+    });
 
     // Name, address and phone of a location are typed by its owner, and the
     // public list is not even limited to locations this user manages.
     const lines = [
-      `Found ${locations.length} ${locations.length === 1 ? 'location' : 'locations'}${input.my === 1 ? ' (user locations)' : ''}, ids: ${locations.map((c) => c.id).join(', ')}.`,
+      `Found ${locations.length} ${locations.length === 1 ? 'location' : 'locations'}${input.managed_only ? ' (managed by the user)' : ''}, ids: ${locations.map((c) => c.id).join(', ')}.`,
     ];
     const untrusted: UntrustedField[] = [];
     for (const c of locations) {
@@ -62,8 +84,7 @@ export const listLocationsTool = defineTool({
           address: c.address,
           phone: c.phone,
         })),
-        count: locations.length,
-        ...pageMetadata(input, locations.length),
+        pagination: pageMetadata(input, locations.length),
       },
     };
   },
@@ -73,7 +94,7 @@ export const updateLocationTool = defineTool({
   name: 'locations_update',
   category: 'Location',
   description:
-    '[Location] Update a location — rename it or change documented address, city/country, website, coordinates, description, business type, or phone fields. AUTHENTICATION REQUIRED (admin access to the location). The result verifies requested fields against a documented location read. In particular, the API may accept phones without persisting them; such fields are reported as unconfirmed, never as successfully updated.',
+    'Update a location: rename it or change its address, city or country, postal code, website, coordinates, description, business type or phones. Needs administrator access to the location. The result verifies every requested field against a fresh read of the location; a field the API accepted but did not persist (phones sometimes) is reported as unconfirmed, never as updated.',
   annotations: {
     title: 'Update Location',
     destructiveHint: false,
@@ -98,14 +119,14 @@ export const updateLocationTool = defineTool({
       .optional()
       .describe('City ID (takes priority over city)'),
     address: z.string().optional().describe('Street address'),
-    zip: z.string().optional().describe('ZIP / postal code'),
+    postal_code: z.string().optional().describe('Postal code'),
     phones: z
       .array(z.string())
       .optional()
       .describe(
         'Location phone numbers (without +). Documented by V1, but some locations accept this field without persisting it; the tool reports the read-back mismatch.'
       ),
-    site: z.string().optional().describe('Website URL'),
+    website: z.string().optional().describe('Website URL'),
     coordinate_lat: z.number().optional().describe('Latitude'),
     coordinate_lon: z.number().optional().describe('Longitude'),
     description: z.string().optional().describe('Description (HTML allowed)'),
@@ -115,11 +136,16 @@ export const updateLocationTool = defineTool({
       .positive()
       .optional()
       .describe('Business type ID'),
-    short_descr: z.string().optional().describe('Business category / tagline'),
+    short_description: z
+      .string()
+      .optional()
+      .describe('Business category or tagline shown under the name'),
   }),
   outputSchema: locationUpdateOutput,
   handler: async ({ input, client }) => {
-    const { location_id, ...updateData } = input;
+    const { location_id, ...requested } = input;
+    // Canonical argument names at the tool boundary, V1 field names on the wire.
+    const updateData = toLocationWire(requested);
     const updateResponse = await client.updateLocation(location_id, updateData);
     let location: AltegioCompany = updateResponse;
     let verificationSource = 'update_response';
@@ -132,13 +158,16 @@ export const updateLocationTool = defineTool({
         error instanceof Error ? error.message : 'Location read-back failed';
     }
 
-    const requestedFields = Object.keys(updateData);
+    const requestedFields = Object.keys(requested);
     const verifiedFields: string[] = [];
     const unconfirmedFields: string[] = [];
     for (const field of requestedFields) {
-      const requested = updateData[field as keyof typeof updateData];
-      const observed = location[field];
-      if (observed !== undefined && sameValue(requested, observed)) {
+      const wireField = LOCATION_WIRE_FIELDS[field] ?? field;
+      const observed = location[wireField];
+      if (
+        observed !== undefined &&
+        sameValue(requested[field as keyof typeof requested], observed)
+      ) {
         verifiedFields.push(field);
       } else {
         unconfirmedFields.push(field);

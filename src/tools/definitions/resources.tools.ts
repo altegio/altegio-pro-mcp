@@ -49,8 +49,7 @@ export const getResourcesTool = defineTool({
       text: withUntrustedBlock(lines.join('\n'), untrusted, { maxChars: 200 }),
       structuredContent: {
         items: resources.map((r) => ({ id: r.id, title: r.title })),
-        count: resources.length,
-        ...pagination,
+        pagination,
       },
     };
   },

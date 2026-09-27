@@ -52,8 +52,7 @@ export const getPositionsTool = defineTool({
           id: p.id,
           title: p.title,
         })),
-        count: positions.length,
-        ...pagination,
+        pagination,
       },
     };
   },

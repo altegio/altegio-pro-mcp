@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import { getClientPayerCohorts } from '../../capabilities/analytics/payer-cohorts.js';
 import { completeMonthsInput } from './finance-period.schema.js';
+import { paginationOutput } from '../pagination.js';
 
 const integer = { type: 'integer' as const };
 const number = { type: 'number' as const };
@@ -61,13 +62,12 @@ export const analyticsGetClientPayerCohortsTool = defineTool({
       items: object({ name: string, payer_count: integer, net_cash: number }),
     },
     target_cohort: string,
-    target_client_ids: { type: 'array', items: integer },
-    page: object({
-      page: integer,
-      page_size: integer,
-      total_count: integer,
-      has_more: { type: 'boolean' },
-    }),
+    items: {
+      type: 'array',
+      items: integer,
+      description: 'Client ids of target_cohort, one page.',
+    },
+    pagination: paginationOutput,
     completeness: object({
       status: { type: 'string', const: 'reconciled_bounded_scan' },
       selected_transaction_count: integer,

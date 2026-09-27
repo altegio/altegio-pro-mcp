@@ -127,10 +127,13 @@ describe('hosted client-file upload over Streamable HTTP', () => {
     });
     expect(response.status).toBe(200);
     const result = await parseSse<{
-      result: { isError?: boolean; structuredContent: { total_count: number } };
+      result: {
+        isError?: boolean;
+        structuredContent: { pagination: { total: number } };
+      };
     }>(response);
     expect(result.result.isError).not.toBe(true);
-    expect(result.result.structuredContent.total_count).toBe(1);
+    expect(result.result.structuredContent.pagination.total).toBe(1);
     expect(upstream).toHaveLength(1);
     expect(upstream[0]!.url).toContain('/company/7/clients/files/8');
     const part = (upstream[0]!.init.body as FormData).get('file') as File;

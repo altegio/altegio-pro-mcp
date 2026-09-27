@@ -26,6 +26,10 @@ import type {
 } from '../../api/clients-api.js';
 import { ClientsInputError } from './errors.js';
 import {
+  pageMetadata,
+  windowPagination,
+} from '../../tools/pagination.js';
+import {
   cardSummary,
   lookupSummary,
   segmentSummary,
@@ -42,6 +46,8 @@ const MAX_PAGE_SIZE = 200;
 const DEFAULT_PAGE_SIZE = 25;
 /** How many rows to spell out in the text summary. */
 const ROWS_IN_SUMMARY = 20;
+/** Matches the lookup endpoint returns when no limit is passed. */
+const DEFAULT_LOOKUP_LIMIT = 7;
 
 /**
  * Client fields that are contact details. Withheld unless the caller asked for
@@ -128,12 +134,13 @@ export async function searchClients(
           }
         : {}),
       filters_applied: filters,
-      total_count: segment.total_count,
-      page: segment.page,
-      page_size: segment.page_size,
-      returned: rows.length,
-      rows,
       contacts_included: includeContacts,
+      items: rows,
+      pagination: pageMetadata(
+        { page: segment.page, page_size: segment.page_size },
+        rows.length,
+        segment.total_count
+      ),
     },
   };
 }
@@ -172,13 +179,13 @@ export async function getClientSegmentReport(
       location_id: input.location_id,
       filters_applied: input.filters ?? {},
       match: input.match ?? 'all',
-      total_count: report.total_count,
-      page: report.page,
-      page_size: report.page_size,
-      returned: report.rows.length,
-      has_more: report.total_count > page * pageSize,
       contacts_included: false,
-      rows: report.rows,
+      items: report.rows,
+      pagination: pageMetadata(
+        { page: report.page, page_size: report.page_size },
+        report.rows.length,
+        report.total_count
+      ),
     },
   };
 }
@@ -233,14 +240,14 @@ export async function listClientProfiles(
     ),
     structuredContent: {
       location_id: input.location_id,
-      total_count: result.total_count,
-      page,
-      page_size: pageSize,
-      returned: rows.length,
-      has_more: result.total_count > page * pageSize,
       contacts_included: includeContacts,
       custom_fields_included: includeCustomFields === true,
-      rows,
+      items: rows,
+      pagination: pageMetadata(
+        { page, page_size: pageSize },
+        rows.length,
+        result.total_count
+      ),
     },
   };
 }
@@ -299,10 +306,12 @@ export async function getVisitHistory(
       ...(input.client_id ? { client_id: input.client_id } : {}),
       ...(input.client_phone ? { client_phone: input.client_phone } : {}),
       items: history.items,
-      count: history.items.length,
-      has_more: history.has_more,
-      next_from: history.next_from,
-      next_to: history.next_to,
+      pagination: windowPagination({
+        returned: history.items.length,
+        has_more: history.has_more,
+        next_date_from: history.next_from,
+        next_date_to: history.next_to,
+      }),
     },
   };
 }
@@ -337,9 +346,13 @@ export async function lookupClients(
     structuredContent: {
       location_id: input.location_id,
       query: input.query.trim(),
-      items,
-      count: items.length,
       contacts_included: includeContacts,
+      items,
+      pagination: pageMetadata(
+        { page: 1, page_size: input.limit ?? DEFAULT_LOOKUP_LIMIT },
+        items.length,
+        items.length
+      ),
     },
   };
 }

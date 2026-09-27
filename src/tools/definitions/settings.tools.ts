@@ -266,8 +266,7 @@ export const getBookingFormsTool = defineTool({
           title: f.title,
           is_default: f.is_default,
         })),
-        count: forms.length,
-        ...pagination,
+        pagination,
       },
     };
   },

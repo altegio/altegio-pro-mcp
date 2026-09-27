@@ -90,7 +90,8 @@ describe('cash-basis payer cohorts', () => {
     expect(output.clients_with_zero_or_negative_net).toBe(1);
     expect(output.unattributed_cash_net).toBe(25);
     expect(output.cohorts.map((row) => row.payer_count)).toEqual([1, 1, 8]);
-    expect(output.target_client_ids).toEqual([1]);
+    expect(output.items).toEqual([1]);
+    expect(output.pagination.total).toBe(1);
     expect(output.cohorts.reduce((sum, row) => sum + row.net_cash, 0)).toBe(
       550
     );

@@ -140,7 +140,7 @@ describe('destructive confirmation — host WITH elicitation', () => {
       expect(h.elicitations[0]!.title).toBe('Delete team member');
 
       expect(h.deleteStaff).toHaveBeenCalledWith(LOCATION, TEAM_MEMBER);
-      expect(firstText(result)).toContain('Successfully deleted team member');
+      expect(firstText(result)).toContain('Deleted team member');
     } finally {
       await h.close();
     }
@@ -220,7 +220,7 @@ describe('destructive confirmation — host WITHOUT elicitation', () => {
 
       expect(h.deleteStaff).toHaveBeenCalledTimes(1);
       expect(h.deleteStaff).toHaveBeenCalledWith(LOCATION, TEAM_MEMBER);
-      expect(firstText(second)).toContain('Successfully deleted team member');
+      expect(firstText(second)).toContain('Deleted team member');
     } finally {
       await h.close();
     }

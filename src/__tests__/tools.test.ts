@@ -168,7 +168,7 @@ describe('Tool Registration', () => {
       {
         params: {
           name: 'locations_list',
-          arguments: { my: 1, count: 1 },
+          arguments: { managed_only: true, page_size: 1 },
         },
       },
       {
@@ -189,16 +189,14 @@ describe('schedules_get', () => {
     const mockClient = {
       getSchedule: jest.fn().mockResolvedValue([
         {
+          team_member_id: 456,
           date: '2025-10-27',
-          time: '09:00',
-          seance_length: 30,
-          datetime: '2025-10-27T09:00:00',
+          slots: [{ from: '09:00', to: '13:00' }],
         },
         {
-          date: '2025-10-27',
-          time: '10:00',
-          seance_length: 60,
-          datetime: '2025-10-27T10:00:00',
+          team_member_id: 456,
+          date: '2025-10-28',
+          slots: [],
         },
       ]),
     } as unknown as jest.Mocked<AltegioClient>;
@@ -207,11 +205,11 @@ describe('schedules_get', () => {
     const result = await handlers.getSchedule({
       location_id: 123,
       team_member_id: 456,
-      start_date: '2025-10-27',
-      end_date: '2025-10-28',
+      date_from: '2025-10-27',
+      date_to: '2025-10-28',
     });
 
-    expect(result.content[0]?.text).toContain('Found 2 schedule entries');
-    expect(result.content[0]?.text).toContain('2025-10-27 at 09:00 (30 min)');
+    expect(result.content[0]?.text).toContain('2 schedule entries for team member 456');
+    expect(result.content[0]?.text).toContain('2025-10-27 09:00-13:00');
   });
 });

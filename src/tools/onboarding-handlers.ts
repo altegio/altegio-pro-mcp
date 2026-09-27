@@ -126,14 +126,14 @@ function unansweredSeatNote(rows: readonly unknown[]): string {
     ) === 'boolean';
   const unanswered = rows.filter(
     (row) =>
-      !answered(row, 'is_paid_staff') || !answered(row, 'has_timetable_access')
+      !answered(row, 'has_paid_seat') || !answered(row, 'has_schedule_access')
   ).length;
   if (unanswered === 0) return '';
   return (
-    `${unanswered} of ${rows.length} row(s) have no is_paid_staff or has_timetable_access answer. ` +
-    'Before importing, ask the location owner whether each team member takes a paid staff seat (billed on per-seat licensing) ' +
+    `${unanswered} of ${rows.length} row(s) have no has_paid_seat or has_schedule_access answer. ` +
+    'Before importing, ask the location owner whether each team member takes a paid seat (billed on per-seat licensing) ' +
     'and whether they should be in the work schedule to take appointments; never choose for them. ' +
-    'Pass the answers per row or once for the whole list with the batch-level is_paid_staff and has_timetable_access.\n\n'
+    'Pass the answers per row or once for the whole list with the batch-level has_paid_seat and has_schedule_access.\n\n'
   );
 }
 
@@ -207,15 +207,15 @@ const LocationIdSchema = z.object({
 
 const StaffBatchArgsSchema = z.object({
   location_id: z.number(),
-  staff_data: z.union([StaffBatchSchema, z.string()]),
+  team_members: z.union([StaffBatchSchema, z.string()]),
   // The owner's one answer for every row that carries none of its own.
-  is_paid_staff: z.boolean().optional(),
-  has_timetable_access: z.boolean().optional(),
+  has_paid_seat: z.boolean().optional(),
+  has_schedule_access: z.boolean().optional(),
 });
 
 const ServiceBatchArgsSchema = z.object({
   location_id: z.number(),
-  services_data: z.union([ServiceBatchSchema, z.string()]),
+  services: z.union([ServiceBatchSchema, z.string()]),
 });
 
 const CategoryArgsSchema = z.object({
@@ -429,14 +429,14 @@ export class OnboardingHandlers {
 
       const {
         location_id,
-        staff_data,
-        is_paid_staff: batchPaidSeat,
-        has_timetable_access: batchScheduleAccess,
+        team_members,
+        has_paid_seat: batchPaidSeat,
+        has_schedule_access: batchScheduleAccess,
       } = StaffBatchArgsSchema.parse(args);
 
       // Parse CSV if string
       const staffArray = StaffBatchSchema.parse(
-        typeof staff_data === 'string' ? parseCSV(staff_data) : staff_data
+        typeof team_members === 'string' ? parseCSV(team_members) : team_members
       );
 
       // A row's own answer wins over the batch answer. A row with neither
@@ -449,16 +449,16 @@ export class OnboardingHandlers {
       }> = [];
       const missing: MissingSeatChoice[] = [];
       staffArray.forEach((staff, index) => {
-        const paidSeat = staff.is_paid_staff ?? batchPaidSeat;
+        const paidSeat = staff.has_paid_seat ?? batchPaidSeat;
         const scheduleAccess =
-          staff.has_timetable_access ?? batchScheduleAccess;
+          staff.has_schedule_access ?? batchScheduleAccess;
         if (paidSeat !== undefined && scheduleAccess !== undefined) {
           rows.push({ staff, paidSeat, scheduleAccess });
           return;
         }
         const fields: MissingSeatChoice['fields'] = [];
-        if (paidSeat === undefined) fields.push('is_paid_staff');
-        if (scheduleAccess === undefined) fields.push('has_timetable_access');
+        if (paidSeat === undefined) fields.push('has_paid_seat');
+        if (scheduleAccess === undefined) fields.push('has_schedule_access');
         missing.push({ row: index + 1, fields });
       });
       if (missing.length > 0) {
@@ -515,9 +515,9 @@ export class OnboardingHandlers {
         created,
         failures,
         summary:
-          `Staff batch processing complete:\n\n` +
-          `✓ ${created.length} staff members created ` +
-          `(${paidSeats} on a paid staff seat, ${inSchedule} in the work schedule)\n` +
+          `Team member batch complete:\n\n` +
+          `✓ ${created.length} team members created ` +
+          `(${paidSeats} on a paid seat, ${inSchedule} in the work schedule)\n` +
           `\nCreated team member IDs: [${created.join(', ')}]\n` +
           `Use these team_member_id values in onboarding_set_schedules.\n` +
           `\nNext: Add service categories with onboarding_add_categories`,
@@ -538,8 +538,8 @@ export class OnboardingHandlers {
         try {
           const categoryRequest: CreateCategoryRequest = {
             title: category.title,
-            api_id: category.api_id,
-            weight: category.weight,
+            api_id: category.external_id,
+            weight: category.sort_weight,
           };
           const result = await this.client.createServiceCategory(
             location_id,
@@ -574,13 +574,11 @@ export class OnboardingHandlers {
     return withErrorHandling('onboarding_add_services_batch', async () => {
       this.requireAuth();
 
-      const { location_id, services_data } = ServiceBatchArgsSchema.parse(args);
+      const { location_id, services } = ServiceBatchArgsSchema.parse(args);
 
       // Parse CSV if string
       let servicesArray =
-        typeof services_data === 'string'
-          ? parseCSV(services_data)
-          : services_data;
+        typeof services === 'string' ? parseCSV(services) : services;
 
       // Validate with Zod
       servicesArray = ServiceBatchSchema.parse(servicesArray);
@@ -595,7 +593,7 @@ export class OnboardingHandlers {
             category_id: service.category_id || 0,
             price_min: service.price_min,
             price_max: service.price_max,
-            duration: service.duration,
+            duration: service.duration_seconds,
           };
           const result = await this.client.createService(
             location_id,

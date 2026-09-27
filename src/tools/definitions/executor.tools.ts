@@ -13,13 +13,14 @@ import { catalog } from '../executor/catalog.js';
 import { MAX_SEARCH_RESULTS, searchOperations } from '../executor/search.js';
 import { describeOperation } from '../executor/describe.js';
 import { callOperation } from '../executor/call.js';
+import { pageArg, pageMetadata, pageSizeArg, paginationOutput } from '../pagination.js';
 
 const DOMAINS = catalog.domains.map((d) => d.domain).join(', ');
 
 const searchOutput = {
   type: 'object' as const,
   properties: {
-    matches: {
+    items: {
       type: 'array' as const,
       items: {
         type: 'object' as const,
@@ -38,11 +39,10 @@ const searchOutput = {
         required: ['operationId', 'method', 'path', 'domain', 'source'],
       },
     },
-    count: { type: 'number' as const },
-    total_matches: { type: 'number' as const },
+    pagination: paginationOutput,
     terms: { type: 'array' as const, items: { type: 'string' as const } },
   },
-  required: ['matches', 'count', 'total_matches'],
+  required: ['items', 'pagination'],
 };
 
 export const searchOperationsTool = defineTool({
@@ -51,7 +51,7 @@ export const searchOperationsTool = defineTool({
   description:
     '[API] Find the API operations behind a business question — "who worked last Tuesday", ' +
     '"loyalty card balance", "cash register shifts" — when no dedicated tool covers it. ' +
-    'Returns up to 10 operations with their operationId, method, canonical path, one-line ' +
+    `Returns a page of up to ${MAX_SEARCH_RESULTS} operations with their operationId, method, canonical path, one-line ` +
     'summary and domain, and names the curated tool when one already exists (prefer that ' +
     'tool over the executor). Use this first, then `api_describe_operation` to read the ' +
     'contract and `api_call_operation` to run a read. Searches the whole documented API ' +
@@ -86,13 +86,8 @@ export const searchOperationsTool = defineTool({
         'Include V3 preview operations. They document the future contract but are not ' +
           'served by the live API yet, so they cannot be called. Default false.'
       ),
-    limit: z
-      .number()
-      .int()
-      .min(1)
-      .max(MAX_SEARCH_RESULTS)
-      .optional()
-      .describe(`Maximum operations to return (1-${MAX_SEARCH_RESULTS}).`),
+    page: pageArg,
+    page_size: pageSizeArg(MAX_SEARCH_RESULTS, MAX_SEARCH_RESULTS),
   }),
   outputSchema: searchOutput,
   handler: async ({ input }) => {
@@ -100,8 +95,14 @@ export const searchOperationsTool = defineTool({
       domain: input.domain,
       method: input.method,
       includePreview: input.include_preview,
-      limit: input.limit,
+      page: input.page,
+      limit: input.page_size,
     });
+    const pagination = pageMetadata(
+      input,
+      result.hits.length,
+      result.totalMatches
+    );
 
     if (result.hits.length === 0) {
       return {
@@ -110,9 +111,8 @@ export const searchOperationsTool = defineTool({
           'Try fewer or broader words, drop the `domain` filter, or set `include_preview` ' +
           `to also search the V3 contract. Domains: ${DOMAINS}.`,
         structuredContent: {
-          matches: [],
-          count: 0,
-          total_matches: 0,
+          items: [],
+          pagination,
           terms: result.terms,
         },
       };
@@ -140,9 +140,8 @@ export const searchOperationsTool = defineTool({
         'Next: `api_describe_operation` for the full contract, then ' +
         '`api_call_operation` to run a GET.',
       structuredContent: {
-        matches: result.hits,
-        count: result.hits.length,
-        total_matches: result.totalMatches,
+        items: result.hits,
+        pagination,
         terms: result.terms,
       },
     };

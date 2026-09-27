@@ -77,14 +77,14 @@ describe('clients_list_profiles', () => {
       page_size: 50,
     });
     const output = result.structuredContent as {
-      rows: Array<Record<string, unknown>>;
-      has_more: boolean;
+      items: Array<Record<string, unknown>>;
+      pagination: { has_more: boolean };
     };
-    expect(output.has_more).toBe(true);
-    expect(output.rows[0]).toMatchObject({ total_paid: 1200 });
-    expect(output.rows[0]).not.toHaveProperty('custom_fields');
-    expect(output.rows[0]).not.toHaveProperty('phone');
-    expect(output.rows[0]).not.toHaveProperty('email');
+    expect(output.pagination.has_more).toBe(true);
+    expect(output.items[0]).toMatchObject({ total_paid: 1200 });
+    expect(output.items[0]).not.toHaveProperty('custom_fields');
+    expect(output.items[0]).not.toHaveProperty('phone');
+    expect(output.items[0]).not.toHaveProperty('email');
     expect(everything(result)).not.toContain('+13155550177');
     expect(everything(result)).not.toContain('james@example.com');
 
@@ -96,9 +96,9 @@ describe('clients_list_profiles', () => {
     expect(
       (
         withContacts.structuredContent as {
-          rows: Array<Record<string, unknown>>;
+          items: Array<Record<string, unknown>>;
         }
-      ).rows[0]
+      ).items[0]
     ).toMatchObject({
       phone: '+13155550177',
       email: 'james@example.com',
@@ -136,15 +136,14 @@ describe('clients_get_segment_report', () => {
       page_size: 50,
     });
     const output = result.structuredContent as {
-      total_count: number;
-      has_more: boolean;
-      rows: Array<{ total_spent: number }>;
+      pagination: { total: number; has_more: boolean };
+      items: Array<{ total_spent: number }>;
     };
 
     expect(calls).toHaveLength(1);
-    expect(output.total_count).toBe(908);
-    expect(output.has_more).toBe(true);
-    expect(output.rows[0]?.total_spent).toBe(1240.5);
+    expect(output.pagination.total).toBe(908);
+    expect(output.pagination.has_more).toBe(true);
+    expect(output.items[0]?.total_spent).toBe(1240.5);
     expect(everything(result)).not.toContain('13155550177');
   });
 });
@@ -254,12 +253,12 @@ describe('clients_search contacts', () => {
     });
 
     const structured = result.structuredContent as {
-      rows: Record<string, unknown>[];
+      items: Record<string, unknown>[];
       contacts_included: boolean;
     };
     expect(structured.contacts_included).toBe(false);
-    expect(structured.rows[0]).not.toHaveProperty('phone');
-    expect(structured.rows[0]).not.toHaveProperty('email');
+    expect(structured.items[0]).not.toHaveProperty('phone');
+    expect(structured.items[0]).not.toHaveProperty('email');
     expect(everything(result)).not.toContain(CARD_PHONE);
     expect(calls).toHaveLength(1);
   });
@@ -272,9 +271,9 @@ describe('clients_search contacts', () => {
     });
 
     const structured = result.structuredContent as {
-      rows: Record<string, unknown>[];
+      items: Record<string, unknown>[];
     };
-    expect(structured.rows[0]?.phone).toBe(CARD_PHONE);
+    expect(structured.items[0]?.phone).toBe(CARD_PHONE);
   });
 });
 

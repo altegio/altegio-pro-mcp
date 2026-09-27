@@ -57,8 +57,7 @@ export const getServiceCategoriesTool = defineTool({
       text: withUntrustedBlock(lines.join('\n'), untrusted, { maxChars: 200 }),
       structuredContent: {
         items: categories.map((c) => ({ id: c.id, title: c.title })),
-        count: categories.length,
-        ...pagination,
+        pagination,
       },
     };
   },

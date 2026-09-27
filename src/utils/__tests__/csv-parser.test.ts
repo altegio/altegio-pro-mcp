@@ -33,11 +33,11 @@ describe('CSV Parser', () => {
 
   describe('CSV with Zod Schema Validation', () => {
     it('should parse services CSV with numeric values and coerce them', () => {
-      const csv = 'title,price_min,duration\nHaircut,50,1800';
+      const csv = 'title,price_min,duration_seconds\nHaircut,50,1800';
       const parsed = parseCSV(csv);
 
       expect(parsed).toEqual([
-        { title: 'Haircut', price_min: '50', duration: '1800' },
+        { title: 'Haircut', price_min: '50', duration_seconds: '1800' },
       ]);
 
       // Validate with Zod schema (coercion happens during validation)
@@ -45,15 +45,15 @@ describe('CSV Parser', () => {
       expect(result).toEqual({
         title: 'Haircut',
         price_min: 50,
-        duration: 1800,
+        duration_seconds: 1800,
       });
       expect(typeof result.price_min).toBe('number');
-      expect(typeof result.duration).toBe('number');
+      expect(typeof result.duration_seconds).toBe('number');
     });
 
     it('should parse services CSV with optional numeric fields', () => {
       const csv =
-        'title,price_min,price_max,duration,category_id\nManicure,30,40,1200,5';
+        'title,price_min,price_max,duration_seconds,category_id\nManicure,30,40,1200,5';
       const parsed = parseCSV(csv);
 
       const result = ServiceBatchItemSchema.parse(parsed[0]);
@@ -61,7 +61,7 @@ describe('CSV Parser', () => {
         title: 'Manicure',
         price_min: 30,
         price_max: 40,
-        duration: 1200,
+        duration_seconds: 1200,
         category_id: 5,
       });
       expect(typeof result.price_max).toBe('number');
@@ -106,12 +106,12 @@ describe('CSV Parser', () => {
 
     it('parses the staff answers from CSV', () => {
       const [row] = parseCSV(
-        'name,is_paid_staff,has_timetable_access\nAlice,no,yes'
+        'name,has_paid_seat,has_schedule_access\nAlice,no,yes'
       );
       expect(StaffBatchItemSchema.parse(row)).toMatchObject({
         name: 'Alice',
-        is_paid_staff: false,
-        has_timetable_access: true,
+        has_paid_seat: false,
+        has_schedule_access: true,
       });
     });
   });

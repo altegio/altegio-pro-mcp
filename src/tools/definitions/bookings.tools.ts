@@ -4,8 +4,31 @@ import { defineTool } from '../factory.js';
 import { bookingsOutput, bookingEntityOutput } from '../output-schemas.js';
 import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
 import { includeContactsArg, CONTACTS_WITHHELD_NOTICE } from '../contacts.js';
-import { visitStatusFromLegacyCode } from '../../capabilities/analytics/vocabulary.js';
+import {
+  visitStatusFromLegacyCode,
+  visitStatusToLegacyCode,
+} from '../../capabilities/analytics/vocabulary.js';
 import type { AltegioBooking } from '../../types/altegio.types.js';
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD');
+
+/** The states a caller can set; `cancelled` is `appointments_delete`. */
+const appointmentStatusArg = z
+  .enum(['waiting', 'confirmed', 'arrived', 'no_show'])
+  .optional()
+  .describe(
+    'Visit status to record: waiting (default for a new appointment), confirmed, arrived or no_show.'
+  );
+
+/** The identifying fields a write returns; the full row is `appointments_list`. */
+function projectAppointmentReference(appointment: AltegioBooking) {
+  return {
+    id: appointment.id,
+    team_member_id: appointment.staff_id ?? appointment.staff?.id ?? null,
+    datetime: appointment.datetime ?? null,
+    date: appointment.date ?? null,
+  };
+}
 
 const serviceItemSchema = z.object({
   id: z.number().int().positive().describe('Service ID'),
@@ -91,7 +114,7 @@ export const getAppointmentsTool = defineTool({
   name: 'appointments_list',
   category: 'Appointments',
   description:
-    '[Appointments] Get appointments for a location. AUTHENTICATION REQUIRED - this is administrative data. User must be logged in and have access to the location. If location_id not known, first call locations_list with my=1 to get user locations, then ask user to choose one. Returns 25 rows by default. Follow next_page until null; a full final page may require one empty request.',
+    'List the appointments of a location, optionally within a date range. Each item carries the canonical status (waiting, confirmed, arrived, no_show, cancelled), team member, client and services. Client phones are withheld unless include_contacts is true. Paged: 25 per page by default; follow pagination.next_page until it is null (a full last page may need one empty request). Find the location_id with locations_list first.',
   annotations: {
     title: 'Get Appointments',
     readOnlyHint: true,
@@ -104,28 +127,25 @@ export const getAppointmentsTool = defineTool({
       .positive()
       .describe('ID of the location to get appointments for'),
     ...paginationInput,
-    start_date: z
-      .string()
+    date_from: isoDate
       .optional()
-      .describe(
-        'Filter appointments from this date (YYYY-MM-DD format). Use to reduce result set.'
-      ),
-    end_date: z
-      .string()
+      .describe('First appointment date to include, YYYY-MM-DD.'),
+    date_to: isoDate
       .optional()
-      .describe(
-        'Filter appointments until this date (YYYY-MM-DD format). Use to reduce result set.'
-      ),
+      .describe('Last appointment date to include, YYYY-MM-DD.'),
     include_contacts: includeContactsArg,
   }),
   outputSchema: bookingsOutput,
   handler: async ({ input, client }) => {
-    const { location_id, include_contacts, ...listParams } = input;
+    const { location_id, include_contacts } = input;
     const includeContacts = include_contacts === true;
-    const appointments = await client.getBookings(
-      location_id,
-      Object.keys(listParams).length > 0 ? listParams : undefined
-    );
+    // Canonical names at the boundary; the V1 query takes count/start_date/end_date.
+    const appointments = await client.getBookings(location_id, {
+      page: input.page,
+      count: input.page_size,
+      ...(input.date_from ? { start_date: input.date_from } : {}),
+      ...(input.date_to ? { end_date: input.date_to } : {}),
+    });
 
     const lines = [
       `Found ${appointments.length} ${appointments.length === 1 ? 'appointment' : 'appointments'} for location ${location_id}:`,
@@ -172,8 +192,7 @@ export const getAppointmentsTool = defineTool({
         items: appointments.map((booking) =>
           projectAppointment(booking, { includeContacts })
         ),
-        count: appointments.length,
-        ...pageMetadata(input, appointments.length),
+        pagination: pageMetadata(input, appointments.length),
         contacts_included: includeContacts,
       },
     };
@@ -184,9 +203,9 @@ export const createAppointmentTool = defineTool({
   name: 'appointments_create',
   category: 'Appointments',
   description:
-    '[Appointments] Create a new client appointment. AUTHENTICATION REQUIRED. Required fields: team_member_id, services, datetime, session_length, client info. ' +
-    'PREREQUISITES: the team member must be LINKED to each service (use services_link_team_member, else HTTP 400 "team member does not provide the selected services") AND scheduled/available at the datetime (use schedules_create, else HTTP 409 "time not available"). ' +
-    'To back-date a completed visit or force a booking onto a busy/off slot, pass save_if_busy=true. Set attendance=1 to mark a past visit as attended.',
+    'Create an appointment for a client. Required: team_member_id, services, datetime, session_length and the client name and phone. ' +
+    'Prerequisites: the team member must be linked to every service (services_link_team_member; otherwise the API answers 400) and be scheduled at that time (schedules_create; otherwise 409). ' +
+    'Pass save_if_busy=true to back-date a completed visit or force a slot that is busy or unscheduled, and status=arrived to record a past visit as attended.',
   annotations: {
     title: 'Create Appointment',
     destructiveHint: false,
@@ -218,19 +237,10 @@ export const createAppointmentTool = defineTool({
       .describe('Client information'),
     comment: z.string().optional().describe('Appointment comment'),
     send_sms: z
-      .number()
-      .int()
-      .min(0)
-      .max(1)
+      .boolean()
       .optional()
-      .describe('Send SMS reminder (0 or 1)'),
-    attendance: z
-      .number()
-      .int()
-      .optional()
-      .describe(
-        'Attendance status: 2 confirmed, 1 arrived/attended, 0 waiting, -1 no-show'
-      ),
+      .describe('Send the client an SMS confirmation.'),
+    status: appointmentStatusArg,
     save_if_busy: z
       .boolean()
       .optional()
@@ -240,21 +250,26 @@ export const createAppointmentTool = defineTool({
   }),
   outputSchema: bookingEntityOutput,
   handler: async ({ input, client }) => {
-    const { location_id, team_member_id, session_length, ...appointmentData } =
-      input;
+    const {
+      location_id,
+      team_member_id,
+      session_length,
+      send_sms,
+      status,
+      ...appointmentData
+    } = input;
     const appointment = await client.createBooking(location_id, {
       staff_id: team_member_id,
       seance_length: session_length,
+      ...(send_sms !== undefined ? { send_sms: send_sms ? 1 : 0 } : {}),
+      ...(status !== undefined
+        ? { attendance: visitStatusToLegacyCode(status) ?? undefined }
+        : {}),
       ...appointmentData,
     });
     return {
-      text: `Successfully created appointment:\nID: ${appointment.id}\nTeam member ID: ${appointment.staff_id}\nDate: ${appointment.datetime || appointment.date}`,
-      structuredContent: {
-        id: appointment.id,
-        team_member_id: appointment.staff_id,
-        datetime: appointment.datetime,
-        date: appointment.date,
-      },
+      text: `Created appointment ${appointment.id} with team member ${appointment.staff_id} on ${appointment.datetime || appointment.date}.`,
+      structuredContent: projectAppointmentReference(appointment),
     };
   },
 });
@@ -263,7 +278,7 @@ export const updateAppointmentTool = defineTool({
   name: 'appointments_update',
   category: 'Appointments',
   description:
-    '[Appointments] Update existing appointment. AUTHENTICATION REQUIRED. Provide only fields to update.',
+    'Update an appointment: move it, change the team member, services, session length, client details, comment or status. Pass only the fields to change.',
   annotations: {
     title: 'Update Appointment',
     destructiveHint: false,
@@ -298,7 +313,7 @@ export const updateAppointmentTool = defineTool({
       .optional()
       .describe('Client information'),
     comment: z.string().optional().describe('Appointment comment'),
-    attendance: z.number().int().optional().describe('Attendance status'),
+    status: appointmentStatusArg,
   }),
   outputSchema: bookingEntityOutput,
   handler: async ({ input, client }) => {
@@ -307,6 +322,7 @@ export const updateAppointmentTool = defineTool({
       appointment_id,
       team_member_id,
       session_length,
+      status,
       ...updateData
     } = input;
     const appointment = await client.updateBooking(
@@ -317,17 +333,15 @@ export const updateAppointmentTool = defineTool({
         ...(session_length !== undefined
           ? { seance_length: session_length }
           : {}),
+        ...(status !== undefined
+          ? { attendance: visitStatusToLegacyCode(status) ?? undefined }
+          : {}),
         ...updateData,
       }
     );
     return {
-      text: `Successfully updated appointment ${appointment_id}:\nDate: ${appointment.datetime || appointment.date}`,
-      structuredContent: {
-        id: appointment.id,
-        team_member_id: appointment.staff_id,
-        datetime: appointment.datetime,
-        date: appointment.date,
-      },
+      text: `Updated appointment ${appointment_id}; now on ${appointment.datetime || appointment.date}.`,
+      structuredContent: projectAppointmentReference(appointment),
     };
   },
 });
@@ -336,7 +350,7 @@ export const deleteAppointmentTool = defineTool({
   name: 'appointments_delete',
   category: 'Appointments',
   description:
-    '[Appointments] Delete/cancel appointment. AUTHENTICATION REQUIRED.',
+    'Cancel an appointment and remove it from the calendar. Asks for confirmation first.',
   annotations: {
     title: 'Delete Appointment',
     destructiveHint: true,

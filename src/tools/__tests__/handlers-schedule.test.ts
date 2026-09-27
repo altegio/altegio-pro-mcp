@@ -17,13 +17,13 @@ describe('schedules_get handler', () => {
     const result = await getScheduleTool.createHandler(client)({
       location_id: 4564,
       team_member_id: 447367,
-      start_date: '2026-09-10',
-      end_date: '2026-09-11',
+      date_from: '2026-09-10',
+      date_to: '2026-09-11',
     });
 
     expect(result.structuredContent).toMatchObject({
       items: [{ is_working: true }, { is_working: false }],
-      count: 2,
+      pagination: { returned: 2, total: 2, has_more: false },
     });
     expect(result.content[0]?.text).toContain('day off');
   });

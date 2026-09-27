@@ -30,6 +30,7 @@ import * as decisionAnalytics from '../../capabilities/analytics/decision-use-ca
 import * as reactivationAnalytics from '../../capabilities/analytics/reactivation.js';
 import * as serviceMix from '../../capabilities/analytics/service-mix.js';
 import { includeContactsArg } from '../contacts.js';
+import { paginationOutput, standardizeCollection } from '../pagination.js';
 import { clientFiltersSchema } from './client-filters.schema.js';
 
 // ========== shared input pieces ==========
@@ -578,14 +579,6 @@ export const analyticsGetClientVisitStatsTool = defineTool({
 
 // ========== temporary stable legacy reports ===============================
 
-const legacyPageOutput = objectSchema({
-  page: { type: 'integer' as const },
-  page_size: { type: 'integer' as const },
-  total_count: { type: 'integer' as const },
-  returned: { type: 'integer' as const },
-  has_more: { type: 'boolean' as const },
-});
-
 const paymentBreakdownOutput = objectSchema({
   discount: num,
   loyalty_points: num,
@@ -640,7 +633,7 @@ export const analyticsGetClientSalesTool = defineTool({
     location_id: { type: 'integer' as const },
     period: periodSchema,
     currency: str,
-    rows: {
+    items: {
       type: 'array' as const,
       items: objectSchema({
         client_id: { type: 'integer' as const },
@@ -654,12 +647,12 @@ export const analyticsGetClientSalesTool = defineTool({
       }),
     },
     totals: objectSchema({ revenue: num }),
-    page: legacyPageOutput,
+    pagination: paginationOutput,
     contacts_included: { type: 'boolean' as const },
     untrusted_data_note: { type: 'string' as const },
   }),
   handler: async ({ input, client }) =>
-    legacyAnalytics.getClientSales(client, input),
+    standardizeCollection(await legacyAnalytics.getClientSales(client, input)),
 });
 
 export const analyticsGetClientRetentionTool = defineTool({
@@ -682,7 +675,7 @@ export const analyticsGetClientRetentionTool = defineTool({
     location_id: { type: 'integer' as const },
     period: periodSchema,
     service_id: int,
-    rows: {
+    items: {
       type: 'array' as const,
       items: objectSchema({
         team_member_id: int,
@@ -700,7 +693,7 @@ export const analyticsGetClientRetentionTool = defineTool({
     untrusted_data_note: { type: 'string' as const },
   }),
   handler: async ({ input, client }) =>
-    legacyAnalytics.getClientRetention(client, input),
+    standardizeCollection(await legacyAnalytics.getClientRetention(client, input)),
 });
 
 export const analyticsGetClientForecastTool = defineTool({
@@ -737,7 +730,7 @@ export const analyticsGetClientForecastTool = defineTool({
     location_id: { type: 'integer' as const },
     prediction_date: str,
     currency: str,
-    rows: {
+    items: {
       type: 'array' as const,
       items: objectSchema({
         client_id: { type: 'null' as const },
@@ -752,13 +745,13 @@ export const analyticsGetClientForecastTool = defineTool({
         email: str,
       }),
     },
-    page: legacyPageOutput,
+    pagination: paginationOutput,
     contacts_included: { type: 'boolean' as const },
     client_identity_status: { type: 'string' as const },
     untrusted_data_note: { type: 'string' as const },
   }),
   handler: async ({ input, client }) =>
-    legacyAnalytics.getClientForecast(client, input),
+    standardizeCollection(await legacyAnalytics.getClientForecast(client, input)),
 });
 
 export const analyticsGetServiceProfitabilityTool = defineTool({
@@ -792,7 +785,7 @@ export const analyticsGetServiceProfitabilityTool = defineTool({
     period: periodSchema,
     currency: str,
     group_by: { type: 'string' as const },
-    rows: {
+    items: {
       type: 'array' as const,
       items: objectSchema({
         service_id: int,
@@ -816,11 +809,11 @@ export const analyticsGetServiceProfitabilityTool = defineTool({
       team_member_compensation: num,
       contribution_result: num,
     }),
-    page: legacyPageOutput,
+    pagination: paginationOutput,
     untrusted_data_note: { type: 'string' as const },
   }),
   handler: async ({ input, client }) =>
-    legacyAnalytics.getServiceProfitability(client, input),
+    standardizeCollection(await legacyAnalytics.getServiceProfitability(client, input)),
 });
 
 export const analyticsGetServiceMixTrendTool = defineTool({
@@ -870,7 +863,7 @@ export const analyticsGetServiceMixTrendTool = defineTool({
     currency: str,
     group_by: { type: 'string' },
     team_member_id: int,
-    rows: {
+    items: {
       type: 'array',
       items: objectSchema({
         month: { type: 'string' },
@@ -892,13 +885,13 @@ export const analyticsGetServiceMixTrendTool = defineTool({
         attribution: { type: 'string' },
       }),
     },
-    page: { type: 'object' },
+    pagination: paginationOutput,
     totals: { type: 'object' },
     provenance: { type: 'object' },
     untrusted_data_note: { type: 'string' },
   }),
   handler: async ({ input, client }) =>
-    serviceMix.getServiceMixTrend(client, input),
+    standardizeCollection(await serviceMix.getServiceMixTrend(client, input)),
 });
 
 export const analyticsGetClientServicePenetrationTool = defineTool({
@@ -1050,13 +1043,13 @@ export const analyticsGetClientServicePenetrationTool = defineTool({
       clients_with_unattributed_lines: { type: 'integer' },
       confirmed_mono_group_clients: { type: 'integer' },
     }),
-    candidate_client_ids: { type: 'array', items: { type: 'integer' } },
-    page: { type: 'object' },
+    items: { type: 'array', items: { type: 'integer' } },
+    pagination: paginationOutput,
     provenance: { type: 'object' },
     untrusted_data_note: { type: 'string' },
   }),
   handler: async ({ input, client }) =>
-    serviceMix.getClientServicePenetration(client, input),
+    standardizeCollection(await serviceMix.getClientServicePenetration(client, input)),
 });
 
 export const analyticsGetTeamMemberSalesTool = defineTool({
@@ -1104,7 +1097,7 @@ export const analyticsGetTeamMemberSalesTool = defineTool({
         items: { type: 'integer' as const },
       },
     }),
-    rows: {
+    items: {
       type: 'array' as const,
       items: objectSchema({
         team_member_id: int,
@@ -1139,7 +1132,7 @@ export const analyticsGetTeamMemberSalesTool = defineTool({
     untrusted_data_note: { type: 'string' as const },
   }),
   handler: async ({ input, client }) =>
-    legacyAnalytics.getTeamMemberSales(client, input),
+    standardizeCollection(await legacyAnalytics.getTeamMemberSales(client, input)),
 });
 
 // ========== task-oriented decision analytics ==========
@@ -1702,14 +1695,8 @@ export const analyticsGetTeamMemberServiceMatrixTool = defineTool({
     location_id: requiredInteger,
     period: strictPeriodSchema,
     currency: str,
-    rows: { type: 'array' as const, items: matrixRowOutput },
-    page: closedObjectSchema({
-      page: requiredInteger,
-      page_size: requiredInteger,
-      total_count: requiredInteger,
-      returned: requiredInteger,
-      has_more: bool,
-    }),
+    items: { type: 'array' as const, items: matrixRowOutput },
+    pagination: { ...paginationOutput, additionalProperties: false },
     top_cells: { type: 'array' as const, items: matrixRowOutput },
     bottom_cells: {
       type: 'array' as const,
@@ -1760,7 +1747,7 @@ export const analyticsGetTeamMemberServiceMatrixTool = defineTool({
     untrusted_data_note: requiredString,
   }),
   handler: async ({ input, client }) =>
-    decisionAnalytics.getTeamMemberServiceMatrix(client, input),
+    standardizeCollection(await decisionAnalytics.getTeamMemberServiceMatrix(client, input)),
 });
 
 export const analyticsGetInventoryReorderRisksTool = defineTool({
@@ -1834,15 +1821,16 @@ export const analyticsGetInventoryReorderRisksTool = defineTool({
       lead_time_days: requiredInteger,
       safety_stock_days: requiredInteger,
     }),
-    rows: { type: 'array' as const, items: inventoryRiskRowOutput },
-    page: closedObjectSchema({
-      page: requiredInteger,
-      page_size: requiredInteger,
-      total_count: requiredInteger,
-      returned: requiredInteger,
-      has_more: bool,
-      returned_after_risk_filter: requiredInteger,
-    }),
+    items: { type: 'array' as const, items: inventoryRiskRowOutput },
+    pagination: {
+      ...paginationOutput,
+      properties: {
+        ...paginationOutput.properties,
+        returned_after_risk_filter: requiredInteger,
+      },
+      required: [...paginationOutput.required, 'returned_after_risk_filter'],
+      additionalProperties: false,
+    },
     formulae: closedObjectSchema({
       average_daily_sales: requiredString,
       days_of_cover: requiredString,
@@ -1885,7 +1873,7 @@ export const analyticsGetInventoryReorderRisksTool = defineTool({
     untrusted_data_note: requiredString,
   }),
   handler: async ({ input, client }) =>
-    decisionAnalytics.getInventoryReorderRisks(client, input),
+    standardizeCollection(await decisionAnalytics.getInventoryReorderRisks(client, input)),
 });
 
 // ========== report builder ==========
@@ -2193,7 +2181,7 @@ export const analyticsGetTeamMemberCapacityTool = defineTool({
   input: z.object({ location_id: locationId, ...periodFields }),
   outputSchema: objectSchema({
     ...nextBaseOutput,
-    rows: {
+    items: {
       type: 'array' as const,
       items: objectSchema({
         team_member_id: int,
@@ -2205,7 +2193,7 @@ export const analyticsGetTeamMemberCapacityTool = defineTool({
     totals: objectSchema(capacityMetricsOutput),
   }),
   handler: async ({ input, client }) =>
-    legacyAnalytics.getTeamMemberCapacity(client, input),
+    standardizeCollection(await legacyAnalytics.getTeamMemberCapacity(client, input)),
 });
 export const analyticsGetClientReactivationCandidatesTool = defineTool({
   name: 'analytics_get_client_reactivation_candidates',
@@ -2267,15 +2255,10 @@ export const analyticsGetClientReactivationCandidatesTool = defineTool({
       field: { type: 'string' as const },
       direction: { type: 'string' as const },
     }),
-    total_count: { type: 'integer' as const },
-    page: { type: 'integer' as const },
-    page_size: { type: 'integer' as const },
-    returned: { type: 'integer' as const },
-    has_more: { type: 'boolean' as const },
-    next_page: { type: ['integer', 'null'] as const },
+    pagination: paginationOutput,
     contacts_included: { type: 'boolean' as const },
     untrusted_data_note: { type: 'string' as const },
-    candidates: {
+    items: {
       type: 'array' as const,
       items: objectSchema({
         client_id: { type: 'integer' as const },
@@ -2321,7 +2304,7 @@ export const analyticsGetGroupEventPerformanceTool = defineTool({
   outputSchema: objectSchema({
     ...nextBaseOutput,
     currency: str,
-    page: legacyPageOutput,
+    pagination: paginationOutput,
     metrics: {
       anyOf: [
         objectSchema({
@@ -2333,7 +2316,7 @@ export const analyticsGetGroupEventPerformanceTool = defineTool({
         { type: 'null' as const },
       ],
     },
-    rows: {
+    items: {
       type: 'array' as const,
       items: objectSchema({
         group_event_id: int,
@@ -2360,7 +2343,7 @@ export const analyticsGetGroupEventPerformanceTool = defineTool({
     },
   }),
   handler: async ({ input, client }) =>
-    legacyAnalytics.getGroupEventPerformance(client, input),
+    standardizeCollection(await legacyAnalytics.getGroupEventPerformance(client, input)),
 });
 const productAmountsOutput = {
   quantity: num,
@@ -2404,8 +2387,8 @@ export const analyticsGetProductSalesTool = defineTool({
       type: 'string' as const,
       enum: ['upstream', 'local'],
     },
-    page: legacyPageOutput,
-    rows: {
+    pagination: paginationOutput,
+    items: {
       type: 'array' as const,
       items: objectSchema({
         product_id: int,
@@ -2420,7 +2403,7 @@ export const analyticsGetProductSalesTool = defineTool({
     totals: objectSchema(productAmountsOutput),
   }),
   handler: async ({ input, client }) =>
-    legacyAnalytics.getProductSales(client, input),
+    standardizeCollection(await legacyAnalytics.getProductSales(client, input)),
 });
 export const analyticsGetCashFlowBreakdownTool = defineTool({
   name: 'analytics_get_cash_flow_breakdown',
@@ -2506,7 +2489,7 @@ export const analyticsGetCashFlowBreakdownTool = defineTool({
         cash_account_title: str,
       }),
     },
-    rows: {
+    items: {
       type: 'array' as const,
       items: objectSchema({
         payment_item_id: int,
@@ -2523,5 +2506,5 @@ export const analyticsGetCashFlowBreakdownTool = defineTool({
     totals: objectSchema({ inflow: num, outflow: num, net_movement: num }),
   }),
   handler: async ({ input, client }) =>
-    legacyAnalytics.getCashFlowBreakdown(client, input),
+    standardizeCollection(await legacyAnalytics.getCashFlowBreakdown(client, input)),
 });

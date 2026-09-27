@@ -87,10 +87,8 @@ describe('client comments', () => {
     )({ location_id: 7, client_id: 8 });
     expectFenced(result);
     expect(content(result)).toMatchObject({
-      total_count: 1,
-      returned: 1,
-      complete: true,
-      comments: [{ id: 2, type: 'text', file_count: 0 }],
+      pagination: { total: 1, returned: 1, has_more: false, next_page: null },
+      items: [{ id: 2, type: 'text', file_count: 0 }],
     });
     expectOutputContract(clientsListCommentsTool, result);
     expect(request).toHaveBeenCalledWith(
@@ -120,7 +118,7 @@ describe('client files', () => {
       fake({ request: request as AltegioClient['request'] })
     )({ location_id: 7, client_id: 8 });
     expectFenced(result);
-    const files = content(result).files as Array<Record<string, unknown>>;
+    const files = content(result).items as Array<Record<string, unknown>>;
     expect(files[0]).toMatchObject({
       size_label: '9 B',
       download_url: 'https://app.alteg.io/client_files/download/7/1/',
@@ -145,7 +143,9 @@ describe('client files', () => {
     expect(result.isError).toBeUndefined();
     expect(uploadClientFile).toHaveBeenCalledWith(7, 8, 'signed.pdf', 'AAEC');
     expectFenced(result);
-    expect(content(result)).toMatchObject({ total_count: 1, returned: 1 });
+    expect(content(result)).toMatchObject({
+      pagination: { total: 1, returned: 1 },
+    });
     expectOutputContract(clientsUploadFileTool, result);
   });
 });

@@ -130,6 +130,9 @@ export interface SearchFilters {
   method?: string;
   /** Include V3 preview operations, which are documented but not yet callable. */
   includePreview?: boolean;
+  /** 1-based page of ranked hits; default 1. */
+  page?: number;
+  /** Hits per page, at most `MAX_SEARCH_RESULTS`. */
   limit?: number;
 }
 
@@ -258,6 +261,8 @@ export function searchOperations(
     Math.max(filters.limit ?? MAX_SEARCH_RESULTS, 1),
     MAX_SEARCH_RESULTS
   );
+  const page = Math.max(filters.page ?? 1, 1);
+  const offset = (page - 1) * limit;
 
   const candidates = allOperations().filter((op) => {
     if (!filters.includePreview && op.source !== 'v1') return false;
@@ -299,7 +304,7 @@ export function searchOperations(
     terms,
     totalMatches: scored.length,
     searched: candidates.length,
-    hits: scored.slice(0, limit).map(({ op, score }) => ({
+    hits: scored.slice(offset, offset + limit).map(({ op, score }) => ({
       operationId: op.operationId,
       method: op.method,
       path: op.displayPath,

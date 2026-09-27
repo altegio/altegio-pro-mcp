@@ -14,6 +14,20 @@ const seanceLengthSchema = z
     'Duration this team member needs for the service, in seconds (min 300, max 86100)'
   );
 
+const durationSecondsArg = z
+  .number()
+  .int()
+  .positive()
+  .optional()
+  .describe('Default duration of the service in seconds');
+
+const prepaidArg = z
+  .enum(['forbidden', 'allowed', 'required'])
+  .optional()
+  .describe(
+    'Online prepayment: forbidden, allowed (client chooses) or required'
+  );
+
 function servicePrice(service: AltegioService): {
   min: number | null;
   max: number | null;
@@ -54,7 +68,7 @@ export const getServicesTool = defineTool({
   name: 'services_list',
   category: 'Services',
   description:
-    '[Services] Get list of services available at a location. AUTHENTICATION REQUIRED - administrative access to view all services with full pricing, settings, and configuration (not just public online-booking info). User must be logged in and have access to the location. Returns a stable page ordered by ID, with next_page and total. Default 25 rows.',
+    'List the services of a location with prices, duration, category, active flag and the team members linked to each. Paged and ordered by id: 25 per page by default; pagination.total is exact and pagination.next_page is null on the last page.',
   annotations: {
     title: 'Get Services',
     readOnlyHint: true,
@@ -104,8 +118,7 @@ export const getServicesTool = defineTool({
       text: withUntrustedBlock(lines.join('\n'), untrusted, { maxChars: 200 }),
       structuredContent: {
         items: services.map(projectService),
-        count: services.length,
-        ...pagination,
+        pagination,
       },
     };
   },
@@ -115,7 +128,7 @@ export const createServiceTool = defineTool({
   name: 'services_create',
   category: 'Services',
   description:
-    '[Services] Create a new service. AUTHENTICATION REQUIRED. Required fields: title, category_id. Services are active and usable by default; pass active=0 only to create a hidden draft. Link at least one team member before booking it.',
+    'Create a service in a category. Required: title and category_id. The service is active by default; pass active=false for a hidden draft. Link at least one team member (services_link_team_member) before it can be booked.',
   annotations: {
     title: 'Create Service',
     destructiveHint: false,
@@ -134,26 +147,26 @@ export const createServiceTool = defineTool({
       .optional()
       .describe('Discount percentage'),
     comment: z.string().optional().describe('Service description'),
-    duration: z.number().positive().optional().describe('Duration in seconds'),
-    prepaid: z.string().optional().describe('Prepaid option'),
+    duration_seconds: durationSecondsArg,
+    prepaid: prepaidArg,
     active: z
-      .number()
-      .int()
-      .min(0)
-      .max(1)
-      .optional()
-      .default(1)
-      .describe('1 (default) creates an active service; 0 creates a draft'),
+      .boolean()
+      .default(true)
+      .describe('true (default) creates an active service; false a hidden draft'),
   }),
   outputSchema: serviceEntityOutput,
   handler: async ({ input, client }) => {
-    const { location_id, ...serviceData } = input;
-    const service = await client.createService(location_id, serviceData);
+    const { location_id, duration_seconds, active, ...serviceData } = input;
+    const service = await client.createService(location_id, {
+      ...serviceData,
+      ...(duration_seconds !== undefined ? { duration: duration_seconds } : {}),
+      active: active ? 1 : 0,
+    });
     return {
-      text:
-        `Successfully created service:\nID: ${service.id}\nTitle: ${service.title}\n` +
-        `Category: ${service.category_id ?? 'not reported'}\n` +
-        `Active: ${service.active === undefined ? 'not reported by create response' : Boolean(Number(service.active))}`,
+      text: withUntrustedBlock(
+        `Created service ${service.id} in category ${service.category_id ?? 'not reported'}; active: ${service.active === undefined ? 'not reported by the create response' : Boolean(Number(service.active))}.`,
+        [{ label: 'title', value: service.title }]
+      ),
       structuredContent: projectService(service),
     };
   },
@@ -188,12 +201,22 @@ export const updateServiceTool = defineTool({
       .optional()
       .describe('Discount percentage'),
     comment: z.string().optional().describe('Service description'),
-    duration: z.number().positive().optional().describe('Duration in seconds'),
-    active: z.number().int().min(0).max(1).optional().describe('0 or 1'),
+    duration_seconds: durationSecondsArg,
+    prepaid: prepaidArg,
+    active: z
+      .boolean()
+      .optional()
+      .describe('false hides the service from booking without deleting it'),
   }),
   outputSchema: serviceEntityOutput,
   handler: async ({ input, client }) => {
-    const { location_id, service_id, ...updateData } = input;
+    const { location_id, service_id, duration_seconds, active, ...rest } =
+      input;
+    const updateData = {
+      ...rest,
+      ...(duration_seconds !== undefined ? { duration: duration_seconds } : {}),
+      ...(active !== undefined ? { active: active ? 1 : 0 } : {}),
+    };
     const service = await client.updateService(
       location_id,
       service_id,
