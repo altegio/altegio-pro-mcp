@@ -5,7 +5,7 @@ import { httpFromClient, queryString } from '../altegio-http.js';
 import { AnalyticsInputError } from '../../capabilities/analytics/errors.js';
 import { callAnalytics } from './analytics-http.js';
 
-const PAGE_SIZE = 1000; // Backend PageApiRecordsController maximum.
+const PAGE_SIZE = 1000; // Largest page the records endpoint serves.
 const MAX_RECORDS = 30000;
 
 function nextDay(day: string): string {

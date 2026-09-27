@@ -182,11 +182,11 @@ describe('token scopes gate execution, end to end', () => {
   };
 
   /**
-   * The literal `x-mcp-auth-scope` value the mcp-proxy forwards today, traced
-   * through `routes.json` → `lib/as.js` (scope filtered to the route's list)
-   * → `lib/rs.js` → `lib/identity-headers.js`. The first version of the gate
-   * assumed this header never arrived and refused every gated tool when it
-   * did; nothing below may ever refuse on the full grant again.
+   * The literal `x-mcp-auth-scope` value the OAuth proxy in front of this
+   * server forwards today (the token's scope filtered to the route's declared
+   * list). The first version of the gate assumed this header never arrived and
+   * refused every gated tool when it did; nothing below may ever refuse on the
+   * full grant again.
    */
   const PROXY_FULL_GRANT = 'mcp:pro:read mcp:pro:write';
   const PROXY_READ_GRANT = 'mcp:pro:read';

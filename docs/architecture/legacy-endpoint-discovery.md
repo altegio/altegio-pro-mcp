@@ -2,16 +2,23 @@
 
 Use this playbook when a valuable owner or administrator workflow is missing
 from the public API, especially while an equivalent V3 contract is pending. It
-turns backend and ERP-web research into a temporary, testable MCP capability
-without making the legacy route part of the agent-facing contract.
+turns black-box observation of the product's web client into a temporary,
+testable MCP capability without making the legacy route part of the
+agent-facing contract.
 
 The durable product is the canonical MCP tool. The legacy route, HTML layout or
 workbook is a replaceable adapter implementation.
 
+The method needs nothing beyond what any customer has: an Altegio account with
+a disposable test location, the product's web client, a browser's network
+inspector and the published OpenAPI specifications. It does not rely on
+backend source access, and nothing observed this way is a contract.
+
 ## 1. Start with a decision, not a route
 
-Write the business question before searching code. Good candidates help a
-location owner or administrator make a recurring decision, for example:
+Write the business question before opening the network inspector. Good
+candidates help a location owner or administrator make a recurring decision,
+for example:
 
 - which clients should be reactivated;
 - where scheduled capacity is unused;
@@ -28,77 +35,68 @@ Check the existing surface first:
 1. Search tool names and descriptions in `src/tools/definitions/`.
 2. Search the generated catalog with `api_search_operations` or
    `src/generated/catalog.json`.
-3. Pull and inspect the v1 and V3 preview OpenAPI specifications.
+3. Pull and inspect the v1 and V3 preview OpenAPI specifications
+   (`ALTEGIO_API_DOCS`, `npm run api:inventory`).
 4. Read the analytics coverage, glossary and relevant source-audit documents.
 
 If documented JSON already supplies the required facts, use it. HTML or
 workbook parsing is a temporary fallback, not the default.
 
-## 2. Find candidate sources in `biz.erp`
+## 2. Observe the candidate source
 
-The route inventory is the broad map. Keep its output in the gitignored
-`.inventory/` directory because this repository is public:
+Open the report or screen in the product's web client on the test location
+with the browser's network inspector recording. Exercise every filter, page,
+sort and export the screen offers, and note for each request:
 
-```bash
-npm run api:inventory
-```
-
-For a focused investigation, search in this order:
-
-1. Route registrations under
-   `../biz.erp/src/Application/Http/Routing/Routes/`.
-2. API and page controllers under
-   `../biz.erp/src/Application/Http/Controllers/` and
-   `../biz.erp/src/Application/Http/PageControllers/`.
-3. Services, renderers, tables and exports used by the controller.
-4. Templates and frontend calls that reveal table columns, paging and filter
-   names.
-5. Permission checks, feature flags and domain-zone behavior.
-
-Useful searches, adjusted to the owner's vocabulary and its legacy synonyms:
-
-```bash
-rg -n -i "retention|workload|turnover|sales.analysis|annual.report" \
-  ../biz.erp/src/Application/Http/Routing/Routes \
-  ../biz.erp/src/Application/Http/Controllers \
-  ../biz.erp/src/Application/Http/PageControllers
-
-rg -n "<route-fragment>|<controller-class>" ../biz.erp/src
-
-rg -n -i "access|permission|feature.flag|start_date|end_date|page|limit" \
-  ../biz.erp/src/path/to/the/controller \
-  ../biz.erp/src/path/to/its/service
-```
-
-Search both canonical and legacy terms: location/company/salon,
-team-member/staff/master/employee, appointment/record, product/goods, and so
-on. Legacy names are discovery inputs only; they must not escape the adapter.
-
-## 3. Trace the complete source contract
-
-Do not infer the contract from the visible table alone. Trace every layer and
-write down:
-
-- HTTP method and exact path;
+- HTTP method and exact path, including the location segment;
 - whether the response is JSON, a JSON envelope containing HTML, plain HTML,
   BIFF8/XLS or XLSX;
-- all accepted filters, defaults, sentinels and inclusive/exclusive date rules;
-- upstream pagination, totals and maximum practical result size;
-- access rights, feature flags, license checks and the status returned when
-  access is missing;
-- whether the requested period can be silently changed;
+- every query or body parameter the client sends, its default, and which UI
+  control changes it;
+- the status and body returned when the request is repeated with a user who
+  lacks the report's right (use a second, restricted user on the test
+  location);
+- whether the request depends on a browser cookie or session state, or works
+  with the user token alone.
+
+Keep raw captures in the gitignored `.inventory/` directory. This repository is
+public; a route inventory or an unsanitized capture is never committed.
+
+Search with both canonical and legacy vocabulary when reading captures:
+location/company/salon, team-member/staff/master/employee, appointment/record,
+product/goods, and so on. Legacy names are discovery inputs only; they must not
+escape the adapter.
+
+## 3. Establish the complete source contract
+
+Do not infer the contract from the visible table alone. Vary the inputs until
+every behaviour below is known, and write it down:
+
+- all accepted filters, defaults, sentinels and inclusive/exclusive date rules
+  (probe a period boundary, an empty period and an impossible range);
+- upstream pagination, totals and maximum practical result size (request the
+  largest page the client ever asks for, then one larger);
+- the status returned when access is missing, and whether the route redirects;
+- whether the requested period can be silently changed (compare the rendered
+  period with the requested one; try a start date older than the client
+  offers);
 - stable identifiers present in links, data attributes, adjacent chart data or
   exports;
-- localization of dates, decimal separators, thousands separators and labels;
-- whether totals overlap dimensions and therefore must not be added;
-- privacy-sensitive fields and whether masking is preserved;
+- localization of dates, decimal separators, thousands separators and labels
+  (repeat the capture under a second interface language and a location with
+  the other date-format setting);
+- whether totals overlap dimensions and therefore must not be added
+  (reconcile the page total against the sum of its rows);
+- privacy-sensitive fields and whether masking is preserved for a restricted
+  user;
 - mutations or saved-report side effects hidden behind a nominally reporting
-  route.
+  route (re-read the location after the call and diff).
 
-Read the controller's filter builder and permission branches, then the service
-or table that calculates each measure. A column title is not a definition.
-For every metric, establish its numerator, denominator, period, unit and
-whether it is authoritative or derived.
+A column title is not a definition. For every metric, establish its numerator,
+denominator, period, unit and whether it is authoritative or derived, by
+reconciling the rendered number against documented API data on the same test
+location (appointments, transactions, the client card). Where the two cannot be
+reconciled, the metric stays `null` with a coverage reason.
 
 ## 4. Score and reject candidates
 
@@ -108,7 +106,8 @@ Prefer a candidate when it has all of the following:
 - a read-only, location-scoped source available to ordinary business users;
 - useful filters and a bounded result;
 - stable identifiers for rows that will be referenced later;
-- metrics whose meaning can be proven from backend code;
+- metrics whose meaning can be proven by reconciliation against documented
+  data;
 - a safe stateless authentication path;
 - a plausible future V3 replacement behind the same canonical contract.
 
@@ -131,32 +130,31 @@ metric.
 
 ## 5. Capture the investigation
 
-Keep raw route inventories and sanitized response captures in `.inventory/`.
-Commit only the durable contract evidence:
+Keep raw captures in `.inventory/`. Commit only the durable contract evidence:
 
 - an `extended` catalog entry for every undocumented route used;
-- source-shaped, sanitized golden fixtures;
+- source-shaped, sanitized golden fixtures recorded from the test location;
 - a source-audit document containing filters, permissions, formulas and
-  limitations;
+  limitations, written as observed behaviour;
 - the canonical vocabulary mapping;
 - tests that pin the route and parsed contract.
 
 Use this candidate record while investigating:
 
-| Field                | Required content                                        |
-| -------------------- | ------------------------------------------------------- |
-| Owner question       | The decision the tool enables                           |
-| Existing alternative | Current MCP tool or documented API, if any              |
-| Source               | Route, controller, service/renderer and response format |
-| Access               | Permissions, feature flags, license and persona         |
-| Filters              | Canonical filters and exact legacy mapping              |
-| Measures             | Formula, unit, period and authority                     |
-| Dimensions           | Stable IDs, labels and hierarchy                        |
-| Bounds               | Pagination, byte limits and narrowing strategy          |
-| Privacy              | Contact or financial fields and withholding rule        |
-| Failure modes        | Redirects, clamping, empty states and layout drift      |
-| V3 migration         | Intended future operation or capability                 |
-| Decision             | Implement, postpone or reject, with reason              |
+| Field                | Required content                                      |
+| -------------------- | ----------------------------------------------------- |
+| Owner question       | The decision the tool enables                         |
+| Existing alternative | Current MCP tool or documented API, if any            |
+| Source               | Route, response format and where it is used in the UI |
+| Access               | Required right, license and persona, as observed      |
+| Filters              | Canonical filters and exact legacy mapping            |
+| Measures             | Formula, unit, period and authority                   |
+| Dimensions           | Stable IDs, labels and hierarchy                      |
+| Bounds               | Pagination, byte limits and narrowing strategy        |
+| Privacy              | Contact or financial fields and withholding rule      |
+| Failure modes        | Redirects, clamping, empty states and layout drift    |
+| V3 migration         | Intended future operation or capability               |
+| Decision             | Implement, postpone or reject, with reason            |
 
 ## 6. Build a temporary legacy adapter
 
@@ -170,7 +168,7 @@ Follow the same boundary used by the analytics pack:
 5. Add the route to `catalog/extended/` and the tool-to-source mapping.
 6. Add the tool to the intended static facets and scope map.
 
-JSON is preferred. For legacy ERP-web reports, use the existing stateless
+JSON is preferred. For legacy web reports, use the existing stateless
 `requestLegacyWebReport` transport. It injects the request-scoped user token as
 `user_hash`, omits cookies, refuses redirects and keeps credential-bearing URLs
 out of errors. Altegio uses `https://app.alteg.io`; a YCLIENTS deployment must
@@ -221,7 +219,8 @@ Every new legacy-backed capability passes all layers:
 5. Validation of fixture-produced `structuredContent` against the published
    output schema, including nested objects.
 6. Surface, scope, catalog and untrusted-text coverage tests.
-7. An opt-in bounded live smoke on the demo location with real delegated auth.
+7. An opt-in bounded live smoke on the disposable test location with real
+   delegated auth.
 8. Post-merge verification of the production commit, effective legacy origin,
    container health and authenticated public health endpoint.
 

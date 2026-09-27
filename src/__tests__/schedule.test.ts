@@ -110,11 +110,11 @@ describe('AltegioClient Schedule Operations', () => {
       ).rejects.toThrow('Not authenticated');
     });
 
-    // Root cause of the 422: the backend expects the per-entry key `staff_id`,
-    // but the public OpenAPI documents `team_member_id`, and the controller
-    // validates with a strict Symfony Collection (no missing/extra keys). The
-    // MCP keeps the canonical `team_member_id` and maps it to `staff_id` on the
-    // wire. These tests pin that mapping.
+    // Root cause of the 422: the endpoint expects the per-entry key `staff_id`,
+    // but the public OpenAPI documents `team_member_id`, and the body is
+    // validated strictly (no missing/extra keys). The MCP keeps the canonical
+    // `team_member_id` and maps it to `staff_id` on the wire. These tests pin
+    // that mapping.
     it('should PUT /company/{id}/staff/schedule mapping team_member_id → staff_id (set)', async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,

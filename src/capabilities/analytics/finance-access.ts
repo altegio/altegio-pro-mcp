@@ -11,7 +11,7 @@ import {
 } from './errors.js';
 
 /**
- * Standard finance income categories (`CTransactions` type ids), in the order
+ * Standard finance income categories (finance transaction `type` ids), in the order
  * the cash-receipt streams are reported. Any other income category is custom
  * and stays unclassified.
  */

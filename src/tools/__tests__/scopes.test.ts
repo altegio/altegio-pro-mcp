@@ -285,7 +285,8 @@ describe('checkToolScopes', () => {
  * v3 requirement, so every gated tool was refused on the closed endpoint.
  *
  * `PROXY_FULL_GRANT` is the literal header value observed in production. If
- * `routes.json` ever changes the names, these tests are what should fail.
+ * the proxy's route configuration ever changes the names, these tests are
+ * what should fail.
  */
 describe('the platform vocabulary (mcp:pro:*)', () => {
   const PROXY_FULL_GRANT = 'mcp:pro:read mcp:pro:write';
@@ -302,7 +303,7 @@ describe('the platform vocabulary (mcp:pro:*)', () => {
     'api_call_operation',
   ] as const;
 
-  it('declares exactly the two names routes.json issues for this service', () => {
+  it('declares exactly the two names the proxy issues for this service', () => {
     expect([...PLATFORM_SCOPES]).toEqual(['mcp:pro:read', 'mcp:pro:write']);
   });
 

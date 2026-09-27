@@ -7,7 +7,7 @@
  *   spec \t METHOD \t path \t operationId \t tags \t DEPRECATED? \t x-altegio-status
  *
  * Usage:
- *   node scripts/api-inventory/openapi-inventory.mjs [--docs ../biz.erp.api.docs] [--out .inventory/documented-ops.tsv]
+ *   node scripts/api-inventory/openapi-inventory.mjs [--docs <ALTEGIO_API_DOCS checkout>] [--out .inventory/documented-ops.tsv]
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,7 +19,9 @@ const args = Object.fromEntries(
     .map((a, i, arr) => (a.startsWith('--') ? [a.slice(2), arr[i + 1]] : null))
     .filter(Boolean)
 );
-const docsRoot = path.resolve(args.docs ?? '../biz.erp.api.docs');
+const docsRoot = path.resolve(
+  args.docs ?? process.env.ALTEGIO_API_DOCS ?? '../biz.erp.api.docs'
+);
 const outFile = path.resolve(args.out ?? '.inventory/documented-ops.tsv');
 
 const SPECS = {

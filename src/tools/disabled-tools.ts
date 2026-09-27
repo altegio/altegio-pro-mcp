@@ -7,10 +7,9 @@
  *
  *  - `POST /company/{id}/analytics_constructor/reports/{id}/data` answers 400 for
  *    every report, even with a valid `BETWEEN {from,to}` override and a report
- *    whose data mart reports `success`. That endpoint always builds its query
- *    with the new query builder, while the mart is queued with the old context
- *    because the backend flag `new_query_builder_analytics_constructor` is off
- *    in production.
+ *    whose data mart reports `success`. Observed behaviour: the data endpoint
+ *    and the data-mart build do not agree on how the report query is built,
+ *    so the mart that reports `success` is never the one the endpoint reads.
  *  - The legacy `POST /company/{id}/ac/{id}/data` does return rows, but its
  *    request accepts only `report_columns` — no filter override — and it ignores
  *    the report's stored date filter, so every answer is all-time data wearing
@@ -27,7 +26,7 @@
  * and the guidance that pointed at them is marked `report builder disabled`
  * where it was rewritten.
  *
- * **To re-enable:** confirm the backend flag is on and that the data endpoint
+ * **To re-enable:** confirm upstream that the data endpoint
  * returns a table, then empty this set and restore the guidance. `./surface.ts`
  * renders the effect of this set next to every other admission rule, so the
  * generated `docs/architecture/tool-surface.md` shows it turning back on.

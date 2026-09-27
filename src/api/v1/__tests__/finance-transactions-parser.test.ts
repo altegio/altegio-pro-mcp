@@ -7,8 +7,8 @@ import { parseFinanceTransactionListPage } from '../finance-transactions-parser.
 import { LegacyAnalyticsParseError } from '../legacy-analytics-parser.js';
 
 /**
- * Golden page shaped like biz.erp `templates/finances/transactions/search.php`:
- * three located rows (linked and unlinked date cells), payer names, a comment,
+ * Golden page shaped like the rendered finance transaction list: three
+ * located rows (linked and unlinked date cells), payer names, a comment,
  * a visit column with its own date, and the unlabelled page-total row.
  */
 const fixture = readFileSync(

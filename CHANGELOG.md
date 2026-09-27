@@ -130,7 +130,7 @@ is declared stable.
   `is_paid_staff` / `has_timetable_access`; a row's own answer wins. A row with
   neither refuses the whole batch before anything is created, naming rows by
   number only. The result counts paid seats and team members in the work
-  schedule. This is what failed on per-seat-licensed demo location 4564.
+  schedule. This is what failed on the per-seat-licensed demo location.
 - **`onboarding_preview_data`:** a staff preview says how many rows still lack
   the answers, so the owner is asked before the import.
 - **`phone_number` removed from `team_members_create`:** quick-create never reads it,
@@ -176,7 +176,7 @@ is declared stable.
   returning nothing. The adapter now sends an explicit ceiling with a lone
   minimum, an inverted range is an input error, and a page containing a
   profile outside the requested bounds or ids is refused rather than returned.
-  Verified live on demo location 4564: `paid_min=1` answered 94 of 94 clients,
+  Verified live on the demo location: `paid_min=1` answered 94 of 94 clients,
   with a ceiling 65.
 - **`analytics_get_client_payer_cohorts`:** the finance-list markup contract
   moved from the adapter into `src/api/v1/finance-transactions-parser.ts`

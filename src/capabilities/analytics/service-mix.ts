@@ -25,8 +25,8 @@ const lineValue = (line: ServiceRecord['services'][number]): number => {
     throw new Error(
       'An attended service line has no recorded line total; the report cannot be complete.'
     );
-  // Backend AttendanceServiceItem::getManualCost returns the line total. It is
-  // NOT a per-unit price and must not be multiplied by amount.
+  // The records API returns `manual_cost` as the line total. It is NOT a
+  // per-unit price and must not be multiplied by amount.
   return line.manual_cost;
 };
 const chargeValue = (line: ServiceRecord['services'][number]): number | null =>
