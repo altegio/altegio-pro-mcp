@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../package-metadata.js';
 import { describe, it, expect } from '@jest/globals';
 import { createServer } from '../server.js';
 import { registerTools } from '../tools/registry.js';
@@ -33,13 +34,13 @@ describe('Tool Registration', () => {
     expect(toolNames).toContain('altegio_logout');
     expect(toolNames).toContain('list_locations');
     expect(toolNames).toContain('get_appointments');
-    expect(toolNames).toContain('get_staff');
+    expect(toolNames).toContain('team_members_list');
     expect(toolNames).toContain('get_services');
     expect(toolNames).toContain('get_service_categories');
     expect(toolNames).toContain('get_schedule');
-    expect(toolNames).toContain('create_staff');
-    expect(toolNames).toContain('update_staff');
-    expect(toolNames).toContain('delete_staff');
+    expect(toolNames).toContain('team_members_create');
+    expect(toolNames).toContain('team_members_update');
+    expect(toolNames).toContain('team_members_delete');
     expect(toolNames).toContain('create_service');
     expect(toolNames).toContain('update_service');
     expect(toolNames).toContain('create_appointment');
@@ -52,7 +53,7 @@ describe('Tool Registration', () => {
     expect(toolNames).toContain('onboarding_status');
     expect(toolNames).toContain('onboarding_add_positions');
     expect(toolNames).toContain('onboarding_set_schedules');
-    expect(toolNames).toContain('onboarding_add_staff_batch');
+    expect(toolNames).toContain('onboarding_add_team_members_batch');
     expect(toolNames).toContain('onboarding_add_services_batch');
     expect(toolNames).toContain('onboarding_add_categories');
     expect(toolNames).toContain('onboarding_import_clients');
@@ -134,7 +135,7 @@ describe('Tool Registration', () => {
 
     expect(server).toBeDefined();
     expect(server.name).toBe('@altegio/mcp-server-pro');
-    expect(server.version).toBe('0.3.0-alpha.0');
+    expect(server.version).toBe(PACKAGE_VERSION);
   });
 
   it('rebinds direct-token headers at the SDK tool-handler boundary', async () => {
@@ -200,7 +201,7 @@ describe('get_schedule', () => {
           datetime: '2025-10-27T10:00:00',
         },
       ]),
-    } as any;
+    } as unknown as jest.Mocked<AltegioClient>;
 
     const handlers = new ToolHandlers(mockClient);
     const result = await handlers.getSchedule({

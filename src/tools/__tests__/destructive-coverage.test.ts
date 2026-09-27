@@ -41,9 +41,9 @@ describe('destructive tools are gated', () => {
       'delete_schedule',
       'delete_service',
       'delete_service_category',
-      'delete_staff',
       'onboarding_rollback_phase',
       'remove_location_user',
+      'team_members_delete',
       'unlink_service_team_member',
     ]);
   });

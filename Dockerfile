@@ -40,6 +40,8 @@ RUN npm ci --omit=dev --ignore-scripts && \
 # Copy built application from builder
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 
+COPY --chown=nodejs:nodejs ["docs/Altegio API and Product Logic Documentation.md", "docs/ONBOARDING_GUIDE.md", "./docs/"]
+
 # Switch to non-root user
 USER nodejs
 

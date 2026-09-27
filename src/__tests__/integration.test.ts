@@ -48,7 +48,7 @@ describe('Tool Integration', () => {
             data: { user_token: 'test-token-123' },
           }),
       } as Response)
-    ) as any;
+    ) as typeof fetch;
 
     const client = new AltegioClient(
       { partnerToken: 'test-token' },
@@ -64,7 +64,7 @@ describe('Tool Integration', () => {
     expect(result.content).toBeDefined();
     expect(result.content.length).toBeGreaterThan(0);
     expect(result.content[0]?.type).toBe('text');
-    expect((result.content[0] as any)?.text).toContain('logged in');
+    expect(result.content[0]?.text).toContain('logged in');
   });
 
   it('should handle logout', async () => {
@@ -79,7 +79,7 @@ describe('Tool Integration', () => {
     expect(result.content).toBeDefined();
     expect(result.content.length).toBeGreaterThan(0);
     expect(result.content[0]?.type).toBe('text');
-    expect((result.content[0] as any)?.text).toContain('logged out');
+    expect(result.content[0]?.text).toContain('logged out');
   });
 
   it('should validate email format with zod schema', async () => {

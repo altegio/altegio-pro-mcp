@@ -290,7 +290,7 @@ export class OnboardingHandlers {
               `Started at: ${state.started_at}\n\n` +
               `Recommended steps (in order):\n` +
               `1. Add positions: onboarding_add_positions\n` +
-              `2. Add staff: onboarding_add_staff_batch\n` +
+              `2. Add staff: onboarding_add_team_members_batch\n` +
               `3. Add service categories: onboarding_add_categories\n` +
               `4. Add services: onboarding_add_services_batch\n` +
               `5. Set work schedules: onboarding_set_schedules\n` +
@@ -418,13 +418,13 @@ export class OnboardingHandlers {
           `✓ ${created.length} positions created\n` +
           `\nCreated position IDs: [${created.join(', ')}]\n` +
           `Use these position_id values when adding staff.\n` +
-          `\nNext: Add staff with onboarding_add_staff_batch`,
+          `\nNext: Add staff with onboarding_add_team_members_batch`,
       });
     });
   }
 
   async addStaffBatch(args: unknown) {
-    return withErrorHandling('onboarding_add_staff_batch', async () => {
+    return withErrorHandling('onboarding_add_team_members_batch', async () => {
       this.requireAuth();
 
       const {
@@ -866,7 +866,7 @@ export class OnboardingHandlers {
       const fieldCount = fields.length;
       const seatNote = data_type === 'staff' ? unansweredSeatNote(parsed) : '';
       const importTool = {
-        staff: 'onboarding_add_staff_batch',
+        staff: 'onboarding_add_team_members_batch',
         services: 'onboarding_add_services_batch',
         clients: 'onboarding_import_clients',
         categories: 'onboarding_add_categories',

@@ -173,7 +173,7 @@ After setup, Claude Desktop will have:
 **Business Management:**
 - `list_locations` - Get managed locations
 - `get_appointments` - View appointments
-- `get_staff` - View all staff (B2B)
+- `team_members_list` - View all staff (B2B)
 - `get_services` - View services (B2B)
 - `get_service_categories` - View categories
 - `get_schedule` - View staff member schedules

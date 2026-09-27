@@ -1,3 +1,4 @@
+import { paginationInput, paginateCollection } from '../pagination.js';
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import { resourcesOutput } from '../output-schemas.js';
@@ -15,15 +16,19 @@ export const getResourcesTool = defineTool({
   },
   input: z.object({
     location_id: z.number().int().positive().describe('Location ID'),
+    ...paginationInput,
   }),
   outputSchema: resourcesOutput,
   handler: async ({ input, client }) => {
-    const resources = await client.getResources(input.location_id);
+    const { items: resources, pagination } = paginateCollection(
+      await client.getResources(input.location_id),
+      input
+    );
 
     if (!resources || resources.length === 0) {
       return {
         text: 'No resources found for this location.',
-        structuredContent: { items: [], count: 0 },
+        structuredContent: { items: [], count: 0, ...pagination },
       };
     }
 
@@ -45,6 +50,7 @@ export const getResourcesTool = defineTool({
       structuredContent: {
         items: resources.map((r) => ({ id: r.id, title: r.title })),
         count: resources.length,
+        ...pagination,
       },
     };
   },

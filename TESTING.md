@@ -1,241 +1,44 @@
-# Testing Altegio.Pro MCP Server
+# Testing
 
-## Unit Tests
+Use the committed lockfile and a supported Node.js version:
 
-```bash
-npm test                 # All tests (157 tests, 23 suites)
-npm run test:coverage    # With coverage report
-npm run test:watch       # Watch mode
-npm run lint             # Code style check
-npm run typecheck        # TypeScript validation
+```sh
+npm ci
+npm run lint
+npm run format:check
+npm run typecheck
+npm test -- --runInBand
+npm run build
+npm run catalog:check
+npm run surface:check
 ```
 
-## Local Docker Testing
+`npm run test:coverage` adds coverage reporting. `npm run test:watch` runs Jest
+in watch mode. Default tests use mocked upstream responses and local HTTP
+servers; no real credentials or business data are needed.
 
-The recommended way to test the HTTP server locally.
+The catalog check requires an OpenAPI checkout. Set `ALTEGIO_API_DOCS` to its
+root; without it, the check reports a skip. Tests still validate the committed
+catalog. Regenerate with `npm run catalog:build` after reviewing spec changes.
+The surface check is self-contained; regenerate with `npm run surface:build`.
 
-### 1. Setup
+## Live integration tests
 
-```bash
-# Create .env with your credentials
-cat > .env << 'EOF'
-ALTEGIO_API_TOKEN=your_partner_token
-ALTEGIO_API_BASE=https://api.alteg.io/api/v1
-EOF
-```
+Live suites are explicitly opt-in. Read the environment guards at the top of
+`src/__tests__/*live.test.ts` and `src/api/v1/__tests__/analytics-live.test.ts`
+before running them. Use a dedicated disposable location and credentials with
+appropriate rights. Appointment suites create and remove real entities; cleanup
+can fail when upstream access is lost. Never enable live flags in default CI.
 
-### 2. Start with Docker Compose
+## Transport checks
 
-```bash
-# Build and start (port 8080, development mode)
-docker compose -f docker-compose.local.yml up --build -d
+Run `npm run dev:http` or the container described in [CI-CD.md](CI-CD.md).
+`GET /health` checks the process. The transport integration suites exercise MCP
+initialization, sessions, tool calls, views, identity isolation, and refusals
+against a local server using the installed SDK.
 
-# Check logs
-docker compose -f docker-compose.local.yml logs -f
+## Release artifact checks
 
-# Stop
-docker compose -f docker-compose.local.yml down
-```
-
-Or run standalone Docker:
-
-```bash
-docker build -t altegio-mcp:local .
-docker run --rm -p 8080:8080 --env-file .env -e PORT=8080 altegio-mcp:local
-```
-
-### 3. Health Check
-
-```bash
-curl http://localhost:8080/health
-# {"status":"ok","timestamp":"..."}
-```
-
-### 4. MCP Protocol Testing
-
-The server uses **Streamable HTTP transport** (MCP spec 2025-11-25). All communication happens via POST requests to the `/mcp` endpoint. The server returns an `mcp-session-id` header on initialization, which must be included in subsequent requests. Responses are returned inline in the POST response body.
-
-```bash
-# Initialize MCP handshake (note the session ID in the response header)
-curl -sv -X POST http://localhost:8080/mcp \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "initialize",
-    "params": {
-      "protocolVersion": "2025-11-25",
-      "capabilities": {},
-      "clientInfo": {"name": "manual-test", "version": "1.0"}
-    }
-  }' 2>&1 | grep -i "mcp-session-id"
-# Look for: mcp-session-id: <SESSION_ID>
-
-SESSION_ID="<paste session id from response header>"
-
-# Send initialized notification
-curl -s -X POST http://localhost:8080/mcp \
-  -H "Content-Type: application/json" \
-  -H "mcp-session-id: $SESSION_ID" \
-  -d '{"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}}'
-
-# List all available tools
-curl -s -X POST http://localhost:8080/mcp \
-  -H "Content-Type: application/json" \
-  -H "mcp-session-id: $SESSION_ID" \
-  -d '{"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}'
-
-# Call a tool (e.g., list_locations)
-curl -s -X POST http://localhost:8080/mcp \
-  -H "Content-Type: application/json" \
-  -H "mcp-session-id: $SESSION_ID" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 3,
-    "method": "tools/call",
-    "params": {
-      "name": "list_locations",
-      "arguments": {"count": 5}
-    }
-  }'
-
-# Terminate session when done
-curl -s -X DELETE http://localhost:8080/mcp \
-  -H "mcp-session-id: $SESSION_ID"
-```
-
-All responses are returned inline in the POST response body (no separate SSE stream needed).
-
-### 5. Automated MCP Test Script
-
-```bash
-python3 -c "
-import subprocess, json, re
-
-BASE = 'http://localhost:8080/mcp'
-
-def post(payload, session_id=None):
-    headers = ['-H', 'Content-Type: application/json']
-    if session_id:
-        headers += ['-H', f'mcp-session-id: {session_id}']
-    result = subprocess.run(
-        ['curl', '-s', '-D', '-', '-X', 'POST', BASE] + headers +
-        ['-d', json.dumps(payload)],
-        capture_output=True, text=True
-    )
-    return result.stdout
-
-# Initialize
-resp = post({'jsonrpc':'2.0','id':1,'method':'initialize',
-    'params':{'protocolVersion':'2025-11-25','capabilities':{},
-        'clientInfo':{'name':'test','version':'1.0'}}})
-
-# Extract session ID from response headers
-session_id = None
-for line in resp.split('\n'):
-    m = re.search(r'mcp-session-id:\s*(\S+)', line, re.IGNORECASE)
-    if m:
-        session_id = m.group(1)
-        break
-
-if not session_id:
-    print('FAIL: No session ID in response headers')
-    exit(1)
-
-# Parse JSON body (after blank line in response)
-parts = resp.split('\r\n\r\n', 1)
-body = parts[1] if len(parts) > 1 else ''
-r = json.loads(body) if body.strip() else None
-print(f'1. Initialize: {\"OK\" if r and \"result\" in r else \"FAIL\"}')
-
-# Send initialized notification
-post({'jsonrpc':'2.0','method':'notifications/initialized','params':{}}, session_id)
-
-# List tools
-resp = post({'jsonrpc':'2.0','id':2,'method':'tools/list','params':{}}, session_id)
-parts = resp.split('\r\n\r\n', 1)
-body = parts[1] if len(parts) > 1 else ''
-r = json.loads(body) if body.strip() else None
-tools = r.get('result',{}).get('tools',[]) if r else []
-print(f'2. Tools list: {len(tools)} tools found {\"(OK)\" if len(tools) > 0 else \"(FAIL)\"}')
-
-# Call list_locations
-resp = post({'jsonrpc':'2.0','id':3,'method':'tools/call',
-    'params':{'name':'list_locations','arguments':{'count':3}}}, session_id)
-parts = resp.split('\r\n\r\n', 1)
-body = parts[1] if len(parts) > 1 else ''
-r = json.loads(body) if body.strip() else None
-has_result = r and 'result' in r and not r.get('result',{}).get('isError')
-print(f'3. list_locations: {\"OK\" if has_result else \"FAIL\"}')
-
-# Terminate session
-subprocess.run(['curl', '-s', '-X', 'DELETE', BASE, '-H', f'mcp-session-id: {session_id}'],
-    capture_output=True, text=True)
-print('Done!')
-"
-```
-
-## Production Testing
-
-After deployment to the VM (see [CI-CD.md](CI-CD.md)).
-
-> **The staff lane is OAuth-protected.** Every request to
-> `https://mcp.altegio.dev/pro/…` — including the health check — needs an
-> `Authorization: Bearer <token>` header with a token carrying the
-> `mcp:pro:read` scope; without it the endpoint returns `401 invalid_token`.
-> The short `https://mcp.alteg.io/pro…` addresses are the customer lane: they
-> take an Altegio sign-in and refuse a staff bearer. Export one first:
->
-> ```bash
-> export MCP_TOKEN="<your mcp:pro:read bearer>"
-> ```
-
-```bash
-# Health check via proxy (staff lane)
-curl https://mcp.altegio.dev/pro/health \
-  -H "Authorization: Bearer $MCP_TOKEN"
-
-# MCP Streamable HTTP — initialize a session
-curl -s -X POST https://mcp.altegio.dev/pro/mcp \
-  -H "Authorization: Bearer $MCP_TOKEN" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
-```
-
-The MCP protocol flow is the same as local — POST requests to `/mcp` with the `mcp-session-id` header.
-
-### Known limitation — live verification from cloud sessions
-
-Reading the authenticated `tools/list` schema from production **cannot be done
-from a cloud Claude Code session**: the staff lane needs an `mcp:pro:read` bearer the
-session does not hold, the session is scope-locked to this repository (so it
-cannot reach the `altegio-analytics-agent` project that holds one), and `gcloud`
-is not available to inspect the VM. Until this is resolved, verify a deployed
-schema change **manually with a token** (the curls above) or by re-running the
-tool from an MCP client. Tracked in
-[#30](https://github.com/altegio/altegio-pro-mcp/issues/30).
-
-## Integration Testing
-
-### Claude Desktop
-
-Native stdio transport. See [CLAUDE_DESKTOP_SETUP.md](CLAUDE_DESKTOP_SETUP.md).
-
-### Other MCP Clients
-
-Streamable HTTP transport via `https://mcp.alteg.io/pro`, signed in with an
-Altegio account (`https://mcp.alteg.io/pro/readonly` for a surface that only
-reads). Any MCP-compatible client can connect using this address.
-
-## Security Notes
-
-- Never commit API tokens to git
-- Use `.env` file (gitignored) for local credentials
-- Use test accounts for public deployments
-- Credentials are stored in `~/.altegio-mcp/credentials.json`
-
-## Support
-
-- **Issues**: https://github.com/altegio/altegio-pro-mcp/issues
-- **API Docs**: https://developer.alteg.io
+After a clean build, inspect `npm pack --dry-run --json`. The package must contain
+both runtime documentation resources and the generated catalog, and must exclude
+test helpers, fixtures, credentials, and local agent state.

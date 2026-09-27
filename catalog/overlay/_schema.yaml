@@ -107,7 +107,7 @@ example:
       domain: team_members
       tier: core
       facets: [ops, catalog]
-      tool_name: get_staff
+      tool_name: team_members_list
       description: >
         List the team members of a location with their positions, specializations
         and ratings. Use this before booking to pick who provides a service.

@@ -35,7 +35,20 @@ const SPEC_PATH = process.env.ALTEGIO_API_DOCS
     );
 
 // Resolved OpenAPI spec (all $refs dereferenced)
-let spec: any;
+interface SpecOperation {
+  operationId?: string;
+  deprecated?: boolean;
+  description?: string;
+  parameters?: Array<{ in: string; name: string }>;
+  requestBody?: {
+    content?: Record<
+      string,
+      { schema?: { properties?: Record<string, unknown>; required?: string[] } }
+    >;
+  };
+}
+type SpecPath = Record<string, SpecOperation>;
+let spec: { paths?: Record<string, SpecPath> };
 let specAvailable = false;
 
 beforeAll(async () => {
@@ -50,7 +63,9 @@ beforeAll(async () => {
   }
 
   try {
-    spec = await SwaggerParser.dereference(SPEC_PATH);
+    spec = (await SwaggerParser.dereference(
+      SPEC_PATH
+    )) as unknown as typeof spec;
     specAvailable = true;
   } catch (err) {
     console.warn(`Failed to parse OpenAPI spec: ${err}`);
@@ -137,7 +152,7 @@ function documentedEntries(): Array<[string, ApiMapping]> {
  * Normalize OpenAPI path template to match our mapping format.
  * Spec uses {location_id} but paths section keys might differ.
  */
-function findPathInSpec(specPath: string): any | null {
+function findPathInSpec(specPath: string): SpecPath | null {
   if (!spec?.paths) return null;
 
   // Direct match
@@ -187,7 +202,7 @@ describe('Spec Compliance', () => {
         const pathObj = findPathInSpec(mapping.path);
         if (!pathObj?.[mapping.method]) return;
 
-        const operation = pathObj[mapping.method];
+        const operation = pathObj[mapping.method]!;
         expect(operation.operationId).toBe(mapping.operationId);
       });
     }
@@ -203,10 +218,10 @@ describe('Spec Compliance', () => {
         const pathObj = findPathInSpec(mapping.path);
         if (!pathObj?.[mapping.method]) return;
 
-        const operation = pathObj[mapping.method];
+        const operation = pathObj[mapping.method]!;
         const specPathParams = (operation.parameters || [])
-          .filter((p: any) => p.in === 'path')
-          .map((p: any) => p.name);
+          .filter((p) => p.in === 'path')
+          .map((p) => p.name);
 
         for (const param of mapping.pathParams) {
           // Our mapping uses generic names, spec might use location_id vs company_id
@@ -238,10 +253,10 @@ describe('Spec Compliance', () => {
         const pathObj = findPathInSpec(mapping.path);
         if (!pathObj?.[mapping.method]) return;
 
-        const operation = pathObj[mapping.method];
+        const operation = pathObj[mapping.method]!;
         const specQueryParams = (operation.parameters || [])
-          .filter((p: any) => p.in === 'query')
-          .map((p: any) => p.name);
+          .filter((p) => p.in === 'query')
+          .map((p) => p.name);
 
         const missingInSpec: string[] = [];
         for (const param of mapping.queryParams!) {
@@ -273,7 +288,7 @@ describe('Spec Compliance', () => {
         const pathObj = findPathInSpec(mapping.path);
         if (!pathObj?.[mapping.method]) return;
 
-        const operation = pathObj[mapping.method];
+        const operation = pathObj[mapping.method]!;
         const requestBody = operation.requestBody;
         if (!requestBody) {
           console.warn(
@@ -323,7 +338,7 @@ describe('Spec Compliance', () => {
         const pathObj = findPathInSpec(mapping.path);
         if (!pathObj?.[mapping.method]) return;
 
-        const operation = pathObj[mapping.method];
+        const operation = pathObj[mapping.method]!;
         const requestBody = operation.requestBody;
         if (!requestBody) return;
 
@@ -357,7 +372,7 @@ describe('Spec Compliance', () => {
         const pathObj = findPathInSpec(mapping.path);
         if (!pathObj?.[mapping.method]) return;
 
-        const operation = pathObj[mapping.method];
+        const operation = pathObj[mapping.method]!;
         if (operation.deprecated) {
           console.warn(
             `⚠️  [${toolName}] uses DEPRECATED endpoint: ${mapping.method.toUpperCase()} ${mapping.path}` +

@@ -29,6 +29,7 @@ export default [
       'node_modules/**',
       'coverage/**',
       '.worktrees/**',
+      '.claude/**',
       // Generated catalog (scripts/catalog/build.mjs) — reviewed as data, not code.
       'src/generated/**',
     ],

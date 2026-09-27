@@ -31,7 +31,7 @@ function walkthrough(locationId?: string): string {
     '',
     '1. Positions — onboarding_add_positions. Job titles first, so every team',
     '   member can reference one.',
-    '2. Team members — onboarding_add_staff_batch. Ask me for names and',
+    '2. Team members — onboarding_add_team_members_batch. Ask me for names and',
     '   positions, or take a CSV or JSON list if I have one. For every team',
     '   member also ask me two questions, and never answer them yourself:',
     '   does this person take a paid staff seat (is_paid_staff — a paid seat',

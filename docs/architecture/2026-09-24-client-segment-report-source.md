@@ -3,9 +3,7 @@
 Investigated against `biz.erp` and `biz.erp.api.docs` `origin/master` on
 2026-09-24. The task is to answer "which clients in this segment have the most
 sales or visits?" with one bounded API request per page instead of one card
-request per client. This is the first concrete report hypothesis from
-[Timur's feedback](../research/2026-09-24-timur-api-mcp-feedback.md); he did
-not prescribe its columns.
+request per client.
 
 | Contract       | Finding                                                                                                                                                                                                                                                          |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

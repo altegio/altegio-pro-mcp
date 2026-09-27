@@ -108,9 +108,9 @@ export const onboardingTools: McpToolSpec[] = [
     outputSchema: output.batchImportOutput,
   },
   {
-    name: 'onboarding_add_staff_batch',
+    name: 'onboarding_add_team_members_batch',
     description:
-      'Bulk add staff members from JSON array or CSV string. Reads name, specialization, position_id, is_paid_staff and has_timetable_access. Every team member needs an explicit is_paid_staff (takes a paid staff seat — billed on per-seat licensing) and has_timetable_access (in the work schedule, able to have working hours and take appointments; per-seat licensing allows it only for a paid seat). Ask the location owner for both and never choose them yourself; give them per row, or once for the whole list with the batch-level fields when the owner gave one answer for everybody. A row without an answer refuses the whole batch before anything is created. Team members are created without user accounts; phone, email and api_id columns are ignored, because the create operation stores none of them (use create_staff with user_phone or user_email to link a user). Creates checkpoint for rollback.',
+      'Bulk add staff members from JSON array or CSV string. Reads name, specialization, position_id, is_paid_staff and has_timetable_access. Every team member needs an explicit is_paid_staff (takes a paid staff seat — billed on per-seat licensing) and has_timetable_access (in the work schedule, able to have working hours and take appointments; per-seat licensing allows it only for a paid seat). Ask the location owner for both and never choose them yourself; give them per row, or once for the whole list with the batch-level fields when the owner gave one answer for everybody. A row without an answer refuses the whole batch before anything is created. Team members are created without user accounts; phone, email and api_id columns are ignored, because the create operation stores none of them (use team_members_create with user_phone or user_email to link a user). Creates checkpoint for rollback.',
     annotations: {
       title: 'Batch Add Staff',
       destructiveHint: false,
@@ -209,7 +209,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_set_schedules',
     description:
-      '[Onboarding] Set work schedules (working hours) for staff members. AUTHENTICATION REQUIRED. Accepts an array of { team_member_id, dates[], slots[{from,to}] }. Use the team member IDs returned by onboarding_add_staff_batch. Without schedules the appointment grid stays empty. Creates checkpoint for rollback.',
+      '[Onboarding] Set work schedules (working hours) for staff members. AUTHENTICATION REQUIRED. Accepts an array of { team_member_id, dates[], slots[{from,to}] }. Use the team member IDs returned by onboarding_add_team_members_batch. Without schedules the appointment grid stays empty. Creates checkpoint for rollback.',
     annotations: {
       title: 'Set Work Schedules',
       destructiveHint: false,

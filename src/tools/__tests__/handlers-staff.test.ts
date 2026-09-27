@@ -13,14 +13,16 @@ describe('ToolHandlers - Staff CRUD', () => {
       createStaff: jest.fn(),
       updateStaff: jest.fn(),
       deleteStaff: jest.fn(),
-    } as any;
+    } as unknown as jest.Mocked<AltegioClient>;
     handlers = new ToolHandlers(mockClient);
   });
 
   describe('createStaff', () => {
     it('should create staff successfully', async () => {
       const mockStaff = { id: 123, name: 'John Doe' };
-      mockClient.createStaff.mockResolvedValue(mockStaff as any);
+      mockClient.createStaff.mockResolvedValue(
+        mockStaff as Awaited<ReturnType<AltegioClient['createStaff']>>
+      );
 
       const result = await handlers.createStaff({
         location_id: 456,
@@ -34,10 +36,10 @@ describe('ToolHandlers - Staff CRUD', () => {
         has_timetable_access: true,
       });
 
-      expect((result.content[0] as any).text).toContain(
-        'Successfully created staff'
+      expect(result.content[0]?.text).toContain(
+        'Successfully created team member'
       );
-      expect((result.content[0] as any).text).toContain('John Doe');
+      expect(result.content[0]?.text).toContain('John Doe');
       expect(mockClient.createStaff).toHaveBeenCalledWith(456, {
         name: 'John Doe',
         specialization: 'Stylist',
@@ -119,13 +121,13 @@ describe('ToolHandlers - Staff CRUD', () => {
       expect(mockClient.createStaff).not.toHaveBeenCalled();
     });
 
-    it('never sends phone_number: quick-create does not read it', async () => {
+    it('rejects obsolete phone_number instead of pretending to store it', async () => {
       mockClient.createStaff.mockResolvedValue({
         id: 125,
         name: 'Alice',
       } as Awaited<ReturnType<AltegioClient['createStaff']>>);
 
-      await handlers.createStaff({
+      const result = await handlers.createStaff({
         location_id: 456,
         name: 'Alice',
         specialization: 'Stylist',
@@ -135,8 +137,9 @@ describe('ToolHandlers - Staff CRUD', () => {
         has_timetable_access: true,
       });
 
-      const [, body] = mockClient.createStaff.mock.calls[0]!;
-      expect(body).not.toHaveProperty('phone_number');
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toContain('phone_number');
+      expect(mockClient.createStaff).not.toHaveBeenCalled();
     });
 
     it('should handle errors', async () => {
@@ -156,17 +159,17 @@ describe('ToolHandlers - Staff CRUD', () => {
         has_timetable_access: true,
       });
 
-      expect((result.content[0] as any).text).toContain(
-        'Authentication required'
-      );
-      expect((result.content[0] as any).text).toContain('altegio_login');
+      expect(result.content[0]?.text).toContain('Authentication required');
+      expect(result.content[0]?.text).toContain('altegio_login');
     });
   });
 
   describe('updateStaff', () => {
     it('should update staff successfully', async () => {
       const mockStaff = { id: 123, name: 'John Smith' };
-      mockClient.updateStaff.mockResolvedValue(mockStaff as any);
+      mockClient.updateStaff.mockResolvedValue(
+        mockStaff as Awaited<ReturnType<AltegioClient['updateStaff']>>
+      );
 
       const result = await handlers.updateStaff({
         location_id: 456,
@@ -174,8 +177,8 @@ describe('ToolHandlers - Staff CRUD', () => {
         name: 'John Smith',
       });
 
-      expect((result.content[0] as any).text).toContain(
-        'Successfully updated staff'
+      expect(result.content[0]?.text).toContain(
+        'Successfully updated team member'
       );
       expect(mockClient.updateStaff).toHaveBeenCalledWith(456, 123, {
         name: 'John Smith',
@@ -192,8 +195,8 @@ describe('ToolHandlers - Staff CRUD', () => {
         team_member_id: 123,
       });
 
-      expect((result.content[0] as any).text).toContain(
-        'Successfully deleted staff'
+      expect(result.content[0]?.text).toContain(
+        'Successfully deleted team member'
       );
       expect(mockClient.deleteStaff).toHaveBeenCalledWith(456, 123);
     });

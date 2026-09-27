@@ -155,11 +155,11 @@ describe('the read-only view', () => {
     // anywhere else still calls it, so the call itself is refused.
     await expect(
       client.callTool({
-        name: 'delete_staff',
+        name: 'team_members_delete',
         arguments: { location_id: 1, staff_id: 2 },
       })
     ).rejects.toThrow(
-      /delete_staff.*read operations only.*https:\/\/mcp\.alteg\.io\/pro\b/s
+      /team_members_delete.*read operations only.*https:\/\/mcp\.alteg\.io\/pro\b/s
     );
     await expect(
       client.callTool({
@@ -211,7 +211,10 @@ describe('tools/call outside the facet', () => {
   it('refuses the call and names the facet that serves the tool', async () => {
     const client = await connect('ops');
     await expect(
-      client.callTool({ name: 'get_staff', arguments: { location_id: 1 } })
+      client.callTool({
+        name: 'team_members_list',
+        arguments: { location_id: 1 },
+      })
     ).rejects.toThrow(
       /not served by the "ops" view.*https:\/\/mcp\.alteg\.io\/pro\/catalog/s
     );

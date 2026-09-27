@@ -140,19 +140,35 @@ function inputJsonSchema(
 export function defineTool<T extends ZodType>(
   def: ToolDefinition<T>
 ): DefinedTool<T> {
+  // Reject misspelled or obsolete top-level arguments instead of silently
+  // dropping them before a mutation. Nested adapter payloads keep their schemas.
+  const schema =
+    def.input instanceof z.ZodObject ? def.input.strict() : def.input;
+  const withoutConfirmation = (args: unknown): unknown => {
+    if (
+      !def.confirm ||
+      !args ||
+      typeof args !== 'object' ||
+      Array.isArray(args)
+    )
+      return args ?? {};
+    const input = { ...(args as Record<string, unknown>) };
+    delete input[CONFIRMATION_TOKEN_ARG];
+    return input;
+  };
   return {
     toMcpTool: () => ({
       name: def.name,
       description: def.description,
       ...(def.annotations ? { annotations: def.annotations } : {}),
-      inputSchema: inputJsonSchema(def.input, def.confirm !== undefined),
+      inputSchema: inputJsonSchema(schema, def.confirm !== undefined),
       ...(def.outputSchema ? { outputSchema: def.outputSchema } : {}),
     }),
 
     ...(def.confirm
       ? {
           prepareConfirmation: prepareConfirmation(def.confirm, (args) => {
-            const parsed = def.input.safeParse(args ?? {});
+            const parsed = schema.safeParse(withoutConfirmation(args));
             return parsed.success ? (parsed.data as z.infer<T>) : undefined;
           }),
         }
@@ -160,7 +176,7 @@ export function defineTool<T extends ZodType>(
 
     createHandler: (client: AltegioClient) => (args: unknown) =>
       withErrorHandling(def.name, async () => {
-        const input = def.input.parse(args ?? {}) as z.infer<T>;
+        const input = schema.parse(withoutConfirmation(args)) as z.infer<T>;
         const { text, structuredContent, extraContent, isError } =
           await def.handler({
             input,

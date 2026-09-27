@@ -14,7 +14,7 @@ describe('ToolHandlers - Appointments CRUD', () => {
       createBooking: jest.fn(),
       updateBooking: jest.fn(),
       deleteBooking: jest.fn(),
-    } as any;
+    } as unknown as jest.Mocked<AltegioClient>;
     handlers = new ToolHandlers(mockClient);
   });
 
@@ -32,7 +32,7 @@ describe('ToolHandlers - Appointments CRUD', () => {
           attendance: 3,
           deleted: false,
         },
-      ] as any);
+      ] as Awaited<ReturnType<AltegioClient['getBookings']>>);
 
       const result = await handlers.getAppointments({
         location_id: 456,
@@ -68,7 +68,7 @@ describe('ToolHandlers - Appointments CRUD', () => {
           online: true,
           deleted: false,
         },
-      ] as any);
+      ] as Awaited<ReturnType<AltegioClient['getBookings']>>);
 
       const result = await handlers.getAppointments({
         location_id: 456,
@@ -110,7 +110,10 @@ describe('ToolHandlers - Appointments CRUD', () => {
           },
         ],
       });
-      expect(mockClient.getBookings).toHaveBeenCalledWith(456, { page: 1 });
+      expect(mockClient.getBookings).toHaveBeenCalledWith(456, {
+        page: 1,
+        count: 25,
+      });
     });
 
     it('reports an unknown status explicitly when V1 omits it', async () => {
@@ -123,7 +126,7 @@ describe('ToolHandlers - Appointments CRUD', () => {
           datetime: '2026-09-10T10:00:00+02:00',
           date: '2026-09-10T10:00:00+02:00',
         },
-      ] as any);
+      ] as Awaited<ReturnType<AltegioClient['getBookings']>>);
 
       const result = await handlers.getAppointments({ location_id: 456 });
       expect(result.content[0]?.text).toContain('unknown');
@@ -138,7 +141,9 @@ describe('ToolHandlers - Appointments CRUD', () => {
         staff_id: 123,
         datetime: '2025-11-01T10:00:00',
       };
-      mockClient.createBooking.mockResolvedValue(mockBooking as any);
+      mockClient.createBooking.mockResolvedValue(
+        mockBooking as Awaited<ReturnType<AltegioClient['createBooking']>>
+      );
 
       const result = await handlers.createAppointment({
         location_id: 456,
@@ -183,7 +188,9 @@ describe('ToolHandlers - Appointments CRUD', () => {
   describe('updateAppointment', () => {
     it('should update appointment successfully', async () => {
       const mockBooking = { id: 999, datetime: '2025-11-02T10:00:00' };
-      mockClient.updateBooking.mockResolvedValue(mockBooking as any);
+      mockClient.updateBooking.mockResolvedValue(
+        mockBooking as Awaited<ReturnType<AltegioClient['updateBooking']>>
+      );
 
       const result = await handlers.updateAppointment({
         location_id: 456,

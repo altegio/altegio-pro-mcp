@@ -89,7 +89,9 @@ describe('confirmation token', () => {
         client_id: 7,
       })
     ).toBe(false);
-    expect(verifyConfirmationToken(token, 'delete_staff', ARGS)).toBe(false);
+    expect(verifyConfirmationToken(token, 'team_members_delete', ARGS)).toBe(
+      false
+    );
     expect(
       verifyConfirmationToken(token, 'clients_delete', { ...ARGS, extra: true })
     ).toBe(false);

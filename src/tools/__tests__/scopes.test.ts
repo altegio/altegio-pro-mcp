@@ -74,7 +74,9 @@ describe('the map covers every tool', () => {
   });
 
   it('normalises a single scope, a list and null the same way', () => {
-    expect(requiredScopesFor('get_staff')).toEqual(['team_members:read']);
+    expect(requiredScopesFor('team_members_list')).toEqual([
+      'team_members:read',
+    ]);
     expect(requiredScopesFor('onboarding_rollback_phase')).toEqual([
       'team_members:write',
       'services:write',
@@ -101,7 +103,9 @@ describe('the map covers every tool', () => {
   });
 
   it('reaches the tool definition through the factory, not the definition file', () => {
-    const staff = factoryTools.find((tool) => tool.meta.name === 'get_staff')!;
+    const staff = factoryTools.find(
+      (tool) => tool.meta.name === 'team_members_list'
+    )!;
     expect(staff.meta.requiredScopes).toEqual(['team_members:read']);
     // Nothing in a definition module spells a scope out; the factory fills it.
     const remove = factoryTools.find(
@@ -176,14 +180,14 @@ describe('parseScopes', () => {
 });
 
 describe('checkToolScopes', () => {
-  const required = requiredScopesFor('delete_staff');
+  const required = requiredScopesFor('team_members_delete');
 
   it('passes a caller that declares no scopes at all', () => {
     // stdio and the public HTTP endpoint (`/public/pro` does not forward
     // identity) are in this state: the gate must be a no-op for both.
     expect(
       checkToolScopes({
-        toolName: 'delete_staff',
+        toolName: 'team_members_delete',
         required,
         granted: undefined,
       })
@@ -193,7 +197,7 @@ describe('checkToolScopes', () => {
   it('passes when the required scope is present', () => {
     expect(
       checkToolScopes({
-        toolName: 'delete_staff',
+        toolName: 'team_members_delete',
         required,
         granted: grants('team_members:write', 'clients:read'),
       })
@@ -204,7 +208,7 @@ describe('checkToolScopes', () => {
     for (const granted of [grants(), grants('future:unknown')]) {
       expect(
         checkToolScopes({
-          toolName: 'delete_staff',
+          toolName: 'team_members_delete',
           required,
           granted,
         })
@@ -224,7 +228,7 @@ describe('checkToolScopes', () => {
 
   it('refuses in band, with an actionable message, when the scope is absent', () => {
     const result = checkToolScopes({
-      toolName: 'delete_staff',
+      toolName: 'team_members_delete',
       required,
       granted: grants('clients:read', 'appointments:read'),
     });
@@ -232,7 +236,7 @@ describe('checkToolScopes', () => {
     expect(result?.isError).toBe(true);
     const text = result!.content[0]!.text!;
     expect(text).toContain('Nothing was done');
-    expect(text).toContain('delete_staff');
+    expect(text).toContain('team_members_delete');
     // What is missing, and what the caller actually has.
     expect(text).toContain('team_members:write');
     expect(text).toContain('appointments:read, clients:read');
@@ -248,7 +252,7 @@ describe('checkToolScopes', () => {
       Array.from({ length: 20 }, (_, i) => `domain_${i}:read`)
     );
     const text = scopeRefusalMessage(
-      'get_staff',
+      'team_members_list',
       ['team_members:read'] as ToolScope[],
       many
     );
@@ -290,7 +294,7 @@ describe('the platform vocabulary (mcp:pro:*)', () => {
   /** The gated tools a session touches first; a refusal here is an outage. */
   const gated = [
     'list_locations',
-    'get_staff',
+    'team_members_list',
     'get_services',
     'get_appointments',
     'clients_search',
@@ -332,7 +336,7 @@ describe('the platform vocabulary (mcp:pro:*)', () => {
     const granted = parseScopes(PROXY_FULL_GRANT)!;
     for (const name of [
       'update_location',
-      'delete_staff',
+      'team_members_delete',
       'create_appointment',
       'remove_location_user',
       'onboarding_rollback_phase',
@@ -368,8 +372,8 @@ describe('the platform vocabulary (mcp:pro:*)', () => {
     const granted = parseScopes(PROXY_READ_GRANT)!;
     for (const name of [
       'update_location',
-      'create_staff',
-      'delete_staff',
+      'team_members_create',
+      'team_members_delete',
       'update_service',
       'create_appointment',
       'delete_appointment',
@@ -438,8 +442,8 @@ describe('an unrecognised vocabulary fails closed', () => {
     ]) {
       expect(
         checkToolScopes({
-          toolName: 'delete_staff',
-          required: requiredScopesFor('delete_staff'),
+          toolName: 'team_members_delete',
+          required: requiredScopesFor('team_members_delete'),
           granted,
         })
       ).toMatchObject({ isError: true });
@@ -450,8 +454,8 @@ describe('an unrecognised vocabulary fails closed', () => {
     // A mixed grant is not an excuse to stand aside: the recognised part is
     // evaluated, the rest simply grants nothing.
     const result = checkToolScopes({
-      toolName: 'delete_staff',
-      required: requiredScopesFor('delete_staff'),
+      toolName: 'team_members_delete',
+      required: requiredScopesFor('team_members_delete'),
       granted: grants('mcp:pro:read', 'openid'),
     });
     expect(result?.isError).toBe(true);

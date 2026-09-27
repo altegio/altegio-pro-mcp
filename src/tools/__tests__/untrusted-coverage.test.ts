@@ -145,7 +145,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     },
   },
 
-  get_staff: {
+  team_members_list: {
     what: 'team-member name, specialization and position title',
     canary: {
       args: { location_id: 1 },
@@ -167,7 +167,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     },
   },
 
-  update_staff: {
+  team_members_update: {
     what: 'name and specialization read back; a partial update returns fields this call never sent',
     canary: {
       args: { location_id: 1, team_member_id: 2, name: 'Ann' },
@@ -504,7 +504,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     what: 'the title of each row that failed to import, with the reason the API gave',
     coveredBy: 'src/tools/__tests__/onboarding-handlers.test.ts',
   },
-  onboarding_add_staff_batch: {
+  onboarding_add_team_members_batch: {
     what: 'the name of each row that failed to import, with the reason the API gave',
     coveredBy: 'src/tools/__tests__/onboarding-handlers.test.ts',
   },
@@ -550,7 +550,7 @@ const NO_FREE_TEXT: Record<string, string> = {
   altegio_describe_operation: 'the same catalog, one operation at a time',
 
   // --- writes that echo back only what this same call sent ---
-  create_staff: 'name and specialization as supplied by this call',
+  team_members_create: 'name and specialization as supplied by this call',
   create_position: 'title as supplied by this call',
   create_service: 'title as supplied by this call',
   create_booking_form: 'title as supplied by this call',
@@ -562,7 +562,7 @@ const NO_FREE_TEXT: Record<string, string> = {
   create_schedule: 'the ids and dates this call sent back as confirmation',
   update_schedule: 'the ids and dates this call sent back as confirmation',
   delete_schedule: 'ids and dates',
-  delete_staff: 'ids',
+  team_members_delete: 'ids',
   delete_service: 'ids',
   delete_service_category: 'ids',
   delete_appointment: 'ids',

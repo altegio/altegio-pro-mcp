@@ -30,7 +30,7 @@ describe('Onboarding E2E Flow', () => {
       createBooking: jest.fn(),
       deleteStaff: jest.fn(),
       deleteBooking: jest.fn(),
-    } as any;
+    } as unknown as jest.Mocked<AltegioClient>;
 
     handlers = new OnboardingHandlers(mockClient, stateManager);
   });
@@ -627,7 +627,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
       await stateManager.checkpoint(companyId, 'staff', [1, 2, 3]);
       await stateManager.checkpoint(companyId, 'services', [10, 11]);
 
-      const bookingCalls: any[] = [];
+      const bookingCalls: Parameters<AltegioClient['createBooking']>[1][] = [];
       mockClient.createBooking = jest
         .fn()
         .mockImplementation((_companyId, data) => {

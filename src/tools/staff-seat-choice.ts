@@ -9,7 +9,7 @@
  * non-paid one with schedule access; elsewhere the API ignores `is_paid_staff`
  * and leaves schedule access off. A default would either spend the owner's
  * money or silently keep someone off the schedule, so both are asked of the
- * owner — `create_staff` and `onboarding_add_staff_batch` refuse a missing
+ * owner — `team_members_create` and `onboarding_add_team_members_batch` refuse a missing
  * value instead of guessing one.
  */
 import { z } from 'zod';
@@ -58,7 +58,7 @@ export function seatChoiceRefusal(
     'Ask the location owner, for each of them, and never choose for them:\n' +
     '- is_paid_staff: does this team member take a paid staff seat? On per-seat licensing a paid seat is billed.\n' +
     '- has_timetable_access: should they be in the work schedule, able to have working hours and take appointments? On per-seat licensing only a paid team member can.\n\n' +
-    'Then call onboarding_add_staff_batch again with the answers per team member (JSON fields or CSV columns is_paid_staff and has_timetable_access), ' +
+    'Then call onboarding_add_team_members_batch again with the answers per team member (JSON fields or CSV columns is_paid_staff and has_timetable_access), ' +
     'or once for the whole list with the batch-level is_paid_staff and has_timetable_access if the owner gave one answer for everybody.'
   );
 }

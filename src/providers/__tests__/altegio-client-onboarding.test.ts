@@ -10,11 +10,9 @@ describe('AltegioClient - Onboarding Methods', () => {
 
     client = new AltegioClient({
       partnerToken: 'test-token',
+      userToken: 'test-user-token',
       apiBase: 'https://api.test.com/api/v1',
     });
-
-    // Simulate login
-    (client as any).userToken = 'test-user-token';
   });
 
   describe('createClient', () => {

@@ -19,9 +19,7 @@
  * for every connection to a given path — the "no per-connection variance" rule
  * of MCP 2026-07-28 (ADR-001 D7) — and keeps the result reviewable in a diff.
  *
- * Legacy tool names (`get_staff`, `create_staff`, …) are listed verbatim
- * because they are the names on the wire today; the canonical vocabulary calls
- * these team member tools and the rename is tracked separately.
+ * Tool names use the canonical product vocabulary.
  *
  * **Where the mechanisms are joined:** this module is one of several that
  * decide where a tool is served. `./surface.ts` puts all of them into one
@@ -196,10 +194,10 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
       'link_team_member_services',
       'get_service_categories',
       'delete_service_category',
-      'get_staff',
-      'create_staff',
-      'update_staff',
-      'delete_staff',
+      'team_members_list',
+      'team_members_create',
+      'team_members_update',
+      'team_members_delete',
       'get_positions',
       'create_position',
       'get_schedule',

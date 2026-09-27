@@ -77,8 +77,6 @@ Decide by audience, not by mechanical replacement: an internal team record is a
 
 ## Legacy names still on the wire
 
-Some tool names and API fields predate this vocabulary — \`get_staff\`,
-\`create_staff\`, \`salon_id\`, \`record_id\`. Call the tools by the names
-\`tools/list\` returns, and use the canonical term in every sentence you write
-back to a person.
+Backend API fields such as \`salon_id\` and \`record_id\` remain inside
+adapters. The MCP boundary uses locations, team members, and appointments.
 `;

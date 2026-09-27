@@ -1,7 +1,12 @@
+import { paginationInput, paginateCollection } from '../pagination.js';
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import { positionsOutput, positionEntityOutput } from '../output-schemas.js';
-import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
+import {
+  withUntrustedBlock,
+  sanitizeUntrusted,
+  type UntrustedField,
+} from '../tool-result.js';
 
 export const getPositionsTool = defineTool({
   name: 'get_positions',
@@ -15,15 +20,19 @@ export const getPositionsTool = defineTool({
   },
   input: z.object({
     location_id: z.number().int().positive().describe('Location ID'),
+    ...paginationInput,
   }),
   outputSchema: positionsOutput,
   handler: async ({ input, client }) => {
-    const positions = await client.getPositions(input.location_id);
+    const { items: positions, pagination } = paginateCollection(
+      await client.getPositions(input.location_id),
+      input
+    );
 
     if (!positions || positions.length === 0) {
       return {
         text: 'No positions found for this location.',
-        structuredContent: { items: [], count: 0 },
+        structuredContent: { items: [], count: 0, ...pagination },
       };
     }
 
@@ -44,6 +53,7 @@ export const getPositionsTool = defineTool({
           title: p.title,
         })),
         count: positions.length,
+        ...pagination,
       },
     };
   },
@@ -69,8 +79,14 @@ export const createPositionTool = defineTool({
     const { location_id, ...positionData } = input;
     const position = await client.createPosition(location_id, positionData);
     return {
-      text: `Successfully created position:\nID: ${position.id}\nTitle: ${position.title}`,
-      structuredContent: { id: position.id, title: position.title },
+      text: withUntrustedBlock(
+        `Successfully created position ${position.id}.`,
+        [{ label: 'title', value: position.title }]
+      ),
+      structuredContent: {
+        id: position.id,
+        title: sanitizeUntrusted(position.title) ?? undefined,
+      },
     };
   },
 });

@@ -1,3 +1,11 @@
+import { scopeSatisfied } from '../../tools/scopes.js';
+import { randomUUID } from 'node:crypto';
+import {
+  getRequestScopes,
+  isCompanyAllowed,
+  requestPrincipalKey,
+} from '../../request-context.js';
+
 /**
  * In-memory store for full report output behind a `resource_link`.
  *
@@ -34,6 +42,7 @@ export interface StoredReport {
 }
 
 const store = new Map<string, StoredReport>();
+const owners = new WeakMap<StoredReport, string | undefined>();
 
 function key(locationId: number, runId: string): string {
   return `${locationId}/${runId}`;
@@ -56,8 +65,8 @@ export function reportUri(locationId: number, runId: string): string {
 }
 
 /** Mint a run id. Short, opaque, and unique enough for one process. */
-export function newRunId(now: number = Date.now()): string {
-  return `${now.toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+export function newRunId(_now: number = Date.now()): string {
+  return randomUUID();
 }
 
 /** Store one rendered CSV and return its handle. */
@@ -80,6 +89,7 @@ export function putReportCsv(input: {
     row_count: input.row_count,
     expires_at: now + REPORT_CSV_TTL_MS,
   };
+  owners.set(entry, requestPrincipalKey());
   store.set(key(input.location_id, runId), entry);
   prune(now);
   return entry;
@@ -93,7 +103,13 @@ export function getReportCsv(
 ): StoredReport | undefined {
   prune(now);
   const entry = store.get(key(locationId, runId));
-  if (!entry) return undefined;
+  if (!entry || !isCompanyAllowed(locationId)) return undefined;
+  const scopes = getRequestScopes();
+  if (scopes !== undefined && !scopeSatisfied(scopes, 'analytics:read'))
+    return undefined;
+  const principal = requestPrincipalKey();
+  if (principal === 'anonymous' || owners.get(entry) !== principal)
+    return undefined;
   if (entry.expires_at <= now) {
     store.delete(key(locationId, runId));
     return undefined;

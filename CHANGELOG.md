@@ -6,6 +6,33 @@ is declared stable.
 
 ## [Unreleased]
 
+## [0.4.0-alpha.0]
+
+### Fixed — report download isolation
+
+- CSV report resources are bound to the creating principal and checked against
+  current location and analytics scope restrictions. Run IDs now use
+  cryptographically random UUIDs. Anonymous HTTP callers cannot read reports.
+
+### Breaking changes — open-source preparation
+
+- Team-member tools now use `team_members_list`, `team_members_create`,
+  `team_members_update`, and `team_members_delete`. The batch onboarding tool is
+  `onboarding_add_team_members_batch`. Refresh cached tool lists and update
+  integrations using the former staff names; no aliases are served.
+- Curated factory tools reject unknown top-level input fields, including obsolete
+  names and misspelled filters, before performing an upstream operation.
+- Reference lists now default to 25 items with deterministic local pagination;
+  appointment and location lists send explicit upstream pagination defaults.
+  Collection output exposes `page`, `page_size`, `next_page` and, where known,
+  `total`. Follow continuation instead of assuming one response is complete.
+- Runtime documentation is included in npm and Docker distributions. Test helpers
+  are excluded from TypeScript build output.
+- Private deployment inventory, demo-agent scripts, research notes, and obsolete
+  editor guidance have been removed. Tests pin the public generated inventory
+  rather than duplicate counts in agent instruction prose.
+
+
 ### Fixed — onboarding results rejected by SDK-based hosts
 
 - **Every onboarding success now carries `structuredContent`.** Eleven of the
@@ -23,7 +50,7 @@ is declared stable.
   `location_id`, the phase the wizard moved to and `created_ids`; every field
   of the three schemas is required.
 - **Created IDs are returned.** `onboarding_set_schedules` told the model to
-  use the team member IDs returned by `onboarding_add_staff_batch`, which
+  use the team member IDs returned by `onboarding_add_team_members_batch`, which
   returned none. The staff, category and service steps now list their IDs in
   the text as the position step already did, and every step returns them in
   `created_ids` (client IDs only there — a client base can run to thousands).
@@ -44,13 +71,13 @@ is declared stable.
 
 ### Changed — paid seat and work schedule are the owner's explicit choice
 
-- **Breaking — `create_staff`:** `is_paid_staff` and `has_timetable_access`
+- **Breaking — `team_members_create`:** `is_paid_staff` and `has_timetable_access`
   are required and never defaulted. A missing value is refused before any API
   call with a message that tells the model to ask the location owner: on
   per-seat licensing a paid staff seat is billed (the API itself refuses an
   active team member without `is_paid_staff`, and a non-paid one with schedule
   access).
-- **Breaking — `onboarding_add_staff_batch`:** every row needs both answers,
+- **Breaking — `onboarding_add_team_members_batch`:** every row needs both answers,
   as JSON fields or CSV columns (`true`/`false`, `yes`/`no`, `1`/`0`; a blank
   cell is no answer), or once for the whole list through the new batch-level
   `is_paid_staff` / `has_timetable_access`; a row's own answer wins. A row with
@@ -59,7 +86,7 @@ is declared stable.
   schedule. This is what failed on per-seat-licensed demo location 4564.
 - **`onboarding_preview_data`:** a staff preview says how many rows still lack
   the answers, so the owner is asked before the import.
-- **`phone_number` removed from `create_staff`:** quick-create never reads it,
+- **`phone_number` removed from `team_members_create`:** quick-create never reads it,
   so the value was silently dropped; the team member's own contact phone cannot
   be set through this operation (`user_phone` stays the user-account link).
   The staff batch ignores `phone`, `email` and `api_id` columns for the same
@@ -71,19 +98,19 @@ is declared stable.
 - **Catalog:** rebuilt from `biz.erp.api.docs` a575ee52, which corrected the
   quick-create contract (required keys, deprecated `phone_number`,
   `has_timetable_access`, `is_user_invite` semantics, 400 refusals); the
-  `create_staff` mapping drops `phone_number`.
+  `team_members_create` mapping drops `phone_number`.
 
 ### Fixed — team-member creation found by the live suites
 
-- **`create_staff`:** `user_email` and `user_phone` are optional. Quick-create
+- **`team_members_create`:** `user_email` and `user_phone` are optional. Quick-create
   treats them as a link to an existing Altegio user and refuses an unknown one
   without an invitation, so the tool could not create a team member without a
   user account. Omitted fields now go out as `null` (no user account);
   `is_user_invite` defaults to false.
-- **`create_staff`:** new optional `has_timetable_access`. On the new
+- **`team_members_create`:** new optional `has_timetable_access`. On the new
   team-member model a member outside the work schedule cannot get a schedule
   or appointments, and per-seat licensing admits only paid staff to it.
-- **`onboarding_add_staff_batch`:** rows no longer send the staff email or
+- **`onboarding_add_team_members_batch`:** rows no longer send the staff email or
   phone as a user link (an empty string failed validation, an unknown user was
   refused), so every row creates a team member without a user account.
 - **Live suites:** `analytics-live` accepts `ALTEGIO_API_TOKEN` like the other
@@ -429,7 +456,7 @@ visible.
 - Extended both rules to the three list tools that were still inlining other
   people's text into our own rows: `get_appointments` (client and team-member
   names, service titles, and the `comment` a client types at online booking),
-  `get_services` (title and comment) and `get_staff` (name, specialization,
+  `get_services` (title and comment) and `team_members_list` (name, specialization,
   position title). Each row now carries ids, dates, status and money — ours —
   and the free text follows in the fenced block, keyed back by id.
 - `get_appointments` also puts the client phone behind `include_contacts`. A
@@ -451,7 +478,7 @@ visible.
   itself, so nothing is cut that the budget would have kept. Depth is bounded.
 - Extended the rule to the remaining packs: `get_service_categories`,
   `get_positions`, `get_resources`, `get_booking_forms` (titles), `list_locations`
-  (name, address, phone), `update_location`, `update_staff` and `update_service`
+  (name, address, phone), `update_location`, `team_members_update` and `update_service`
   (a partial update reads back fields the call never sent),
   `analytics_get_appointments_breakdown` (the `other` bucket's label),
   `analytics_get_day_end_report` (the names staff gave their payment accounts),

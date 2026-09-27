@@ -13,7 +13,7 @@ describe('ToolHandlers - Services CRUD', () => {
       getServices: jest.fn(),
       createService: jest.fn(),
       updateService: jest.fn(),
-    } as any;
+    } as unknown as jest.Mocked<AltegioClient>;
     handlers = new ToolHandlers(mockClient);
   });
 
@@ -30,7 +30,7 @@ describe('ToolHandlers - Services CRUD', () => {
           active: 1,
           staff: [{ id: 123, seance_length: 3600 }],
         },
-      ] as any);
+      ] as Awaited<ReturnType<AltegioClient['getServices']>>);
 
       const result = await handlers.getServices({ location_id: 456, page: 1 });
 
@@ -57,14 +57,16 @@ describe('ToolHandlers - Services CRUD', () => {
           },
         ],
       });
-      expect(mockClient.getServices).toHaveBeenCalledWith(456, { page: 1 });
+      expect(mockClient.getServices).toHaveBeenCalledWith(456);
     });
   });
 
   describe('createService', () => {
     it('should create service successfully', async () => {
       const mockService = { id: 789, title: 'Haircut', category_id: 10 };
-      mockClient.createService.mockResolvedValue(mockService as any);
+      mockClient.createService.mockResolvedValue(
+        mockService as Awaited<ReturnType<AltegioClient['createService']>>
+      );
 
       const result = await handlers.createService({
         location_id: 456,
@@ -72,10 +74,8 @@ describe('ToolHandlers - Services CRUD', () => {
         category_id: 10,
       });
 
-      expect((result.content[0] as any).text).toContain(
-        'Successfully created service'
-      );
-      expect((result.content[0] as any).text).toContain('Haircut');
+      expect(result.content[0]?.text).toContain('Successfully created service');
+      expect(result.content[0]?.text).toContain('Haircut');
       expect(mockClient.createService).toHaveBeenCalledWith(456, {
         title: 'Haircut',
         category_id: 10,
@@ -94,16 +94,16 @@ describe('ToolHandlers - Services CRUD', () => {
         category_id: 1,
       });
 
-      expect((result.content[0] as any).text).toContain(
-        'Authentication required'
-      );
+      expect(result.content[0]?.text).toContain('Authentication required');
     });
   });
 
   describe('updateService', () => {
     it('should update service successfully', async () => {
       const mockService = { id: 789, title: 'New Haircut' };
-      mockClient.updateService.mockResolvedValue(mockService as any);
+      mockClient.updateService.mockResolvedValue(
+        mockService as Awaited<ReturnType<AltegioClient['updateService']>>
+      );
 
       const result = await handlers.updateService({
         location_id: 456,
@@ -111,9 +111,7 @@ describe('ToolHandlers - Services CRUD', () => {
         title: 'New Haircut',
       });
 
-      expect((result.content[0] as any).text).toContain(
-        'Successfully updated service'
-      );
+      expect(result.content[0]?.text).toContain('Successfully updated service');
       expect(mockClient.updateService).toHaveBeenCalledWith(456, 789, {
         title: 'New Haircut',
       });

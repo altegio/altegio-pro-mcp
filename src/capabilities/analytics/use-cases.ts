@@ -522,7 +522,7 @@ export async function getTeamMemberOccupancy(
 ): Promise<AnalyticsResult> {
   if (input.team_member_ids.length === 0) {
     throw new AnalyticsInputError(
-      'Give at least one team_member_id. Call get_staff to list the team members of this location.'
+      'Give at least one team_member_id. Call team_members_list to list the team members of this location.'
     );
   }
   if (input.team_member_ids.length > 10) {

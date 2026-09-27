@@ -41,7 +41,7 @@ Served tools per category, in `tools/list` order:
 | Schedule | 4 |
 | Services | 8 |
 | Settings | 7 |
-| Staff | 4 |
+| Team members | 4 |
 | Users | 1 |
 
 ## Views
@@ -208,7 +208,7 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | `onboarding_add_categories` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | services:write |
 | `onboarding_add_positions` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | team_members:write |
 | `onboarding_add_services_batch` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | services:write |
-| `onboarding_add_staff_batch` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | team_members:write |
+| `onboarding_add_team_members_batch` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | team_members:write |
 | `onboarding_create_test_appointments` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | appointments:create |
 | `onboarding_import_clients` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | clients:write |
 | `onboarding_preview_data` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `-` | `-` | `pfx` | — |
@@ -265,14 +265,14 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | `update_appointment_settings` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write |
 | `update_online_booking_settings` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write |
 
-### Staff
+### Team members
 
 | Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `create_staff` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write |
-| `delete_staff` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write, confirm |
-| `get_staff` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:read |
-| `update_staff` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write |
+| `team_members_create` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write |
+| `team_members_delete` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write, confirm |
+| `team_members_list` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:read |
+| `team_members_update` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write |
 
 ### Users
 
@@ -297,5 +297,5 @@ onboarding on `/mcp`. Two environment switches change it.
 
 `MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING=true`:
 
-- `/mcp` — −`onboarding_add_categories`, −`onboarding_add_positions`, −`onboarding_add_services_batch`, −`onboarding_add_staff_batch`, −`onboarding_create_test_appointments`, −`onboarding_import_clients`, −`onboarding_preview_data`, −`onboarding_resume`, −`onboarding_rollback_phase`, −`onboarding_set_schedules`, −`onboarding_start`, −`onboarding_status`
+- `/mcp` — −`onboarding_add_categories`, −`onboarding_add_positions`, −`onboarding_add_services_batch`, −`onboarding_add_team_members_batch`, −`onboarding_create_test_appointments`, −`onboarding_import_clients`, −`onboarding_preview_data`, −`onboarding_resume`, −`onboarding_rollback_phase`, −`onboarding_set_schedules`, −`onboarding_start`, −`onboarding_status`
 

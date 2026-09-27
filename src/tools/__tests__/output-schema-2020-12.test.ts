@@ -112,8 +112,19 @@ describe('analytics_get_daily_series output schema (the dailyPoints regression)'
   });
 
   it('does not use draft-specific tuple keywords that draft-7 misreads', () => {
-    const point = (spec!.outputSchema as any).properties.series.items.properties
-      .points.items;
+    const point = (
+      spec!.outputSchema as {
+        properties: {
+          series: {
+            items: {
+              properties: {
+                points: { items: { prefixItems?: unknown; items?: unknown } };
+              };
+            };
+          };
+        };
+      }
+    ).properties.series.items.properties.points.items;
     expect(point.prefixItems).toBeUndefined();
     expect(point.items).not.toBe(false);
   });
