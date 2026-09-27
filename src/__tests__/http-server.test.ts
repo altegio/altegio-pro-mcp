@@ -472,7 +472,7 @@ describe('HTTP server facet wiring, end to end', () => {
           id: 2,
           method: 'tools/call',
           params: {
-            name: 'delete_staff',
+            name: 'team_members_delete',
             arguments: { location_id: 1, staff_id: 2 },
           },
         },
@@ -483,7 +483,7 @@ describe('HTTP server facet wiring, end to end', () => {
       }>(call);
 
       expect(payload.error).toBeDefined();
-      expect(payload.error?.message).toContain('delete_staff');
+      expect(payload.error?.message).toContain('team_members_delete');
       expect(payload.error?.message).toContain('/mcp');
       // A tool refusal is an in-band JSON-RPC error; it must not take the HTTP
       // session down with a transport-level status.

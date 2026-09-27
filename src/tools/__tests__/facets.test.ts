@@ -114,7 +114,7 @@ describe('static views', () => {
 
   it('serves the catalog domains on catalog', () => {
     const index = buildFacetIndex(tools);
-    expect(index.includes('catalog', 'get_staff')).toBe(true);
+    expect(index.includes('catalog', 'team_members_list')).toBe(true);
     expect(index.includes('catalog', 'get_schedule')).toBe(true);
     expect(index.includes('catalog', 'get_online_booking_settings')).toBe(true);
     expect(index.includes('catalog', 'get_resources')).toBe(true);
@@ -138,7 +138,7 @@ describe('static views', () => {
 
   it('points an out-of-facet tool at the facets that serve it', () => {
     const index = buildFacetIndex(tools);
-    expect(index.facetsProviding('get_staff')).toEqual(['catalog']);
+    expect(index.facetsProviding('team_members_list')).toEqual(['catalog']);
     expect(index.facetsProviding('get_appointments')).toEqual(['ops']);
     expect(index.facetsProviding('list_locations')).toEqual([...FACET_NAMES]);
   });
@@ -480,7 +480,7 @@ describe('the read-only view', () => {
 
   it('carries no destructive tool and no password login', () => {
     for (const name of [
-      'delete_staff',
+      'team_members_delete',
       'delete_appointment',
       'clients_delete',
       'remove_location_user',
@@ -521,10 +521,10 @@ describe('the read-only view', () => {
 
   describe('the refusal a writing tool gets here', () => {
     const base = 'https://mcp.alteg.io/pro';
-    const message = readOnlyRefusalMessage('delete_staff', base);
+    const message = readOnlyRefusalMessage('team_members_delete', base);
 
     it('names the tool and the full address of the complete surface', () => {
-      expect(message).toContain('delete_staff');
+      expect(message).toContain('team_members_delete');
       expect(message).toContain(viewUrl(base, READONLY_VIEW));
       expect(message).toContain(viewUrl(base, DEFAULT_FACET));
       expect(viewUrl(base, READONLY_VIEW)).toBe(

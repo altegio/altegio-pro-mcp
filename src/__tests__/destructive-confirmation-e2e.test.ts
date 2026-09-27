@@ -116,7 +116,7 @@ async function callDeleteStaff(
   args: Record<string, unknown> = {}
 ): Promise<CallToolResult> {
   return (await client.callTool({
-    name: 'delete_staff',
+    name: 'team_members_delete',
     arguments: {
       location_id: LOCATION,
       team_member_id: TEAM_MEMBER,
@@ -140,7 +140,7 @@ describe('destructive confirmation — host WITH elicitation', () => {
       expect(h.elicitations[0]!.title).toBe('Delete team member');
 
       expect(h.deleteStaff).toHaveBeenCalledWith(LOCATION, TEAM_MEMBER);
-      expect(firstText(result)).toContain('Successfully deleted staff member');
+      expect(firstText(result)).toContain('Successfully deleted team member');
     } finally {
       await h.close();
     }
@@ -178,7 +178,7 @@ describe('destructive confirmation — host WITH elicitation', () => {
     const h = await connect({ elicitation: true });
     try {
       await h.client.callTool({
-        name: 'get_staff',
+        name: 'team_members_list',
         arguments: { location_id: LOCATION },
       });
       expect(h.elicitations).toHaveLength(0);
@@ -220,7 +220,7 @@ describe('destructive confirmation — host WITHOUT elicitation', () => {
 
       expect(h.deleteStaff).toHaveBeenCalledTimes(1);
       expect(h.deleteStaff).toHaveBeenCalledWith(LOCATION, TEAM_MEMBER);
-      expect(firstText(second)).toContain('Successfully deleted staff member');
+      expect(firstText(second)).toContain('Successfully deleted team member');
     } finally {
       await h.close();
     }
@@ -270,7 +270,9 @@ describe('tools/list stays identical for both hosts (ADR-001 D7)', () => {
       const b = await without.client.listTools();
       expect(a.tools).toEqual(b.tools);
 
-      const deleteStaff = a.tools.find((tool) => tool.name === 'delete_staff');
+      const deleteStaff = a.tools.find(
+        (tool) => tool.name === 'team_members_delete'
+      );
       const properties = deleteStaff?.inputSchema.properties as
         Record<string, unknown> | undefined;
       // Present on every connection, never negotiated per client.

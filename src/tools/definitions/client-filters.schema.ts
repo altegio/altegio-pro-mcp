@@ -37,7 +37,7 @@ const appointmentHistory = z
       .array(z.number().int().positive())
       .optional()
       .describe(
-        'Only appointments with these team members (get_staff for ids).'
+        'Only appointments with these team members (team_members_list for ids).'
       ),
     service_ids: z
       .array(z.number().int().positive())

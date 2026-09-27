@@ -40,7 +40,7 @@ onboarding_set_schedules({
   location_id: 123456,
   schedules: [
     {
-      team_member_id: 101,                       // from onboarding_add_staff_batch response
+      team_member_id: 101,                       // from onboarding_add_team_members_batch response
       dates: ["2026-08-01", "2026-08-02"],
       slots: [{ from: "09:00", to: "18:00" }]
     }
@@ -107,7 +107,7 @@ answer for everybody. A row's own answer wins over the batch-level one.
 
 **Option A: JSON Array**
 ```typescript
-onboarding_add_staff_batch({
+onboarding_add_team_members_batch({
   location_id: 123456,
   staff_data: [
     {
@@ -128,7 +128,7 @@ onboarding_add_staff_batch({
 
 **Option B: CSV String** (answers as `true`/`false`, `yes`/`no` or `1`/`0`)
 ```typescript
-onboarding_add_staff_batch({
+onboarding_add_team_members_batch({
   location_id: 123456,
   staff_data: `name,specialization,is_paid_staff,has_timetable_access
 Alice Johnson,Senior Stylist,yes,yes
@@ -143,7 +143,7 @@ Carol White,Massage Therapist,yes,yes`
 
 **Option C: one answer for the whole list**
 ```typescript
-onboarding_add_staff_batch({
+onboarding_add_team_members_batch({
   location_id: 123456,
   staff_data: `name,specialization
 Alice Johnson,Senior Stylist
@@ -155,7 +155,7 @@ Bob Smith,Nail Technician`,
 
 **Missing answer — nothing is created:**
 ```typescript
-onboarding_add_staff_batch({
+onboarding_add_team_members_batch({
   location_id: 123456,
   staff_data: [{ name: "Alice Johnson" }]
 })
@@ -167,7 +167,7 @@ onboarding_add_staff_batch({
 
 Team members are created without user accounts. `phone`, `email` and `api_id`
 columns are ignored: the create operation stores no contact details or external
-id for a team member. To link or invite a user account, use `create_staff` with
+id for a team member. To link or invite a user account, use `team_members_create` with
 `user_phone` or `user_email`.
 
 ### 4. Add Services
@@ -334,7 +334,7 @@ Bob Smith,Nail Technician,,`
 //           …
 //           1 of 2 row(s) have no is_paid_staff or has_timetable_access answer.
 //           Before importing, ask the location owner…
-//           Proceed with onboarding_add_staff_batch to create entities."
+//           Proceed with onboarding_add_team_members_batch to create entities."
 //           (the rows themselves follow in a fenced block)
 ```
 
@@ -407,7 +407,7 @@ Supported `phase_name` values for `onboarding_rollback_phase`: `positions`, `sta
 If some entries fail during batch import:
 
 ```typescript
-onboarding_add_staff_batch({
+onboarding_add_team_members_batch({
   location_id: 123456,
   staff_data: [
     { name: "Alice", specialization: "Stylist", is_paid_staff: true, has_timetable_access: true },
@@ -501,11 +501,11 @@ allowing parallel onboarding without cross-user checkpoint reads or resets:
 ```typescript
 // Location A onboarding
 onboarding_start({ location_id: 111111 })
-onboarding_add_staff_batch({ location_id: 111111, ... })
+onboarding_add_team_members_batch({ location_id: 111111, ... })
 
 // Location B onboarding (independent)
 onboarding_start({ location_id: 222222 })
-onboarding_add_staff_batch({ location_id: 222222, ... })
+onboarding_add_team_members_batch({ location_id: 222222, ... })
 
 // Local stdio states are saved separately:
 // ~/.altegio-mcp/onboarding/111111/state.json
@@ -535,7 +535,7 @@ onboarding_add_categories({
 // Note category IDs: [501, 502]
 
 // 4. Import staff from CSV (paid seat and work schedule answered by the owner)
-onboarding_add_staff_batch({
+onboarding_add_team_members_batch({
   location_id: 123456,
   staff_data: `name,specialization,is_paid_staff,has_timetable_access
 Alice Johnson,Senior Stylist,yes,yes
@@ -633,7 +633,7 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 - Required: `title`
 - Run before staff so staff can reference `position_id`
 
-**`onboarding_add_staff_batch(location_id, staff_data, is_paid_staff?, has_timetable_access?)`**
+**`onboarding_add_team_members_batch(location_id, staff_data, is_paid_staff?, has_timetable_access?)`**
 - Bulk add staff from JSON array or CSV string
 - Required: `name`, plus the owner's `is_paid_staff` and `has_timetable_access`
   answers per row or once for the batch (a missing answer refuses the batch)
@@ -648,7 +648,7 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 **`onboarding_set_schedules(location_id, schedules)`**
 - Set work schedules (working hours) for staff members
 - Each entry: `team_member_id`, `dates` (YYYY-MM-DD[]), `slots` (`[{from, to}]` in HH:MM)
-- Use staff IDs returned by `onboarding_add_staff_batch`
+- Use staff IDs returned by `onboarding_add_team_members_batch`
 - Without schedules the appointment grid stays empty
 
 **`onboarding_import_clients(location_id, clients_csv)`**
@@ -710,7 +710,7 @@ After completing onboarding:
 
 1. **Verify data:** Use existing tools to check created entities
    ```typescript
-   get_staff({ location_id: 123456 })
+   team_members_list({ location_id: 123456 })
    get_services({ location_id: 123456 })
    get_appointments({ location_id: 123456 })
    ```

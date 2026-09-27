@@ -40,10 +40,11 @@ tests/
 *.spec.ts
 
 # Documentation
-docs/
 examples/
 *.md
 !README.md
+!docs/Altegio API and Product Logic Documentation.md
+!docs/ONBOARDING_GUIDE.md
 
 # CI/CD
 .github/
@@ -58,3 +59,8 @@ logs/
 tmp/
 temp/
 *.tmp
+
+# Local agent state and worktrees
+.claude/
+.agents/
+.inventory/

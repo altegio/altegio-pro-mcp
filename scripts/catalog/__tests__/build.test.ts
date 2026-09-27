@@ -156,7 +156,7 @@ describe('catalog build', () => {
       const staff = catalog.operations.find(
         (o) => o.operationId === 'get_team_member_list'
       );
-      expect(staff?.curation?.tool_name).toBe('get_staff');
+      expect(staff?.curation?.tool_name).toBe('team_members_list');
       expect(staff?.curation?.projection).toContain('specialization');
 
       const curated = catalog.operations.filter((o) => o.curation).length;

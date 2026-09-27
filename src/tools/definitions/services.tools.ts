@@ -1,3 +1,4 @@
+import { paginationInput, paginateCollection } from '../pagination.js';
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
@@ -53,7 +54,7 @@ export const getServicesTool = defineTool({
   name: 'get_services',
   category: 'Services',
   description:
-    '[Services] Get list of services available at a location. AUTHENTICATION REQUIRED - administrative access to view all services with full pricing, settings, and configuration (not just public online-booking info). User must be logged in and have access to the location. PAGINATION STRATEGY: May return many services (50+). RECOMMENDED: Start with count=30-50 to show main services. User can request more or use categories for better organization.',
+    '[Services] Get list of services available at a location. AUTHENTICATION REQUIRED - administrative access to view all services with full pricing, settings, and configuration (not just public online-booking info). User must be logged in and have access to the location. Returns a stable page ordered by ID, with next_page and total. Default 25 rows.',
   annotations: {
     title: 'Get Services',
     readOnlyHint: true,
@@ -65,30 +66,14 @@ export const getServicesTool = defineTool({
       .int()
       .positive()
       .describe('ID of the location to get services for'),
-    page: z
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(
-        '1-based page number for pagination (default 1). Use 2 for the next page.'
-      ),
-    count: z
-      .number()
-      .int()
-      .positive()
-      .max(300)
-      .optional()
-      .describe(
-        'Results per page. Default may be large. RECOMMENDED: Use 30-50 for initial display. Max 300.'
-      ),
+    ...paginationInput,
   }),
   outputSchema: servicesOutput,
   handler: async ({ input, client }) => {
-    const { location_id, ...listParams } = input;
-    const services = await client.getServices(
-      location_id,
-      Object.keys(listParams).length > 0 ? listParams : undefined
+    const { location_id } = input;
+    const { items: services, pagination } = paginateCollection(
+      await client.getServices(location_id),
+      input
     );
 
     const lines = [
@@ -120,6 +105,7 @@ export const getServicesTool = defineTool({
       structuredContent: {
         items: services.map(projectService),
         count: services.length,
+        ...pagination,
       },
     };
   },

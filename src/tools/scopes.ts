@@ -237,10 +237,10 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   get_resources: 'locations:read',
 
   // --- Team members, positions, schedules ----------------------------------
-  get_staff: 'team_members:read',
-  create_staff: 'team_members:write',
-  update_staff: 'team_members:write',
-  delete_staff: 'team_members:write',
+  team_members_list: 'team_members:read',
+  team_members_create: 'team_members:write',
+  team_members_update: 'team_members:write',
+  team_members_delete: 'team_members:write',
   get_positions: 'team_members:read',
   create_position: 'team_members:write',
   get_schedule: 'team_members:read',
@@ -331,7 +331,7 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   onboarding_status: null,
   onboarding_preview_data: null,
   onboarding_add_positions: 'team_members:write',
-  onboarding_add_staff_batch: 'team_members:write',
+  onboarding_add_team_members_batch: 'team_members:write',
   onboarding_set_schedules: 'team_members:write',
   onboarding_add_categories: 'services:write',
   onboarding_add_services_batch: 'services:write',

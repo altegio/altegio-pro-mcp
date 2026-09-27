@@ -155,14 +155,14 @@ export const apiMapping: Record<string, ApiMapping> = {
   // ==========================================
   // Staff (Team Members)
   // ==========================================
-  get_staff: {
+  team_members_list: {
     path: '/staff/{location_id}',
     method: 'get',
     operationId: 'get_team_member_list',
     pathParams: ['location_id'],
     queryParams: ['page', 'count'],
   },
-  create_staff: {
+  team_members_create: {
     path: '/company/{location_id}/staff/quick',
     method: 'post',
     operationId: 'create_team_member_quick',
@@ -178,7 +178,7 @@ export const apiMapping: Record<string, ApiMapping> = {
       'is_paid_staff',
     ],
   },
-  update_staff: {
+  team_members_update: {
     path: '/staff/{location_id}/{team_member_id}',
     method: 'put',
     operationId: 'update_team_member',
@@ -194,7 +194,7 @@ export const apiMapping: Record<string, ApiMapping> = {
       'user_id',
     ],
   },
-  delete_staff: {
+  team_members_delete: {
     path: '/staff/{location_id}/{team_member_id}',
     method: 'delete',
     operationId: 'delete_team_member',
@@ -1369,7 +1369,7 @@ export const unmappedTools: string[] = [
   'onboarding_status',
   'onboarding_add_positions',
   'onboarding_set_schedules',
-  'onboarding_add_staff_batch',
+  'onboarding_add_team_members_batch',
   'onboarding_add_services_batch',
   'onboarding_add_categories',
   'onboarding_import_clients',

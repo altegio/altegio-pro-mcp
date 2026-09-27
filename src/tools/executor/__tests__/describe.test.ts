@@ -16,7 +16,7 @@ describe('altegio_describe_operation', () => {
       domain: 'team_members',
       deprecated: false,
       callable_by_executor: true,
-      curated_tool: 'get_staff',
+      curated_tool: 'team_members_list',
       tier: 'core',
     });
 
@@ -44,7 +44,7 @@ describe('altegio_describe_operation', () => {
 
     expect(text).toContain('get_team_member_list — GET /staff/{location_id}');
     expect(text).toContain('location_id (path, required, integer)');
-    expect(text).toContain('get_staff');
+    expect(text).toContain('team_members_list');
   });
 
   it('notes which legacy parameter names are accepted as canonical ones', () => {

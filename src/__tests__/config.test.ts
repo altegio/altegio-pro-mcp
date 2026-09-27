@@ -1,3 +1,4 @@
+import { PACKAGE_VERSION } from '../package-metadata.js';
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import {
   loadConfig,
@@ -160,7 +161,7 @@ describe('Configuration Schema', () => {
       const result = ServerConfigSchema.parse({});
 
       expect(result.name).toBe('@altegio/mcp-server-pro');
-      expect(result.version).toBe('0.3.0-alpha.0');
+      expect(result.version).toBe(PACKAGE_VERSION);
       expect(result.protocolVersion).toBe('2025-11-25');
       expect(result.capabilities.tools?.listChanged).toBe(true);
     });

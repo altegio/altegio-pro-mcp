@@ -263,7 +263,7 @@ describe('onboarding results through an SDK client', () => {
         errors: [],
       });
 
-      const staff = await call('onboarding_add_staff_batch', {
+      const staff = await call('onboarding_add_team_members_batch', {
         location_id: LOCATION,
         staff_data: [{ name: 'Alice' }, { name: 'Bob' }],
         // The owner's one answer for the whole list (the batch refuses a row

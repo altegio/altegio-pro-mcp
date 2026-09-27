@@ -36,7 +36,7 @@ Feature requests are tracked as GitHub issues. Include:
 
 ### Prerequisites
 
-- Node.js >= 20
+- Node.js >= 20.17
 - npm
 - Git
 - Altegio Partner Token from [developer.alteg.io](https://developer.alteg.io)
@@ -45,11 +45,11 @@ Feature requests are tracked as GitHub issues. Include:
 
 ```bash
 # Clone your fork
-git clone https://github.com/YOUR_USERNAME/altegio-mcp.git
-cd altegio-mcp
+git clone https://github.com/YOUR_USERNAME/altegio-pro-mcp.git
+cd altegio-pro-mcp
 
 # Install dependencies
-npm install
+npm ci
 
 # Configure environment
 cp .env.example .env
@@ -73,7 +73,6 @@ src/
   index.ts       # stdio server entry
   http-server.ts # HTTP server entry
 
-tests/           # Additional test files
 examples/        # Usage examples
 docs/            # Documentation
 ```
@@ -106,7 +105,7 @@ All warnings must be resolved before merging.
 ### Testing
 
 - Write tests for all new features
-- Maintain or improve coverage (currently 157 tests, 23 suites)
+- Cover behavior and regressions; avoid assertions that only duplicate implementation or prose
 - Use Jest with descriptive test names
 - Mock external dependencies
 - Test edge cases and errors

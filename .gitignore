@@ -54,3 +54,9 @@ test-*.sh
 
 # Claude Code agent worktrees (harness-managed, never committed)
 /.claude/worktrees/
+
+# Local agent guidance and deployment notes
+/AGENTS.md
+/BUILD.md
+/.claude/
+/.agents/

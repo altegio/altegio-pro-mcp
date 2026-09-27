@@ -36,7 +36,7 @@ describe('Onboarding Handlers', () => {
     mockClient = {
       isAuthenticated: jest.fn().mockReturnValue(true),
       getLocation: jest.fn().mockResolvedValue({ id: 123 }),
-    } as any;
+    } as unknown as jest.Mocked<AltegioClient>;
 
     handlers = new OnboardingHandlers(mockClient, stateManager);
   });
@@ -447,7 +447,7 @@ describe('Onboarding Handlers', () => {
       const textContent = result.content[0]?.text ?? '';
       expect(textContent).toContain('Total rows: 2');
       expect(textContent).toContain('Fields per row: 2');
-      expect(textContent).toContain('onboarding_add_staff_batch');
+      expect(textContent).toContain('onboarding_add_team_members_batch');
       // The rows themselves came out of the user's own file: they are shown
       // inside the fence, after our summary, never woven into it.
       expect(textContent).toContain('<<<UNTRUSTED');
@@ -998,7 +998,7 @@ describe('Onboarding Handlers', () => {
           }),
       ],
       [
-        'onboarding_add_staff_batch',
+        'onboarding_add_team_members_batch',
         'createStaff',
         () =>
           handlers.addStaffBatch({

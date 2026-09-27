@@ -1,3 +1,4 @@
+import { paginationInput, pageMetadata } from '../pagination.js';
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import { bookingsOutput, bookingEntityOutput } from '../output-schemas.js';
@@ -90,7 +91,7 @@ export const getAppointmentsTool = defineTool({
   name: 'get_appointments',
   category: 'Appointments',
   description:
-    '[Appointments] Get appointments for a location. AUTHENTICATION REQUIRED - this is administrative data. User must be logged in and have access to the location. If location_id not known, first call list_locations with my=1 to get user locations, then ask user to choose one. PAGINATION STRATEGY: Default may return many appointments. RECOMMENDED: Start with count=20-50 for recent appointments. Use start_date/end_date to filter by date range. Show first batch to user, fetch more only if needed. This saves context and computation.',
+    '[Appointments] Get appointments for a location. AUTHENTICATION REQUIRED - this is administrative data. User must be logged in and have access to the location. If location_id not known, first call list_locations with my=1 to get user locations, then ask user to choose one. Returns 25 rows by default. Follow next_page until null; a full final page may require one empty request.',
   annotations: {
     title: 'Get Appointments',
     readOnlyHint: true,
@@ -102,23 +103,7 @@ export const getAppointmentsTool = defineTool({
       .int()
       .positive()
       .describe('ID of the location to get appointments for'),
-    page: z
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(
-        '1-based page number for pagination (default 1). Use 2 for the next page.'
-      ),
-    count: z
-      .number()
-      .int()
-      .positive()
-      .max(300)
-      .optional()
-      .describe(
-        'Results per page. Default may be large. RECOMMENDED: Use 20-50 for initial requests. Only increase if user explicitly requests more. Max 300.'
-      ),
+    ...paginationInput,
     start_date: z
       .string()
       .optional()
@@ -188,6 +173,7 @@ export const getAppointmentsTool = defineTool({
           projectAppointment(booking, { includeContacts })
         ),
         count: appointments.length,
+        ...pageMetadata(input, appointments.length),
         contacts_included: includeContacts,
       },
     };

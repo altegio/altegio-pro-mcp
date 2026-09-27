@@ -1,205 +1,38 @@
-# CI/CD: VM-Based Deployment
+# Build and deployment
 
-## Architecture
+Pull requests run lint, formatting, type checking, tests, build, generated-surface
+checks, and dependency auditing through `.github/workflows/ci.yml`.
+Tests run on Node.js 20, 22, and 24. Merge with a merge commit after required
+checks and reviews pass; do not bypass branch protection.
 
-```
-PR merged to main → VM cron (2 min) → git pull → docker compose rebuild
-VM: mcp-servers (10.132.0.3, europe-west1-b, e2-small)
-Proxy: mcp-proxy (Cloud Run) → mcp.alteg.io (customers)
-       mcp-proxy-internal (Cloud Run) → mcp.altegio.dev (staff)
-```
+## Self-hosting
 
-### Production Endpoints
-
-| Service | VM Port | Public URL |
-|---------|---------|------------|
-| altegio-pro-mcp (customers, Altegio sign-in) | 3000 | `https://mcp.alteg.io/pro` |
-| altegio-pro-mcp (customer views) | 3000 | `https://mcp.alteg.io/pro/<facet>`, `https://mcp.alteg.io/pro/readonly` |
-| altegio-pro-mcp (staff, Google sign-in) | 3000 | `https://mcp.altegio.dev/pro/mcp`, `https://mcp.altegio.dev/pro/mcp/<facet>` |
-| bi-data (staff) | 8080 | `https://mcp.altegio.dev/bi-data/mcp` |
-
-The customer addresses are canonical. `https://mcp.alteg.io/public/pro/mcp…`
-still works as an alias of them. Staff routes live on `mcp.altegio.dev`; their
-old `mcp.alteg.io/pro/mcp…` and `mcp.alteg.io/bi-data/…` forms stop answering at
-the domain cut on 2026-09-28. Never rewrite a customer `/public/pro/mcp` address
-to `https://mcp.alteg.io/pro/mcp`.
-
-## Quick Start
-
-### Deploy to Production
-
-```bash
-git checkout -b feature/my-feature
-# ... make changes ...
-git push origin feature/my-feature
-gh pr create --fill
-
-# After PR approval and CI passes
-gh pr merge --merge
-
-# → VM auto-deploys within 2 minutes
+```sh
+npm ci
+npm run build
+npm run start:http
 ```
 
-## Deployment Flow
+Set the configuration described in `.env.example`. The HTTP service is designed
+for a trusted authentication proxy. Keep its listener private and strip
+caller-supplied identity headers before forwarding verified identity and scope.
+See the authentication section of README.md before exposing it to a network.
 
-### 1. CI (GitHub Actions)
+For containers:
 
-**Trigger:** Push/PR to `main`
-
-**Workflow:** `.github/workflows/ci.yml`
-- Lint, typecheck, format check
-- Tests on Node.js 20, 22, 24
-- Build verification
-- Security audit (`npm audit`)
-
-### 2. Auto-Deploy (VM Cron)
-
-**Trigger:** Cron every 2 minutes on `mcp-servers` VM
-
-**Process:**
-1. `~/deploy.sh` runs `git pull --ff-only origin main`
-2. If new commits detected, rebuilds only the changed service
-3. `docker compose up -d` restarts the updated container
-4. Health check confirms the service is running
-
-**Deploy script:** `~/deploy.sh` on VM
-
-**Docker Compose:** `~/docker-compose.yml` on VM (both services)
-
-### 3. Proxy (Cloud Run)
-
-**Services:** `mcp-proxy` on Cloud Run (`mcp.alteg.io`, customers) and
-`mcp-proxy-internal` (`mcp.altegio.dev`, staff). Both route to the VM internal
-IP:
-- `mcp.alteg.io/pro`, `/pro/<facet>`, `/pro/readonly` → Altegio sign-in (OAuth
-  or the caller's own Altegio user token) → `10.132.0.3:3000`, mapped onto
-  `/mcp`, `/mcp/<facet>` and `/mcp/readonly`. `/public/pro/…` is a kept alias of
-  this lane, forwarded with `/public/pro` stripped.
-- `mcp.altegio.dev/pro/*` → Google sign-in or a machine token (staff lane) →
-  the same backend, `/pro` stripped.
-- `mcp.altegio.dev/bi-data/*` → `10.132.0.3:8080`
-
-Until the cut on 2026-09-28 `mcp.alteg.io` also still answers the staff forms
-(`/pro/mcp…`, `/bi-data/*`); the `/mcp` segment tells the two Pro lanes apart.
-
-**Facets need no proxy change.** A customer `https://mcp.alteg.io/pro/<facet>`
-and a staff `https://mcp.altegio.dev/pro/mcp/<facet>` both arrive at the service
-as `/mcp/<facet>`, which the app already serves (see
-[README → Facets](README.md#facets)). Adding or removing a facet is a change in
-this repository only — no route, audience or scope in
-`altegio-mcp-platform/mcp-proxy/routes.json` is touched. An unknown facet is
-answered by the service itself with `404` and a JSON-RPC shaped error.
-
-## Monitoring
-
-### Check Containers
-```bash
-gcloud compute ssh mcp-servers --project=altegio-mcp --zone=europe-west1-b --tunnel-through-iap \
-  --command='docker compose ps'
+```sh
+docker build -t altegio-pro-mcp .
+docker run --rm --env-file .env -p 127.0.0.1:3000:3000 -e PORT=3000 altegio-pro-mcp
+curl --fail http://localhost:3000/health
 ```
 
-### View Logs
-```bash
-gcloud compute ssh mcp-servers --project=altegio-mcp --zone=europe-west1-b --tunnel-through-iap \
-  --command='docker compose logs altegio-pro-mcp --tail=50'
-```
+The image runs as a non-root user and includes the documentation served by MCP
+resources. Keep credentials outside the image. Persist the configured credential
+and onboarding directories if the deployment uses file-backed state.
 
-### Deploy Log
-```bash
-gcloud compute ssh mcp-servers --project=altegio-mcp --zone=europe-west1-b --tunnel-through-iap \
-  --command='tail -20 /var/log/mcp-deploy.log'
-```
+## Maintained hosted service
 
-### Health Checks
-```bash
-# Via proxy: every proxied path needs a Bearer (only the proxy's own /health
-# is public). Use the read-only smoke-probe machine token on the staff lane.
-PROBE_TOKEN=$(gcloud secrets versions access latest \
-  --secret=MACHINE_TOKEN_smoke-probe --project=altegio-mcp)
-curl -H "Authorization: Bearer $PROBE_TOKEN" https://mcp.altegio.dev/pro/health
-curl -H "Authorization: Bearer $PROBE_TOKEN" https://mcp.altegio.dev/bi-data/health
-# Not https://mcp.alteg.io/pro/health: that is the customer lane now. It wants
-# an Altegio sign-in and lands under /mcp, so it never reaches /health.
-
-# Direct (from internal network)
-curl http://10.132.0.3:3000/health
-curl http://10.132.0.3:8080/health
-```
-
-## Local Testing
-
-### Build Docker Image
-```bash
-docker build -t altegio-mcp:local .
-```
-
-### Run Locally
-```bash
-docker run --rm -d \
-  --name altegio-mcp-local \
-  -p 3000:3000 \
-  --env-file .env \
-  -e PORT=3000 \
-  altegio-mcp:local
-
-curl http://localhost:3000/health
-
-docker stop altegio-mcp-local
-```
-
-## Troubleshooting
-
-### Container Not Starting
-```bash
-gcloud compute ssh mcp-servers --project=altegio-mcp --zone=europe-west1-b --tunnel-through-iap \
-  --command='docker compose logs altegio-pro-mcp --tail=100'
-```
-
-### Deploy Not Triggering
-```bash
-# Check cron is running
-gcloud compute ssh mcp-servers --project=altegio-mcp --zone=europe-west1-b --tunnel-through-iap \
-  --command='crontab -l'
-
-# Check deploy log
-gcloud compute ssh mcp-servers --project=altegio-mcp --zone=europe-west1-b --tunnel-through-iap \
-  --command='tail -20 /var/log/mcp-deploy.log'
-
-# Manual deploy
-gcloud compute ssh mcp-servers --project=altegio-mcp --zone=europe-west1-b --tunnel-through-iap \
-  --command='~/deploy.sh'
-```
-
-### Proxy Not Routing
-```bash
-# Check proxy health
-curl https://mcp.alteg.io/health
-
-# Check proxy sees both services
-curl https://mcp.alteg.io/
-```
-
-## Security
-
-### Secrets
-- **VM:** `ALTEGIO_API_TOKEN` in `~/.env` (chmod 600). The compose default sets `ALTEGIO_LEGACY_WEB_BASE=https://app.alteg.io`; a YCLIENTS deployment must override it explicitly.
-- **Proxy:** No secrets needed (stateless reverse proxy)
-
-### Network
-- VM accessible only via internal IP (10.132.0.3)
-- Firewall: `allow-internal-mcp` (tcp:3000, tcp:8080-8090)
-- Proxy on Cloud Run handles public HTTPS termination
-
-### SSH Access
-```bash
-gcloud compute ssh mcp-servers --project=altegio-mcp --zone=europe-west1-b --tunnel-through-iap
-```
-
-## Files
-
-- `.github/workflows/ci.yml` — CI checks (lint, test, build, security)
-- `Dockerfile` — Multi-stage Node.js 20 Alpine build
-
----
-
-**Support:** [GitHub Issues](https://github.com/altegio/altegio-pro-mcp/issues)
+Merges to main are picked up by the maintained deployment's automation. A green
+CI run confirms a build, not a rollout: maintainers must verify the deployed Git
+revision and `/health` after deployment. Infrastructure inventory, credentials,
+and operational access instructions belong in the private deployment runbook.

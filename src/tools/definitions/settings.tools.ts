@@ -1,3 +1,4 @@
+import { paginationInput, paginateCollection } from '../pagination.js';
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import {
@@ -6,7 +7,11 @@ import {
   bookingFormsOutput,
   bookingFormEntityOutput,
 } from '../output-schemas.js';
-import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
+import {
+  withUntrustedBlock,
+  sanitizeUntrusted,
+  type UntrustedField,
+} from '../tool-result.js';
 
 // ========== Appointment calendar settings ==========
 
@@ -226,15 +231,19 @@ export const getBookingFormsTool = defineTool({
   },
   input: z.object({
     location_id: z.number().int().positive().describe('Location ID'),
+    ...paginationInput,
   }),
   outputSchema: bookingFormsOutput,
   handler: async ({ input, client }) => {
-    const forms = await client.getBookingForms(input.location_id);
+    const { items: forms, pagination } = paginateCollection(
+      await client.getBookingForms(input.location_id),
+      input
+    );
 
     if (!forms || forms.length === 0) {
       return {
         text: 'No booking forms found for this location.',
-        structuredContent: { items: [], count: 0 },
+        structuredContent: { items: [], count: 0, ...pagination },
       };
     }
 
@@ -258,6 +267,7 @@ export const getBookingFormsTool = defineTool({
           is_default: f.is_default,
         })),
         count: forms.length,
+        ...pagination,
       },
     };
   },
@@ -295,8 +305,14 @@ export const createBookingFormTool = defineTool({
     const { location_id, ...data } = input;
     const form = await client.createBookingForm(location_id, data);
     return {
-      text: `Successfully created booking form:\nID: ${form.id}\nTitle: ${form.title}`,
-      structuredContent: { id: form.id, title: form.title },
+      text: withUntrustedBlock(
+        `Successfully created booking form ${form.id}.`,
+        [{ label: 'title', value: form.title }]
+      ),
+      structuredContent: {
+        id: form.id,
+        title: sanitizeUntrusted(form.title) ?? undefined,
+      },
     };
   },
 });

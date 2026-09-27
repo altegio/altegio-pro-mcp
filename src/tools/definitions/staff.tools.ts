@@ -1,16 +1,21 @@
+import { paginationInput, paginateCollection } from '../pagination.js';
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
-import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
+import {
+  withUntrustedBlock,
+  sanitizeUntrusted,
+  type UntrustedField,
+} from '../tool-result.js';
 import { staffListOutput, staffEntityOutput } from '../output-schemas.js';
 import { paidSeatChoice, scheduleAccessChoice } from '../staff-seat-choice.js';
 
 export const getStaffTool = defineTool({
-  name: 'get_staff',
-  category: 'Staff',
+  name: 'team_members_list',
+  category: 'Team members',
   description:
-    '[Staff] Get list of staff members for a location. AUTHENTICATION REQUIRED - administrative access to view all staff with full details (not just public online-booking info). User must be logged in and have access to the location. PAGINATION STRATEGY: May return many staff (100+). RECOMMENDED: Start with count=30-50 to show initial options. User can browse and request more if needed. This saves context for large salons.',
+    '[Team members] Get list of team members for a location. AUTHENTICATION REQUIRED - administrative access to view all team members with full details (not just public online-booking info). User must be logged in and have access to the location. Returns a stable page ordered by ID, with next_page and total. Default 25 rows.',
   annotations: {
-    title: 'Get Staff',
+    title: 'List Team Members',
     readOnlyHint: true,
     openWorldHint: true,
   },
@@ -19,31 +24,15 @@ export const getStaffTool = defineTool({
       .number()
       .int()
       .positive()
-      .describe('ID of the location to get staff list for'),
-    page: z
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(
-        '1-based page number for pagination (default 1). Use 2 for the next page.'
-      ),
-    count: z
-      .number()
-      .int()
-      .positive()
-      .max(300)
-      .optional()
-      .describe(
-        'Results per page. Default may be large. RECOMMENDED: Use 30-50 for initial display. Max 300.'
-      ),
+      .describe('ID of the location to list team members for'),
+    ...paginationInput,
   }),
   outputSchema: staffListOutput,
   handler: async ({ input, client }) => {
-    const { location_id, ...listParams } = input;
-    const staff = await client.getStaff(
-      location_id,
-      Object.keys(listParams).length > 0 ? listParams : undefined
+    const { location_id } = input;
+    const { items: staff, pagination } = paginateCollection(
+      await client.getStaff(location_id),
+      input
     );
 
     const lines = [
@@ -76,27 +65,28 @@ export const getStaffTool = defineTool({
       structuredContent: {
         items: staff.map((s) => ({
           id: s.id,
-          name: s.name,
-          specialization: s.specialization,
+          name: sanitizeUntrusted(s.name) ?? undefined,
+          specialization: sanitizeUntrusted(s.specialization) ?? undefined,
           rating: s.rating,
           position_id: s.position?.id,
-          position_title: s.position?.title,
+          position_title: sanitizeUntrusted(s.position?.title) ?? undefined,
           hidden: s.hidden,
           fired: s.fired,
         })),
         count: staff.length,
+        ...pagination,
       },
     };
   },
 });
 
 export const createStaffTool = defineTool({
-  name: 'create_staff',
-  category: 'Staff',
+  name: 'team_members_create',
+  category: 'Team members',
   description:
-    '[Staff] Create a new staff member. AUTHENTICATION REQUIRED. Required fields: name, specialization, position_id, is_paid_staff, has_timetable_access. Ask the location owner for is_paid_staff and has_timetable_access and never choose them yourself: on per-seat licensing a paid staff seat is billed, and only a paid team member can be in the work schedule. A team member needs has_timetable_access=true to get working hours or appointments. Omit user_email and user_phone to create a team member without a user account. Pass them to link an existing Altegio user, or add is_user_invite=true to invite that person; the API refuses an email or phone of an unknown user without an invitation. The create operation stores no contact phone for the team member itself.',
+    '[Team members] Create a new team member. AUTHENTICATION REQUIRED. Required fields: name, specialization, position_id, is_paid_staff, has_timetable_access. Ask the location owner for is_paid_staff and has_timetable_access and never choose them yourself: on per-seat licensing a paid staff seat is billed, and only a paid team member can be in the work schedule. A team member needs has_timetable_access=true to get working hours or appointments. Omit user_email and user_phone to create a team member without a user account. Pass them to link an existing Altegio user, or add is_user_invite=true to invite that person; the API refuses an email or phone of an unknown user without an invitation. The create operation stores no contact phone for the team member itself.',
   annotations: {
-    title: 'Create Staff Member',
+    title: 'Create Team Member',
     destructiveHint: false,
     openWorldHint: true,
     idempotentHint: false,
@@ -146,23 +136,29 @@ export const createStaffTool = defineTool({
       is_user_invite: staffData.is_user_invite ?? false,
     });
     return {
-      text: `Successfully created staff member:\nID: ${staff.id}\nName: ${staff.name}\nSpecialization: ${staff.specialization}`,
+      text: withUntrustedBlock(
+        `Successfully created team member ${staff.id}.`,
+        [
+          { label: 'name', value: staff.name },
+          { label: 'specialization', value: staff.specialization },
+        ]
+      ),
       structuredContent: {
         id: staff.id,
-        name: staff.name,
-        specialization: staff.specialization,
+        name: sanitizeUntrusted(staff.name) ?? undefined,
+        specialization: sanitizeUntrusted(staff.specialization) ?? undefined,
       },
     };
   },
 });
 
 export const updateStaffTool = defineTool({
-  name: 'update_staff',
-  category: 'Staff',
+  name: 'team_members_update',
+  category: 'Team members',
   description:
-    '[Staff] Update existing staff member. AUTHENTICATION REQUIRED. Provide only fields to update.',
+    '[Team members] Update existing team member. AUTHENTICATION REQUIRED. Provide only fields to update.',
   annotations: {
-    title: 'Update Staff Member',
+    title: 'Update Team Member',
     destructiveHint: false,
     openWorldHint: true,
     idempotentHint: true,
@@ -216,7 +212,7 @@ export const updateStaffTool = defineTool({
       // A partial update reads back fields this call never sent, so the name
       // and specialization here may be someone else's text, not the caller's.
       text: withUntrustedBlock(
-        `Successfully updated staff member ${team_member_id}. Name and specialization as stored are below.`,
+        `Successfully updated team member ${team_member_id}. Name and specialization as stored are below.`,
         [
           { label: 'name', value: staff.name },
           { label: 'specialization', value: staff.specialization },
@@ -225,19 +221,20 @@ export const updateStaffTool = defineTool({
       ),
       structuredContent: {
         id: staff.id,
-        name: staff.name,
-        specialization: staff.specialization,
+        name: sanitizeUntrusted(staff.name) ?? undefined,
+        specialization: sanitizeUntrusted(staff.specialization) ?? undefined,
       },
     };
   },
 });
 
 export const deleteStaffTool = defineTool({
-  name: 'delete_staff',
-  category: 'Staff',
-  description: '[Staff] Delete/remove staff member. AUTHENTICATION REQUIRED.',
+  name: 'team_members_delete',
+  category: 'Team members',
+  description:
+    '[Team members] Delete/remove team member. AUTHENTICATION REQUIRED.',
   annotations: {
-    title: 'Delete Staff Member',
+    title: 'Delete Team Member',
     destructiveHint: true,
     idempotentHint: true,
     openWorldHint: true,
@@ -270,7 +267,7 @@ export const deleteStaffTool = defineTool({
   handler: async ({ input, client }) => {
     await client.deleteStaff(input.location_id, input.team_member_id);
     return {
-      text: `Successfully deleted staff member ${input.team_member_id} from location ${input.location_id}`,
+      text: `Successfully deleted team member ${input.team_member_id} from location ${input.location_id}`,
     };
   },
 });

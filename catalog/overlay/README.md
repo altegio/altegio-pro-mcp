@@ -34,7 +34,7 @@ operations:
     domain: team_members
     tier: core
     facets: [ops, catalog]
-    tool_name: get_staff
+    tool_name: team_members_list
     description: List the team members of a location with positions and ratings.
     hidden_params: [internal_flag]
     param_renames:

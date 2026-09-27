@@ -71,20 +71,20 @@ operations:
     domain: team_members
     tier: core
     facets: [ops, catalog]
-    tool_name: get_staff
+    tool_name: team_members_list
     projection: [id, name, specialization, position.title, hidden, fired]
     write_allowed: false
   create_team_member_quick:
     domain: team_members
     tier: core
     facets: [catalog, onboarding]
-    tool_name: create_staff
+    tool_name: team_members_create
     write_allowed: false
   update_team_member:
     domain: team_members
     tier: core
     facets: [catalog]
-    tool_name: update_staff
+    tool_name: team_members_update
     param_renames:
       staff_id: team_member_id
     write_allowed: false
@@ -92,7 +92,7 @@ operations:
     domain: team_members
     tier: core
     facets: [catalog]
-    tool_name: delete_staff
+    tool_name: team_members_delete
     param_renames:
       staff_id: team_member_id
     write_allowed: false

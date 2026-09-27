@@ -50,7 +50,7 @@ describe('factory tool definitions', () => {
     ).toBe(true);
   });
 
-  it('get_staff preserves required location_id and outputSchema', () => {
+  it('team_members_list preserves required location_id and outputSchema', () => {
     const spec = defs.getStaffTool.toMcpTool();
     expect(spec.inputSchema.properties).toHaveProperty('location_id');
     expect(spec.inputSchema.required).toContain('location_id');

@@ -45,7 +45,7 @@ describe('altegio_search_operations ranking', () => {
 
   it('names the curated tool when one already covers the operation', () => {
     const { hits } = searchOperations('staff list');
-    expect(hits[0]?.tool).toBe('get_staff');
+    expect(hits[0]?.tool).toBe('team_members_list');
   });
 
   it('shows the canonical path, not the legacy spelling', () => {

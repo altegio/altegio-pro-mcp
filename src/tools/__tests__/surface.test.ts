@@ -107,12 +107,12 @@ describe('the reasons', () => {
     expect(reasonOn('analytics_get_overview')).toBe('default-view-extra-tool');
     expect(reasonOn('altegio_login')).toBe('password-login-not-exposed');
     expect(reasonOn('list_locations')).toBe('facet-base-tool');
-    expect(reasonOn('get_staff')).toBe('default-view-not-excluded');
+    expect(reasonOn('team_members_list')).toBe('default-view-not-excluded');
     expect(reasonOn('analytics_run_report')).toBe('disabled-everywhere');
   });
 
   it('names the mechanism that admitted each tool to a facet', () => {
-    expect(surface.cell('get_staff', 'catalog')?.reason).toBe(
+    expect(surface.cell('team_members_list', 'catalog')?.reason).toBe(
       'facet-rule-name'
     );
     expect(surface.cell('clients_search', 'ops')?.reason).toBe(
@@ -121,7 +121,9 @@ describe('the reasons', () => {
     expect(surface.cell('list_locations', 'marketing')?.reason).toBe(
       'facet-base-tool'
     );
-    expect(surface.cell('get_staff', 'ops')?.reason).toBe('not-in-facet-rule');
+    expect(surface.cell('team_members_list', 'ops')?.reason).toBe(
+      'not-in-facet-rule'
+    );
   });
 
   it('answers the read-only view with the tool’s own annotation', () => {
@@ -218,7 +220,7 @@ describe('the gates', () => {
         .gates.some((gate) => gate.kind === 'executor-read-only');
     expect(readsOnly('altegio_call_operation')).toBe(true);
     expect(readsOnly('altegio_describe_operation')).toBe(false);
-    expect(readsOnly('get_staff')).toBe(false);
+    expect(readsOnly('team_members_list')).toBe(false);
   });
 
   it('lists gates in the order the call path checks them', () => {
