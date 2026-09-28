@@ -190,6 +190,19 @@ async function readHtmlPage(
     await readBounded(response, MAX_HTML_BYTES, report)
   );
   assertAuthenticatedBody(body);
+  // A refused HTML report comes back as the same HTTP 200 JSON envelope as a
+  // refused search report (`{success: false, meta: {status_code: 403}}`), not
+  // as HTML. Without this check the page parser reports a changed ERP markup
+  // for what is a missing access right.
+  if (body.trimStart().startsWith('{')) {
+    let envelope: unknown;
+    try {
+      envelope = JSON.parse(body);
+    } catch {
+      /* Not an envelope; the page parser reports the structure. */
+    }
+    assertPermittedEnvelope(envelope, report);
+  }
   return body;
 }
 

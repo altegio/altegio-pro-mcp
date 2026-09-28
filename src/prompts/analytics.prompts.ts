@@ -71,7 +71,7 @@ export const ANALYTICS_PROMPTS: readonly PromptEntry[] = [
       {
         name: 'team_member_ids',
         description:
-          'Comma-separated team member ids to look at in detail. Leave out to review the whole team from the report table first.',
+          'Comma-separated team member ids to look at day by day. Leave out to start from the whole-team sales and capacity tables.',
         required: false,
       },
     ],
@@ -143,7 +143,7 @@ export function getAnalyticsPrompt(
         '2. For every headline metric that moved by more than ten percent, decompose it before concluding: was revenue traffic (clients_active, visits) or spend (average_check)? Is the appointment count healthy but the attendance rate weak?',
         `3. analytics_get_daily_series with metric=revenue — the shape of the period, the best and worst days, any weekly rhythm.`,
         '4. analytics_get_appointments_breakdown by source, then by visit_status — where demand comes from and how much of it leaks to no-shows and cancellations. Call out the no-show share explicitly.',
-        '5. analytics_get_profit_and_loss_statement for the posted operating result and service contribution, analytics_get_cash_flow_breakdown for cash movements, analytics_get_revenue_leakage for avoidable signals, analytics_get_team_member_service_matrix for the exact team × service mix, analytics_get_product_sales for product mix, and analytics_get_capacity_heatmap if capacity looks off. Keep the statement’s missing cost classes explicit and never rename tracked operating result to net profit.',
+        '5. analytics_get_profit_and_loss_statement for the posted operating result and service contribution, analytics_get_cash_flow_breakdown for cash movements (once with cash_account_type=cash and once with non_cash when the full table is too wide), analytics_get_revenue_leakage for avoidable signals, analytics_get_team_member_service_matrix for the exact team × service mix, analytics_get_product_sales for product mix, and analytics_get_capacity_heatmap if capacity looks off. Keep the statement’s missing cost classes explicit and never rename tracked operating result to net profit.',
         '',
         'Finish with three to five sentences an owner can act on: what grew, what shrank, what is leaking (no-shows, cancellations, idle time), and the single change with the largest expected effect. Report absolute money next to every percentage. If a tool reports a missing access right or a switched-off module, say so plainly instead of guessing the number — missing is not zero.',
       ].join('\n');
@@ -169,10 +169,11 @@ export function getAnalyticsPrompt(
         `Review the team of location ${locationId} for the period "${period}".`,
         '',
         `1. Call analytics_get_team_member_sales for period=${period}, then analytics_get_team_member_service_matrix. Rank the team by revenue and contribution while excluding cells below the matrix minimum sample. Use analytics_get_client_retention for the same period when repeat business matters.`,
+        `2. analytics_get_team_member_capacity for period=${period} — scheduled, booked and idle hours and the period occupancy of every team member in one call — then analytics_get_capacity_heatmap for the peak and underused time.`,
         ids
-          ? `2. analytics_get_capacity_heatmap and analytics_get_team_member_occupancy for team_member_ids=[${ids}] — peak/underused time plus scheduled, booked and idle hours per person.`
-          : '2. Use analytics_get_capacity_heatmap for the team. Pick the two or three team members whose revenue looks unusual and call analytics_get_team_member_occupancy for them.',
-        '3. Before concluding about anyone with no occupancy at all, read their work schedule for the period: no schedule means no occupancy, not poor performance.',
+          ? `3. analytics_get_team_member_occupancy for team_member_ids=[${ids}] — their day-by-day booked share.`
+          : '3. Call analytics_get_team_member_occupancy for up to ten team members who stand out — their day-by-day booked share.',
+        '4. Before concluding about anyone with no occupancy at all, check their scheduled hours in the capacity table: no schedule means no occupancy, not poor performance.',
         '',
         'Conclude with who is at capacity, who has room for more bookings, and whether the schedule or the price list is the constraint. Remember that a team member with no work schedule shows no occupancy at all — say that rather than reporting zero as poor performance.',
       ].join('\n');

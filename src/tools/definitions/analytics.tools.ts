@@ -520,7 +520,7 @@ export const analyticsGetTeamMemberOccupancyTool = defineTool({
   name: 'analytics_get_team_member_occupancy',
   category: 'Analytics',
   description:
-    'Day-by-day occupancy for up to ten named team members: the share of each one’s scheduled working time that is booked. Answers "who has free capacity this week", "is anyone overloaded", "how full is a given stylist". A team member with no work schedule shows no occupancy at all, because occupancy is measured against scheduled time. For the whole location at once use analytics_get_daily_series with metric=occupancy; for hours and idle time per team member use the "Occupancy" report template. Needs access to the work schedule of the location.',
+    'Day-by-day occupancy for up to ten named team members: the share of each one’s scheduled working time that is booked. Answers "who has free capacity this week", "is anyone overloaded", "how full is a given stylist". A team member with no work schedule shows no occupancy at all, because occupancy is measured against scheduled time. For the whole location at once use analytics_get_daily_series with metric=occupancy; for scheduled, booked and idle hours and the period occupancy of every team member use analytics_get_team_member_capacity. Needs access to the work schedule of the location.',
   annotations: { title: 'Analytics: team member occupancy', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -554,7 +554,7 @@ export const analyticsGetClientVisitStatsTool = defineTool({
   name: 'analytics_get_client_visit_stats',
   category: 'Analytics',
   description:
-    'Visit history figures for one client in this location: visits attended, visits missed, total spent, total paid, the balance on their client account, and the date of their last attended visit. Answers "is this client reliable", "how much has this client spent with us", "does this client have money on account" while looking at a client card. For a table of many clients at once run the "Revenue and visits by client" report template instead. Needs access to client cards in this location.',
+    'Visit history figures for one client in this location: visits attended, visits missed, total spent, total paid, the balance on their client account, and the date of their last attended visit. Answers "is this client reliable", "how much has this client spent with us", "does this client have money on account" while looking at a client card. For many clients at once use analytics_get_client_sales (revenue and visits in a period) or clients_get_segment_report (lifetime values). Needs access to client cards in this location.',
   annotations: { title: 'Analytics: client visit history', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
