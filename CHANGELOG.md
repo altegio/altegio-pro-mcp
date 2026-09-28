@@ -6,6 +6,20 @@ is declared stable.
 
 ## [Unreleased]
 
+### Fixed — an unknown session answers 404, so clients re-initialize
+
+- **HTTP transport** answers a request carrying an `Mcp-Session-Id` this
+  process does not hold with **404** and JSON-RPC error `-32001`
+  `Session not found` on POST, GET and DELETE, as the Streamable HTTP
+  transport specifies. Sessions live in process memory, so a restart or
+  redeploy forgets every one; the old 400 did not tell clients to start over,
+  and claude.ai kept retrying a dead session for about 15 minutes after each
+  restart. **400** (`Bad Request: Missing session ID`) is now only for a
+  request without a session ID other than `initialize`; GET and DELETE use the
+  same JSON-RPC body instead of a bare `error` string.
+- A session ID that names an inherited object key (`constructor`) is no longer
+  looked up as a session.
+
 ### Fixed — analytics guidance and refusals checked against live data
 
 - **`analytics_get_team_member_occupancy`** no longer returns the zero point

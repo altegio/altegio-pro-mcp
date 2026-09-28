@@ -43,6 +43,44 @@ const MCP_SUB_PATHS = FACET_ROUTES.map((route) => route.path).filter(
   (path) => path !== '/mcp'
 );
 
+/** The session this view holds for `sessionId`, if any. */
+function sessionTransport(
+  transports: TransportRegistry,
+  sessionId: string | undefined
+): StreamableHTTPServerTransport | undefined {
+  // Own keys only: a header such as `constructor` is not a session.
+  return sessionId && Object.hasOwn(transports, sessionId)
+    ? transports[sessionId]
+    : undefined;
+}
+
+/**
+ * Refuse a request this view has no session for, as the Streamable HTTP
+ * transport specifies. A session ID the view does not hold — lost when the
+ * process restarted, terminated by DELETE, or issued by another view — is 404,
+ * which tells the client to start a new session with `initialize`. A missing
+ * session ID on anything but `initialize` is 400. Answering 400 for an unknown
+ * session left clients retrying a dead session until their own timeout.
+ */
+function rejectSessionlessRequest(
+  res: express.Response,
+  sessionId: string | undefined
+): void {
+  if (sessionId) {
+    res.status(404).json({
+      jsonrpc: '2.0',
+      error: { code: -32001, message: 'Session not found' },
+      id: null,
+    });
+    return;
+  }
+  res.status(400).json({
+    jsonrpc: '2.0',
+    error: { code: -32000, message: 'Bad Request: Missing session ID' },
+    id: null,
+  });
+}
+
 /**
  * Build the Express app and the per-session transport registries.
  *
@@ -95,10 +133,11 @@ export function createApp(): {
 
       try {
         let transport: StreamableHTTPServerTransport;
+        const existing = sessionTransport(transports, sessionId);
 
-        if (sessionId && transports[sessionId]) {
+        if (existing) {
           // Reuse existing transport
-          transport = transports[sessionId];
+          transport = existing;
         } else if (!sessionId && isInitializeRequest(req.body)) {
           // New initialization request — create transport + server
           transport = new StreamableHTTPServerTransport({
@@ -124,14 +163,7 @@ export function createApp(): {
           );
           return;
         } else {
-          res.status(400).json({
-            jsonrpc: '2.0',
-            error: {
-              code: -32000,
-              message: 'Bad Request: No valid session ID provided',
-            },
-            id: null,
-          });
+          rejectSessionlessRequest(res, sessionId);
           return;
         }
 
@@ -154,10 +186,10 @@ export function createApp(): {
     // GET — client opens SSE stream for server-initiated messages
     app.get(path, async (req, res) => {
       const sessionId = req.headers['mcp-session-id'] as string | undefined;
-      const transport = sessionId ? transports[sessionId] : undefined;
+      const transport = sessionTransport(transports, sessionId);
 
       if (!transport) {
-        res.status(400).json({ error: 'Invalid or missing session ID' });
+        rejectSessionlessRequest(res, sessionId);
         return;
       }
 
@@ -177,10 +209,10 @@ export function createApp(): {
     // DELETE — client terminates session
     app.delete(path, async (req, res) => {
       const sessionId = req.headers['mcp-session-id'] as string | undefined;
-      const transport = sessionId ? transports[sessionId] : undefined;
+      const transport = sessionTransport(transports, sessionId);
 
       if (!transport) {
-        res.status(400).json({ error: 'Invalid or missing session ID' });
+        rejectSessionlessRequest(res, sessionId);
         return;
       }
 

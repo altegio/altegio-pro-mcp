@@ -112,7 +112,7 @@ describe('HTTP server per-request identity', () => {
     }
   });
 
-  it('returns 400 for an unknown session without touching identity', async () => {
+  it('returns 404 for an unknown session without touching identity', async () => {
     const { app } = createApp();
     const server = app.listen(0);
     try {
@@ -121,7 +121,7 @@ describe('HTTP server per-request identity', () => {
         'x-mcp-auth-kind': 'user',
         'x-mcp-auth-email': 'a@example.com',
       });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(404);
     } finally {
       server.close();
     }
@@ -218,8 +218,8 @@ describe('HTTP server facet routes', () => {
       const { port } = server.address() as AddressInfo;
       expect((await postTo(port, '/mcp/ops', 'sess-ops')).status).toBe(202);
       // The same session id on another facet is not a session there.
-      expect((await postTo(port, '/mcp/catalog', 'sess-ops')).status).toBe(400);
-      expect((await postTo(port, '/mcp', 'sess-ops')).status).toBe(400);
+      expect((await postTo(port, '/mcp/catalog', 'sess-ops')).status).toBe(404);
+      expect((await postTo(port, '/mcp', 'sess-ops')).status).toBe(404);
     } finally {
       server.close();
     }
@@ -509,5 +509,139 @@ describe('HTTP server facet wiring, end to end', () => {
     } finally {
       server.close();
     }
+  });
+});
+
+/**
+ * Streamable HTTP session status codes, over the real transport. Sessions live
+ * in process memory, so every restart forgets them all: a client still holding
+ * one must get 404, which the transport defines as "start a new session with
+ * `initialize`". 400 is only for a request that carries no session at all.
+ */
+describe('HTTP server session status codes', () => {
+  const MCP_HEADERS = {
+    'content-type': 'application/json',
+    accept: 'application/json, text/event-stream',
+    'mcp-protocol-version': '2025-11-25',
+  };
+  const INITIALIZE = {
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'initialize',
+    params: {
+      protocolVersion: '2025-11-25',
+      capabilities: {},
+      clientInfo: { name: 'session-test', version: '1.0.0' },
+    },
+  };
+  const TOOLS_LIST = {
+    jsonrpc: '2.0',
+    id: 2,
+    method: 'tools/list',
+    params: {},
+  };
+  const SESSION_NOT_FOUND = {
+    jsonrpc: '2.0',
+    error: { code: -32001, message: 'Session not found' },
+    id: null,
+  };
+
+  const send = (
+    port: number,
+    method: 'POST' | 'GET' | 'DELETE',
+    sessionId: string | null,
+    body?: unknown
+  ) =>
+    fetch(`http://127.0.0.1:${port}/mcp`, {
+      method,
+      headers: {
+        ...MCP_HEADERS,
+        ...(sessionId ? { 'mcp-session-id': sessionId } : {}),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+
+  const withApp = async (
+    run: (port: number, app: ReturnType<typeof createApp>) => Promise<void>
+  ) => {
+    const created = createApp();
+    const server = created.app.listen(0);
+    try {
+      await run((server.address() as AddressInfo).port, created);
+    } finally {
+      server.close();
+    }
+  };
+
+  it('answers 404 for a session this process does not hold, on every method', async () => {
+    await withApp(async (port) => {
+      const stale = '6f1c2a4e-0000-4000-8000-000000000000';
+
+      const post = await send(port, 'POST', stale, TOOLS_LIST);
+      expect(post.status).toBe(404);
+      expect(await post.json()).toEqual(SESSION_NOT_FOUND);
+
+      // Even `initialize` carrying a dead session is refused: the client must
+      // drop the old ID, as the transport requires, before starting over.
+      expect((await send(port, 'POST', stale, INITIALIZE)).status).toBe(404);
+
+      const get = await send(port, 'GET', stale);
+      expect(get.status).toBe(404);
+      expect(await get.json()).toEqual(SESSION_NOT_FOUND);
+
+      const del = await send(port, 'DELETE', stale);
+      expect(del.status).toBe(404);
+      expect(await del.json()).toEqual(SESSION_NOT_FOUND);
+
+      // A prototype key is not a session either.
+      expect((await send(port, 'POST', 'constructor', TOOLS_LIST)).status).toBe(
+        404
+      );
+    });
+  });
+
+  it('answers 400 only when the session ID is missing', async () => {
+    await withApp(async (port) => {
+      for (const method of ['POST', 'GET', 'DELETE'] as const) {
+        const res = await send(
+          port,
+          method,
+          null,
+          method === 'POST' ? TOOLS_LIST : undefined
+        );
+        expect(res.status).toBe(400);
+        expect(await res.json()).toEqual({
+          jsonrpc: '2.0',
+          error: { code: -32000, message: 'Bad Request: Missing session ID' },
+          id: null,
+        });
+      }
+    });
+  });
+
+  it('answers 404 once a session is terminated, and a fresh initialize recovers', async () => {
+    await withApp(async (port, { transports }) => {
+      const init = await send(port, 'POST', null, INITIALIZE);
+      expect(init.status).toBe(200);
+      const sessionId = init.headers.get('mcp-session-id') as string;
+      await init.text();
+      expect(Object.keys(transports)).toContain(sessionId);
+
+      expect((await send(port, 'DELETE', sessionId)).status).toBe(200);
+      expect(Object.keys(transports)).not.toContain(sessionId);
+
+      // Same as after a restart: the ID is gone, so the answer is 404 ...
+      const stale = await send(port, 'POST', sessionId, TOOLS_LIST);
+      expect(stale.status).toBe(404);
+      expect(await stale.json()).toEqual(SESSION_NOT_FOUND);
+
+      // ... and the client's next step, a new initialize, gets a new session.
+      const again = await send(port, 'POST', null, INITIALIZE);
+      expect(again.status).toBe(200);
+      const next = again.headers.get('mcp-session-id');
+      await again.text();
+      expect(next).toBeTruthy();
+      expect(next).not.toBe(sessionId);
+    });
   });
 });
