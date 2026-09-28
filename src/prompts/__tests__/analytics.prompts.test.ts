@@ -76,7 +76,21 @@ describe('getAnalyticsPrompt', () => {
     const withoutIds = getAnalyticsPrompt('analytics_team_member_review', {
       location_id: '4564',
     })!.messages[0]!.content.text;
-    expect(withoutIds).toContain('Pick the two or three team members');
+    expect(withoutIds).toContain('up to ten team members who stand out');
+  });
+
+  it('reads hours per person from the capacity table, not the daily occupancy', () => {
+    // analytics_get_team_member_occupancy returns day-by-day shares only; the
+    // scheduled, booked and idle hours per person come from the capacity table.
+    for (const args of [
+      { location_id: '4564' },
+      { location_id: '4564', team_member_ids: '1' },
+    ] as Record<string, string>[]) {
+      const text = getAnalyticsPrompt('analytics_team_member_review', args)!
+        .messages[0]!.content.text;
+      expect(text).toContain('analytics_get_team_member_capacity');
+      expect(text).not.toMatch(/occupancy[^.\n]*idle hours per person/);
+    }
   });
 
   it('uses the built-in comparison when no baseline is given', () => {

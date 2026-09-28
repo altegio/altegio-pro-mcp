@@ -107,7 +107,7 @@ export const METRIC_SOURCES: readonly MetricSource[] = [
  * finance figure and an inventory figure can be reconciled against each other.
  */
 export const LEDGER_NOTE =
-  'A sale moves two ledgers at once: the money ledger (a payment in or out of an account) and the product ledger (a unit leaving or entering inventory). Selling one product for its price writes +price to the money ledger and −1 unit to the product ledger, so product revenue and stock movement always reconcile. The "financial_transactions" dataset reads the money ledger; product margin in the "sales" dataset reads the product ledger.';
+  'A sale moves two ledgers at once: the money ledger (a payment in or out of an account) and the product ledger (a unit leaving or entering inventory). Selling one product for its price writes +price to the money ledger and −1 unit to the product ledger, so product revenue and stock movement always reconcile. analytics_get_cash_flow_breakdown, analytics_get_client_cash_receipts and analytics_get_profit_and_loss_statement read the money ledger; analytics_get_product_sales and analytics_get_inventory_reorder_risks read the product ledger.';
 
 /** One coded value family an analytics answer carries, in canonical form. */
 export interface CodedValue {
@@ -139,7 +139,7 @@ export const CODED_VALUES: readonly CodedValue[] = [
     field: 'client priority',
     values: 'none · bronze · silver · gold',
     meaning:
-      'The client’s importance class, set by the location. Useful for segmenting revenue by client value in a report.',
+      'The client’s importance class, set by the location. Segment by it with the importance filter of clients_search or clients_get_segment_report.',
   },
   {
     field: 'money units',

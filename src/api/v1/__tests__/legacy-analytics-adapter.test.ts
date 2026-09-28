@@ -476,6 +476,42 @@ describe('ERP refusal envelope on search reports', () => {
     }
   );
 
+  it('surfaces the refusal on the HTML profit and loss page as a 403', async () => {
+    // Observed live on an application system user without the finance
+    // annual-report right: HTTP 200 with the JSON envelope instead of the page.
+    const { client, requests } = fakeClient([refusal(403)]);
+    const error = await new V1LegacyAnalyticsAdapter(client)
+      .getProfitAndLoss({
+        location_id: 4564,
+        date_from: '2026-08-01',
+        date_to: '2026-08-31',
+      })
+      .then(
+        () => null,
+        (e: unknown) => e
+      );
+    expect(requests[0]?.path).toBe('/finances_reports/annual_report/4564/');
+    expect(error).toMatchObject({
+      statusCode: 403,
+      message:
+        'Access to the profit and loss report is denied for the current Altegio user. Ask a location owner to grant the required analytics permission.',
+    });
+  });
+
+  it('surfaces a 401 refusal on an HTML page as rejected authentication', async () => {
+    const { client } = fakeClient([refusal(401)]);
+    await expect(
+      new V1LegacyAnalyticsAdapter(client).getProfitAndLoss({
+        location_id: 4564,
+        date_from: '2026-08-01',
+        date_to: '2026-08-31',
+      })
+    ).rejects.toMatchObject({
+      statusCode: 401,
+      message: expect.stringMatching(/authentication was not accepted/),
+    });
+  });
+
   it('surfaces the refusal on cash flow ahead of its legacy error shape', async () => {
     const { client } = fakeClient([refusal(403)]);
     await expect(

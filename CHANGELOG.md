@@ -6,6 +6,27 @@ is declared stable.
 
 ## [Unreleased]
 
+### Fixed — analytics guidance and refusals checked against live data
+
+- **`analytics_get_team_member_occupancy`** no longer returns the zero point
+  the workload endpoint adds for the day after `date_to`; it was counted as a
+  day of the period and lowered the mean.
+- **`analytics_get_profit_and_loss_statement`** reports a missing
+  annual-report right as an access denial (403). The ERP answers the refused
+  HTML page with its JSON refusal envelope, which the page parser used to call
+  a changed markup ("retry later").
+- **`analytics_get_cash_flow_breakdown`** refuses a table over its cell bound
+  with a 422 that names the size and how to narrow it (fewer days,
+  `cash_account_type`, `cash_account_ids`), not as a markup change; a week of
+  a live location already exceeds it.
+- **Guidance names served tools only.** The team review, the capacity play and
+  the tool map read hours, idle time and period occupancy per person from
+  `analytics_get_team_member_capacity` (the daily occupancy tool returns shares
+  only); descriptions, the playbook and the data model no longer send the
+  model to report templates or report-builder datasets, and the glossary drops
+  its report-builder dataset list. The health check narrows the cash-flow
+  table by account type.
+
 ### Added — `users_get_current`
 
 - **`users_get_current`** returns the signed-in person: id, display name,

@@ -1,3 +1,4 @@
+import { AltegioApiError } from '../../../utils/errors.js';
 import {
   parseTeamMemberCapacityHtml,
   parseProductSalesHtml,
@@ -96,6 +97,36 @@ it('parses both dynamic account and account-type columns without double-counting
     cash_account_id: null,
     cash_account_title: 'Front desk',
   });
+});
+
+it('refuses an over-wide cash-flow table as a narrowing request, not a markup change', () => {
+  const headers =
+    '<th class="by-type" rowspan="2">Item</th><th class="by-account" rowspan="2">Item</th>' +
+    ['Sep 1', 'Total']
+      .map(
+        (label) =>
+          `<th class="by-type" colspan="3">${label}</th><th class="by-account" colspan="1">${label}</th>`
+      )
+      .join('') +
+    '<th class="by-type" rowspan="2">Total</th><th class="by-account" rowspan="2">Total</th>';
+  const row = (name: string, aggregate: boolean) =>
+    `<tr class="${aggregate ? 'row-aggregated' : ''}"><td class="report-title-cell">${name}</td>${'<td class="by-type">0</td>'.repeat(6)}<td class="by-account">0</td><td class="by-account">0</td><td class="report-all-cell">0</td></tr>`;
+  // 6 columns (2 periods × cash, non-cash + one account) × 1,001 rows > 6,000 cells.
+  const items = Array.from({ length: 998 }, (_v, i) => row(`Item ${i}`, false));
+  const html = `<table class="table-report"><thead><tr>${headers}</tr><tr class="by-type">${'<td>Cash</td><td>Card</td><td>Total</td>'.repeat(2)}</tr><tr class="by-account"><td>Front desk</td><td>Front desk</td></tr></thead><tbody>${row('Income', true)}${items.join('')}${row('Expenses', true)}${row('Balance', true)}</tbody></table>`;
+  let error: unknown;
+  try {
+    parseCashFlowBreakdownHtml({ html, currency: 'USD', accountType: 'all' });
+  } catch (caught) {
+    error = caught;
+  }
+  expect(error).toBeInstanceOf(AltegioApiError);
+  expect(error).toMatchObject({ statusCode: 422 });
+  expect((error as Error).message).toContain('1001 payment-item rows × 6');
+  expect((error as Error).message).toContain(
+    'cash_account_type=cash or non_cash'
+  );
+  expect((error as Error).message).not.toMatch(/unexpected structure|retry/i);
 });
 
 import { readFileSync } from 'node:fs';

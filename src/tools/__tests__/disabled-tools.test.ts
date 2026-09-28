@@ -60,4 +60,27 @@ describe('disabled report builder', () => {
       }
     }
   });
+
+  it('never sends a caller to a report template or report-builder dataset', async () => {
+    // A served text that says "run the X report template" or names a builder
+    // dataset sends the model after a tool it cannot call; guidance must name a
+    // served curated tool instead.
+    const texts: string[] = orderedToolEntries().map(
+      (entry) => entry.spec.description ?? ''
+    );
+    for (const prompt of ANALYTICS_PROMPTS) {
+      const rendered = getAnalyticsPrompt(prompt.name, { location_id: '1' })!;
+      texts.push(rendered.description, rendered.messages[0]!.content.text);
+    }
+    for (const entry of listAnalyticsResources()) {
+      const read = await readAnalyticsResource(entry.uri);
+      if (read) texts.push(read.contents[0]!.text);
+    }
+    for (const text of texts) {
+      expect(text).not.toMatch(
+        /report template|from the report table|Report builder datasets/i
+      );
+      expect(text).not.toMatch(/"(?:financial_transactions|sales)" dataset/);
+    }
+  });
 });

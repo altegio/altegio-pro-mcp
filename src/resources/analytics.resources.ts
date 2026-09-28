@@ -121,12 +121,6 @@ export function renderGlossary(): string {
     '',
     rules,
     '',
-    '## Report builder datasets',
-    '',
-    DATASETS.map(
-      (dataset) => `- **${dataset}** — ${DATASET_DESCRIPTIONS[dataset]}`
-    ).join('\n'),
-    '',
   ].join('\n');
 }
 

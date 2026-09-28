@@ -1,6 +1,7 @@
 /** Structural parsers for the temporary ERP HTML/XLS analytics reports. */
 import { load, type CheerioAPI } from 'cheerio';
 import * as XLSX from '@e965/xlsx';
+import { AltegioApiError } from '../../utils/errors.js';
 import type {
   CashAccountType,
   CashFlowBreakdownReport,
@@ -26,6 +27,9 @@ import type {
 } from '../legacy-analytics-api.js';
 
 const MISSING = /^(?:-|—|–|n\/a|null)?$/i;
+
+/** Most payment-item × column cells one cash-flow call returns. */
+export const MAX_CASH_FLOW_CELLS = 6000;
 
 export class LegacyAnalyticsParseError extends Error {
   constructor(report: string, detail: string) {
@@ -1160,10 +1164,12 @@ export function parseCashFlowBreakdownHtml(args: {
   const sourceRows = table
     .find('tbody tr')
     .filter((_i, r) => $(r).children('.report-title-cell').length === 1);
-  if (sourceRows.length * columns.length > 6000)
-    throw new LegacyAnalyticsParseError(
-      'cash-flow breakdown',
-      'result too wide; narrow the period or account filters'
+  if (sourceRows.length * columns.length > MAX_CASH_FLOW_CELLS)
+    // A size bound, not a changed markup: the same call keeps failing until
+    // the caller narrows it, so it must not read as "retry later".
+    throw new AltegioApiError(
+      `The cash-flow breakdown for this period has ${sourceRows.length} payment-item rows × ${columns.length} day and account columns, more than the ${MAX_CASH_FLOW_CELLS} cells one call returns. Narrow it: a shorter period (a few days), cash_account_type=cash or non_cash, or cash_account_ids.`,
+      422
     );
   let aggregateIndex = 0;
   let direction: 'inflow' | 'outflow' | null = null;

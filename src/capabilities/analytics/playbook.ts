@@ -42,7 +42,7 @@ export const METRIC_RELATIONSHIPS: readonly MetricRelationship[] = [
     title: 'Revenue splits into what was sold',
     identity:
       'revenue_total = revenue_services + revenue_products + revenue_memberships + revenue_gift_cards + client_account_top_ups',
-    use: 'A revenue change with a flat average check is usually a mix change. Run "Revenue by service" and "Product sales analysis" to see which line moved, and watch average_services_check next to average_check so product sales do not disguise a drop in service spend.',
+    use: 'A revenue change with a flat average check is usually a mix change. Run analytics_get_service_profitability (or analytics_get_service_mix_trend for month-by-month delivered value) and analytics_get_product_sales to see which line moved, and watch average_services_check next to average_check so product sales do not disguise a drop in service spend.',
   },
   {
     title: 'Appointments are not visits',
@@ -104,7 +104,8 @@ export const DIAGNOSTIC_PLAYS: readonly DiagnosticPlay[] = [
     symptom: 'The team looks busy but occupancy is low, or capacity is wasted',
     steps: [
       'analytics_get_capacity_heatmap — identify peak and underused weekday/hour buckets from scheduled, booked and completed-utilized time.',
-      'analytics_get_team_member_occupancy for the team, up to ten ids at once — scheduled, booked and idle hours per person, day by day.',
+      'analytics_get_team_member_capacity — scheduled, booked and idle hours and the period occupancy per person, for the whole team in one call.',
+      'analytics_get_team_member_occupancy, up to ten ids at once — the day-by-day booked share of the people who stand out.',
       'analytics_get_daily_series with metric=occupancy — the location-wide booked share and the no-show share of working time.',
     ],
     read: 'Separate three causes: no schedule (occupancy is blank, fix the schedule, not the marketing), a full schedule with empty slots (demand — fill it), and time lost to no-shows (occupancy_no_show_percent — a front-desk and reminder problem). Idle hours are the size of the opportunity.',
@@ -212,7 +213,12 @@ export const QUESTION_ROUTES: readonly QuestionRoute[] = [
     tool: 'analytics_get_capacity_heatmap',
   },
   {
-    question: 'How busy is each team member / occupancy per person',
+    question:
+      'How busy was each team member over the period / occupancy per person',
+    tool: 'analytics_get_team_member_capacity',
+  },
+  {
+    question: 'How full is a given team member day by day',
     tool: 'analytics_get_team_member_occupancy',
   },
   {
