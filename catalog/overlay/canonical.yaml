@@ -1,0 +1,38 @@
+# V2 operations that supersede a V1 twin and have no curated tool yet.
+#
+# Format: catalog/overlay/_schema.yaml. Where V1 and V2 describe the same
+# operation, V2 is canonical (product owner, 2026-09-29) and the V1 twin leaves
+# the catalog. Twins that share an operationId (`create_tag`, `get_product`,
+# `get_service`, `delete_appointment`) are retired by the build without an
+# entry; the pairs below have different ids, so they are named here. A V1
+# operation stays when it can do something its V2 counterpart cannot — the
+# appointment list (team member and change-date filters), the service list
+# (category and team member filters), the service category reads (by id) and
+# the product search (categories as well as products).
+
+version: 1
+
+operations:
+  # --- tags ------------------------------------------------------------------
+  list_tags:
+    domain: tags
+    supersedes: [get_tag_list_by_entity]
+  update_tag:
+    domain: tags
+    supersedes: [update_tag_by_tag_id]
+  delete_tag:
+    domain: tags
+    supersedes: [delete_tag_by_tag_id]
+
+  # --- products --------------------------------------------------------------
+  list_products:
+    domain: products
+    supersedes: [get_products_list]
+  list_product_categories:
+    domain: products
+    supersedes: [get_product_category_list]
+
+  # --- custom fields ---------------------------------------------------------
+  list_custom_fields:
+    domain: custom_fields
+    supersedes: [get_custom_field_list]

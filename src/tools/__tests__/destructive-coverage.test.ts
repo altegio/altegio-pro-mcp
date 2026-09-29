@@ -38,6 +38,8 @@ describe('destructive tools are gated', () => {
       'appointments_delete',
       'booking_forms_delete',
       'clients_delete',
+      'events_delete',
+      'events_delete_duplication_strategy',
       'locations_remove_user',
       'onboarding_rollback_phase',
       'schedules_delete',

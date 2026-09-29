@@ -7,7 +7,7 @@ description, hidden parameters, canonical parameter names, result projection and
 the executor write allowlist.
 
 ```
-../biz.erp.api.docs (b2b-v1, b2b-v3)   +   catalog/overlay/*.yaml
+../biz.erp.api.docs (b2b-v1, v2, v3)  +   catalog/overlay/*.yaml
                               │
                     scripts/catalog/build.mjs
                               ▼
@@ -25,16 +25,18 @@ the executor write allowlist.
 ## Shape
 
 Each data file is keyed by `operationId` — the identifier from the OpenAPI spec,
-unique across the v1 and v3 specs and verified as such by the build:
+unique across the specs and verified as such by the build. A V2 id is used
+without the spec's `_v2` suffix:
 
 ```yaml
 version: 1
 operations:
-  get_team_member_list:
+  list_team_members:
     domain: team_members
     tier: core
     facets: [ops, catalog]
     tool_name: team_members_list
+    supersedes: [get_team_member_list]
     description: List the team members of a location with positions and ratings.
     hidden_params: [internal_flag]
     param_renames:
@@ -64,6 +66,11 @@ that is the drift signal when the spec repository renames or drops an operation.
 - **`write_allowed` is the executor write allowlist** (ADR-001 D2) and defaults
   to false. The current executor refuses every non-GET operation regardless, so
   setting it today only records intent.
+- **V2 is canonical; V1 fills the gaps.** When V1 and V2 both offer a
+  capability, curate the V2 operation. If the V1 twin has a different
+  `operationId`, name it under `supersedes`; a twin with the same id is retired
+  without being listed. Curation left on a retired V1 operation fails the build.
+  Keep a V1 operation only when V2 lacks what it does, and say why in `notes`.
 - **`projection` keeps results inside the size budget** (ADR-001 D8). Prefer a
   short allowlist of fields with ids over a whole API object.
 

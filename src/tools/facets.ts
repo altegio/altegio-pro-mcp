@@ -164,9 +164,10 @@ interface FacetRule {
  */
 const FACET_RULES: Record<FacetName, FacetRule> = {
   /**
-   * Daily work: the digital schedule, appointments, clients. The `clients_*`
-   * pack (segmentation, client card, visit history, lookup) joins by prefix;
-   * the journal tools do not exist yet.
+   * Daily work: the digital schedule, appointments, group events, clients. The
+   * `events_*` pack (timetable, bookings, duplication) and the `clients_*` pack
+   * (segmentation, client card, visit history, lookup) join by prefix; the
+   * journal tools do not exist yet.
    */
   ops: {
     tools: [
@@ -177,7 +178,7 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
       'appointments_preview_attendance',
       'appointments_apply_attendance',
     ],
-    prefixes: ['clients_'],
+    prefixes: ['events_', 'clients_'],
   },
 
   /**

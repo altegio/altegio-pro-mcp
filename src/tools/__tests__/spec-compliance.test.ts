@@ -27,12 +27,12 @@ const KNOWN_DISCREPANCIES: Record<string, string> = {};
  * Run after pulling latest spec: git -C ../biz.erp.api.docs pull origin master
  */
 
-const SPEC_PATH = process.env.ALTEGIO_API_DOCS
-  ? path.resolve(process.env.ALTEGIO_API_DOCS, 'docs/en/b2b-v1/openapi.yaml')
-  : path.resolve(
-      __dirname,
-      '../../../../biz.erp.api.docs/docs/en/b2b-v1/openapi.yaml'
-    );
+const DOCS_ROOT = process.env.ALTEGIO_API_DOCS
+  ? path.resolve(process.env.ALTEGIO_API_DOCS)
+  : path.resolve(__dirname, '../../../../biz.erp.api.docs');
+const SPEC_PATH = path.join(DOCS_ROOT, 'docs/en/b2b-v1/openapi.yaml');
+/** The V2 spec documents the operations whose mapping says `spec: 'v2'`. */
+const V2_SPEC_PATH = path.join(DOCS_ROOT, 'docs/en/b2b-v2/openapi.yaml');
 
 // Resolved OpenAPI spec (all $refs dereferenced)
 interface SpecOperation {
@@ -49,6 +49,7 @@ interface SpecOperation {
 }
 type SpecPath = Record<string, SpecOperation>;
 let spec: { paths?: Record<string, SpecPath> };
+let v2Spec: { paths?: Record<string, SpecPath> } | undefined;
 let specAvailable = false;
 
 beforeAll(async () => {
@@ -66,6 +67,11 @@ beforeAll(async () => {
     spec = (await SwaggerParser.dereference(
       SPEC_PATH
     )) as unknown as typeof spec;
+    if (fs.existsSync(V2_SPEC_PATH)) {
+      v2Spec = (await SwaggerParser.dereference(
+        V2_SPEC_PATH
+      )) as unknown as typeof spec;
+    }
     specAvailable = true;
   } catch (err) {
     console.warn(`Failed to parse OpenAPI spec: ${err}`);
@@ -152,15 +158,19 @@ function documentedEntries(): Array<[string, ApiMapping]> {
  * Normalize OpenAPI path template to match our mapping format.
  * Spec uses {location_id} but paths section keys might differ.
  */
-function findPathInSpec(specPath: string): SpecPath | null {
-  if (!spec?.paths) return null;
+function findPathInSpec(
+  specPath: string,
+  version: ApiMapping['spec'] = 'v1'
+): SpecPath | null {
+  const document = version === 'v2' ? v2Spec : spec;
+  if (!document?.paths) return null;
 
   // Direct match
-  if (spec.paths[specPath]) return spec.paths[specPath];
+  if (document.paths[specPath]) return document.paths[specPath];
 
   // Try normalizing parameter names
   const normalized = specPath.replace(/\{[^}]+\}/g, '{*}');
-  for (const [key, value] of Object.entries(spec.paths)) {
+  for (const [key, value] of Object.entries(document.paths)) {
     const keyNormalized = key.replace(/\{[^}]+\}/g, '{*}');
     if (keyNormalized === normalized) return value;
   }
@@ -174,7 +184,7 @@ describe('Spec Compliance', () => {
       it(`${toolName} → ${mapping.method.toUpperCase()} ${mapping.path} exists in spec`, () => {
         if (skipIfNoSpec()) return;
 
-        const pathObj = findPathInSpec(mapping.path);
+        const pathObj = findPathInSpec(mapping.path, mapping.spec);
 
         if (!pathObj || !pathObj[mapping.method]) {
           if (KNOWN_DISCREPANCIES[toolName]) {
@@ -199,7 +209,7 @@ describe('Spec Compliance', () => {
       it(`${toolName} → operationId "${mapping.operationId}"`, () => {
         if (skipIfNoSpec()) return;
 
-        const pathObj = findPathInSpec(mapping.path);
+        const pathObj = findPathInSpec(mapping.path, mapping.spec);
         if (!pathObj?.[mapping.method]) return;
 
         const operation = pathObj[mapping.method]!;
@@ -215,7 +225,7 @@ describe('Spec Compliance', () => {
       it(`${toolName} → path params match spec`, () => {
         if (skipIfNoSpec()) return;
 
-        const pathObj = findPathInSpec(mapping.path);
+        const pathObj = findPathInSpec(mapping.path, mapping.spec);
         if (!pathObj?.[mapping.method]) return;
 
         const operation = pathObj[mapping.method]!;
@@ -250,7 +260,7 @@ describe('Spec Compliance', () => {
       it(`${toolName} → query params exist in spec`, () => {
         if (skipIfNoSpec()) return;
 
-        const pathObj = findPathInSpec(mapping.path);
+        const pathObj = findPathInSpec(mapping.path, mapping.spec);
         if (!pathObj?.[mapping.method]) return;
 
         const operation = pathObj[mapping.method]!;
@@ -285,7 +295,7 @@ describe('Spec Compliance', () => {
       it(`${toolName} → body params exist in spec`, () => {
         if (skipIfNoSpec()) return;
 
-        const pathObj = findPathInSpec(mapping.path);
+        const pathObj = findPathInSpec(mapping.path, mapping.spec);
         if (!pathObj?.[mapping.method]) return;
 
         const operation = pathObj[mapping.method]!;
@@ -335,7 +345,7 @@ describe('Spec Compliance', () => {
       it(`${toolName} → spec required fields are covered`, () => {
         if (skipIfNoSpec()) return;
 
-        const pathObj = findPathInSpec(mapping.path);
+        const pathObj = findPathInSpec(mapping.path, mapping.spec);
         if (!pathObj?.[mapping.method]) return;
 
         const operation = pathObj[mapping.method]!;
@@ -369,7 +379,7 @@ describe('Spec Compliance', () => {
       it(`${toolName} → check if endpoint is deprecated`, () => {
         if (skipIfNoSpec()) return;
 
-        const pathObj = findPathInSpec(mapping.path);
+        const pathObj = findPathInSpec(mapping.path, mapping.spec);
         if (!pathObj?.[mapping.method]) return;
 
         const operation = pathObj[mapping.method]!;
@@ -521,7 +531,7 @@ describe('Spec Compliance', () => {
             true
           );
         } else if (specAvailable) {
-          const pathObj = findPathInSpec(mapping.path);
+          const pathObj = findPathInSpec(mapping.path, mapping.spec);
           expect(pathObj?.[mapping.method]).toBeDefined();
         }
         expect(typeof tool).toBe('string');

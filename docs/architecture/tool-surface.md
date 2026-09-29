@@ -16,13 +16,13 @@ the code disagree, which is how a surface change reaches a reviewer’s diff
 
 ## Counts
 
-**96 tools served (102 defined, 6 withheld from every view).**
+**111 tools served (117 defined, 6 withheld from every view).**
 
 | What | Count | Where |
 | --- | --- | --- |
-| Defined | 102 | 90 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
+| Defined | 117 | 105 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
 | Withheld from every view | 6 | `src/tools/disabled-tools.ts` (the report builder) |
-| **Served** | **96** | what `stdio` lists; every HTTP view is a subset |
+| **Served** | **111** | what `stdio` lists; every HTTP view is a subset |
 
 Served tools per category, in `tools/list` order:
 
@@ -34,6 +34,7 @@ Served tools per category, in `tools/list` order:
 | Auth | 2 |
 | Categories | 2 |
 | Clients | 12 |
+| Events | 15 |
 | Location | 3 |
 | Onboarding | 12 |
 | Positions | 2 |
@@ -46,17 +47,17 @@ Served tools per category, in `tools/list` order:
 
 ## Views
 
-| View | Address | Serves (of 102 defined) | Reasons |
+| View | Address | Serves (of 117 defined) | Reasons |
 | --- | --- | --- | --- |
-| `all` | stdio (no HTTP route) | 96 | all ×96, -off ×6 |
-| `default` | `/mcp` | 66 | dflt ×63, -pack ×27, -off ×6, base ×2, -pwd ×2, -name ×1, xtra ×1 |
-| `readonly` | `/mcp/readonly` | 57 | ro ×57, -write ×37, -off ×6, -pwd ×2 |
-| `ops` | `/mcp/ops` | 20 | - ×74, pfx ×12, -off ×6, rule ×6, base ×2, -pwd ×2 |
-| `catalog` | `/mcp/catalog` | 33 | - ×61, rule ×31, -off ×6, base ×2, -pwd ×2 |
-| `finance` | `/mcp/finance` | 31 | - ×63, pfx ×28, -off ×6, base ×2, -pwd ×2, rule ×1 |
-| `marketing` | `/mcp/marketing` | 3 | - ×91, -off ×6, base ×2, -pwd ×2, rule ×1 |
-| `analytics` | `/mcp/analytics` | 30 | - ×64, pfx ×28, -off ×6, base ×2, -pwd ×2 |
-| `onboarding` | `/mcp/onboarding` | 14 | - ×80, pfx ×12, -off ×6, base ×2, -pwd ×2 |
+| `all` | stdio (no HTTP route) | 111 | all ×111, -off ×6 |
+| `default` | `/mcp` | 81 | dflt ×78, -pack ×27, -off ×6, base ×2, -pwd ×2, -name ×1, xtra ×1 |
+| `readonly` | `/mcp/readonly` | 62 | ro ×62, -write ×47, -off ×6, -pwd ×2 |
+| `ops` | `/mcp/ops` | 35 | - ×74, pfx ×27, -off ×6, rule ×6, base ×2, -pwd ×2 |
+| `catalog` | `/mcp/catalog` | 33 | - ×76, rule ×31, -off ×6, base ×2, -pwd ×2 |
+| `finance` | `/mcp/finance` | 31 | - ×78, pfx ×28, -off ×6, base ×2, -pwd ×2, rule ×1 |
+| `marketing` | `/mcp/marketing` | 3 | - ×106, -off ×6, base ×2, -pwd ×2, rule ×1 |
+| `analytics` | `/mcp/analytics` | 30 | - ×79, pfx ×28, -off ×6, base ×2, -pwd ×2 |
+| `onboarding` | `/mcp/onboarding` | 14 | - ×95, pfx ×12, -off ×6, base ×2, -pwd ×2 |
 
 A facet answers *how many tools fit in this host’s context*; `readonly`
 answers *what may this agent do at all*. They are different kinds of view —
@@ -192,6 +193,26 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | `clients_lookup` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
 | `clients_search` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
 | `clients_upload_file` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:write |
+
+### Events
+
+| Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `events_book_clients` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:create |
+| `events_create` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write |
+| `events_create_duplication_strategy` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write |
+| `events_delete` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write, confirm |
+| `events_delete_duplication_strategy` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write, confirm |
+| `events_duplicate` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write + appointments:create |
+| `events_get` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:read |
+| `events_list` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:read |
+| `events_list_dates` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:read |
+| `events_list_duplication_strategies` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:read |
+| `events_list_services` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:read |
+| `events_reschedule_appointment` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write |
+| `events_update` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write |
+| `events_update_appointment` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write |
+| `events_update_duplication_strategy` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write |
 
 ### Location
 

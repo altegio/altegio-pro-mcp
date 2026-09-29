@@ -42,45 +42,43 @@ describe('api_call_operation', () => {
         data: [
           {
             id: 11,
-            name: 'Ann',
-            specialization: 'Stylist',
-            position: { id: 3, title: 'Senior stylist' },
-            hidden: 0,
-            fired: 0,
-            avatar_big: 'https://example.test/a.png',
-            information: '<p>bio</p>',
+            title: 'Haircut',
+            category_id: 3,
+            price_min: 10,
+            price_max: 20,
+            duration: 3600,
+            image: 'https://example.test/a.png',
+            comment: '<p>notes</p>',
           },
         ],
         meta: { total_count: 1 },
       });
 
-      const result = await callOperation(client, 'get_team_member_list', {
+      const result = await callOperation(client, 'get_service_list', {
         location_id: 4564,
       });
 
-      expect(fetchedUrl()).toBe(
-        'https://api.alteg.io/api/v1/locations/4564/team_members'
-      );
+      expect(fetchedUrl()).toBe('https://api.alteg.io/api/v1/services/4564');
       expect(result.structuredContent).toMatchObject({
-        operation_id: 'get_team_member_list',
+        operation_id: 'get_service_list',
         method: 'GET',
-        path: '/locations/4564/team_members',
+        path: '/services/4564',
         meta: { total_count: 1 },
       });
 
-      // The overlay projection for this operation drops avatar_big/information.
+      // The overlay projection for this operation drops image/comment.
       expect(result.structuredContent.data).toEqual([
         {
           id: 11,
-          name: 'Ann',
-          specialization: 'Stylist',
-          position: { title: 'Senior stylist' },
-          hidden: 0,
-          fired: 0,
+          title: 'Haircut',
+          category_id: 3,
+          price_min: 10,
+          price_max: 20,
+          duration: 3600,
         },
       ]);
       expect(result.structuredContent.projection_applied).toBeDefined();
-      expect(result.text).toContain('GET /locations/4564/team_members');
+      expect(result.text).toContain('GET /services/4564');
       expect(result.text).toContain('1 item');
     });
 
@@ -172,6 +170,96 @@ describe('api_call_operation', () => {
     });
   });
 
+  describe('V2 operations', () => {
+    it('reaches /api/v2 through the v1-bound transport and unwraps JSON:API', async () => {
+      // `list_event_dates` is canonical: its V1 twin `search_event_dates` is
+      // superseded and no longer in the catalog.
+      mockOk({
+        data: [
+          {
+            type: 'activity_date',
+            id: '2026-07-18',
+            attributes: { date: '2026-07-18' },
+          },
+        ],
+        meta: [],
+      });
+
+      const result = await callOperation(client, 'list_event_dates', {
+        location_id: 4564,
+        'filter[from]': '2026-07-16 00:00:00',
+        'filter[to]': '2026-07-31 23:59:59',
+      });
+
+      const url = new URL(fetchedUrl());
+      expect(url.pathname).toBe('/api/v2/locations/4564/events/dates');
+      expect(url.searchParams.get('filter[from]')).toBe('2026-07-16 00:00:00');
+      const init = (global.fetch as jest.Mock).mock.calls[0]?.[1] as {
+        headers: Record<string, string>;
+      };
+      expect(init.headers.Accept).toBe('application/vnd.api.v2+json');
+
+      expect(result.structuredContent).toMatchObject({
+        operation_id: 'list_event_dates',
+        data: [
+          {
+            type: 'activity_date',
+            id: '2026-07-18',
+            attributes: { date: '2026-07-18' },
+          },
+        ],
+      });
+      // V2 sends an empty meta as `[]`; it carries nothing.
+      expect(result.structuredContent.meta).toBeUndefined();
+      // The caller never learns which API version served the read.
+      expect(result.structuredContent).not.toHaveProperty('api_version');
+      expect(result.text).toContain('GET /locations/4564/events/dates');
+      expect(result.text).not.toMatch(/\/api\/v\d|\bv2\b/);
+    });
+
+    it('keeps a JSON:API document with side-loads whole', async () => {
+      const body = {
+        data: { type: 'activity', id: '5', attributes: {} },
+        included: [{ type: 'service', id: '7', attributes: {} }],
+      };
+      mockOk(body);
+
+      const result = await callOperation(client, 'get_event', {
+        location_id: 4564,
+        event_id: 5,
+      });
+      expect(result.structuredContent.data).toEqual(body);
+    });
+
+    it('still refuses a V2 write', async () => {
+      await expect(
+        callOperation(client, 'bulk_create_event_appointments', {
+          location_id: 4564,
+          event_id: 5,
+        })
+      ).rejects.toThrow(/Use the curated tool `events_book_clients`/);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('points a superseded id at the operation that replaced it', async () => {
+      await expect(
+        callOperation(client, 'search_events', { location_id: 4564 })
+      ).rejects.toThrow(/`list_events` replaces it/);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('serves a same-id twin from the canonical spec only', async () => {
+      mockOk({ data: { type: 'activity', id: '5', attributes: {} }, meta: [] });
+      await callOperation(client, 'get_event', {
+        location_id: 4564,
+        event_id: 5,
+      });
+      expect(new URL(fetchedUrl()).pathname).toBe(
+        '/api/v2/locations/4564/events/5'
+      );
+    });
+  });
+
   describe('canonical parameter names', () => {
     it('binds a canonical name onto a legacy path segment', () => {
       const op = getOperation('get_appointment');
@@ -221,10 +309,10 @@ describe('api_call_operation', () => {
   describe('parameter validation', () => {
     it('refuses a call missing a required parameter', async () => {
       await expect(
-        callOperation(client, 'get_team_member_list', {})
+        callOperation(client, 'get_service_list', {})
       ).rejects.toThrow(ExecutorRefusalError);
       await expect(
-        callOperation(client, 'get_team_member_list', {})
+        callOperation(client, 'get_service_list', {})
       ).rejects.toThrow(/missing required: location_id/);
       expect(global.fetch).not.toHaveBeenCalled();
     });
@@ -237,35 +325,33 @@ describe('api_call_operation', () => {
 
     it('refuses a value of the wrong type', async () => {
       await expect(
-        callOperation(client, 'get_team_member_list', {
+        callOperation(client, 'get_service_list', {
           location_id: 'not-a-number',
         })
-      ).rejects.toThrow(/`location_id` must be integer/);
+      ).rejects.toThrow(/`location_id` must be number/);
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
     it('accepts a numeric string for an integer parameter', async () => {
       mockOk({ success: true, data: [] });
-      await callOperation(client, 'get_team_member_list', {
+      await callOperation(client, 'get_service_list', {
         location_id: '4564',
       });
-      expect(fetchedUrl()).toBe(
-        'https://api.alteg.io/api/v1/locations/4564/team_members'
-      );
+      expect(fetchedUrl()).toBe('https://api.alteg.io/api/v1/services/4564');
     });
 
     it('points at describe_operation when arguments do not fit', async () => {
       await expect(
-        callOperation(client, 'get_team_member_list', {})
+        callOperation(client, 'get_service_list', {})
       ).rejects.toThrow(/api_describe_operation/);
     });
 
     it('forwards an undocumented parameter and says so', async () => {
       mockOk({ success: true, data: [] });
 
-      // The V1 spec does not document page/count on /locations/{location_id}/team_members,
+      // The V1 spec does not document page/count on /services/{location_id},
       // although the API honours them — refusing would block paging.
-      const result = await callOperation(client, 'get_team_member_list', {
+      const result = await callOperation(client, 'get_service_list', {
         location_id: 4564,
         count: 30,
       });
@@ -333,8 +419,9 @@ describe('api_call_operation', () => {
     it('finds and enforces a location id even when it is not the first path parameter', async () => {
       await expect(
         scoped(() =>
-          callOperation(client, 'get_custom_field_list', {
-            field_category: 1,
+          callOperation(client, 'get_loyalty_card_list_by_phone', {
+            phone: '13155550100',
+            chain_id: 1,
             location_id: 999,
           })
         )
@@ -370,15 +457,15 @@ describe('api_call_operation', () => {
         success: true,
         data: Array.from({ length: 3000 }, (_, i) => ({
           id: i,
-          name: `Team member ${i}`,
-          specialization: 'Stylist',
-          position: { id: 1, title: 'Stylist' },
-          hidden: 0,
-          fired: 0,
+          title: `Service ${i} with a long enough title`,
+          category_id: 1,
+          price_min: 10,
+          price_max: 20,
+          duration: 3600,
         })),
       });
 
-      const result = await callOperation(client, 'get_team_member_list', {
+      const result = await callOperation(client, 'get_service_list', {
         location_id: 4564,
       });
 
@@ -394,7 +481,7 @@ describe('api_call_operation', () => {
 
     it('keeps the whole result when it fits', async () => {
       mockOk({ success: true, data: [{ id: 1, name: 'Ann' }] });
-      const result = await callOperation(client, 'get_team_member_list', {
+      const result = await callOperation(client, 'get_service_list', {
         location_id: 4564,
       });
       expect(result.structuredContent.truncated).toBeUndefined();
@@ -411,7 +498,7 @@ describe('api_call_operation', () => {
       });
 
       await expect(
-        callOperation(client, 'get_team_member_list', { location_id: 1 })
+        callOperation(client, 'get_service_list', { location_id: 1 })
       ).rejects.toThrow(/Verify the ID is correct/);
     });
 
@@ -421,7 +508,7 @@ describe('api_call_operation', () => {
         '/tmp/altegio-executor-test-anon'
       );
       await expect(
-        callOperation(anonymous, 'get_team_member_list', { location_id: 4564 })
+        callOperation(anonymous, 'get_service_list', { location_id: 4564 })
       ).rejects.toThrow(/Not authenticated/);
     });
   });

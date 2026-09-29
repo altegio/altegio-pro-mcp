@@ -27,7 +27,10 @@ export interface CatalogPayload {
   required?: boolean;
   contentType?: string;
   statusCode?: string;
-  /** `v1` when the spec wraps the payload in `{success, data, meta}`. */
+  /**
+   * How the response is wrapped: `v1` for `{success, data, meta}`, `jsonapi`
+   * for a `{data, meta}` document. Either is unwrapped before the caller sees it.
+   */
   envelope?: string;
   schema?: Record<string, unknown>;
 }
@@ -43,12 +46,24 @@ export interface CatalogCuration {
   param_renames?: Record<string, string>;
   projection?: string[];
   write_allowed?: boolean;
+  /** V1 operationIds this operation replaces (they are not in the catalog). */
+  supersedes?: string[];
   notes?: string;
 }
 
 export interface CatalogOperation {
   operationId: string;
-  /** Which spec the operation comes from: `v1` is live, `v3` is a preview. */
+  /**
+   * The spec's own operationId when the catalog id differs from it — the V2
+   * spec suffixes some ids with `_v2`, which the catalog drops. Internal: the
+   * model is shown the catalog id only.
+   */
+  specOperationId?: string;
+  /**
+   * Which spec the operation comes from: `v1` and `v2` are live, `v3` is a
+   * preview. Internal for live operations — the model never sees a version;
+   * only a preview operation is labelled as one.
+   */
   source: string;
   method: string;
   /** Real HTTP path, with the spec's own parameter spelling. */
@@ -84,10 +99,35 @@ export interface Catalog {
   operationCount: number;
   curatedCount: number;
   domains: Array<{ domain: string; operations: number }>;
+  supersededCount: number;
   operations: CatalogOperation[];
+  /**
+   * V1 operations whose V2 twin is canonical. They are not callable,
+   * searchable or describable; an id from this list resolves to its survivor
+   * only to point a caller at it.
+   */
+  superseded: SupersededOperation[];
+}
+
+export interface SupersededOperation {
+  operationId: string;
+  source: string;
+  method: string;
+  path: string;
+  supersededBy: string;
+  /** `same-id` (the specs share the id) or `declared` (the overlay names it). */
+  reason: string;
 }
 
 export const catalog = catalogJson as unknown as Catalog;
+
+/** Specs served by the live API; anything else (`v3`) is a preview contract. */
+const LIVE_SOURCES = new Set(['v1', 'v2']);
+
+/** Whether an operation's spec is served by the live API today. */
+export function isLiveSource(source: string): boolean {
+  return LIVE_SOURCES.has(source);
+}
 
 /** Legacy spec name → canonical name (`staff_id` → `team_member_id`). */
 export const canonicalAliases: Record<string, string> =
@@ -143,6 +183,25 @@ export function acceptedNames(specName: string): string[] {
   const names = new Set<string>([specName, canonical]);
   for (const legacy of legacyAliases[canonical] ?? []) names.add(legacy);
   return [...names];
+}
+
+const supersededIds = new Map<string, string>(
+  (catalog.superseded ?? []).map((s) => [s.operationId, s.supersededBy])
+);
+
+/**
+ * The canonical operation that replaced a retired id, if the id was retired.
+ * Only ids that differ from their survivor can reach this: a same-id twin
+ * resolves to the survivor directly.
+ */
+export function replacementFor(operationId: string): string | undefined {
+  const survivor = supersededIds.get(operationId);
+  return survivor && survivor !== operationId ? survivor : undefined;
+}
+
+/** Whether an operation is only a preview of a future contract. */
+export function isPreview(op: Pick<CatalogOperation, 'source'>): boolean {
+  return !isLiveSource(op.source);
 }
 
 /** The curated tool that already covers this operation, if any. */

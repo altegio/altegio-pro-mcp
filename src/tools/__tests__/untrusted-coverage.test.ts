@@ -72,6 +72,83 @@ const envelope = (data: unknown, meta?: unknown): unknown => ({
   ...(meta ? { meta } : {}),
 });
 
+/** A V2 event document whose free text is the canary. */
+function eventDoc(single = false): unknown {
+  const event = {
+    type: 'activity',
+    id: '5',
+    attributes: {
+      staff_id: 7,
+      service_id: 3,
+      date: '2027-01-15T09:00:00+0200',
+      length: 3600,
+      capacity: 10,
+      clients_count: 1,
+      comment: CANARY,
+      instructions: '',
+      stream_link: '',
+      color: '',
+      deleted: false,
+    },
+    relationships: { staff: { data: { type: 'staff', id: '7' } } },
+  };
+  return {
+    data: single ? event : [event],
+    included: [{ type: 'staff', id: '7', attributes: { name: CANARY } }],
+    meta: [],
+  };
+}
+
+/** A V2 appointment list with one event booking whose comment is the canary. */
+function bookingDoc(): { data: unknown[]; included: unknown[] } {
+  return {
+    data: [
+      {
+        type: 'record',
+        id: '9',
+        attributes: {
+          activity_id: 5,
+          client_id: 21,
+          clients_count: 1,
+          attendance: 0,
+          comment: CANARY,
+        },
+        relationships: {
+          client: { data: { type: 'client', id: '21' } },
+          attendance_service_items: {
+            data: [{ type: 'attendance_service_item', id: '31' }],
+          },
+        },
+      },
+    ],
+    included: [
+      { type: 'client', id: '21', attributes: { name: CANARY } },
+      {
+        type: 'attendance_service_item',
+        id: '31',
+        attributes: {
+          cost_per_unit: 100,
+          discount_percent: 0,
+          manual_cost: 100,
+        },
+      },
+    ],
+  };
+}
+
+/** A V2 duplication pattern list whose title is the canary. */
+function strategyDoc(): { data: unknown[] } {
+  return {
+    data: [
+      {
+        type: 'activity_duplication_strategy',
+        id: '11',
+        attributes: { title: CANARY, repeat_mode_id: 1, days: [], interval: 1 },
+      },
+    ],
+  };
+}
+
 // ===========================================================================
 // The tools that hand over other people's text
 // ===========================================================================
@@ -97,21 +174,19 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     what: 'the entire API response — one tool reaches every documented GET, so the payload is fenced whole, with no field list to enumerate',
     canary: {
       args: {
-        operation_id: 'get_team_member_list',
-        params: { location_id: 1 },
+        operation_id: 'get_appointment',
+        params: { location_id: 1, appointment_id: 11 },
       },
       routes: [
         {
-          match: /\/locations\/1\/team_members/,
+          match: /\/locations\/1\/appointments\/11/,
           body: ok(
-            envelope([
-              {
-                id: 11,
-                name: CANARY,
-                specialization: CANARY,
-                information: CANARY,
-              },
-            ])
+            envelope({
+              id: 11,
+              comment: CANARY,
+              client: { name: CANARY },
+              services: [{ title: CANARY }],
+            })
           ),
         },
       ],
@@ -407,6 +482,147 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     },
   },
 
+  // --- group events ---
+  events_list: {
+    what: 'team-member names, service titles, event comments and instructions',
+    canary: {
+      args: { location_id: 1, date_from: '2027-01-01', date_to: '2027-01-31' },
+      routes: [{ match: /\/locations\/1\/events\?/, body: ok(eventDoc()) }],
+    },
+  },
+  events_get: {
+    what: 'the event’s free text and the names and comments of booked clients',
+    canary: {
+      args: { location_id: 1, event_id: 5 },
+      routes: [
+        { match: /\/locations\/1\/events\/5\?/, body: ok(eventDoc(true)) },
+        { match: /\/locations\/1\/appointments\?/, body: ok(bookingDoc()) },
+      ],
+    },
+  },
+  events_list_dates: {
+    what: 'names of the team members, services, categories and resources that run events',
+    canary: {
+      args: { location_id: 1, date_from: '2027-01-01', date_to: '2027-01-31' },
+      routes: [
+        {
+          match: /\/events\/dates\?/,
+          body: ok({ data: [{ type: 'activity_date', id: '2027-01-15' }] }),
+        },
+        {
+          match: /\/events\/filters\?/,
+          body: ok({
+            data: [
+              {
+                type: 'activity_filter',
+                id: 'staff',
+                relationships: { data: { data: [{ type: null, id: '7' }] } },
+              },
+            ],
+            included: [{ type: null, id: '7', attributes: { name: CANARY } }],
+          }),
+        },
+      ],
+    },
+  },
+  events_list_services: {
+    what: 'service titles, category titles, team-member names and resource titles',
+    canary: {
+      args: { location_id: 1 },
+      routes: [
+        {
+          match: /\/locations\/1\/events\/services/,
+          body: ok(
+            envelope([{ id: 3, title: CANARY, staff: [], resources: [] }])
+          ),
+        },
+      ],
+    },
+  },
+  events_list_duplication_strategies: {
+    what: 'the names staff gave their duplication patterns',
+    canary: {
+      args: { location_id: 1 },
+      routes: [{ match: /\/duplication_strategies/, body: ok(strategyDoc()) }],
+    },
+  },
+  events_create: {
+    what: 'the created event’s free text as the API stored it',
+    canary: {
+      args: {
+        location_id: 1,
+        team_member_id: 7,
+        service_id: 3,
+        start: '2027-01-15T09:00',
+        duration_minutes: 60,
+        capacity: 10,
+      },
+      routes: [{ match: /\/locations\/1\/events\?/, body: ok(eventDoc(true)) }],
+    },
+  },
+  events_update: {
+    what: 'the updated event’s free text as the API stored it',
+    canary: {
+      args: { location_id: 1, event_id: 5, capacity: 12 },
+      routes: [
+        { match: /\/locations\/1\/events\/5\?/, body: ok(eventDoc(true)) },
+      ],
+    },
+  },
+  events_create_duplication_strategy: {
+    what: 'the saved pattern’s name',
+    canary: {
+      args: { location_id: 1, title: 'Weekly', repeat: 'daily' },
+      routes: [
+        {
+          match: /\/duplication_strategies/,
+          body: ok({ data: strategyDoc().data[0], meta: [] }),
+        },
+      ],
+    },
+  },
+  events_update_duplication_strategy: {
+    what: 'the updated pattern’s name',
+    canary: {
+      args: { location_id: 1, strategy_id: 11, interval: 2 },
+      routes: [{ match: /\/duplication_strategies/, body: ok(strategyDoc()) }],
+    },
+  },
+  events_book_clients: {
+    what: 'the API’s own reason for each client it could not book',
+    coveredBy: 'src/capabilities/events/__tests__/use-cases.test.ts',
+  },
+  events_update_appointment: {
+    what: 'the booking comment as the API stored it',
+    canary: {
+      args: { location_id: 1, event_id: 5, appointment_id: 9, seats: 2 },
+      routes: [
+        {
+          match: /\/events\/5\/appointments\/9/,
+          body: ok({ data: bookingDoc().data[0], included: [], meta: [] }),
+        },
+        { match: /\/locations\/1\/appointments\?/, body: ok(bookingDoc()) },
+      ],
+    },
+  },
+  events_reschedule_appointment: {
+    what: 'the booking comment as the API stored it',
+    canary: {
+      args: {
+        location_id: 1,
+        event_id: 5,
+        appointment_id: 9,
+        target_event_id: 6,
+      },
+      routes: [
+        {
+          match: /\/events\/5\/appointments\/9/,
+          body: ok({ data: bookingDoc().data[0], included: [], meta: [] }),
+        },
+      ],
+    },
+  },
+
   clients_lookup: {
     what: 'client names matching the typed fragment',
     canary: {
@@ -547,6 +763,10 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
 // ===========================================================================
 
 const NO_FREE_TEXT: Record<string, string> = {
+  // --- group events ---
+  events_delete: 'the event and location ids only',
+  events_duplicate: 'ids, start times and seat counts of the copies only',
+  events_delete_duplication_strategy: 'the pattern and location ids only',
   locations_diagnose_access:
     'statuses and caller-selected permission keys; application slugs are API vocabulary',
   clients_add_comment:

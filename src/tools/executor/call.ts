@@ -13,9 +13,12 @@ import { ExecutorRefusalError } from '../../utils/errors.js';
 import {
   acceptedNames,
   getOperation,
+  isLiveSource,
+  replacementFor,
   type CatalogOperation,
   type CatalogParameter,
 } from './catalog.js';
+import { v2Path } from '../../api/altegio-http.js';
 import {
   applyProjection,
   enforceBudget,
@@ -321,7 +324,7 @@ export function assertCallable(op: CatalogOperation): void {
     );
   }
 
-  if (op.source !== 'v1') {
+  if (!isLiveSource(op.source)) {
     throw new ExecutorRefusalError(
       `\`${op.operationId}\` comes from the ${op.source} preview contract ` +
         `(status: ${op.status ?? 'preview'}) and is not served by the live API yet. ` +
@@ -387,6 +390,30 @@ export interface CallOutput {
   structuredContent: Record<string, unknown>;
 }
 
+/**
+ * Unwrap a V2 JSON:API document (`{data, meta}`) the way the client unwraps the
+ * V1 `{success, data, meta}` envelope. A document with anything else at the top
+ * level (`included`, `links`, `errors`) is returned whole so nothing is lost.
+ * V2 sends an empty `meta` as `[]`, which carries nothing and is dropped.
+ */
+function unwrapJsonApi(body: unknown): {
+  data: unknown;
+  meta?: Record<string, unknown>;
+} {
+  if (
+    !isRecord(body) ||
+    !('data' in body) ||
+    Object.keys(body).some((key) => key !== 'data' && key !== 'meta')
+  ) {
+    return { data: body };
+  }
+  const meta = body.meta;
+  return {
+    data: body.data,
+    ...(isRecord(meta) && Object.keys(meta).length > 0 ? { meta } : {}),
+  };
+}
+
 function summarize(payload: unknown): string {
   if (Array.isArray(payload)) {
     return `${payload.length} item${payload.length === 1 ? '' : 's'}`;
@@ -404,22 +431,29 @@ export async function callOperation(
 ): Promise<CallOutput> {
   const op = getOperation(operationId);
   if (!op) {
+    const replacement = replacementFor(operationId);
     throw new ExecutorRefusalError(
-      `No operation \`${operationId}\` in the API catalog. ` +
-        'Use `api_search_operations` to find the right operationId.',
-      { operationId }
+      replacement
+        ? `\`${operationId}\` is not in the API catalog: \`${replacement}\` replaces it. ` +
+            `Call \`api_describe_operation\` for \`${replacement}\` and use its parameters.`
+        : `No operation \`${operationId}\` in the API catalog. ` +
+            'Use `api_search_operations` to find the right operationId.',
+      { operationId, ...(replacement ? { replacedBy: replacement } : {}) }
     );
   }
 
   assertCallable(op);
   const { path, query, warnings } = buildRequest(op, params);
   const scopedCompany = enforceCatalogCompanyScope(op, params);
-  const { data, meta } = await client.request(
+  // The transport is bound to `/api/v1` and already sends the V2 media type.
+  const response = await client.request(
     'GET',
-    path,
+    op.source === 'v2' ? v2Path(path) : path,
     query,
     scopedCompany
   );
+  const { data, meta } =
+    op.source === 'v2' ? unwrapJsonApi(response.data) : response;
 
   const projection = op.curation?.projection;
   const projected =

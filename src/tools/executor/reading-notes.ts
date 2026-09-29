@@ -30,7 +30,7 @@ const ANALYTICS_POINTER = `For how these fields roll up into metrics (revenue, a
  */
 const NOTES_BY_DOMAIN: Readonly<Record<string, readonly string[]>> = {
   appointments: [
-    'This is an appointment (the v1 spec calls it a `record`); one appointment is one team member in one slot.',
+    'This is an appointment (the spec calls it a `record`); one appointment is one team member in one slot.',
     'Visit status is a coded field: `attendance`/`visit_attendance` = -1 no-show, 0 waiting, 1 arrived, 2 confirmed (V3 spells them no_show/waiting/arrived/confirmed/cancelled). Only an arrived appointment becomes a visit with revenue.',
     'Marking is manual: about one past appointment in eight is never moved off waiting/confirmed, so attendance-based counts undercount — treat them as a floor.',
     '`paid_full` = 1 means the appointment is fully paid. `is_mobile` = 0 (admin, app or web created by the team) · 1 (mobile-browser online widget) · 2 (desktop-browser online widget), so `is_mobile > 0` is an online booking. `visit_id` links the appointment to its billing visit.',
@@ -57,6 +57,10 @@ const NOTES_BY_DOMAIN: Readonly<Record<string, readonly string[]>> = {
   ],
   memberships: [
     'Memberships and gift cards are prepaid: sold once (revenue then), redeemed later (a write-off against the visit, no new cash). Value remaining and expiry are what the loyalty dataset reports.',
+  ],
+  events: [
+    'An event is a group class or other session many clients book into (the specs call it an `activity`); `capacity` is its seat count and each booking is an appointment on the event.',
+    'The event reads `list_events`, `list_event_dates`, `get_event_date_range` and `list_event_filters` require `filter[from]` and `filter[to]` as `YYYY-MM-DD HH:MM:SS` in the location’s time zone, and refuse (422) a period that starts before the current time there. `list_events` and `list_event_dates` read the past with `filter[include_deleted]=1`, which also returns cancelled events (`deleted: true`). Prefer the curated `events_*` tools, which handle this.',
   ],
   schedule: [
     'Occupancy is booked time over scheduled time. A team member with no schedule contributes no scheduled time, so their occupancy is blank, not zero.',

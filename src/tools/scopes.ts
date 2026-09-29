@@ -274,6 +274,28 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   appointments_update: 'appointments:write',
   appointments_delete: 'appointments:write',
 
+  // --- Group events ---------------------------------------------------------
+  // The v3 P0 catalog has no events domain. An event is a timetable slot
+  // clients book appointments into, so it rides on the appointments scopes:
+  // reading and managing events is `appointments:read` / `:write`, and booking
+  // clients creates appointments, which needs the explicit `:create` grant.
+  // Duplicating an event can copy its bookings, so it needs both.
+  events_list: 'appointments:read',
+  events_get: 'appointments:read',
+  events_list_dates: 'appointments:read',
+  events_list_services: 'appointments:read',
+  events_list_duplication_strategies: 'appointments:read',
+  events_create: 'appointments:write',
+  events_update: 'appointments:write',
+  events_delete: 'appointments:write',
+  events_duplicate: ['appointments:write', 'appointments:create'],
+  events_create_duplication_strategy: 'appointments:write',
+  events_update_duplication_strategy: 'appointments:write',
+  events_delete_duplication_strategy: 'appointments:write',
+  events_book_clients: 'appointments:create',
+  events_update_appointment: 'appointments:write',
+  events_reschedule_appointment: 'appointments:write',
+
   // --- Client base ----------------------------------------------------------
   clients_search: 'clients:read',
   clients_get_membership_purchases: [

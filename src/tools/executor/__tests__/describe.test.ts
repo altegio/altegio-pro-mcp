@@ -3,16 +3,17 @@ import { acceptedNames, canonicalName, getOperation } from '../catalog.js';
 
 describe('api_describe_operation', () => {
   it('describes a curated read with its parameters, auth and response', () => {
-    const { found, text, structuredContent } = describeOperation(
-      'get_team_member_list'
-    );
+    const { found, text, structuredContent } =
+      describeOperation('list_team_members');
 
     expect(found).toBe(true);
+    // A live operation names no API version.
+    expect(structuredContent).not.toHaveProperty('source');
+    expect(text).not.toContain('Source:');
     expect(structuredContent).toMatchObject({
-      operation_id: 'get_team_member_list',
+      operation_id: 'list_team_members',
       method: 'GET',
       path: '/locations/{location_id}/team_members',
-      source: 'v1',
       domain: 'team_members',
       deprecated: false,
       callable_by_executor: true,
@@ -39,11 +40,15 @@ describe('api_describe_operation', () => {
 
     expect(structuredContent.authentication).toMatchObject({ required: true });
     expect(structuredContent.response).toMatchObject({ statusCode: '200' });
-    // The V1 envelope is transport; the catalog stores the payload itself.
-    expect(structuredContent.response).toMatchObject({ envelope: 'v1' });
+    // The wrapper is transport; the catalog stores the payload itself and
+    // names the wrapper by its shape, never by an API version.
+    expect(structuredContent.response).toMatchObject({
+      unwrapped_from: '{data, meta}',
+    });
+    expect(structuredContent.response).not.toHaveProperty('envelope');
 
     expect(text).toContain(
-      'get_team_member_list — GET /locations/{location_id}/team_members'
+      'list_team_members — GET /locations/{location_id}/team_members'
     );
     expect(text).toContain('location_id (path, required, integer)');
     expect(text).toContain('team_members_list');
@@ -125,6 +130,27 @@ describe('api_describe_operation', () => {
     });
   });
 
+  it('describes a canonical read with a clean id and no version', () => {
+    const { text, structuredContent } = describeOperation(
+      'get_event_date_range'
+    );
+    expect(structuredContent).toMatchObject({
+      operation_id: 'get_event_date_range',
+      path: '/locations/{location_id}/events/dates/range',
+      callable_by_executor: true,
+      curated_tool: 'events_list_dates',
+    });
+    expect(structuredContent).not.toHaveProperty('source');
+    expect(structuredContent).not.toHaveProperty('spec_operation_id');
+    expect(text).toContain('`{data, meta}` wrapper is unwrapped');
+    expect(text).not.toMatch(/\bv[12]\b|JSON:API/i);
+    expect(text).not.toContain('Not callable');
+    // The live API refuses a period that starts in the past; the note says so.
+    expect(structuredContent.reading_notes).toEqual(
+      expect.arrayContaining([expect.stringContaining('filter[from]')])
+    );
+  });
+
   it('reports deprecation', () => {
     const { text, structuredContent } = describeOperation(
       'deprecated_get_service_category_list'
@@ -140,20 +166,36 @@ describe('api_describe_operation', () => {
     });
   });
 
+  it('strips the spec suffix from a V2 id', () => {
+    expect(getOperation('list_event_duplication_strategies')).toMatchObject({
+      specOperationId: 'list_event_duplication_strategies_v2',
+    });
+    expect(
+      describeOperation('list_event_duplication_strategies_v2').found
+    ).toBe(false);
+  });
+
+  it('points a superseded id at the operation that replaced it', () => {
+    const result = describeOperation('get_team_member_list');
+    expect(result.found).toBe(false);
+    expect(result.text).toContain('`list_team_members` replaces it');
+    expect(result.structuredContent).toMatchObject({
+      replaced_by: 'list_team_members',
+    });
+  });
+
   it('suggests neighbours for an unknown operationId', () => {
     const result = describeOperation('get_team_member_lst');
     expect(result.found).toBe(false);
     expect(result.text).toContain('No operation `get_team_member_lst`');
     expect(result.text).toContain('api_search_operations');
-    expect(result.structuredContent.suggestions).toContain(
-      'get_team_member_list'
-    );
+    expect(result.structuredContent.suggestions).toContain('get_team_member');
   });
 
   it('stays inside the per-result size budget for every operation', () => {
     // 14000 characters ≈ 3.5k tokens (ADR-001 D8: ≤ 4k per result).
     for (const op of [
-      'get_team_member_list',
+      'list_team_members',
       'get_appointment_list',
       'get_client_list',
       'get_location_list',
@@ -191,7 +233,7 @@ describe('canonical alias helpers', () => {
   });
 
   it('produces no note when the spec is already canonical', () => {
-    const op = getOperation('get_team_member_list');
+    const op = getOperation('list_team_members');
     expect(op).toBeDefined();
     expect(terminologyNotes(op!)).toEqual([]);
   });

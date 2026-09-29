@@ -11,6 +11,9 @@ import {
   acceptedNames,
   canonicalName,
   getOperation,
+  isLiveSource,
+  isPreview,
+  replacementFor,
   type CatalogOperation,
   type CatalogParameter,
 } from './catalog.js';
@@ -107,6 +110,22 @@ export interface DescribeOutput {
 
 /** Suggest neighbours when an operationId does not exist (D8: errors carry the next action). */
 function notFound(operationId: string): DescribeOutput {
+  const replacement = replacementFor(operationId);
+  if (replacement) {
+    return {
+      found: false,
+      text:
+        `\`${operationId}\` is not in the API catalog: \`${replacement}\` replaces it. ` +
+        `Describe \`${replacement}\` instead.`,
+      structuredContent: {
+        operation_id: operationId,
+        found: false,
+        replaced_by: replacement,
+        suggestions: [replacement],
+      },
+    };
+  }
+
   const { hits } = searchOperations(operationId.replace(/[_-]+/g, ' '), {
     limit: 5,
     includePreview: true,
@@ -132,6 +151,20 @@ function notFound(operationId: string): DescribeOutput {
   };
 }
 
+/** Envelope → the wrapper the caller is spared, named by shape, not by API version. */
+const ENVELOPE_SHAPES: Readonly<Record<string, string>> = {
+  v1: '{success, data, meta}',
+  jsonapi: '{data, meta}',
+};
+
+function responseForModel(
+  response: NonNullable<CatalogOperation['response']>
+): Record<string, unknown> {
+  const { envelope, ...rest } = response;
+  const shape = envelope ? ENVELOPE_SHAPES[envelope] : undefined;
+  return { ...rest, ...(shape ? { unwrapped_from: shape } : {}) };
+}
+
 export function describeOperation(operationId: string): DescribeOutput {
   const op = getOperation(operationId);
   if (!op) return notFound(operationId);
@@ -146,7 +179,9 @@ export function describeOperation(operationId: string): DescribeOutput {
     method: op.method,
     path: op.displayPath,
     ...(op.path !== op.displayPath ? { spec_path: op.path } : {}),
-    source: op.source,
+    // Only a preview names its spec: a live operation is one capability,
+    // whichever API version serves it.
+    ...(isPreview(op) ? { source: op.source } : {}),
     ...(op.status ? { status: op.status } : {}),
     domain: op.domain,
     ...(op.summary ? { summary: op.summary } : {}),
@@ -161,8 +196,8 @@ export function describeOperation(operationId: string): DescribeOutput {
     },
     parameters,
     ...(op.requestBody ? { request_body: op.requestBody } : {}),
-    ...(op.response ? { response: op.response } : {}),
-    callable_by_executor: op.method === 'GET' && op.source === 'v1',
+    ...(op.response ? { response: responseForModel(op.response) } : {}),
+    callable_by_executor: op.method === 'GET' && isLiveSource(op.source),
     ...(curatedTool ? { curated_tool: curatedTool } : {}),
     ...(op.curation?.tier ? { tier: op.curation.tier } : {}),
     ...(op.curation?.projection ? { projection: op.curation.projection } : {}),
@@ -195,7 +230,8 @@ function renderText(
   lines.push(`${op.operationId} — ${op.method} ${op.displayPath}`);
   if (op.summary) lines.push(op.summary);
   lines.push(
-    `Domain: ${op.domain} · Source: ${op.source}${op.status ? ` (${op.status})` : ''}` +
+    `Domain: ${op.domain}` +
+      `${isPreview(op) ? ` · Source: ${op.source} (${op.status ?? 'preview'})` : ''}` +
       `${op.deprecated ? ' · DEPRECATED' : ''}`
   );
   lines.push(
@@ -211,7 +247,7 @@ function renderText(
           ? `Use the curated tool \`${op.curation.tool_name}\`.`
           : 'Writes are available through curated tools only.')
     );
-  } else if (op.source !== 'v1') {
+  } else if (!isLiveSource(op.source)) {
     lines.push(
       `Not callable yet: ${op.source} is a preview contract (${op.status ?? 'preview'}).`
     );
@@ -248,7 +284,7 @@ function renderText(
     lines.push(
       '',
       `Response ${op.response.statusCode ?? '200'}` +
-        `${op.response.envelope === 'v1' ? ' (the `{success, data, meta}` envelope is unwrapped for you)' : ''}` +
+        `${op.response.envelope && ENVELOPE_SHAPES[op.response.envelope] ? ` (the \`${ENVELOPE_SHAPES[op.response.envelope]}\` wrapper is unwrapped for you)` : ''}` +
         ': see `response.schema` in the structured result.'
     );
   }
