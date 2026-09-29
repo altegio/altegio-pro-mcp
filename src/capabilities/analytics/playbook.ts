@@ -321,7 +321,7 @@ export const SLICING_NOTES: readonly SlicingNote[] = [
   },
   {
     dimension: 'Comparison',
-    how: 'Every period result carries the previous period of equal length immediately before it — a 7-day period compares with the 7 days before, never the same week last year. For a year-on-year or seasonal comparison, call analytics_get_overview twice with explicit date_from/date_to (this year and last year) and compare them yourself.',
+    how: 'Results that carry previous_period — analytics_get_overview (previous values and change_percent), the daily series, the appointments breakdown, occupancy, receptionist performance, loyalty-program results and the day-end report — already compare with the period of equal length immediately before: a 7-day period compares with the 7 days before, never the same week last year. Rankings and tables without previous_period (client, product and team-member sales, service profitability, capacity) cover their own period only; compare them with a second call for the base period. For a year-on-year or seasonal comparison, call the tool twice with explicit date_from/date_to (this year and last year) and compare the results yourself.',
   },
   {
     dimension: 'Team member',
@@ -333,7 +333,7 @@ export const SLICING_NOTES: readonly SlicingNote[] = [
   },
   {
     dimension: 'Group-by',
-    how: 'Curated grouped tables exist for client sales, client retention, service profitability, team-member sales and the team-member × service matrix. The ad-hoc report builder is switched off, so custom dimensions outside those tools must be declined rather than approximated.',
+    how: 'Curated grouped tables exist for client sales, client retention, service profitability, team-member sales and the team-member × service matrix. A dimension those tables do not group by can still be computed from tool results that carry it — revenue by weekday from the daily series, appointments by hour of day or online share from the appointment list, revenue per scheduled hour from team-member sales and capacity — stated as a calculation with its formula. The ad-hoc report builder is switched off, so only a dimension no tool result carries is named as a gap rather than approximated.',
   },
   {
     dimension: 'Scope',
@@ -410,7 +410,7 @@ export const ANALYSIS_NOTES: readonly AnalysisNote[] = [
     text: 'A switched-off module (forecast), a missing access right (day-end report, Analytics), or an absent work schedule (occupancy) returns nothing or a clamped value, not a true zero. Say so plainly instead of reporting the empty result as a bad number.',
   },
   {
-    title: 'Only curated report tables',
-    text: 'The ad-hoc report builder is switched off. Use the dedicated curated tools, including profit-and-loss, cash-flow, capacity, leakage, team-member × service, product-sales and inventory-risk views; name the gap for arbitrary dimensions or a complete statutory statement instead of improvising one.',
+    title: 'Curated metrics, derived calculations',
+    text: 'Take each metric from the curated tool that returns it, including profit-and-loss, cash-flow, capacity, leakage, team-member × service, product-sales and inventory-risk views: it applies Altegio’s own inclusion rules. Derive everything else in code from those results — ratios, growth, mixes, concentration, weekday patterns — and state the formula; combine averages and percentages through their numerators and denominators. The ad-hoc report builder is switched off, so name the gap for a dimension no tool result carries or a complete statutory statement instead of improvising one.',
   },
 ] as const;

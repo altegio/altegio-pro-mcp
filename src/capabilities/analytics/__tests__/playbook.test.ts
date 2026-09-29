@@ -68,6 +68,48 @@ describe('analytics playbook', () => {
     }
   });
 
+  it('names as comparable only the tools whose output carries previous_period', () => {
+    // The Comparison note lists these tools by their human names; when one gains
+    // or loses previous_period, that sentence must change with it.
+    const carriers = (Object.values(definitions) as unknown[])
+      .filter(
+        (value): value is DefinedTool =>
+          !!value &&
+          typeof value === 'object' &&
+          'toMcpTool' in value &&
+          'meta' in value
+      )
+      .filter(
+        (tool) =>
+          tool.meta.name.startsWith('analytics_') &&
+          !isToolDisabled(tool.meta.name)
+      )
+      .filter((tool) =>
+        JSON.stringify(tool.toMcpTool().outputSchema ?? {}).includes(
+          '"previous_period"'
+        )
+      )
+      .map((tool) => tool.meta.name)
+      .sort();
+    expect(carriers).toEqual([
+      'analytics_get_appointments_breakdown',
+      'analytics_get_daily_series',
+      'analytics_get_day_end_report',
+      'analytics_get_loyalty_program_results',
+      'analytics_get_overview',
+      'analytics_get_receptionist_performance',
+      'analytics_get_team_member_occupancy',
+    ]);
+    expect(renderPlaybook()).not.toMatch(/every period result carries/i);
+  });
+
+  it('lets the model compute what the curated tables do not group by', () => {
+    const text = renderPlaybook();
+    expect(text).not.toMatch(/must be declined rather than approximated/);
+    expect(text).toContain('stated as a calculation with its formula');
+    expect(text).toContain('Derive everything else in code from those results');
+  });
+
   it('carries content for every section', () => {
     expect(METRIC_RELATIONSHIPS.length).toBeGreaterThanOrEqual(5);
     expect(DIAGNOSTIC_PLAYS.length).toBeGreaterThanOrEqual(5);
