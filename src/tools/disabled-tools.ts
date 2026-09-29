@@ -51,10 +51,14 @@ export function isToolDisabled(name: string): boolean {
  * `api_call_operation`, so a session cannot walk back into the builder
  * through the universal executor. The routes stay documented in
  * `catalog/extended/analytics.yaml` — this hides them, it does not forget them.
+ *
+ * The spec now documents V1 routes on canonical `/locations/{id}/…` URLs and
+ * the backend aliases `/locations/{id}/ac/…` to the legacy `/company/{id}/ac/…`
+ * handler, so both spellings are closed.
  */
 export function isDisabledOperationPath(path: string): boolean {
   return (
     path.includes('/analytics_constructor') ||
-    /\/company\/[^/]+\/ac(\/|$)/.test(path)
+    /\/(?:company|locations)\/[^/]+\/ac(\/|$)/.test(path)
   );
 }

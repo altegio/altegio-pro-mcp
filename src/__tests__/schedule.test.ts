@@ -76,7 +76,7 @@ describe('AltegioClient Schedule Operations', () => {
       });
 
       const url = new URL((global.fetch as jest.Mock).mock.calls[0][0]);
-      expect(url.pathname).toBe('/api/v1/company/123/staff/schedule');
+      expect(url.pathname).toBe('/api/v1/locations/123/team_members/schedule');
       expect(url.searchParams.get('start_date')).toBe('2026-09-01');
       expect(url.searchParams.get('end_date')).toBe('2026-09-07');
       expect(url.searchParams.getAll('staff_ids[]')).toEqual(['7', '9']);
@@ -115,7 +115,7 @@ describe('AltegioClient Schedule Operations', () => {
     // validated strictly (no missing/extra keys). The MCP keeps the canonical
     // `team_member_id` and maps it to `staff_id` on the wire. These tests pin
     // that mapping.
-    it('should PUT /company/{id}/staff/schedule mapping team_member_id → staff_id (set)', async () => {
+    it('should PUT /locations/{id}/team_members/schedule mapping team_member_id → staff_id (set)', async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
         status: 200,
@@ -158,7 +158,7 @@ describe('AltegioClient Schedule Operations', () => {
       });
 
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/company/123/staff/schedule',
+        'https://api.alteg.io/api/v1/locations/123/team_members/schedule',
         expect.objectContaining({
           method: 'PUT',
           headers: expect.objectContaining({
@@ -215,7 +215,7 @@ describe('AltegioClient Schedule Operations', () => {
       });
 
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/company/123/staff/schedule',
+        'https://api.alteg.io/api/v1/locations/123/team_members/schedule',
         expect.objectContaining({
           method: 'PUT',
           body: JSON.stringify({

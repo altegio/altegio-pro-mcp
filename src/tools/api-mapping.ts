@@ -5,7 +5,11 @@
  * match the OpenAPI specification in ../biz.erp.api.docs.
  *
  * Each entry maps a tool name to:
- * - path: OpenAPI path (as defined in openapi.yaml)
+ * - path: the URL the tool calls, exactly as its contract spells it — the
+ *   spec's canonical `/locations/{id}/…` URL for a documented operation, the
+ *   stub's own URL for an extended one. V1 also accepts the legacy spellings
+ *   (`/company/{id}`, `/staff/{id}`, `/record/{id}/{rid}`, …), but the spec no
+ *   longer documents them, so a tool never calls one for a documented operation.
  * - method: HTTP method
  * - operationId: OpenAPI operationId for cross-reference
  * - pathParams: parameters extracted from URL path by the handler
@@ -51,26 +55,26 @@ export const executorTools: string[] = [
 
 export const apiMapping: Record<string, ApiMapping> = {
   clients_list_comments: {
-    path: '/company/{location_id}/clients/{client_id}/comments',
+    path: '/locations/{location_id}/clients/{client_id}/comments',
     method: 'get',
     operationId: 'list_client_comments',
     pathParams: ['location_id', 'client_id'],
   },
   clients_add_comment: {
-    path: '/company/{location_id}/clients/{client_id}/comments',
+    path: '/locations/{location_id}/clients/{client_id}/comments',
     method: 'post',
     operationId: 'create_client_comment',
     pathParams: ['location_id', 'client_id'],
     bodyParams: ['text'],
   },
   clients_list_files: {
-    path: '/company/{location_id}/clients/files/{client_id}',
+    path: '/locations/{location_id}/clients/files/{client_id}',
     method: 'get',
     operationId: 'get_client_file_list',
     pathParams: ['location_id', 'client_id'],
   },
   clients_upload_file: {
-    path: '/company/{location_id}/clients/files/{client_id}',
+    path: '/locations/{location_id}/clients/files/{client_id}',
     method: 'post',
     operationId: 'upload_client_file',
     pathParams: ['location_id', 'client_id'],
@@ -103,14 +107,14 @@ export const apiMapping: Record<string, ApiMapping> = {
   // Locations
   // ==========================================
   locations_list: {
-    path: '/companies',
+    path: '/locations',
     method: 'get',
     operationId: 'get_location_list',
     pathParams: [],
     queryParams: ['my', 'page', 'count'],
   },
   locations_update: {
-    path: '/company/{location_id}',
+    path: '/locations/{location_id}',
     method: 'put',
     operationId: 'update_location',
     pathParams: ['location_id'],
@@ -136,28 +140,28 @@ export const apiMapping: Record<string, ApiMapping> = {
   // Appointments
   // ==========================================
   appointments_list: {
-    path: '/records/{location_id}',
+    path: '/locations/{location_id}/appointments',
     method: 'get',
     operationId: 'get_appointment_list',
     pathParams: ['location_id'],
     queryParams: ['page', 'count', 'start_date', 'end_date'],
   },
   appointments_create: {
-    path: '/records/{location_id}',
+    path: '/locations/{location_id}/appointments',
     method: 'post',
     operationId: 'create_appointment',
     pathParams: ['location_id'],
     bodyParams: ['staff_id', 'services', 'datetime', 'client'],
   },
   appointments_update: {
-    path: '/record/{location_id}/{record_id}',
+    path: '/locations/{location_id}/appointments/{record_id}',
     method: 'put',
     operationId: 'update_appointment',
     pathParams: ['location_id', 'record_id'],
     bodyParams: ['staff_id', 'services', 'datetime', 'client'],
   },
   appointments_delete: {
-    path: '/record/{location_id}/{record_id}',
+    path: '/locations/{location_id}/appointments/{record_id}',
     method: 'delete',
     operationId: 'delete_appointment',
     pathParams: ['location_id', 'record_id'],
@@ -167,14 +171,14 @@ export const apiMapping: Record<string, ApiMapping> = {
   // Staff (Team Members)
   // ==========================================
   team_members_list: {
-    path: '/staff/{location_id}',
+    path: '/locations/{location_id}/team_members',
     method: 'get',
     operationId: 'get_team_member_list',
     pathParams: ['location_id'],
     queryParams: ['page', 'count'],
   },
   team_members_create: {
-    path: '/company/{location_id}/staff/quick',
+    path: '/locations/{location_id}/team_members/quick',
     method: 'post',
     operationId: 'create_team_member_quick',
     pathParams: ['location_id'],
@@ -190,7 +194,7 @@ export const apiMapping: Record<string, ApiMapping> = {
     ],
   },
   team_members_update: {
-    path: '/staff/{location_id}/{team_member_id}',
+    path: '/locations/{location_id}/team_members/{team_member_id}',
     method: 'put',
     operationId: 'update_team_member',
     pathParams: ['location_id', 'team_member_id'],
@@ -206,7 +210,7 @@ export const apiMapping: Record<string, ApiMapping> = {
     ],
   },
   team_members_delete: {
-    path: '/staff/{location_id}/{team_member_id}',
+    path: '/locations/{location_id}/team_members/{team_member_id}',
     method: 'delete',
     operationId: 'delete_team_member',
     pathParams: ['location_id', 'team_member_id'],
@@ -266,7 +270,7 @@ export const apiMapping: Record<string, ApiMapping> = {
   // Service ↔ Team Member links
   // ==========================================
   services_link_team_member: {
-    path: '/company/{location_id}/services/{service_id}/staff',
+    path: '/locations/{location_id}/services/{service_id}/team_members',
     method: 'post',
     operationId: 'assign_service_to_team_member',
     pathParams: ['location_id', 'service_id'],
@@ -274,21 +278,21 @@ export const apiMapping: Record<string, ApiMapping> = {
   },
   // Bulk variant loops the single-assign operation, so it maps to the same op.
   team_members_link_services: {
-    path: '/company/{location_id}/services/{service_id}/staff',
+    path: '/locations/{location_id}/services/{service_id}/team_members',
     method: 'post',
     operationId: 'assign_service_to_team_member',
     pathParams: ['location_id', 'service_id'],
     bodyParams: ['master_id', 'seance_length', 'technological_card_id'],
   },
   services_update_team_member_link: {
-    path: '/company/{location_id}/services/{service_id}/staff/{team_member_id}',
+    path: '/locations/{location_id}/services/{service_id}/team_members/{team_member_id}',
     method: 'put',
     operationId: 'update_service_team_member_assignment',
     pathParams: ['location_id', 'service_id', 'team_member_id'],
     bodyParams: ['seance_length', 'technological_card_id'],
   },
   services_unlink_team_member: {
-    path: '/company/{location_id}/services/{service_id}/staff/{team_member_id}',
+    path: '/locations/{location_id}/services/{service_id}/team_members/{team_member_id}',
     method: 'delete',
     operationId: 'remove_service_from_team_member',
     pathParams: ['location_id', 'service_id', 'team_member_id'],
@@ -315,13 +319,13 @@ export const apiMapping: Record<string, ApiMapping> = {
   // Positions (deprecated V1, pending V2 migration)
   // ==========================================
   positions_list: {
-    path: '/company/{location_id}/staff/positions',
+    path: '/locations/{location_id}/team_members/positions',
     method: 'get',
     operationId: 'get_position_list',
     pathParams: ['location_id'],
   },
   positions_create: {
-    path: '/company/{location_id}/positions/quick',
+    path: '/locations/{location_id}/positions/quick',
     method: 'post',
     operationId: 'create_position_quick',
     pathParams: ['location_id'],
@@ -337,26 +341,26 @@ export const apiMapping: Record<string, ApiMapping> = {
     pathParams: ['location_id', 'team_member_id', 'start_date', 'end_date'],
   },
   // create/update/schedules_delete all funnel through client.setSchedule, which
-  // PUTs the modern /company/{id}/staff/schedule endpoint. NOTE: the backend
+  // PUTs the modern /locations/{id}/team_members/schedule endpoint. NOTE: the backend
   // expects the per-entry key `staff_id`, not the `team_member_id` the spec
   // documents — the client maps it (see AltegioClient.setSchedule). The body
   // params below name the top-level keys the spec does document.
   schedules_create: {
-    path: '/company/{location_id}/staff/schedule',
+    path: '/locations/{location_id}/team_members/schedule',
     method: 'put',
     operationId: 'set_team_member_schedule',
     pathParams: ['location_id'],
     bodyParams: ['schedules_to_set'],
   },
   schedules_update: {
-    path: '/company/{location_id}/staff/schedule',
+    path: '/locations/{location_id}/team_members/schedule',
     method: 'put',
     operationId: 'set_team_member_schedule',
     pathParams: ['location_id'],
     bodyParams: ['schedules_to_set'],
   },
   schedules_delete: {
-    path: '/company/{location_id}/staff/schedule',
+    path: '/locations/{location_id}/team_members/schedule',
     method: 'put',
     operationId: 'set_team_member_schedule',
     pathParams: ['location_id'],
@@ -367,26 +371,26 @@ export const apiMapping: Record<string, ApiMapping> = {
   // Location settings
   // ==========================================
   settings_get_appointment_calendar: {
-    path: '/company/{location_id}/settings/timetable',
+    path: '/locations/{location_id}/settings/timetable',
     method: 'get',
     operationId: 'get_appointment_calendar_settings',
     pathParams: ['location_id'],
   },
   settings_update_appointment_calendar: {
-    path: '/company/{location_id}/settings/timetable',
+    path: '/locations/{location_id}/settings/timetable',
     method: 'patch',
     operationId: 'update_appointment_calendar_settings',
     pathParams: ['location_id'],
     bodyParams: ['record_type', 'activity_record_clients_count_max'],
   },
   settings_get_online_booking: {
-    path: '/company/{location_id}/settings/online',
+    path: '/locations/{location_id}/settings/online',
     method: 'get',
     operationId: 'get_online_booking_settings',
     pathParams: ['location_id'],
   },
   settings_update_online_booking: {
-    path: '/company/{location_id}/settings/online',
+    path: '/locations/{location_id}/settings/online',
     method: 'patch',
     operationId: 'update_online_booking_settings',
     pathParams: ['location_id'],
@@ -398,20 +402,20 @@ export const apiMapping: Record<string, ApiMapping> = {
     ],
   },
   booking_forms_list: {
-    path: '/company/{location_id}/booking_forms',
+    path: '/locations/{location_id}/booking_forms',
     method: 'get',
     operationId: 'get_booking_widget_list',
     pathParams: ['location_id'],
   },
   booking_forms_create: {
-    path: '/company/{location_id}/booking_forms',
+    path: '/locations/{location_id}/booking_forms',
     method: 'post',
     operationId: 'create_booking_widget',
     pathParams: ['location_id'],
     bodyParams: ['title'],
   },
   booking_forms_delete: {
-    path: '/company/{location_id}/booking_forms/{form_id}',
+    path: '/locations/{location_id}/booking_forms/{form_id}',
     method: 'delete',
     operationId: 'delete_booking_widget',
     pathParams: ['location_id', 'form_id'],
@@ -431,14 +435,14 @@ export const apiMapping: Record<string, ApiMapping> = {
   // Clients (client base)
   // ==========================================
   clients_search: {
-    path: '/company/{location_id}/clients/search',
+    path: '/locations/{location_id}/clients/search',
     method: 'post',
     operationId: 'get_client_list',
     pathParams: ['location_id'],
     bodyParams: ['filters', 'operation', 'page', 'page_size'],
   },
   clients_get_segment_report: {
-    path: '/company/{location_id}/clients/search',
+    path: '/locations/{location_id}/clients/search',
     method: 'post',
     operationId: 'get_client_list',
     pathParams: ['location_id'],
@@ -470,7 +474,7 @@ export const apiMapping: Record<string, ApiMapping> = {
     pathParams: ['location_id', 'id'],
   },
   clients_get_visit_history: {
-    path: '/company/{location_id}/clients/visits/search',
+    path: '/locations/{location_id}/clients/visits/search',
     method: 'post',
     operationId: 'search_client_visits',
     pathParams: ['location_id'],
@@ -502,7 +506,7 @@ export const apiMapping: Record<string, ApiMapping> = {
   // Location users
   // ==========================================
   locations_remove_user: {
-    path: '/company/{location_id}/users/{user_id}',
+    path: '/locations/{location_id}/users/{user_id}',
     method: 'delete',
     operationId: 'remove_user_from_location',
     pathParams: ['location_id', 'user_id'],
@@ -512,7 +516,7 @@ export const apiMapping: Record<string, ApiMapping> = {
   // Analytics — tools that call exactly one operation
   // ==========================================
   analytics_get_overview: {
-    path: '/company/{location_id}/analytics/overall',
+    path: '/locations/{location_id}/analytics/overall',
     method: 'get',
     operationId: 'get_location_analytics_overall',
     pathParams: ['location_id'],
@@ -619,7 +623,7 @@ export const apiMapping: Record<string, ApiMapping> = {
     source: 'extended',
   },
   analytics_get_client_reactivation_candidates: {
-    path: '/company/{location_id}/clients/search',
+    path: '/locations/{location_id}/clients/search',
     method: 'post',
     operationId: 'get_client_list',
     pathParams: ['location_id'],
@@ -724,14 +728,14 @@ export const apiMapping: Record<string, ApiMapping> = {
 export const multiApiMapping: Record<string, ApiMapping[]> = {
   analytics_get_service_mix_trend: [
     {
-      path: '/records/{location_id}',
+      path: '/locations/{location_id}/appointments',
       method: 'get',
       operationId: 'get_appointment_list',
       pathParams: ['location_id'],
       queryParams: ['start_date', 'end_date', 'staff_id', 'page', 'count'],
     },
     {
-      path: '/company/{location_id}',
+      path: '/locations/{location_id}',
       method: 'get',
       operationId: 'get_location',
       pathParams: ['location_id'],
@@ -757,14 +761,14 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
   ],
   analytics_get_client_service_penetration: [
     {
-      path: '/records/{location_id}',
+      path: '/locations/{location_id}/appointments',
       method: 'get',
       operationId: 'get_appointment_list',
       pathParams: ['location_id'],
       queryParams: ['start_date', 'end_date', 'page', 'count'],
     },
     {
-      path: '/company/{location_id}',
+      path: '/locations/{location_id}',
       method: 'get',
       operationId: 'get_location',
       pathParams: ['location_id'],
@@ -793,7 +797,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
   // checked against, so it is not listed here.
   locations_diagnose_access: [
     {
-      path: '/company/{location_id}',
+      path: '/locations/{location_id}',
       method: 'get',
       operationId: 'get_location',
       pathParams: ['location_id'],
@@ -820,7 +824,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       queryParams: ['company_id', 'phone'],
     },
     {
-      path: '/company/{location_id}/client/{client_id}/loyalty/abonements/{membership_id}/history',
+      path: '/locations/{location_id}/client/{client_id}/loyalty/abonements/{membership_id}/history',
       method: 'get',
       operationId: 'get_client_membership_activity_history',
       pathParams: ['location_id', 'client_id', 'membership_id'],
@@ -832,7 +836,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       pathParams: ['location_id', 'transaction_id'],
     },
     {
-      path: '/company/{location_id}/sale/{document_id}',
+      path: '/locations/{location_id}/sale/{document_id}',
       method: 'get',
       operationId: 'get_sale_transaction',
       pathParams: ['location_id', 'document_id'],
@@ -840,7 +844,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
   ],
   appointments_preview_attendance: [
     {
-      path: '/record/{location_id}/{record_id}',
+      path: '/locations/{location_id}/appointments/{record_id}',
       method: 'get',
       operationId: 'get_appointment',
       pathParams: ['location_id', 'record_id'],
@@ -854,13 +858,13 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
   ],
   appointments_apply_attendance: [
     {
-      path: '/record/{location_id}/{record_id}',
+      path: '/locations/{location_id}/appointments/{record_id}',
       method: 'get',
       operationId: 'get_appointment',
       pathParams: ['location_id', 'record_id'],
     },
     {
-      path: '/company/{location_id}/records/{record_id}/attendance',
+      path: '/locations/{location_id}/appointments/{record_id}/attendance',
       method: 'post',
       operationId: 'update_appointment_attendance',
       pathParams: ['location_id', 'record_id'],
@@ -978,14 +982,14 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
   ],
   analytics_get_capacity_heatmap: [
     {
-      path: '/company/{location_id}/staff/schedule',
+      path: '/locations/{location_id}/team_members/schedule',
       method: 'get',
       operationId: 'get_team_member_schedule_list',
       pathParams: ['location_id'],
       queryParams: ['start_date', 'end_date', 'staff_ids', 'include'],
     },
     {
-      path: '/records/{location_id}',
+      path: '/locations/{location_id}/appointments',
       method: 'get',
       operationId: 'get_appointment_list',
       pathParams: ['location_id'],
@@ -1001,7 +1005,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
   ],
   analytics_get_revenue_leakage: [
     {
-      path: '/records/{location_id}',
+      path: '/locations/{location_id}/appointments',
       method: 'get',
       operationId: 'get_appointment_list',
       pathParams: ['location_id'],
@@ -1015,7 +1019,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       ],
     },
     {
-      path: '/company/{location_id}/staff/schedule',
+      path: '/locations/{location_id}/team_members/schedule',
       method: 'get',
       operationId: 'get_team_member_schedule_list',
       pathParams: ['location_id'],
@@ -1065,7 +1069,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
   ],
   analytics_get_daily_series: [
     {
-      path: '/company/{location_id}/analytics/overall/charts/income_daily',
+      path: '/locations/{location_id}/analytics/overall/charts/income_daily',
       method: 'get',
       operationId: 'get_location_analytics_revenue_daily',
       pathParams: ['location_id'],
@@ -1078,7 +1082,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       ],
     },
     {
-      path: '/company/{location_id}/analytics/overall/charts/records_daily',
+      path: '/locations/{location_id}/analytics/overall/charts/records_daily',
       method: 'get',
       operationId: 'get_location_analytics_appointments_daily',
       pathParams: ['location_id'],
@@ -1091,7 +1095,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       ],
     },
     {
-      path: '/company/{location_id}/analytics/overall/charts/fullness_daily',
+      path: '/locations/{location_id}/analytics/overall/charts/fullness_daily',
       method: 'get',
       operationId: 'get_location_analytics_occupancy_daily',
       pathParams: ['location_id'],
@@ -1118,7 +1122,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       source: 'extended',
     },
     {
-      path: '/company/{location_id}/analytics/overall',
+      path: '/locations/{location_id}/analytics/overall',
       method: 'get',
       operationId: 'get_location_analytics_overall',
       pathParams: ['location_id'],
@@ -1127,7 +1131,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
   ],
   analytics_get_appointments_breakdown: [
     {
-      path: '/company/{location_id}/analytics/overall/charts/record_source',
+      path: '/locations/{location_id}/analytics/overall/charts/record_source',
       method: 'get',
       operationId: 'get_appointment_analytics_by_source',
       pathParams: ['location_id'],
@@ -1140,7 +1144,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       ],
     },
     {
-      path: '/company/{location_id}/analytics/overall/charts/record_status',
+      path: '/locations/{location_id}/analytics/overall/charts/record_status',
       method: 'get',
       operationId: 'get_appointment_analytics_by_status',
       pathParams: ['location_id'],
@@ -1155,21 +1159,21 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
   ],
   analytics_get_loyalty_program_results: [
     {
-      path: '/company/{location_id}/analytics/loyalty_programs/visits',
+      path: '/locations/{location_id}/analytics/loyalty_programs/visits',
       method: 'get',
       operationId: 'get_loyalty_program_client_statistics',
       pathParams: ['location_id'],
       queryParams: ['loyalty_program_id', 'date_from', 'date_to'],
     },
     {
-      path: '/company/{location_id}/analytics/loyalty_programs/income',
+      path: '/locations/{location_id}/analytics/loyalty_programs/income',
       method: 'get',
       operationId: 'get_loyalty_program_revenue_statistics',
       pathParams: ['location_id'],
       queryParams: ['loyalty_program_id', 'date_from', 'date_to'],
     },
     {
-      path: '/company/{location_id}/analytics/loyalty_programs/staff',
+      path: '/locations/{location_id}/analytics/loyalty_programs/team_members',
       method: 'get',
       operationId: 'get_loyalty_program_team_member_statistics',
       pathParams: ['location_id'],

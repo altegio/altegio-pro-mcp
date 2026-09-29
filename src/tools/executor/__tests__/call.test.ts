@@ -58,11 +58,13 @@ describe('api_call_operation', () => {
         location_id: 4564,
       });
 
-      expect(fetchedUrl()).toBe('https://api.alteg.io/api/v1/staff/4564');
+      expect(fetchedUrl()).toBe(
+        'https://api.alteg.io/api/v1/locations/4564/team_members'
+      );
       expect(result.structuredContent).toMatchObject({
         operation_id: 'get_team_member_list',
         method: 'GET',
-        path: '/staff/4564',
+        path: '/locations/4564/team_members',
         meta: { total_count: 1 },
       });
 
@@ -78,7 +80,7 @@ describe('api_call_operation', () => {
         },
       ]);
       expect(result.structuredContent.projection_applied).toBeDefined();
-      expect(result.text).toContain('GET /staff/4564');
+      expect(result.text).toContain('GET /locations/4564/team_members');
       expect(result.text).toContain('1 item');
     });
 
@@ -93,7 +95,7 @@ describe('api_call_operation', () => {
       });
 
       const url = fetchedUrl();
-      expect(url).toContain('/records/4564?');
+      expect(url).toContain('/locations/4564/appointments?');
       expect(url).toContain('start_date=2026-09-01');
       expect(url).toContain('end_date=2026-09-07');
       expect(url).toContain('count=30');
@@ -179,14 +181,14 @@ describe('api_call_operation', () => {
         location_id: 4564,
         appointment_id: 987,
       });
-      expect(built.path).toBe('/record/4564/987');
+      expect(built.path).toBe('/locations/4564/appointments/987');
       expect(built.warnings).toEqual([]);
     });
 
     it('still accepts the legacy spelling on that same path', () => {
       const op = getOperation('get_appointment');
       const built = buildRequest(op!, { location_id: 4564, record_id: 987 });
-      expect(built.path).toBe('/record/4564/987');
+      expect(built.path).toBe('/locations/4564/appointments/987');
     });
 
     it('forwards a canonical query name unchanged — V1 accepts the alias', () => {
@@ -200,18 +202,19 @@ describe('api_call_operation', () => {
       expect(built.warnings).toEqual([]);
     });
 
-    it('forwards `location_id` where the spec still says `company_id`', () => {
+    it('forwards a legacy query spelling where the spec says `location_id`', () => {
       const op = getOperation('get_client_memberships');
-      expect(op?.parameters.some((p) => p.name === 'company_id')).toBe(true);
+      expect(op?.parameters.some((p) => p.name === 'location_id')).toBe(true);
 
       const built = buildRequest(op!, {
-        location_id: 4564,
+        company_id: 4564,
         phone: '79000000000',
       });
       expect(built.query).toEqual({
-        location_id: 4564,
+        company_id: 4564,
         phone: '79000000000',
       });
+      expect(built.warnings).toEqual([]);
     });
   });
 
@@ -246,7 +249,9 @@ describe('api_call_operation', () => {
       await callOperation(client, 'get_team_member_list', {
         location_id: '4564',
       });
-      expect(fetchedUrl()).toBe('https://api.alteg.io/api/v1/staff/4564');
+      expect(fetchedUrl()).toBe(
+        'https://api.alteg.io/api/v1/locations/4564/team_members'
+      );
     });
 
     it('points at describe_operation when arguments do not fit', async () => {
@@ -258,7 +263,7 @@ describe('api_call_operation', () => {
     it('forwards an undocumented parameter and says so', async () => {
       mockOk({ success: true, data: [] });
 
-      // The V1 spec does not document page/count on /staff/{location_id},
+      // The V1 spec does not document page/count on /locations/{location_id}/team_members,
       // although the API honours them — refusing would block paging.
       const result = await callOperation(client, 'get_team_member_list', {
         location_id: 4564,

@@ -135,7 +135,7 @@ describe('hosted client-file upload over Streamable HTTP', () => {
     expect(result.result.isError).not.toBe(true);
     expect(result.result.structuredContent.pagination.total).toBe(1);
     expect(upstream).toHaveLength(1);
-    expect(upstream[0]!.url).toContain('/company/7/clients/files/8');
+    expect(upstream[0]!.url).toContain('/locations/7/clients/files/8');
     const part = (upstream[0]!.init.body as FormData).get('file') as File;
     expect(part.name).toBe('signed.pdf');
     const actual = Buffer.from(await part.arrayBuffer());

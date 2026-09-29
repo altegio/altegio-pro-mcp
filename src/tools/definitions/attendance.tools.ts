@@ -117,7 +117,12 @@ async function readSnapshot(
   const snapshot: AppointmentSnapshot[] = [];
   for (const id of appointmentIds) {
     const record = asRecord(
-      (await client.request<unknown>('GET', `/record/${locationId}/${id}`)).data
+      (
+        await client.request<unknown>(
+          'GET',
+          `/locations/${locationId}/appointments/${id}`
+        )
+      ).data
     );
     if (
       asInteger(record.id) !== id ||
@@ -321,7 +326,7 @@ export const appointmentsApplyAttendanceTool = defineTool({
       }
       try {
         await client.postJson(
-          `/company/${input.location_id}/records/${pending.id}/attendance`,
+          `/locations/${input.location_id}/appointments/${pending.id}/attendance`,
           { attendance: targetCode }
         );
       } catch (error) {

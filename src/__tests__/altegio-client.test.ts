@@ -441,7 +441,7 @@ describe('AltegioClient', () => {
       const companies = await client.getCompanies();
 
       expect(fetch).toHaveBeenLastCalledWith(
-        'https://api.alteg.io/api/v1/companies',
+        'https://api.alteg.io/api/v1/locations',
         {
           headers: {
             Accept: 'application/vnd.api.v2+json',
@@ -490,7 +490,7 @@ describe('AltegioClient', () => {
       const companies = await client.getCompanies({ my: 1 });
 
       expect(fetch).toHaveBeenLastCalledWith(
-        'https://api.alteg.io/api/v1/companies?my=1',
+        'https://api.alteg.io/api/v1/locations?my=1',
         {
           headers: {
             Accept: 'application/vnd.api.v2+json',
@@ -539,7 +539,7 @@ describe('AltegioClient', () => {
       const companies = await client.getCompanies({ page: 1, count: 10 });
 
       expect(fetch).toHaveBeenLastCalledWith(
-        'https://api.alteg.io/api/v1/companies?page=1&count=10',
+        'https://api.alteg.io/api/v1/locations?page=1&count=10',
         {
           headers: {
             Accept: 'application/vnd.api.v2+json',
@@ -634,7 +634,7 @@ describe('AltegioClient', () => {
       const bookings = await client.getBookings(1);
 
       expect(fetch).toHaveBeenLastCalledWith(
-        'https://api.alteg.io/api/v1/records/1',
+        'https://api.alteg.io/api/v1/locations/1/appointments',
         {
           headers: {
             Accept: 'application/vnd.api.v2+json',
@@ -717,7 +717,7 @@ describe('AltegioClient', () => {
         const staff = await authenticatedClient.getStaff(4564);
 
         expect(fetch).toHaveBeenLastCalledWith(
-          'https://api.alteg.io/api/v1/staff/4564',
+          'https://api.alteg.io/api/v1/locations/4564/team_members',
           {
             headers: {
               Accept: 'application/vnd.api.v2+json',
@@ -777,7 +777,7 @@ describe('AltegioClient', () => {
         await authenticatedClient.getStaff(4564);
 
         expect(fetch).toHaveBeenLastCalledWith(
-          'https://api.alteg.io/api/v1/staff/4564',
+          'https://api.alteg.io/api/v1/locations/4564/team_members',
           {
             headers: {
               Accept: 'application/vnd.api.v2+json',
@@ -952,7 +952,7 @@ describe('AltegioClient', () => {
       mockEmptyCompanies();
       await runWithIdentity(idA, () => client.getCompanies());
       expect(fetch).toHaveBeenLastCalledWith(
-        'https://api.alteg.io/api/v1/companies',
+        'https://api.alteg.io/api/v1/locations',
         {
           headers: {
             Accept: 'application/vnd.api.v2+json',
@@ -1011,7 +1011,7 @@ describe('AltegioClient', () => {
       mockEmptyCompanies();
       await stdioClient.getCompanies();
       expect(fetch).toHaveBeenLastCalledWith(
-        'https://api.alteg.io/api/v1/companies',
+        'https://api.alteg.io/api/v1/locations',
         {
           headers: {
             Accept: 'application/vnd.api.v2+json',
@@ -1065,7 +1065,7 @@ describe('AltegioClient', () => {
         client.getCompanies()
       );
       expect(fetch).toHaveBeenLastCalledWith(
-        'https://api.alteg.io/api/v1/companies',
+        'https://api.alteg.io/api/v1/locations',
         {
           headers: {
             Accept: 'application/vnd.api.v2+json',
@@ -1096,7 +1096,7 @@ describe('AltegioClient', () => {
         client.getCompanies()
       );
       expect(fetch).toHaveBeenLastCalledWith(
-        'https://api.alteg.io/api/v1/companies',
+        'https://api.alteg.io/api/v1/locations',
         {
           headers: {
             Accept: 'application/vnd.api.v2+json',
@@ -1144,7 +1144,7 @@ describe('AltegioClient', () => {
           () => client.getCompanies()
         );
         expect(fetch).toHaveBeenLastCalledWith(
-          'https://api.alteg.io/api/v1/companies',
+          'https://api.alteg.io/api/v1/locations',
           {
             headers: {
               Accept: 'application/vnd.api.v2+json',
@@ -1167,7 +1167,7 @@ describe('AltegioClient', () => {
           () => client.getStaff(4564)
         );
         expect(fetch).toHaveBeenLastCalledWith(
-          'https://api.alteg.io/api/v1/staff/4564',
+          'https://api.alteg.io/api/v1/locations/4564/team_members',
           {
             headers: {
               Accept: 'application/vnd.api.v2+json',
@@ -1186,7 +1186,7 @@ describe('AltegioClient', () => {
           () => client.getCompanies()
         );
         expect(fetch).toHaveBeenLastCalledWith(
-          'https://api.alteg.io/api/v1/companies',
+          'https://api.alteg.io/api/v1/locations',
           {
             headers: {
               Accept: 'application/vnd.api.v2+json',
@@ -1216,7 +1216,7 @@ describe('AltegioClient', () => {
           },
           () => client.getCompanies({ my: 1 })
         );
-        // Only exact declared IDs are resolved; `/companies` is not used for
+        // Only exact declared IDs are resolved; `/locations` is not used for
         // scoped my=1 calls because it can return an empty list for UC2.
         expect(companies).toEqual([
           { id: 4564, title: 'Demo Location' },
@@ -1225,7 +1225,7 @@ describe('AltegioClient', () => {
         expect(fetch).toHaveBeenCalledTimes(2);
         expect(
           (fetch as jest.MockedFunction<typeof fetch>).mock.calls.some(
-            ([url]) => String(url).includes('/companies')
+            ([url]) => /\/api\/v1\/locations(\?|$)/.test(String(url))
           )
         ).toBe(false);
       });
@@ -1252,7 +1252,7 @@ describe('AltegioClient', () => {
         );
         expect(staff).toEqual([]);
         expect(fetch).toHaveBeenLastCalledWith(
-          'https://api.alteg.io/api/v1/staff/720441',
+          'https://api.alteg.io/api/v1/locations/720441/team_members',
           expect.anything()
         );
       });
@@ -1273,7 +1273,7 @@ describe('AltegioClient', () => {
       });
 
       it('confines the universal executor path the same way', async () => {
-        // /records/{id} built for an out-of-scope company is rejected before fetch.
+        // /locations/{id}/appointments built for an out-of-scope company is rejected before fetch.
         await expect(
           runWithContext(
             {
@@ -1281,7 +1281,10 @@ describe('AltegioClient', () => {
               userToken: 'shared-token',
               companyIds: new Set([4564]),
             },
-            () => client.request('GET', '/records/720441', { page: 2 })
+            () =>
+              client.request('GET', '/locations/720441/appointments', {
+                page: 2,
+              })
           )
         ).rejects.toThrow(/company 720441 is not in scope/);
         expect(fetch).not.toHaveBeenCalled();
@@ -1295,7 +1298,7 @@ describe('AltegioClient', () => {
         );
         expect(staff).toEqual([]);
         expect(fetch).toHaveBeenLastCalledWith(
-          'https://api.alteg.io/api/v1/staff/999',
+          'https://api.alteg.io/api/v1/locations/999/team_members',
           expect.anything()
         );
       });

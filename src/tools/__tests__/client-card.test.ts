@@ -72,7 +72,7 @@ describe('client comments', () => {
       comment_id: 9,
       created_at: '2026-09-24',
     });
-    expect(postJson).toHaveBeenCalledWith('/company/7/clients/8/comments', {
+    expect(postJson).toHaveBeenCalledWith('/locations/7/clients/8/comments', {
       text: 'Form URL',
     });
     expectOutputContract(clientsAddCommentTool, good);
@@ -93,7 +93,7 @@ describe('client comments', () => {
     expectOutputContract(clientsListCommentsTool, result);
     expect(request).toHaveBeenCalledWith(
       'GET',
-      '/company/7/clients/8/comments'
+      '/locations/7/clients/8/comments'
     );
   });
 });
@@ -125,7 +125,7 @@ describe('client files', () => {
     });
     expect(files[1]!.download_url).toBeNull();
     expectOutputContract(clientsListFilesTool, result);
-    expect(request).toHaveBeenCalledWith('GET', '/company/7/clients/files/8');
+    expect(request).toHaveBeenCalledWith('GET', '/locations/7/clients/files/8');
   });
 
   it('projects the upload response like the file list', async () => {
@@ -165,11 +165,9 @@ describe('clients_get_membership_purchases', () => {
         },
         { id: 11, number: 'B', type: { id: 5 }, goods_transaction_id: 0 },
       ]),
-      '/company/7/client/8/loyalty/abonements/10/history': data([]),
-      '/company/7/client/8/loyalty/abonements/11/history': new AltegioApiError(
-        'not found',
-        404
-      ),
+      '/locations/7/client/8/loyalty/abonements/10/history': data([]),
+      '/locations/7/client/8/loyalty/abonements/11/history':
+        new AltegioApiError('not found', 404),
       '/storage_operations/goods_transactions/7/20': data({
         id: 20,
         type_id: 1,
@@ -179,7 +177,7 @@ describe('clients_get_membership_purchases', () => {
         create_date: '2026-02-02',
         good: { loyalty_abonement_type_id: '5' },
       }),
-      '/company/7/sale/30': data({ state: { items: [] } }),
+      '/locations/7/sale/30': data({ state: { items: [] } }),
       ...overrides,
     };
     const request = jest.fn(async (_method: string, path: string) => {
@@ -249,9 +247,9 @@ describe('clients_get_membership_purchases', () => {
   it('reports refused sources as evidence gaps, not as errors', async () => {
     const result = await run(
       membershipClient({
-        '/company/7/client/8/loyalty/abonements/11/history':
+        '/locations/7/client/8/loyalty/abonements/11/history':
           new AltegioApiError('forbidden', 403),
-        '/company/7/sale/30': new AltegioApiError('forbidden', 403),
+        '/locations/7/sale/30': new AltegioApiError('forbidden', 403),
       })
     );
     expect(result.isError).toBeUndefined();

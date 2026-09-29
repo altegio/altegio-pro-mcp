@@ -19,7 +19,7 @@ describe('AltegioClient - updateLocation', () => {
     jest.restoreAllMocks();
   });
 
-  it('should PUT /company/{id} with the update body', async () => {
+  it('should PUT /locations/{id} with the update body', async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -37,7 +37,7 @@ describe('AltegioClient - updateLocation', () => {
 
     expect(result.title).toBe('Renamed Salon');
     expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/company/4564'),
+      expect.stringContaining('/locations/4564'),
       expect.objectContaining({
         method: 'PUT',
         body: JSON.stringify({ title: 'Renamed Salon', city: 'Berlin' }),
@@ -95,17 +95,17 @@ describe('AltegioClient - company-scoped location listing', () => {
     expect(locations.map((location) => location.id)).toEqual([4564, 720441]);
     expect(global.fetch).toHaveBeenNthCalledWith(
       1,
-      expect.stringContaining('/company/4564?my=1'),
+      expect.stringContaining('/locations/4564?my=1'),
       expect.any(Object)
     );
     expect(global.fetch).toHaveBeenNthCalledWith(
       2,
-      expect.stringContaining('/company/720441?my=1'),
+      expect.stringContaining('/locations/720441?my=1'),
       expect.any(Object)
     );
     expect(
       (global.fetch as jest.Mock).mock.calls.some(([url]) =>
-        String(url).includes('/companies')
+        /\/api\/v1\/locations(\?|$)/.test(String(url))
       )
     ).toBe(false);
   });

@@ -4,10 +4,28 @@ This document records API behavior that materially affects safe location
 management. Curated MCP tools use public B2B V1 only; internal V2 endpoints are
 not used.
 
+## Canonical URLs
+
+The V1 specification documents operations on canonical resource URLs:
+`/locations`, `/locations/{location_id}/…`, `…/team_members`,
+`…/appointments`, `…/events`, `…/products`, `…/product_categories` and
+`/chains`. The backend still accepts the legacy spellings (`/companies`,
+`/company/{id}`, `/staff/{id}`, `/records/{id}`, `/record/{id}/{rid}`,
+`/activity/{id}`, `/goods/{id}`, `/groups`, `/chain/{id}`) and routes both to
+the same handler with the same response.
+
+Every curated tool calls a documented operation on exactly the URL the
+specification documents, so `src/tools/api-mapping.ts` matches the spec
+one-to-one and the universal executor calls the same URL the catalog shows.
+The backend alias table is not copied into this repository. Undocumented
+operations in `catalog/extended/*.yaml` keep the legacy URL they were observed
+on until the specification publishes them. The Marketplace permission probe keeps
+the path from the developers specification.
+
 ## Corrected MCP behavior
 
 - `locations_list` with a declared `X-Altegio-Company-Id` scope resolves those
-  exact location IDs. It does not depend on `GET /companies?my=1`, which may be
+  exact location IDs. It does not depend on `GET /locations?my=1`, which may be
   empty for per-request application credentials. Pagination is one-based.
 - Service creation defaults `active` to `1`. Service output uses the API's
   canonical price fields and exposes activation, duration and team-member links.
@@ -22,8 +40,8 @@ not used.
 - Public V1 destructive tools use the exact documented entity endpoint for
   clients, service categories, booking forms, and location users. User removal
   requires the same user ID in `user_id` and `confirm_user_id`.
-- Positions use `GET /company/{location_id}/staff/positions` and
-  `POST /company/{location_id}/positions/quick`. Public V1 has no position
+- Positions use `GET /locations/{location_id}/team_members/positions` and
+  `POST /locations/{location_id}/positions/quick`. Public V1 has no position
   update/delete contract, so those unsafe tools were removed.
 
 ## Upstream documentation or API follow-ups

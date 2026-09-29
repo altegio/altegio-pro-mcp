@@ -75,7 +75,7 @@ const V3_CATALOG_SCOPES = [
  * them yet. They follow the same `domain:action` convention, and they are the
  * first thing to revisit when the API team publishes the final vocabulary.
  *
- * - `analytics:*` — the analytics pack reads `/company/{id}/analytics/**`,
+ * - `analytics:*` — the analytics pack reads `/locations/{id}/analytics/**`,
  *   which is out of the P0 slice entirely. Some of it is money-shaped (the
  *   day-end report, loyalty results) and may well end up behind `finance:read`
  *   or a split of it; mapping it onto `finance:read` today would be worse than
@@ -178,7 +178,7 @@ type ScopeRequirement = ToolScope | readonly ToolScope[] | null;
  *   appointment defaults, online-booking settings and booking forms are all
  *   location settings (L1/L2).
  * - **Service ↔ team-member links are service writes.** All four go to
- *   `POST|PUT|DELETE /company/{id}/services/{service_id}/staff…`, and the
+ *   `POST|PUT|DELETE /locations/{id}/services/{service_id}/team_members…`, and the
  *   catalog notes staff bindings travel in the body of S3/S4.
  * - **`appointments_create` needs `appointments:create`, not
  *   `appointments:write`.** The catalog makes `create` an action-scope that is

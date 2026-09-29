@@ -102,7 +102,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       },
       routes: [
         {
-          match: /\/staff\/1/,
+          match: /\/locations\/1\/team_members/,
           body: ok(
             envelope([
               {
@@ -124,7 +124,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       args: {},
       routes: [
         {
-          match: /\/companies/,
+          match: /\/locations(\?|$)/,
           body: ok(
             envelope([
               { id: 1, title: CANARY, address: CANARY, phone: '13155550178' },
@@ -153,7 +153,10 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     canary: {
       args: { location_id: 1, title: 'New name' },
       routes: [
-        { match: /\/company\/1/, body: ok(envelope({ id: 1, title: CANARY })) },
+        {
+          match: /\/locations\/1(\?|$)/,
+          body: ok(envelope({ id: 1, title: CANARY })),
+        },
       ],
     },
   },
@@ -164,7 +167,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       args: { location_id: 1 },
       routes: [
         {
-          match: /\/staff\/1/,
+          match: /\/locations\/1\/team_members/,
           body: ok(
             envelope([
               {
@@ -186,7 +189,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       args: { location_id: 1, team_member_id: 2, name: 'Ann' },
       routes: [
         {
-          match: /\/staff\/1\/2/,
+          match: /\/locations\/1\/team_members\/2/,
           body: ok(envelope({ id: 2, name: CANARY, specialization: CANARY })),
         },
       ],
@@ -246,7 +249,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       args: { location_id: 1 },
       routes: [
         {
-          match: /\/company\/1\/staff\/positions/,
+          match: /\/locations\/1\/team_members\/positions/,
           body: ok(envelope([{ id: 5, title: CANARY }])),
         },
       ],
@@ -272,7 +275,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       args: { location_id: 1 },
       routes: [
         {
-          match: /\/company\/1\/booking_forms/,
+          match: /\/locations\/1\/booking_forms/,
           body: ok(envelope([{ id: 7, title: CANARY, is_default: true }])),
         },
       ],
@@ -285,7 +288,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       args: { location_id: 1 },
       routes: [
         {
-          match: /\/records\/1/,
+          match: /\/locations\/1\/appointments/,
           body: ok(
             envelope([
               {
@@ -309,7 +312,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       args: { location_id: 1, filters: {} },
       routes: [
         {
-          match: /\/company\/1\/clients\/search/,
+          match: /\/locations\/1\/clients\/search/,
           body: ok(envelope([{ id: 9, name: CANARY }], { total_count: 1 })),
         },
       ],
@@ -322,7 +325,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       args: { location_id: 1, filters: {} },
       routes: [
         {
-          match: /\/company\/1\/clients\/search/,
+          match: /\/locations\/1\/clients\/search/,
           body: ok(envelope([{ id: 9, name: CANARY }], { total_count: 1 })),
         },
       ],
@@ -383,7 +386,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       args: { location_id: 1, client_id: 9 },
       routes: [
         {
-          match: /\/company\/1\/clients\/visits\/search/,
+          match: /\/locations\/1\/clients\/visits\/search/,
           body: ok(
             envelope({
               records: [

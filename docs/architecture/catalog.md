@@ -34,7 +34,7 @@ schema refs, and writes one entry per operation:
 | Field                                      | Notes                                                                                                                                                                                                                                            |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `operationId`                              | Spec-native identifier; unique across both specs (the build fails on a clash).                                                                                                                                                                   |
-| `method`, `path`                           | The real HTTP method and path, with the spec's own parameter spelling.                                                                                                                                                                           |
+| `method`, `path`                           | The real HTTP method and path, with the spec's own parameter spelling. V1 paths are the spec's canonical URLs (`/locations/{location_id}/appointments/…`); the backend also accepts the legacy spellings, which the catalog does not carry.      |
 | `displayPath`                              | The same path with legacy segments renamed to canonical ones (`{record_id}` → `{appointment_id}`). What the model is shown; `path` is what gets called.                                                                                          |
 | `summary`, `description`, `tags`, `domain` | `domain` comes from the OpenAPI tag, or from the overlay when it overrides it.                                                                                                                                                                   |
 | `deprecated`, `security`                   | Auth requirement and scheme names.                                                                                                                                                                                                               |
@@ -169,9 +169,9 @@ Rebuild and read the summary line for the live figures:
 
 ```
 $ npm run catalog:build
-  v1  docs/en/b2b-v1/openapi.yaml → 260 operations
-  v3  docs/en/b2b-v3/openapi.yaml → 57 operations
-catalog: 317 operations, 25 curated, 30 domains, 1709 KB → src/generated/catalog.json
+  v1  docs/en/b2b-v1/openapi.yaml → 261 operations
+  v3  docs/en/b2b-v3/openapi.yaml → 59 operations
+catalog: 320 operations, 32 curated, 30 domains, 1723 KB → src/generated/catalog.json
 ```
 
 `catalog.json` is excluded from eslint and prettier (it is reviewed as data, and

@@ -194,9 +194,12 @@ describe('attendance apply', () => {
     });
     expectOutputContract(appointmentsApplyAttendanceTool, result);
     expect(postJson).toHaveBeenCalledTimes(1);
-    expect(postJson).toHaveBeenCalledWith('/company/7/records/2/attendance', {
-      attendance: 1,
-    });
+    expect(postJson).toHaveBeenCalledWith(
+      '/locations/7/appointments/2/attendance',
+      {
+        attendance: 1,
+      }
+    );
   });
 
   it('stops after a failed group and keeps the earlier confirmed one', async () => {

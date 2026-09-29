@@ -81,7 +81,7 @@ export const removeLocationUserTool = defineTool({
     resolve: async (input, client) => {
       const { data } = await client.request<
         Array<{ id?: number; user_id?: number; name?: string; email?: string }>
-      >('GET', `/company/${input.location_id}/users`);
+      >('GET', `/locations/${input.location_id}/users`);
       const user = (Array.isArray(data) ? data : []).find(
         (candidate) => (candidate.user_id ?? candidate.id) === input.user_id
       );

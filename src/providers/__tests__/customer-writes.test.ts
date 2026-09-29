@@ -27,12 +27,12 @@ describe('curated JSON writes', () => {
       )
     );
     global.fetch = fetchMock as typeof fetch;
-    const result = await client().postJson('/company/7/clients/8/comments', {
+    const result = await client().postJson('/locations/7/clients/8/comments', {
       text: 'Intake form URL',
     });
     expect(result).toEqual({ id: 9 });
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.example.test/api/v1/company/7/clients/8/comments',
+      'https://api.example.test/api/v1/locations/7/clients/8/comments',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ text: 'Intake form URL' }),
@@ -56,7 +56,9 @@ describe('curated JSON writes', () => {
       )
     ) as typeof fetch;
     await expect(
-      client().postJson('/company/7/records/11/attendance', { attendance: 1 })
+      client().postJson('/locations/7/appointments/11/attendance', {
+        attendance: 1,
+      })
     ).rejects.toMatchObject<Partial<AltegioApiError>>({ statusCode: 403 });
   });
 });

@@ -53,8 +53,10 @@ describe('httpFromClient', () => {
     } as unknown as AltegioClient;
 
     const http = httpFromClient(fake);
-    await http.request('/company/1/analytics/overall', { method: 'GET' });
-    expect(seen).toEqual([['/company/1/analytics/overall', { method: 'GET' }]]);
+    await http.request('/locations/1/analytics/overall', { method: 'GET' });
+    expect(seen).toEqual([
+      ['/locations/1/analytics/overall', { method: 'GET' }],
+    ]);
     expect(http.isAuthenticated()).toBe(true);
   });
 });

@@ -229,7 +229,7 @@ describe('AltegioClient - Services CRUD', () => {
       });
 
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/company/456/services/789/staff'),
+        expect.stringContaining('/locations/456/services/789/team_members'),
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({
@@ -243,7 +243,7 @@ describe('AltegioClient - Services CRUD', () => {
   });
 
   describe('updateServiceStaffAssignment', () => {
-    it('should PUT the link at /staff/{team_member_id}', async () => {
+    it('should PUT the link at /team_members/{team_member_id}', async () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -256,7 +256,7 @@ describe('AltegioClient - Services CRUD', () => {
       });
 
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/company/456/services/789/staff/123'),
+        expect.stringContaining('/locations/456/services/789/team_members/123'),
         expect.objectContaining({
           method: 'PUT',
           body: JSON.stringify({
@@ -269,7 +269,7 @@ describe('AltegioClient - Services CRUD', () => {
   });
 
   describe('removeServiceFromStaff', () => {
-    it('should DELETE the link at /staff/{team_member_id}', async () => {
+    it('should DELETE the link at /team_members/{team_member_id}', async () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
         status: 204,
@@ -278,7 +278,7 @@ describe('AltegioClient - Services CRUD', () => {
       await client.removeServiceFromStaff(456, 789, 123);
 
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/company/456/services/789/staff/123'),
+        expect.stringContaining('/locations/456/services/789/team_members/123'),
         expect.objectContaining({ method: 'DELETE' })
       );
     });

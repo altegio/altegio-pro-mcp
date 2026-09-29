@@ -46,7 +46,7 @@ describe('AltegioClient Position Operations', () => {
       await client.getPositions(123);
 
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/company/123/staff/positions',
+        'https://api.alteg.io/api/v1/locations/123/team_members/positions',
         expect.objectContaining({
           headers: expect.objectContaining({
             Authorization: 'Bearer partner123, User user456',
@@ -95,7 +95,7 @@ describe('AltegioClient Position Operations', () => {
       await client.createPosition(123, { title: 'Manager' });
 
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.alteg.io/api/v1/company/123/positions/quick',
+        'https://api.alteg.io/api/v1/locations/123/positions/quick',
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({

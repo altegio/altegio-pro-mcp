@@ -372,7 +372,7 @@ export const deleteAppointmentTool = defineTool({
     resolve: async (input, client) => {
       const { data } = await client.request<AltegioBooking>(
         'GET',
-        `/record/${input.location_id}/${input.appointment_id}`
+        `/locations/${input.location_id}/appointments/${input.appointment_id}`
       );
       if (!data?.id) return undefined;
       const services = (data.services ?? [])
