@@ -102,7 +102,7 @@ const eventFieldInputs = {
     .nullable()
     .optional()
     .describe(
-      'Break kept free after the session, in minutes (steps of 5, at most 60), counted inside duration_minutes. null uses the location setting.'
+      'Break kept free after the session, in minutes (steps of 5, at most 60, 0 for none), counted inside duration_minutes. Omitted (or null) on create, the location adds its default break after duration_minutes, so the event runs longer; omitted on update, the current break is kept.'
     ),
   comment: optionalText(255, 'Internal comment on the event.').optional(),
   color: color.optional(),
@@ -446,7 +446,9 @@ export const eventsCreateTool = defineTool({
       .int()
       .min(5)
       .max(1440)
-      .describe('Length in minutes, steps of 5, including the break.'),
+      .describe(
+        'Length in minutes, steps of 5, including technical_break_minutes when it is given; without it the location’s default break is added after this length.'
+      ),
     capacity: z
       .number()
       .int()

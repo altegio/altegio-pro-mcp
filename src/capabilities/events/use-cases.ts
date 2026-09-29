@@ -468,15 +468,15 @@ function fieldsFromInput(input: EventFieldsInput): Partial<EventFields> {
       ? { resource_ids: input.resource_ids }
       : {}),
     ...(input.tag_ids !== undefined ? { tag_ids: input.tag_ids } : {}),
-    ...(input.technical_break_minutes !== undefined
+    // null reads as "not given": the API adds its default break on create
+    // and keeps the current one on update, whatever the body says.
+    ...(input.technical_break_minutes !== undefined &&
+    input.technical_break_minutes !== null
       ? {
-          technical_break_seconds:
-            input.technical_break_minutes === null
-              ? null
-              : minutesToSeconds(
-                  input.technical_break_minutes,
-                  'technical_break_minutes'
-                ),
+          technical_break_seconds: minutesToSeconds(
+            input.technical_break_minutes,
+            'technical_break_minutes'
+          ),
         }
       : {}),
     ...(input.comment !== undefined ? { comment: input.comment } : {}),
@@ -493,10 +493,14 @@ function fieldsFromInput(input: EventFieldsInput): Partial<EventFields> {
   };
 }
 
-function savedEvent(verb: string, event: EventSummary): EventsResult {
+function savedEvent(
+  verb: string,
+  event: EventSummary,
+  note?: string
+): EventsResult {
   return {
     text: withUntrustedBlock(
-      `${verb} ${eventLine(event).replace(/^- /, '')}`,
+      `${verb} ${eventLine(event).replace(/^- /, '')}${note ? `\n${note}` : ''}`,
       eventUntrusted(event),
       { maxChars: 200 }
     ),
@@ -521,7 +525,22 @@ export async function createEvent(
     resource_ids: fields.resource_ids ?? [],
     tag_ids: fields.tag_ids ?? [],
   });
-  return savedEvent('Created', event);
+  // Without an explicit break the API appends the location's default break
+  // to the requested length; say so rather than leave a longer event unexplained.
+  const requested = fields.duration_seconds;
+  const added =
+    fields.technical_break_seconds === undefined &&
+    event.duration_seconds !== null &&
+    event.duration_seconds > requested
+      ? event.duration_seconds - requested
+      : 0;
+  return savedEvent(
+    'Created',
+    event,
+    added > 0
+      ? `The location added its default ${added / 60}-minute break after the requested ${requested / 60} minutes, so the event occupies ${event.duration_seconds! / 60} minutes. To keep ${requested / 60} minutes in total, call events_update with duration_minutes and technical_break_minutes.`
+      : undefined
+  );
 }
 
 export async function updateEvent(
@@ -581,10 +600,14 @@ export async function duplicateEvent(
     force: input.force === true,
   });
   return {
-    text: [
-      `Duplicated event ${input.event_id} into ${created.length} new event(s)${content === 'with_bookings' ? ' with its bookings' : ''}:`,
-      ...created.map(eventLine),
-    ].join('\n'),
+    text: withUntrustedBlock(
+      [
+        `Duplicated event ${input.event_id} into ${created.length} new event(s)${content === 'with_bookings' ? ' with its bookings' : ''}:`,
+        ...created.map(eventLine),
+      ].join('\n'),
+      created.flatMap(eventUntrusted),
+      { maxChars: 200 }
+    ),
     structuredContent: {
       location_id: input.location_id,
       source_event_id: input.event_id,
