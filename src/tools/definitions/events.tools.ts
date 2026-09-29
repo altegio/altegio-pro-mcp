@@ -320,7 +320,7 @@ export const eventsListDatesTool = defineTool({
   name: 'events_list_dates',
   category: 'Events',
   description:
-    'The event calendar of a location for an upcoming period: which dates have group events, the first and last of them, and which team members, services, service categories and resources those events use — with ids and names to pass as filters to events_list. Use it to answer "when is the next workshop" or to fill a date picker. The period must start now or later in the location’s time zone and cover at most 366 days; for past events use events_list.',
+    'The event calendar of a location for an upcoming period: which dates have group events, the first and last of them, and which team members, services, service categories and resources those events use — with ids and names to pass as filters to events_list. Use it to answer "when is the next workshop" or to fill a date picker. The calendar reads from the current time in the location’s time zone onward: a period that starts earlier ("from today") is read from now on, and the result says so. It covers at most 366 days; for past events use events_list.',
   annotations: { title: 'Events: dates with events', ...READ_ONLY },
   input: z.object(periodFilters),
   outputSchema: {

@@ -21,7 +21,7 @@ import { isValidTimezone } from './periods.js';
 export const TIMEZONE_CACHE_TTL_MS = 60 * 60 * 1000;
 
 interface CacheEntry {
-  readonly timezone: string;
+  readonly timezone: string | null;
   readonly expires_at: number;
 }
 
@@ -33,6 +33,18 @@ export async function resolveLocationTimezone(
   locationId: number,
   now: number = Date.now()
 ): Promise<string> {
+  return (await knownLocationTimezone(client, locationId, now)) ?? 'UTC';
+}
+
+/**
+ * The IANA timezone of one location, or `null` when the location list cannot
+ * say. For a caller that must not guess: a UTC stand-in shifts "now" by hours.
+ */
+export async function knownLocationTimezone(
+  client: AltegioClient,
+  locationId: number,
+  now: number = Date.now()
+): Promise<string | null> {
   // Every location-scoped analytics use-case resolves a timezone first, so this
   // is the earliest, clearest place to reject a location outside the declared
   // company scope — before any network round-trip. `apiRequest` enforces the
@@ -46,10 +58,9 @@ export async function resolveLocationTimezone(
     const locations = await client.getCompanies({ my: 1 });
     for (const location of locations) {
       const name = location.timezone_name;
-      const timezone =
-        typeof name === 'string' && isValidTimezone(name) ? name : 'UTC';
       cache.set(location.id, {
-        timezone,
+        timezone:
+          typeof name === 'string' && isValidTimezone(name) ? name : null,
         expires_at: now + TIMEZONE_CACHE_TTL_MS,
       });
     }
@@ -58,7 +69,7 @@ export async function resolveLocationTimezone(
     // question the owner asked.
   }
 
-  return cache.get(locationId)?.timezone ?? 'UTC';
+  return cache.get(locationId)?.timezone ?? null;
 }
 
 /** Drop the cache — used by tests. */

@@ -17,6 +17,7 @@ import {
   type FinanceTransactionListPage,
 } from './finance-transactions-parser.js';
 import { isValidTimezone } from '../../capabilities/analytics/periods.js';
+import { resolveLocationCurrency } from './location-currency.js';
 import type {
   LegacyPeriodRequest,
   GroupEventPerformanceRequest,
@@ -50,12 +51,6 @@ import {
 
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
 const MAX_WORKBOOK_BYTES = 12 * 1024 * 1024;
-
-function canonicalCurrency(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const normalized = value.trim().toUpperCase();
-  return /^[A-Z]{3}$/.test(normalized) ? normalized : null;
-}
 
 function contentLength(response: Response): number | null {
   const raw = response.headers.get('content-length');
@@ -238,10 +233,7 @@ export class V1LegacyAnalyticsAdapter {
   constructor(private readonly client: AltegioClient) {}
 
   private async currency(locationId: number): Promise<string | null> {
-    const location = await this.client.getLocation(locationId, { my: 1 });
-    return canonicalCurrency(
-      location.currency_short_title ?? location.currency ?? null
-    );
+    return resolveLocationCurrency(this.client, locationId);
   }
 
   /** Posted income by local calendar month, using the same ledger as P&L. */
@@ -254,18 +246,17 @@ export class V1LegacyAnalyticsAdapter {
     timezone: string | null;
     months: PostedIncomeMonth[];
   }> {
-    const [response, location] = await Promise.all([
+    const [response, location, currency] = await Promise.all([
       this.client.requestLegacyWebReport({
         locationId: input.location_id,
         path: `/finances_reports/annual_report/${input.location_id}/`,
         query: { date_from: input.date_from, date_to: input.date_to },
       }),
       this.client.getLocation(input.location_id, { my: 1 }),
+      this.currency(input.location_id),
     ]);
     return {
-      currency: canonicalCurrency(
-        location.currency_short_title ?? location.currency ?? null
-      ),
+      currency,
       timezone:
         typeof location.timezone_name === 'string' &&
         isValidTimezone(location.timezone_name)
@@ -615,8 +606,26 @@ export class V1LegacyAnalyticsAdapter {
       }),
       this.currency(input.location_id),
     ]);
+    const envelope = await readSearchEnvelope(
+      response,
+      'cash-flow breakdown',
+      true
+    ).catch((error: unknown) => {
+      // Without an account type the report has a column per cash account for
+      // every day, which outgrows the size bound within a week or two.
+      if (
+        error instanceof AltegioApiError &&
+        error.statusCode === 413 &&
+        (input.cash_account_type ?? 'all') === 'all'
+      )
+        throw new AltegioApiError(
+          'The cash-flow breakdown for this period is too large to read at once: across all account types it has a column for every cash account on every day. Ask for cash_account_type=cash and then non_cash (a month fits in each), pass cash_account_ids, or shorten the period.',
+          413
+        );
+      throw error;
+    });
     const report = parseCashFlowBreakdownHtml({
-      ...(await readSearchEnvelope(response, 'cash-flow breakdown', true)),
+      ...envelope,
       currency,
       accountType: input.cash_account_type ?? 'all',
       ...(input.payment_item_id

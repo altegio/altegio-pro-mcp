@@ -15,6 +15,7 @@
  */
 import type { AltegioClient } from '../../providers/altegio-client.js';
 import { EventsAdapter } from '../../api/v2/events-adapter.js';
+import { knownLocationTimezone } from '../analytics/location-timezone.js';
 import type {
   BookingChanges,
   BookingRequest,
@@ -281,11 +282,50 @@ export async function getEvent(
 /** The longest period the calendar reads in one call. */
 const MAX_CALENDAR_DAYS = 366;
 
+/**
+ * The location's wall-clock time a little ahead of now, as a wire time. The
+ * lead covers the trip to the API and clock skew, and is rounded up to a whole
+ * minute; a calendar of dates loses nothing to it.
+ */
+function localWireNow(timezone: string, now: number): string {
+  const ahead = Math.ceil((now + 60_000) / 60_000) * 60_000;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(ahead));
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? '00';
+  return `${part('year')}-${part('month')}-${part('day')} ${part('hour')}:${part('minute')}:${part('second')}`;
+}
+
 export async function getCalendar(
   client: AltegioClient,
-  input: PeriodInput
+  input: PeriodInput,
+  now: number = Date.now()
 ): Promise<EventsResult> {
   const query = periodQuery(input);
+  // The API reads this calendar from the location's "now" onward and refuses
+  // an earlier start, so "from today" would fail after midnight. Start at now
+  // instead; when the location's zone is unknown, send the period unchanged.
+  const timezone = await knownLocationTimezone(client, input.location_id);
+  const requestedFrom = query.from;
+  if (timezone) {
+    const localNow = localWireNow(timezone, now);
+    if (query.from < localNow) {
+      if (query.to <= localNow) {
+        throw new EventsInputError(
+          `The period ends before now (${localNow.slice(0, 16)} location time). This calendar reads from the current time onward; use events_list for earlier events.`
+        );
+      }
+      query.from = localNow;
+    }
+  }
   const span =
     (Date.parse(query.to.slice(0, 10)) - Date.parse(query.from.slice(0, 10))) /
     86_400_000;
@@ -299,6 +339,11 @@ export async function getCalendar(
   const idList = (values: { id: number }[]) =>
     values.length > 0 ? values.map((v) => v.id).join(', ') : 'none';
   const lines = [
+    ...(query.from !== requestedFrom
+      ? [
+          `The calendar reads from now on, so the period starts at ${query.from} (location time) instead of ${requestedFrom}; events_list covers earlier events.`,
+        ]
+      : []),
     calendar.dates.length > 0
       ? `${calendar.dates.length} date(s) with events in location ${input.location_id} between ${query.from} and ${query.to}, first ${calendar.first_date}, last ${calendar.last_date}:`
       : `No events in location ${input.location_id} between ${query.from} and ${query.to}.`,
