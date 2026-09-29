@@ -539,6 +539,26 @@ it('recognizes the cash-flow permission envelope without reflecting source diagn
     new V1LegacyAnalyticsAdapter(client).getCashFlowBreakdown(nextPeriod)
   ).rejects.toMatchObject({ statusCode: 403 });
 });
+it('points an oversized all-accounts cash flow at the account-type split', async () => {
+  const oversized = () =>
+    new Response('{}', {
+      status: 200,
+      headers: { 'content-length': String(3 * 1024 * 1024) },
+    });
+  await expect(
+    new V1LegacyAnalyticsAdapter(
+      fakeClient([oversized()]).client
+    ).getCashFlowBreakdown(nextPeriod)
+  ).rejects.toMatchObject({
+    statusCode: 413,
+    message: expect.stringMatching(/cash_account_type=cash and then non_cash/),
+  });
+  await expect(
+    new V1LegacyAnalyticsAdapter(
+      fakeClient([oversized()]).client
+    ).getCashFlowBreakdown({ ...nextPeriod, cash_account_type: 'cash' })
+  ).rejects.toThrow(/too large to process safely/);
+});
 it('keeps nonzero non-cash-only items when zero movement rows are excluded', async () => {
   const html = fixture('cash-flow-en.html').replace(
     /<td class="by-type report-amount-cell">1,234.56<\/td><td class="by-type report-amount-cell">0<\/td>/g,

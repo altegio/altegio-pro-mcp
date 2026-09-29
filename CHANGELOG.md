@@ -6,6 +6,22 @@ is declared stable.
 
 ## [Unreleased]
 
+### Fixed — found by a production audit on real location data
+
+- `events_list_dates` read "from today" as a refusal after midnight, because
+  the API reads this calendar only from the location's current time onward. A
+  period that starts earlier is now read from the location's current time, and
+  the result says so; a period that is already over points at `events_list`.
+- Analytics tools built on the temporary ERP reports (client and team-member
+  sales, cash flow, cash receipts, payer cohorts, profit and loss, product
+  sales, service profitability, service mix and the decision tools) reported
+  `currency: null` or a display symbol such as `Kč`, because a location record
+  holds only the symbol. They now report the ISO code, as `analytics_get_overview`
+  does, from the same key-metrics source.
+- `analytics_get_cash_flow_breakdown` over a month across all account types
+  failed with a generic "too large" error. It now says to split the request by
+  `cash_account_type` (a month fits in each) or pass `cash_account_ids`.
+
 ### Added — group events: 15 curated `events_*` tools
 
 - **Reads**: `events_list` (period, team members, services, resources,

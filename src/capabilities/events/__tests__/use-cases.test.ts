@@ -24,6 +24,7 @@ import {
   EventsInputError,
   EventsNotFoundError,
 } from '../errors.js';
+import { clearTimezoneCache } from '../../analytics/location-timezone.js';
 
 interface Call {
   method: string;
@@ -463,6 +464,68 @@ describe('events_list_dates', () => {
         date_to: '2026-07-31',
       })
     ).rejects.toThrow(/use events_list for earlier events/);
+  });
+
+  describe('a period that starts before now', () => {
+    // 2026-09-29 23:24:10 UTC is 2026-09-30 01:24:10 in Prague (+02:00).
+    const NOW = Date.UTC(2026, 8, 29, 23, 24, 10);
+    const inPrague = (routes: Route[]) => {
+      const client = fakeClient(routes, calls) as unknown as Record<
+        string,
+        unknown
+      >;
+      client.getCompanies = async () => [
+        { id: 1, timezone_name: 'Europe/Prague' },
+      ];
+      return client as unknown as AltegioClient;
+    };
+    const empty: Route[] = [
+      ['GET', /\/events\/dates$/, 200, { data: [] }],
+      ['GET', /\/events\/filters$/, 200, { data: [] }],
+    ];
+
+    beforeEach(() => clearTimezoneCache());
+    afterAll(() => clearTimezoneCache());
+
+    it('starts "from today" at the location’s now and says so', async () => {
+      const result = await getCalendar(
+        inPrague(empty),
+        { location_id: 1, date_from: '2026-09-30', date_to: '2026-10-31' },
+        NOW
+      );
+      for (const call of calls) {
+        expect(call.query.get('filter[from]')).toBe('2026-09-30 01:26:00');
+        expect(call.query.get('filter[to]')).toBe('2026-10-31 23:59:59');
+      }
+      expect(calls).toHaveLength(2);
+      expect(result.structuredContent).toMatchObject({
+        period: { from: '2026-09-30 01:26:00', to: '2026-10-31 23:59:59' },
+      });
+      expect(result.text).toMatch(
+        /reads from now on, so the period starts at 2026-09-30 01:26:00 .* instead of 2026-09-30 00:00:00/
+      );
+    });
+
+    it('keeps a start that is already ahead of now', async () => {
+      const result = await getCalendar(
+        inPrague(empty),
+        { location_id: 1, date_from: '2026-10-01', date_to: '2026-10-31' },
+        NOW
+      );
+      expect(calls[0]!.query.get('filter[from]')).toBe('2026-10-01 00:00:00');
+      expect(result.text).not.toMatch(/reads from now on/);
+    });
+
+    it('refuses a period that is over, without calling the API', async () => {
+      await expect(
+        getCalendar(
+          inPrague([]),
+          { location_id: 1, date_from: '2026-09-01', date_to: '2026-09-29' },
+          NOW
+        )
+      ).rejects.toThrow(/ends before now .*use events_list for earlier events/);
+      expect(calls).toHaveLength(0);
+    });
   });
 
   it('refuses a period longer than a year', async () => {

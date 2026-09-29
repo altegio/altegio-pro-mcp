@@ -1,5 +1,6 @@
 /** Service analytics from complete, bounded V1 appointment pages. */
 import type { AltegioClient } from '../../providers/altegio-client.js';
+import { resolveLocationCurrency } from '../../api/v1/location-currency.js';
 import {
   scanRecords,
   type ServiceRecord,
@@ -61,8 +62,8 @@ async function source(
     period.date_to,
     teamMemberId
   );
-  const [company, services, categories, resources] = await Promise.all([
-    client.getLocation(input.location_id),
+  const [currency, services, categories, resources] = await Promise.all([
+    resolveLocationCurrency(client, input.location_id),
     catalog === 'categories' || catalog === 'both'
       ? client.getServices(input.location_id)
       : Promise.resolve([]),
@@ -105,7 +106,7 @@ async function source(
     source_count: scan.source_count,
     pages: scan.pages,
     scanned_at: scan.scanned_at,
-    currency: sanitizeUntrusted(company.currency_short_title, { maxChars: 16 }),
+    currency,
     service_categories: serviceCategories,
     resource_names: resourceNames,
     category_names: categoryNames,

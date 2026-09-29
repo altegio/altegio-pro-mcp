@@ -11,6 +11,7 @@ import { httpFromClient } from '../../api/altegio-http.js';
 import { AnalyticsInputError } from './errors.js';
 import { previousPeriod, resolvePeriod, type PeriodInput } from './periods.js';
 import { resolveLocationTimezone } from './location-timezone.js';
+import { resolveLocationCurrency } from '../../api/v1/location-currency.js';
 import { sanitizeUntrusted, UNTRUSTED_NOTE } from '../../tools/tool-result.js';
 import type { VisitStatus } from './vocabulary.js';
 
@@ -1014,10 +1015,12 @@ export async function getRevenueLeakage(
     (row) => statusOf(row) === 'arrived' && row.paid_full === 0
   );
   const discounted = rows.filter((row) => (filteredDiscount(row) ?? 0) > 0);
-  const currency = rows
-    .flatMap((row) => (row.services ?? []).filter(serviceMatches))
-    .map((service) => service.currency)
-    .find((value): value is string => Boolean(value));
+  const currency =
+    rows
+      .flatMap((row) => (row.services ?? []).filter(serviceMatches))
+      .map((service) => service.currency)
+      .find((value): value is string => Boolean(value)) ??
+    (await resolveLocationCurrency(client, input.location_id));
   const outputCategories: unknown[] = [
     category(
       'no_show_appointments',
