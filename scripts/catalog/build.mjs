@@ -2,10 +2,10 @@
 /**
  * Catalog build — ADR-001 D4.
  *
- * Reads the corporate OpenAPI specs (B2B v1, live; B2B v3, preview contract),
- * resolves `$ref`-ed path items and local/relative schema refs, merges the
- * curation overlay from `catalog/overlay/*.yaml`, and writes a deterministic
- * `src/generated/catalog.json` — one entry per operation.
+ * Reads the corporate OpenAPI specs (B2B v1 and v2, live; B2B v3, preview
+ * contract), resolves `$ref`-ed path items and local/relative schema refs,
+ * merges the curation overlay from `catalog/overlay/*.yaml`, and writes a
+ * deterministic `src/generated/catalog.json` — one entry per operation.
  *
  * The catalog is the source of truth for the executor tools
  * (`api_search_operations`, `api_describe_operation`,
@@ -72,9 +72,32 @@ const PLUMBING_HEADERS = new Set([
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'];
 const METHOD_RANK = new Map(METHODS.map((m, i) => [m, i]));
 
-/** Specs that feed the catalog. `b2b-v2` is internal-only by API-team policy. */
+/**
+ * Specs that feed the catalog, in precedence order.
+ *
+ * V2 supersedes V1 (the product owner's decision of 2026-09-29): where both
+ * specs describe the same operation, the V2 one is canonical and the V1 twin
+ * leaves the catalog, so the model sees each capability exactly once and never
+ * a version. Two rules decide what "the same operation" is:
+ *
+ * - **Same id.** A V2 operation's catalog id is its spec id without the `_v2`
+ *   suffix the V2 spec uses on some of its ids (`canonicalSuffix`). A V1
+ *   operation with that same id is its twin by the spec authors' own naming
+ *   (`get_event`, `delete_appointment`) and is superseded automatically.
+ * - **Declared.** Twins with different ids (`search_events` → `list_events`)
+ *   are named by the overlay field `supersedes` on the surviving operation.
+ *
+ * Superseded operations are listed under `superseded` in the catalog, not
+ * under `operations`. Any other id clash still fails the build.
+ */
 const SPECS = [
   { source: 'v1', rel: 'docs/en/b2b-v1/openapi.yaml' },
+  {
+    source: 'v2',
+    rel: 'docs/en/b2b-v2/openapi.yaml',
+    canonicalSuffix: '_v2',
+    supersedes: 'v1',
+  },
   { source: 'v3', rel: 'docs/en/b2b-v3/openapi.yaml' },
 ];
 
@@ -127,6 +150,7 @@ const TAG_DOMAINS = {
   notifications: 'notifications',
   'online booking settings': 'online_booking',
   'custom fields': 'custom_fields',
+  'booking users': 'clients',
   tags: 'tags',
   utilities: 'utilities',
 };
@@ -142,6 +166,7 @@ const OVERLAY_FIELDS = [
   'param_renames',
   'projection',
   'write_allowed',
+  'supersedes',
   'notes',
 ];
 const OVERLAY_TIERS = new Set(['core', 'pack', 'executor-only']);
@@ -156,6 +181,7 @@ const KEY_ORDER = [
   'operationCount',
   'curatedCount',
   'domains',
+  'supersededCount',
   // source / domain summary entries
   'source',
   'spec',
@@ -163,6 +189,7 @@ const KEY_ORDER = [
   'version',
   // operation entry
   'operationId',
+  'specOperationId',
   'method',
   'path',
   'displayPath',
@@ -194,10 +221,15 @@ const KEY_ORDER = [
   'param_renames',
   'projection',
   'write_allowed',
+  'supersedes',
   'notes',
+  // superseded entry
+  'supersededBy',
+  'reason',
   // long tail last
   'schema',
   'operations',
+  'superseded',
 ];
 const KEY_RANK = new Map(KEY_ORDER.map((k, i) => [k, i]));
 
@@ -535,10 +567,11 @@ function resolveTopSchema(schema, ctx) {
 }
 
 /**
- * The V1 `{success, data, meta}` wrapper is transport, not payload: the client
- * unwraps it and so does `api_call_operation`. Storing `data` directly keeps
- * the catalog describing what a caller actually receives and spends the depth
- * budget on the payload instead of the envelope.
+ * The V1 `{success, data, meta}` wrapper and the V2 JSON:API `{data, meta}`
+ * document are transport, not payload: the client unwraps the first and
+ * `api_call_operation` the second. Storing `data` directly keeps the catalog
+ * describing what a caller actually receives and spends the depth budget on
+ * the payload instead of the envelope.
  */
 function unwrapEnvelope(schema, ctx) {
   const { node, file } = resolveTopSchema(schema, ctx);
@@ -547,10 +580,14 @@ function unwrapEnvelope(schema, ctx) {
     node?.type === 'object' &&
     properties &&
     typeof properties === 'object' &&
-    properties.data !== undefined &&
-    properties.success !== undefined
+    properties.data !== undefined
   ) {
-    return { schema: properties.data, file, envelope: 'v1' };
+    if (properties.success !== undefined) {
+      return { schema: properties.data, file, envelope: 'v1' };
+    }
+    if (ctx.source === 'v2') {
+      return { schema: properties.data, file, envelope: 'jsonapi' };
+    }
   }
   return { schema, file: ctx.file };
 }
@@ -627,7 +664,7 @@ function readSpec({ source, rel }, docsRoot, warnings) {
       const operation = pathItem[method];
       if (!operation || typeof operation !== 'object') continue;
 
-      const ctx = { file: itemFile, rootFile: specFile, warnings };
+      const ctx = { file: itemFile, rootFile: specFile, source, warnings };
       const tags = Array.isArray(operation.tags) ? [...operation.tags] : [];
       const operationId =
         typeof operation.operationId === 'string' && operation.operationId
@@ -716,6 +753,16 @@ export function loadOverlay(overlayDir) {
           `${file}: operation "${operationId}" has invalid tier "${raw.tier}" (expected ${[...OVERLAY_TIERS].join(' | ')})`
         );
       }
+      if (
+        raw.supersedes !== undefined &&
+        (!Array.isArray(raw.supersedes) ||
+          raw.supersedes.length === 0 ||
+          raw.supersedes.some((id) => typeof id !== 'string' || id === ''))
+      ) {
+        throw new Error(
+          `${file}: operation "${operationId}" has an invalid supersedes list (expected a non-empty list of operationIds)`
+        );
+      }
       if (curation.has(operationId)) {
         throw new Error(
           `duplicate overlay entry for "${operationId}" (second one in ${file})`
@@ -778,32 +825,104 @@ export function stableStringify(value, indent = 2, level = 0, ranked = true) {
 // Build
 // ---------------------------------------------------------------------------
 
+/**
+ * Retire the V1 twins the overlay names under `supersedes`.
+ *
+ * The survivor must come from a spec that supersedes V1, each named twin must
+ * still be a live V1 operation, and a twin may be named once. An overlay entry
+ * keyed by a retired twin is refused rather than dropped, so its curation is
+ * moved to the survivor by hand instead of silently disappearing.
+ */
+function applySupersedes(curation, byId, superseded, retire) {
+  const claimed = new Map();
+  for (const [operationId, entry] of curation) {
+    if (!entry.supersedes) continue;
+    const survivor = byId.get(operationId);
+    const spec = SPECS.find((s) => s.source === survivor?.source);
+    if (!survivor || !spec?.supersedes) {
+      throw new Error(
+        `overlay entry "${operationId}" declares supersedes but is not an operation of a spec that supersedes another`
+      );
+    }
+    for (const twinId of entry.supersedes) {
+      if (claimed.has(twinId)) {
+        throw new Error(
+          `"${twinId}" is superseded twice: by "${claimed.get(twinId)}" and by "${operationId}"`
+        );
+      }
+      const twin = byId.get(twinId);
+      if (!twin || twin.source !== spec.supersedes) {
+        const retired = superseded.find((s) => s.operationId === twinId);
+        throw new Error(
+          retired
+            ? `"${operationId}" supersedes "${twinId}", which "${retired.supersededBy}" already supersedes by the same id`
+            : `"${operationId}" supersedes "${twinId}", which is not a ${spec.supersedes} operation in the specs`
+        );
+      }
+      claimed.set(twinId, operationId);
+      retire(twin, survivor, 'declared');
+    }
+  }
+  for (const operationId of curation.keys()) {
+    if (claimed.has(operationId)) {
+      throw new Error(
+        `overlay entry "${operationId}" curates an operation that "${claimed.get(operationId)}" supersedes; move its curation to "${claimed.get(operationId)}"`
+      );
+    }
+  }
+}
+
 /** Build the catalog object from a spec repository plus the overlay directory. */
 export function buildCatalog({ docsRoot, overlayDir }) {
   const warnings = [];
   const sources = [];
   const operations = [];
 
+  const byId = new Map();
+  const superseded = [];
+  const retire = (op, survivor, reason) => {
+    byId.delete(op.operationId);
+    operations.splice(operations.indexOf(op), 1);
+    superseded.push({
+      operationId: op.operationId,
+      source: op.source,
+      method: op.method,
+      path: op.path,
+      supersededBy: survivor.operationId,
+      reason,
+    });
+  };
+
   for (const spec of SPECS) {
     const read = readSpec(spec, docsRoot, warnings);
     if (!read) continue;
     sources.push(read.meta);
-    operations.push(...read.operations);
-  }
 
-  const byId = new Map();
-  for (const op of operations) {
-    const clash = byId.get(op.operationId);
-    if (clash) {
-      throw new Error(
-        `duplicate operationId "${op.operationId}": ` +
-          `${clash.source} ${clash.method} ${clash.path} and ${op.source} ${op.method} ${op.path}`
-      );
+    for (const op of read.operations) {
+      if (
+        spec.canonicalSuffix &&
+        op.operationId.endsWith(spec.canonicalSuffix)
+      ) {
+        op.specOperationId = op.operationId;
+        op.operationId = op.operationId.slice(0, -spec.canonicalSuffix.length);
+      }
+      const clash = byId.get(op.operationId);
+      if (clash && spec.supersedes && clash.source === spec.supersedes) {
+        retire(clash, op, 'same-id');
+      } else if (clash) {
+        throw new Error(
+          `duplicate operationId "${op.operationId}": ` +
+            `${clash.source} ${clash.method} ${clash.path} and ${op.source} ${op.method} ${op.path}`
+        );
+      }
+      byId.set(op.operationId, op);
+      operations.push(op);
     }
-    byId.set(op.operationId, op);
   }
 
   const curation = loadOverlay(overlayDir);
+  applySupersedes(curation, byId, superseded, retire);
+
   let curatedCount = 0;
   for (const [operationId, entry] of curation) {
     const op = byId.get(operationId);
@@ -815,7 +934,10 @@ export function buildCatalog({ docsRoot, overlayDir }) {
     }
     op.curation = entry;
     if (entry.domain) op.domain = entry.domain;
-    curatedCount += 1;
+    // Naming the twins a survivor replaces is bookkeeping, not curation.
+    if (Object.keys(entry).some((field) => field !== 'supersedes')) {
+      curatedCount += 1;
+    }
   }
 
   operations.sort(
@@ -845,7 +967,13 @@ export function buildCatalog({ docsRoot, overlayDir }) {
       operationCount: operations.length,
       curatedCount,
       domains,
+      supersededCount: superseded.length,
       operations,
+      superseded: superseded.sort(
+        (a, b) =>
+          a.operationId.localeCompare(b.operationId) ||
+          a.source.localeCompare(b.source)
+      ),
     },
     warnings,
   };
@@ -945,6 +1073,7 @@ function main(argv) {
     }
     console.log(
       `catalog: ${catalog.operationCount} operations, ${catalog.curatedCount} curated, ` +
+        `${catalog.supersededCount} superseded, ` +
         `${Object.keys(catalog.domains).length} domains, ` +
         `${(Buffer.byteLength(serialized) / 1024).toFixed(0)} KB → ${path.relative(REPO_ROOT, outFile)}`
     );

@@ -38,6 +38,13 @@ Conclusion: roughly a third of the undocumented surface is relevant to business 
 
 - **V3 is the only new public contract.** Flat REST under `/api/v3/locations/{location_id}/…`, `problem+json` errors with stable `code`, cursor pagination, `Idempotency-Key`, `If-Match`, OpenAPI 3.1 as the contract with a CI gate in both repos (`x-altegio-status: available` requires a registered route).
 - **V2 stays internal**, V1 is legacy: no new public methods are added to V1.
+  _Update 2026-09-29: the product owner decided that V2 is the canonical live
+  contract and V1 is only a fallback where V2 lacks a capability. The catalog
+  reads the V2 spec and retires every V1 operation that V2 replaces (see
+  [the catalog](catalog.md#v2-supersedes-v1)). Curated tools, starting with
+  the `events_*` pack, call V2 first. Clients see one operation per capability,
+  in the product glossary, and never an API version. V3 remains the target
+  contract._
 - **Auth is OAuth 2.1**: Authorization Code + PKCE for agents and MCP hosts (DCR and Client ID Metadata Documents accepted), Client Credentials for marketplace backends, restricted keys for a business's own scripts. **There is no password grant in V3.** Token audiences are split: `https://api.alteg.io/api/v3` for REST and a separate MCP audience for a hosted MCP; a REST token is not accepted by MCP and vice versa.
 - **The first audience of V3 is external partners and MCP/AI integrations.** The team also plans the backend use-case layer so that "REST v3 controller, MCP tool handler and legacy v2 adapter call one shared service" (guardrails §9) — a future in-process MCP inside the monolith is on their table.
 

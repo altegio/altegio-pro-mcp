@@ -6,6 +6,41 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — group events: 15 curated `events_*` tools
+
+- **Reads**: `events_list` (period, team members, services, resources,
+  weekdays, free seats; past periods and cancelled events on request),
+  `events_get` (the event with its bookings; contacts only with
+  `include_contacts`), `events_list_dates` (the days with events and the values
+  to filter by), `events_list_services`, `events_list_duplication_strategies`.
+- **Writes**, each behind confirmation: `events_create`, `events_update`,
+  `events_delete`, `events_duplicate`, `events_create_duplication_strategy`,
+  `events_update_duplication_strategy`, `events_delete_duplication_strategy`,
+  `events_book_clients` (1–50 clients, partial success reported per client),
+  `events_update_appointment`, `events_reschedule_appointment`.
+- Each tool calls the V2 API first and V1 only for the one capability V2
+  lacks: the list of services an event can run. Tools show local times, minutes
+  and team members. `events_update` and `events_update_appointment` read the
+  current state and send it back with the changes, because the API replaces the
+  whole resource. `events_update_appointment` refuses a booking that has
+  product sales rather than drop them. Names, comments and refusal reasons are
+  fenced as untrusted text. The tools are in the default and `/ops` views and
+  need the `appointments` scopes.
+
+### Changed — one API operation per capability, V2 canonical
+
+- **API catalog** reads the B2B V2 spec alongside V1 and the V3 preview, and
+  keeps one operation per capability. V2 is canonical. A V1 operation that V2
+  replaces is retired, either automatically when the ids match or declared with
+  the new overlay field `supersedes`. The catalog has 346 operations: V1 236,
+  V2 51, V3 59. 25 V1 operations are retired, among them `search_events`,
+  `get_team_member_list`, `get_products_list` and `get_tag_list_by_entity`.
+- **Executor tools** show no API version. Ids carry no `_v2` suffix,
+  `api_search_operations` and `api_describe_operation` mark only the V3
+  preview, and `api_call_operation` calls V2 reads under `/api/v2` and unwraps
+  the JSON:API document. A retired id is answered with the operation that
+  replaces it.
+
 ### Changed — curated tools call the canonical V1 URLs the spec documents
 
 - **API catalog** is rebuilt from the latest V1 specification, which documents

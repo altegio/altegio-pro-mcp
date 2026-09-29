@@ -8,7 +8,7 @@ import { MAX_SEARCH_RESULTS, queryTerms, searchOperations } from '../search.js';
 describe('api_search_operations ranking', () => {
   const cases: Array<{ query: string; expect: string }> = [
     { query: 'team member schedule', expect: 'get_team_member_schedule' },
-    { query: 'staff list', expect: 'get_team_member_list' },
+    { query: 'staff list', expect: 'list_team_members' },
     { query: 'list of services', expect: 'get_service_list' },
     {
       query: 'cash register transactions',
@@ -33,7 +33,7 @@ describe('api_search_operations ranking', () => {
     // The path and some summaries still say "staff"; the query says the
     // canonical thing and must still reach the operation.
     const { hits } = searchOperations('team members of a location');
-    expect(hits.map((h) => h.operationId)).toContain('get_team_member_list');
+    expect(hits.map((h) => h.operationId)).toContain('list_team_members');
   });
 
   it('matches the legacy vocabulary against canonical summaries', () => {
@@ -74,7 +74,7 @@ describe('api_search_operations ranking', () => {
 
   it('excludes V3 preview operations by default and includes them on request', () => {
     const hidden = searchOperations('oauth token', { limit: 10 });
-    expect(hidden.hits.every((h) => h.source === 'v1')).toBe(true);
+    expect(hidden.hits.every((h) => h.source !== 'v3')).toBe(true);
 
     const shown = searchOperations('oauth token', {
       includePreview: true,
@@ -82,6 +82,26 @@ describe('api_search_operations ranking', () => {
     });
     expect(shown.hits.some((h) => h.source === 'v3')).toBe(true);
     expect(shown.hits.find((h) => h.source === 'v3')?.status).toBe('preview');
+  });
+
+  it('finds live V2 operations without the preview flag or a version', () => {
+    const { hits } = searchOperations('event dates', {
+      domain: 'events',
+      limit: 10,
+    });
+    const hit = hits.find((h) => h.operationId === 'list_event_dates');
+    expect(hit).toMatchObject({ method: 'GET', tool: 'events_list_dates' });
+    expect(hit).not.toHaveProperty('source');
+  });
+
+  it('lists each capability once: a superseded twin is not searchable', () => {
+    const ids = searchOperations('search events', { limit: 20 }).hits.map(
+      (h) => h.operationId
+    );
+    expect(ids).toContain('list_events');
+    expect(ids).not.toContain('search_events');
+    expect(ids.filter((id) => id === 'get_event')).toHaveLength(1);
+    expect(ids.some((id) => id.endsWith('_v2'))).toBe(false);
   });
 
   it('filters by domain and by method', () => {

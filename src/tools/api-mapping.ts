@@ -33,6 +33,12 @@ export interface ApiMapping {
    *   contract test.
    */
   source?: 'documented' | 'extended';
+  /**
+   * Which published specification documents the operation: `v1` (default,
+   * `docs/en/b2b-v1/openapi.yaml`) or `v2` (`docs/en/b2b-v2/openapi.yaml`).
+   * The curated tool's adapter decides the version; the model never sees it.
+   */
+  spec?: 'v1' | 'v2';
 }
 
 /**
@@ -165,6 +171,120 @@ export const apiMapping: Record<string, ApiMapping> = {
     method: 'delete',
     operationId: 'delete_appointment',
     pathParams: ['location_id', 'record_id'],
+  },
+
+  // ==========================================
+  // Group events (V2 first; event services only exist on V1)
+  // ==========================================
+  events_list: {
+    path: '/locations/{location_id}/events',
+    method: 'get',
+    operationId: 'list_events',
+    pathParams: ['location_id'],
+    queryParams: [
+      'filter[from]',
+      'filter[to]',
+      'filter[master_ids][]',
+      'filter[service_ids][]',
+      'filter[resource_ids][]',
+      'filter[weekdays][]',
+      'filter[capacity]',
+      'filter[sort]',
+      'filter[include_deleted]',
+      'page',
+      'limit',
+      'include',
+    ],
+    spec: 'v2',
+  },
+  events_list_services: {
+    path: '/locations/{location_id}/events/services',
+    method: 'get',
+    operationId: 'search_event_services',
+    pathParams: ['location_id'],
+    queryParams: ['staff_id', 'term'],
+  },
+  events_list_duplication_strategies: {
+    path: '/locations/{location_id}/events/duplication_strategies',
+    method: 'get',
+    operationId: 'list_event_duplication_strategies_v2',
+    pathParams: ['location_id'],
+    spec: 'v2',
+  },
+  events_create: {
+    path: '/locations/{location_id}/events',
+    method: 'post',
+    operationId: 'create_event',
+    pathParams: ['location_id'],
+    queryParams: ['include'],
+    bodyParams: [
+      'staff_id',
+      'service_id',
+      'resource_instance_ids',
+      'label_ids',
+      'date',
+      'length',
+      'capacity',
+      'technical_break_duration',
+      'comment',
+      'color',
+      'instructions',
+      'stream_link',
+      'force',
+    ],
+    spec: 'v2',
+  },
+  events_delete: {
+    path: '/locations/{location_id}/events/{event_id}',
+    method: 'delete',
+    operationId: 'delete_event',
+    pathParams: ['location_id', 'event_id'],
+    spec: 'v2',
+  },
+  events_duplicate: {
+    path: '/locations/{location_id}/events/{event_id}/duplicate',
+    method: 'post',
+    operationId: 'duplicate_event',
+    pathParams: ['location_id', 'event_id'],
+    bodyParams: ['dates', 'content_type', 'force'],
+    spec: 'v2',
+  },
+  events_create_duplication_strategy: {
+    path: '/locations/{location_id}/events/duplication_strategies',
+    method: 'post',
+    operationId: 'create_event_duplication_strategy_v2',
+    pathParams: ['location_id'],
+    bodyParams: ['title', 'repeat_mode_id', 'days', 'interval', 'content_type'],
+    spec: 'v2',
+  },
+  events_delete_duplication_strategy: {
+    path: '/locations/{location_id}/events/duplication_strategies/{strategy_id}',
+    method: 'delete',
+    operationId: 'delete_event_duplication_strategy_v2',
+    pathParams: ['location_id', 'strategy_id'],
+    spec: 'v2',
+  },
+  events_book_clients: {
+    path: '/locations/{location_id}/events/{event_id}/appointments/bulk',
+    method: 'post',
+    operationId: 'bulk_create_event_appointments',
+    pathParams: ['location_id', 'event_id'],
+    bodyParams: ['records'],
+    spec: 'v2',
+  },
+  events_reschedule_appointment: {
+    path: '/locations/{location_id}/events/{event_id}/appointments/{record_id}',
+    method: 'patch',
+    operationId: 'reschedule_event_appointment',
+    pathParams: ['location_id', 'event_id', 'record_id'],
+    queryParams: ['include'],
+    bodyParams: [
+      'reschedule_activity_id',
+      'with_comer',
+      'comment',
+      'clients_count',
+    ],
+    spec: 'v2',
   },
 
   // ==========================================
@@ -726,6 +846,125 @@ export const apiMapping: Record<string, ApiMapping> = {
  * or in `catalog/extended/*.yaml`, so the compliance test walks both maps.
  */
 export const multiApiMapping: Record<string, ApiMapping[]> = {
+  // Group events: reads that join two operations, and the updates that read
+  // the current state first because the API replaces what it is sent.
+  events_get: [
+    {
+      path: '/locations/{location_id}/events/{event_id}',
+      method: 'get',
+      operationId: 'get_event',
+      pathParams: ['location_id', 'event_id'],
+      queryParams: ['include'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/appointments',
+      method: 'get',
+      operationId: 'list_appointments',
+      pathParams: ['location_id'],
+      queryParams: ['filter[activity_id]', 'limit', 'include'],
+      spec: 'v2',
+    },
+  ],
+  events_list_dates: [
+    {
+      path: '/locations/{location_id}/events/dates',
+      method: 'get',
+      operationId: 'list_event_dates',
+      pathParams: ['location_id'],
+      queryParams: ['filter[from]', 'filter[to]'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/events/filters',
+      method: 'get',
+      operationId: 'list_event_filters',
+      pathParams: ['location_id'],
+      queryParams: ['filter[from]', 'filter[to]'],
+      spec: 'v2',
+    },
+  ],
+  events_update: [
+    {
+      path: '/locations/{location_id}/events/{event_id}',
+      method: 'get',
+      operationId: 'get_event',
+      pathParams: ['location_id', 'event_id'],
+      queryParams: ['include'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/events/{event_id}',
+      method: 'put',
+      operationId: 'update_event',
+      pathParams: ['location_id', 'event_id'],
+      queryParams: ['include'],
+      bodyParams: [
+        'staff_id',
+        'service_id',
+        'resource_instance_ids',
+        'label_ids',
+        'date',
+        'length',
+        'capacity',
+        'technical_break_duration',
+        'comment',
+        'color',
+        'instructions',
+        'stream_link',
+        'force',
+      ],
+      spec: 'v2',
+    },
+  ],
+  events_update_duplication_strategy: [
+    {
+      path: '/locations/{location_id}/events/duplication_strategies',
+      method: 'get',
+      operationId: 'list_event_duplication_strategies_v2',
+      pathParams: ['location_id'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/events/duplication_strategies/{strategy_id}',
+      method: 'put',
+      operationId: 'update_event_duplication_strategy_v2',
+      pathParams: ['location_id', 'strategy_id'],
+      bodyParams: [
+        'title',
+        'repeat_mode_id',
+        'days',
+        'interval',
+        'content_type',
+      ],
+      spec: 'v2',
+    },
+  ],
+  events_update_appointment: [
+    {
+      path: '/locations/{location_id}/appointments',
+      method: 'get',
+      operationId: 'list_appointments',
+      pathParams: ['location_id'],
+      queryParams: ['filter[activity_id]', 'limit', 'include'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/events/{event_id}/appointments/{record_id}',
+      method: 'put',
+      operationId: 'update_event_appointment',
+      pathParams: ['location_id', 'event_id', 'record_id'],
+      queryParams: ['include'],
+      bodyParams: [
+        'attendance_service_item',
+        'label_ids',
+        'clients_count',
+        'comment',
+        'color',
+      ],
+      spec: 'v2',
+    },
+  ],
   analytics_get_service_mix_trend: [
     {
       path: '/locations/{location_id}/appointments',

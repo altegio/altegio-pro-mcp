@@ -62,18 +62,22 @@ operations:
     tier: core
     facets: [ops]
     tool_name: appointments_delete
-    param_renames:
-      record_id: appointment_id
     write_allowed: false
+    notes: >
+      The V2 operation supersedes the V1 one with the same id; the curated tool
+      still calls the V1 route until it is migrated.
 
   # --- team members --------------------------------------------------------
-  get_team_member_list:
+  list_team_members:
     domain: team_members
     tier: core
     facets: [ops, catalog]
     tool_name: team_members_list
-    projection: [id, name, specialization, position.title, hidden, fired]
+    supersedes: [get_team_member_list]
     write_allowed: false
+    notes: >
+      Supersedes the unfiltered V1 list; the curated tool still calls the V1
+      route until it is migrated.
   create_team_member_quick:
     domain: team_members
     tier: core
@@ -98,22 +102,26 @@ operations:
     write_allowed: false
 
   # --- positions -----------------------------------------------------------
-  get_position_list:
+  list_positions:
     domain: positions
     tier: core
     facets: [catalog, onboarding]
     tool_name: positions_list
-    projection: [id, title]
+    supersedes: [get_position_list]
     write_allowed: false
-  create_position_quick:
+    notes: >
+      Supersedes the deprecated V1 list; the curated tool still calls the V1
+      route until it is migrated.
+  create_position:
     domain: positions
     tier: core
     facets: [catalog, onboarding]
     tool_name: positions_create
+    supersedes: [create_position_quick]
     write_allowed: false
     notes: >
-      Deprecated but still the only public V1 position create operation. Public
-      V1 has no supported position update or delete; do not use internal V2.
+      Supersedes the deprecated V1 quick create; the curated tool still calls
+      the V1 route until it is migrated.
 
   # --- services ------------------------------------------------------------
   get_service_list:

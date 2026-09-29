@@ -6,10 +6,10 @@ A TypeScript [Model Context Protocol](https://modelcontextprotocol.io) server fo
 Altegio business owners, administrators, and team members. It provides
 administrative B2B operations, client workflows, onboarding, and analytics.
 
-**96 tools served (102 defined, 6 withheld from every view)** — see the generated
+**111 tools served (117 defined, 6 withheld from every view)** — see the generated
 [tool surface](docs/architecture/tool-surface.md) for exact membership and gates.
-The surface includes a 28-tool analytics pack, a 3-tool API explorer, and
-12 onboarding wizard tools. The API explorer executes reads only; administrative
+The surface includes a 28-tool analytics pack, a 15-tool group events pack, a
+3-tool API explorer, and 12 onboarding wizard tools. The API explorer executes reads only; administrative
 writes use curated tools. The six unavailable report-builder tools are withheld
 because their upstream report-data service is not usable.
 
@@ -84,11 +84,23 @@ Tool inputs and structured outputs are published as JSON Schema. Curated tools
 reject unknown top-level arguments rather than silently discarding misspelled
 filters or update fields. Expected execution failures use MCP `isError` results.
 
-The public vocabulary is **location**, **team member**, **appointment**, and
-**client**. Team-member tools are `team_members_list`, `team_members_create`,
-`team_members_update`, and `team_members_delete`; the onboarding batch is
+The public vocabulary is **location**, **team member**, **appointment**,
+**event**, **client**, **service** and **resource**. Team-member tools are
+`team_members_list`, `team_members_create`, `team_members_update`, and
+`team_members_delete`; the onboarding batch is
 `onboarding_add_team_members_batch`. See [CHANGELOG.md](CHANGELOG.md) for breaking
-changes. Upstream V1 wire names remain inside adapters where required.
+changes. Upstream wire names remain inside adapters, and so does the API
+version: a tool or catalog operation is one capability whichever version serves
+it, V2 where it can and V1 only where V2 has no equivalent.
+
+Group events — classes, workshops and other sessions many clients book into —
+are the `events_*` pack: `events_list`, `events_get` (with the bookings),
+`events_list_dates`, `events_list_services`, `events_create`, `events_update`,
+`events_delete`, `events_duplicate`, the duplication patterns
+(`events_list_duplication_strategies`, `events_create_duplication_strategy`,
+`events_update_duplication_strategy`, `events_delete_duplication_strategy`),
+`events_book_clients` (one client or up to 50, partial success reported per
+client), `events_update_appointment` and `events_reschedule_appointment`.
 
 Every collection result uses one pagination contract. Inputs are `page`
 (1-based) and `page_size` (default 25, maximum 300 unless a tool documents a

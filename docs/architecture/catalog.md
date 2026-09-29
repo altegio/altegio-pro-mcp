@@ -13,7 +13,8 @@ See [ADR-001](2026-09-07-mcp-platform-architecture.md) D2 (tool tiers), D4
 ```
 ../biz.erp.api.docs                      catalog/overlay/*.yaml
   docs/en/b2b-v1/openapi.yaml   +          domain, tier, facets, tool_name,
-  docs/en/b2b-v3/openapi.yaml              description, hidden_params,
+  docs/en/b2b-v2/openapi.yaml              description, hidden_params,
+  docs/en/b2b-v3/openapi.yaml
   (read-only, never modified)              param_renames, projection,
             │                              write_allowed
             └──────────────┬───────────────────────┘
@@ -28,20 +29,48 @@ See [ADR-001](2026-09-07-mcp-platform-architecture.md) D2 (tool tiers), D4
   search · describe · call             (later: generated domain tools)
 ```
 
-The build reads both specs, resolves `$ref`-ed path items and local/relative
+The build reads the three specs, resolves `$ref`-ed path items and local/relative
 schema refs, and writes one entry per operation:
 
 | Field                                      | Notes                                                                                                                                                                                                                                            |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `operationId`                              | Spec-native identifier; unique across both specs (the build fails on a clash).                                                                                                                                                                   |
+| `operationId`                              | Spec-native identifier, unique across the specs. A V2 id that ends in `_v2` is catalogued without the suffix; any clash other than a V2 operation retiring its V1 twin fails the build (see below).                                              |
 | `method`, `path`                           | The real HTTP method and path, with the spec's own parameter spelling. V1 paths are the spec's canonical URLs (`/locations/{location_id}/appointments/…`); the backend also accepts the legacy spellings, which the catalog does not carry.      |
 | `displayPath`                              | The same path with legacy segments renamed to canonical ones (`{record_id}` → `{appointment_id}`). What the model is shown; `path` is what gets called.                                                                                          |
 | `summary`, `description`, `tags`, `domain` | `domain` comes from the OpenAPI tag, or from the overlay when it overrides it.                                                                                                                                                                   |
 | `deprecated`, `security`                   | Auth requirement and scheme names.                                                                                                                                                                                                               |
 | `parameters`                               | Name, `in`, required, one-line description, shallow schema. Transport plumbing (`Accept`, `Authorization`, `Content-Type`, `User-Token`) is dropped by name — several V1 path files declare those as _query_ parameters, two of them misspelled. |
 | `requestBody`, `response`                  | Dereferenced to a bounded depth (see below). The V1 `{success, data, meta}` envelope is unwrapped, so the schema describes the payload a caller actually receives.                                                                               |
-| `source`, `status`                         | `v1` is live; `v3` is the preview contract, carrying `x-altegio-status`.                                                                                                                                                                         |
+| `source`, `status`                         | `v1` and `v2` are live; `v3` is the preview contract, carrying `x-altegio-status`. Only the preview source is shown to the model.                                                                                                                |
 | `curation`                                 | Whatever the overlay says about this operation.                                                                                                                                                                                                  |
+
+### V2 supersedes V1
+
+V1 and V2 are both live, and many operations exist in both. Clients see one
+operation per capability: V2 is canonical, and V1 stays only where V2 lacks the
+capability (product owner, 2026-09-29). The build therefore retires the V1 twin
+of every V2 operation in one of two ways:
+
+- **Same id.** A V2 id is catalogued without its `_v2` suffix
+  (`get_event_date_range_v2` → `get_event_date_range`). When the V1 spec uses
+  that id too, the V1 operation is retired with reason `same-id`.
+- **Declared.** When the twins have different ids, the V2 operation's overlay
+  entry names the V1 ids it replaces under `supersedes`
+  (`list_events: {supersedes: [search_events]}`), and they are retired with
+  reason `declared`.
+
+A retired operation leaves `operations` and is listed under `superseded` with
+its method, path and `supersededBy`. The executor uses that list to answer a
+retired id with a pointer to its replacement, not with "unknown operation".
+The build fails when a `supersedes` entry names something other than a V1
+operation, when an operation is retired twice, when a spec that supersedes
+nothing claims a twin, or when the retired operation still carries curation.
+Move the curation to the surviving operation.
+
+No version reaches the model. Search and describe results show no `v1`/`v2`
+source, and `api_call_operation` shows the path without its `/api/v2` prefix.
+Only the V3 preview is marked, because it is a future contract rather than a
+live one. A V1 operation that V2 does not replace keeps its V1 path.
 
 ### Bounded depth (D8)
 
@@ -101,8 +130,9 @@ and workflow are in [`catalog/overlay/README.md`](../../catalog/overlay/README.m
 Fields: `domain`, `tier` (`core` | `pack` | `executor-only`), `facets`,
 `tool_name`, `description`, `hidden_params`, `param_renames` (legacy → canonical,
 e.g. `staff_id` → `team_member_id`), `projection` (result field allowlist),
-`write_allowed`, `notes`. Every field is optional; an unknown field, an invalid
-`tier` or a duplicate `operationId` fails the build, and an overlay entry that
+`write_allowed`, `supersedes` (the V1 ids a V2 operation replaces), `notes`.
+Every field is optional. The build fails on an unknown field, an invalid `tier`,
+a duplicate `operationId` or a `supersedes` that is not a list of ids. An overlay entry that
 matches no operation is reported as a warning — that is the drift signal when the
 spec repository renames or drops an operation.
 
@@ -120,11 +150,13 @@ tool already owns.
   path and parameter names, with canonical/legacy vocabulary synonyms so a query
   in either glossary reaches the operation. Deterministic, hence testable.
 - `describe.ts` — renders one entry as a contract: parameters with types and
-  requiredness, request and response shapes, auth, deprecation, source/status,
+  requiredness, request and response shapes, auth, deprecation, preview status,
   the curated tool that may already do the job, and the canonical-alias notes.
+  A retired id is answered with `replaced_by`.
 - `call.ts` — binds canonical parameter names onto the spec's spelling, validates
   against the catalog, builds path and query, and refuses anything that is not a
-  documented V1 `GET`. Under a declared location scope it also requires and
+  documented live `GET`. It calls a V2 operation under `/api/v2` and unwraps its
+  JSON:API document. Under a declared location scope it also requires and
   validates an explicit `location_id`, `company_id` or `salon_id`; chain-level,
   entity-only and company-less reads are refused because a numeric URL segment
   is not proof of location ownership.
@@ -170,8 +202,9 @@ Rebuild and read the summary line for the live figures:
 ```
 $ npm run catalog:build
   v1  docs/en/b2b-v1/openapi.yaml → 261 operations
+  v2  docs/en/b2b-v2/openapi.yaml → 51 operations
   v3  docs/en/b2b-v3/openapi.yaml → 59 operations
-catalog: 320 operations, 32 curated, 30 domains, 1723 KB → src/generated/catalog.json
+catalog: 346 operations, 56 curated, 25 superseded, 30 domains, 1979 KB → src/generated/catalog.json
 ```
 
 `catalog.json` is excluded from eslint and prettier (it is reviewed as data, and

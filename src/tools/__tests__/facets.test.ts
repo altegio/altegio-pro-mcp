@@ -85,7 +85,7 @@ describe('static views', () => {
     }
   });
 
-  it('serves appointments on ops and nothing from the catalog', () => {
+  it('serves appointments, events and clients on ops and nothing from the catalog', () => {
     const index = buildFacetIndex(tools);
     expect([...index.members('ops')].sort()).toEqual(
       [
@@ -106,6 +106,21 @@ describe('static views', () => {
         'appointments_create',
         'appointments_delete',
         'appointments_list',
+        'events_book_clients',
+        'events_create',
+        'events_create_duplication_strategy',
+        'events_delete',
+        'events_delete_duplication_strategy',
+        'events_duplicate',
+        'events_get',
+        'events_list',
+        'events_list_dates',
+        'events_list_duplication_strategies',
+        'events_list_services',
+        'events_reschedule_appointment',
+        'events_update',
+        'events_update_appointment',
+        'events_update_duplication_strategy',
         'locations_list',
         'users_get_current',
         'appointments_update',

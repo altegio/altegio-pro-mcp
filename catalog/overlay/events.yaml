@@ -1,0 +1,140 @@
+# Group events — the operations behind the curated `events_*` tools.
+#
+# Format: catalog/overlay/_schema.yaml. Where V1 and V2 describe the same
+# operation, V2 is canonical (product owner, 2026-09-29): a V1 twin with the
+# same operationId is retired by the build, and a twin with a different id is
+# named under `supersedes` here. The V1-only operations that V2 lacks stay in the
+# catalog as they are (event services, memberships for an event, event
+# schedules).
+
+version: 1
+
+operations:
+  # --- reads ---------------------------------------------------------------
+  list_events:
+    domain: events
+    tier: core
+    facets: [ops]
+    tool_name: events_list
+    supersedes: [search_events]
+    notes: >
+      The curated tool always sends filter[include_deleted] and drops cancelled
+      events itself, because without it the API refuses any period that starts
+      before "now" in the location's time zone.
+  get_event:
+    domain: events
+    tier: core
+    facets: [ops]
+    tool_name: events_get
+    notes: >
+      events_get also reads the event's bookings from list_appointments
+      (filter[activity_id]).
+  list_event_dates:
+    domain: events
+    tier: core
+    facets: [ops]
+    tool_name: events_list_dates
+    supersedes: [search_event_dates]
+  get_event_date_range:
+    domain: events
+    tier: core
+    facets: [ops]
+    tool_name: events_list_dates
+    notes: >
+      events_list_dates derives the first and last date from list_event_dates,
+      so it does not call this operation.
+  list_event_filters:
+    domain: events
+    tier: core
+    facets: [ops]
+    tool_name: events_list_dates
+    supersedes: [get_event_search_filters]
+  search_event_services:
+    domain: events
+    tier: core
+    facets: [ops]
+    tool_name: events_list_services
+    notes: V1 only; V2 has no list of the services an event can run.
+  list_event_duplication_strategies:
+    domain: events
+    tier: core
+    facets: [ops]
+    tool_name: events_list_duplication_strategies
+
+  # --- writes --------------------------------------------------------------
+  create_event:
+    domain: events
+    tier: core
+    facets: [ops]
+    tool_name: events_create
+    write_allowed: false
+  update_event:
+    domain: events
+    tier: core
+    facets: [ops]
+    tool_name: events_update
+    write_allowed: false
+    notes: >
+      PUT replaces the event; the curated tool reads it first and sends every
+      field back with the changes applied.
+  delete_event:
+    domain: events
+    tier: core
+    facets: [ops]
+    tool_name: events_delete
+    write_allowed: false
+  duplicate_event:
+    domain: events
+    tier: core
+    facets: [ops]
+    tool_name: events_duplicate
+    write_allowed: false
+  create_event_duplication_strategy:
+    domain: events
+    tier: core
+    facets: [ops]
+    tool_name: events_create_duplication_strategy
+    write_allowed: false
+  update_event_duplication_strategy:
+    domain: events
+    tier: core
+    facets: [ops]
+    tool_name: events_update_duplication_strategy
+    write_allowed: false
+  delete_event_duplication_strategy:
+    domain: events
+    tier: core
+    facets: [ops]
+    tool_name: events_delete_duplication_strategy
+    write_allowed: false
+  bulk_create_event_appointments:
+    domain: events
+    tier: core
+    facets: [ops]
+    tool_name: events_book_clients
+    write_allowed: false
+  create_event_appointment:
+    domain: events
+    tier: core
+    facets: [ops]
+    tool_name: events_book_clients
+    write_allowed: false
+    notes: >
+      events_book_clients books one client through the bulk operation as well,
+      so a single booking and a batch share one contract.
+  update_event_appointment:
+    domain: events
+    tier: core
+    facets: [ops]
+    tool_name: events_update_appointment
+    write_allowed: false
+    notes: >
+      PUT rewrites the booking's price and replaces its tags and product items;
+      the curated tool reads the booking first and refuses one with product
+      items.
+  reschedule_event_appointment:
+    domain: events
+    tier: core
+    facets: [ops]
+    tool_name: events_reschedule_appointment
+    write_allowed: false

@@ -10,6 +10,7 @@
 import {
   allOperations,
   curatedToolFor,
+  isLiveSource,
   type CatalogOperation,
 } from './catalog.js';
 
@@ -143,7 +144,8 @@ export interface SearchHit {
   path: string;
   summary: string;
   domain: string;
-  source: string;
+  /** Set for preview operations only; a live operation carries no version. */
+  source?: string;
   score: number;
   deprecated?: boolean;
   status?: string;
@@ -233,7 +235,7 @@ const METHOD_RANK = new Map(
 );
 
 function tieBreak(a: CatalogOperation, b: CatalogOperation): number {
-  // Live V1 before V3 preview: a preview operation cannot be called yet.
+  // Live operations before V3 preview: a preview operation cannot be called yet.
   if (a.source !== b.source) return a.source.localeCompare(b.source);
   const rank =
     (METHOD_RANK.get(a.method) ?? 9) - (METHOD_RANK.get(b.method) ?? 9);
@@ -265,7 +267,7 @@ export function searchOperations(
   const offset = (page - 1) * limit;
 
   const candidates = allOperations().filter((op) => {
-    if (!filters.includePreview && op.source !== 'v1') return false;
+    if (!filters.includePreview && !isLiveSource(op.source)) return false;
     if (wantedDomain && op.domain !== wantedDomain) return false;
     if (wantedMethod && op.method !== wantedMethod) return false;
     return true;
@@ -310,7 +312,7 @@ export function searchOperations(
       path: op.displayPath,
       summary: op.summary ?? op.description?.split('\n')[0] ?? '',
       domain: op.domain,
-      source: op.source,
+      ...(isLiveSource(op.source) ? {} : { source: op.source }),
       score: Math.round(score * 100) / 100,
       ...(op.deprecated ? { deprecated: true } : {}),
       ...(op.status ? { status: op.status } : {}),

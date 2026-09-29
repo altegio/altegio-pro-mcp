@@ -93,6 +93,18 @@ operation_entry:
         with a non-GET method. Defaults to false; the current executor
         iteration refuses every non-GET regardless.
 
+    supersedes:
+      type: array
+      items: { type: string }
+      minItems: 1
+      description: >
+        The V1 operationIds this V2 operation replaces when the two specs name
+        the same capability differently. V2 is canonical, so the build retires
+        each listed V1 operation, and the executor answers its id with this one.
+        A V1 twin with the same operationId is retired without being listed.
+        Allowed only on a V2 operation; each listed id must be a V1 operation
+        that carries no curation of its own and that nothing else retires.
+
     notes:
       type: string
       description: >
@@ -103,11 +115,12 @@ operation_entry:
 example:
   version: 1
   operations:
-    get_team_member_list:
+    list_team_members:
       domain: team_members
       tier: core
       facets: [ops, catalog]
       tool_name: team_members_list
+      supersedes: [get_team_member_list]
       description: >
         List the team members of a location with their positions, specializations
         and ratings. Use this before booking to pick who provides a service.

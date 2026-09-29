@@ -9,7 +9,7 @@
  */
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
-import { catalog } from '../executor/catalog.js';
+import { catalog, isLiveSource } from '../executor/catalog.js';
 import { MAX_SEARCH_RESULTS, searchOperations } from '../executor/search.js';
 import { describeOperation } from '../executor/describe.js';
 import { callOperation } from '../executor/call.js';
@@ -41,7 +41,7 @@ const searchOutput = {
           status: { type: 'string' as const },
           tool: { type: 'string' as const },
         },
-        required: ['operationId', 'method', 'path', 'domain', 'source'],
+        required: ['operationId', 'method', 'path', 'domain'],
       },
     },
     pagination: paginationOutput,
@@ -125,7 +125,9 @@ export const searchOperationsTool = defineTool({
 
     const lines = result.hits.map((hit, index) => {
       const flags = [
-        hit.source !== 'v1' ? `${hit.source} ${hit.status ?? 'preview'}` : null,
+        hit.source && !isLiveSource(hit.source)
+          ? `${hit.source} ${hit.status ?? 'preview'}`
+          : null,
         hit.deprecated ? 'deprecated' : null,
       ].filter(Boolean);
       return (
@@ -159,8 +161,8 @@ export const describeOperationTool = defineTool({
   description:
     'Read the full contract of one API operation before calling it: every parameter ' +
     'with type, requiredness and description, the request body shape, the response shape, ' +
-    'whether a logged-in session is needed, whether it is deprecated, which spec it comes ' +
-    'from, and which legacy parameter names are accepted under canonical ones (for example ' +
+    'whether a logged-in session is needed, whether it is deprecated or only a preview of a ' +
+    'future contract, and which legacy parameter names are accepted under canonical ones (for example ' +
     '`staff_id` is accepted as `team_member_id`). Use it after `api_search_operations` ' +
     'and before `api_call_operation`. Reads the built-in catalog only — no API call.',
   annotations: {
