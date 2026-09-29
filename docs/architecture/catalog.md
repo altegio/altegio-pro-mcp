@@ -13,7 +13,8 @@ See [ADR-001](2026-09-07-mcp-platform-architecture.md) D2 (tool tiers), D4
 ```
 ../biz.erp.api.docs                      catalog/overlay/*.yaml
   docs/en/b2b-v1/openapi.yaml   +          domain, tier, facets, tool_name,
-  docs/en/b2b-v3/openapi.yaml              description, hidden_params,
+  docs/en/b2b-v2/openapi.yaml              description, hidden_params,
+  docs/en/b2b-v3/openapi.yaml
   (read-only, never modified)              param_renames, projection,
             │                              write_allowed
             └──────────────┬───────────────────────┘
@@ -28,12 +29,12 @@ See [ADR-001](2026-09-07-mcp-platform-architecture.md) D2 (tool tiers), D4
   search · describe · call             (later: generated domain tools)
 ```
 
-The build reads both specs, resolves `$ref`-ed path items and local/relative
+The build reads the three specs, resolves `$ref`-ed path items and local/relative
 schema refs, and writes one entry per operation:
 
 | Field                                      | Notes                                                                                                                                                                                                                                            |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `operationId`                              | Spec-native identifier; unique across both specs (the build fails on a clash).                                                                                                                                                                   |
+| `operationId`                              | Spec-native identifier, unique across the specs. A V2 operation that reuses a V1 id is catalogued as `<id>_v2` with the spec id in `specOperationId`; any other clash fails the build.                                                           |
 | `method`, `path`                           | The real HTTP method and path, with the spec's own parameter spelling.                                                                                                                                                                           |
 | `displayPath`                              | The same path with legacy segments renamed to canonical ones (`{record_id}` → `{appointment_id}`). What the model is shown; `path` is what gets called.                                                                                          |
 | `summary`, `description`, `tags`, `domain` | `domain` comes from the OpenAPI tag, or from the overlay when it overrides it.                                                                                                                                                                   |
@@ -169,9 +170,10 @@ Rebuild and read the summary line for the live figures:
 
 ```
 $ npm run catalog:build
-  v1  docs/en/b2b-v1/openapi.yaml → 260 operations
-  v3  docs/en/b2b-v3/openapi.yaml → 57 operations
-catalog: 317 operations, 25 curated, 30 domains, 1709 KB → src/generated/catalog.json
+  v1  docs/en/b2b-v1/openapi.yaml → 263 operations
+  v2  docs/en/b2b-v2/openapi.yaml → 51 operations
+  v3  docs/en/b2b-v3/openapi.yaml → 59 operations
+catalog: 373 operations, 32 curated, 30 domains, 2053 KB → src/generated/catalog.json
 ```
 
 `catalog.json` is excluded from eslint and prettier (it is reviewed as data, and

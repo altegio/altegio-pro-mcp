@@ -11,6 +11,7 @@ import {
   acceptedNames,
   canonicalName,
   getOperation,
+  isLiveSource,
   type CatalogOperation,
   type CatalogParameter,
 } from './catalog.js';
@@ -143,6 +144,7 @@ export function describeOperation(operationId: string): DescribeOutput {
 
   const structured: Record<string, unknown> = {
     operation_id: op.operationId,
+    ...(op.specOperationId ? { spec_operation_id: op.specOperationId } : {}),
     method: op.method,
     path: op.displayPath,
     ...(op.path !== op.displayPath ? { spec_path: op.path } : {}),
@@ -162,7 +164,7 @@ export function describeOperation(operationId: string): DescribeOutput {
     parameters,
     ...(op.requestBody ? { request_body: op.requestBody } : {}),
     ...(op.response ? { response: op.response } : {}),
-    callable_by_executor: op.method === 'GET' && op.source === 'v1',
+    callable_by_executor: op.method === 'GET' && isLiveSource(op.source),
     ...(curatedTool ? { curated_tool: curatedTool } : {}),
     ...(op.curation?.tier ? { tier: op.curation.tier } : {}),
     ...(op.curation?.projection ? { projection: op.curation.projection } : {}),
@@ -211,7 +213,7 @@ function renderText(
           ? `Use the curated tool \`${op.curation.tool_name}\`.`
           : 'Writes are available through curated tools only.')
     );
-  } else if (op.source !== 'v1') {
+  } else if (!isLiveSource(op.source)) {
     lines.push(
       `Not callable yet: ${op.source} is a preview contract (${op.status ?? 'preview'}).`
     );
@@ -249,6 +251,7 @@ function renderText(
       '',
       `Response ${op.response.statusCode ?? '200'}` +
         `${op.response.envelope === 'v1' ? ' (the `{success, data, meta}` envelope is unwrapped for you)' : ''}` +
+        `${op.response.envelope === 'jsonapi' ? ' (the JSON:API `{data, meta}` document is unwrapped for you)' : ''}` +
         ': see `response.schema` in the structured result.'
     );
   }

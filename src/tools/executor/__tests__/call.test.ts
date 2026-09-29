@@ -170,6 +170,74 @@ describe('api_call_operation', () => {
     });
   });
 
+  describe('V2 operations', () => {
+    it('reaches /api/v2 through the v1-bound transport and unwraps JSON:API', async () => {
+      mockOk({
+        data: [
+          {
+            type: 'activity_date',
+            id: '2026-07-18',
+            attributes: { date: '2026-07-18' },
+          },
+        ],
+        meta: [],
+      });
+
+      const result = await callOperation(client, 'list_event_dates', {
+        location_id: 4564,
+        'filter[from]': '2026-07-16 00:00:00',
+        'filter[to]': '2026-07-31 23:59:59',
+      });
+
+      const url = new URL(fetchedUrl());
+      expect(url.pathname).toBe('/api/v2/locations/4564/events/dates');
+      expect(url.searchParams.get('filter[from]')).toBe('2026-07-16 00:00:00');
+      const init = (global.fetch as jest.Mock).mock.calls[0]?.[1] as {
+        headers: Record<string, string>;
+      };
+      expect(init.headers.Accept).toBe('application/vnd.api.v2+json');
+
+      expect(result.structuredContent).toMatchObject({
+        operation_id: 'list_event_dates',
+        api_version: 'v2',
+        data: [
+          {
+            type: 'activity_date',
+            id: '2026-07-18',
+            attributes: { date: '2026-07-18' },
+          },
+        ],
+      });
+      // V2 sends an empty meta as `[]`; it carries nothing.
+      expect(result.structuredContent.meta).toBeUndefined();
+      expect(result.text).toContain('GET /api/v2/locations/4564/events/dates');
+    });
+
+    it('keeps a JSON:API document with side-loads whole', async () => {
+      const body = {
+        data: { type: 'activity', id: '5', attributes: {} },
+        included: [{ type: 'service', id: '7', attributes: {} }],
+      };
+      mockOk(body);
+
+      const result = await callOperation(client, 'get_event_v2', {
+        location_id: 4564,
+        event_id: 5,
+      });
+      expect(result.structuredContent.data).toEqual(body);
+    });
+
+    it('still refuses a V2 write', async () => {
+      await expect(
+        callOperation(client, 'bulk_create_event_appointments', {
+          location_id: 4564,
+          event_id: 5,
+        })
+      ).rejects.toThrow(/writes are available through curated tools/);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+  });
+
   describe('canonical parameter names', () => {
     it('binds a canonical name onto a legacy path segment', () => {
       const op = getOperation('get_appointment');

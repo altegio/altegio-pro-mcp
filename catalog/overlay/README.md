@@ -7,7 +7,7 @@ description, hidden parameters, canonical parameter names, result projection and
 the executor write allowlist.
 
 ```
-../biz.erp.api.docs (b2b-v1, b2b-v3)   +   catalog/overlay/*.yaml
+../biz.erp.api.docs (b2b-v1, v2, v3)  +   catalog/overlay/*.yaml
                               │
                     scripts/catalog/build.mjs
                               ▼
@@ -25,7 +25,8 @@ the executor write allowlist.
 ## Shape
 
 Each data file is keyed by `operationId` — the identifier from the OpenAPI spec,
-unique across the v1 and v3 specs and verified as such by the build:
+unique across the specs (a V2 id that repeats a V1 one is catalogued with a
+`_v2` suffix) and verified as such by the build:
 
 ```yaml
 version: 1

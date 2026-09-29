@@ -13,6 +13,9 @@ repository. Inside the checkout the build reads:
 
 - `docs/en/b2b-v1/openapi.yaml` — V1, the live API every curated tool uses
   (path items under `docs/en/paths/**`, schemas under `docs/en/schemas/**`)
+- `docs/en/b2b-v2/openapi.yaml` — V2, the live JSON:API tree the ERP web client
+  uses; its reads are callable through the executor. A V2 operation that reuses
+  a V1 `operationId` is catalogued as `<operationId>_v2`
 - `docs/en/b2b-v3/openapi.yaml` — V3 preview, described in the catalog but not
   callable yet
 

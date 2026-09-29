@@ -115,6 +115,7 @@ describe('catalog build', () => {
         path: string;
         displayPath: string;
         source: string;
+        specOperationId?: string;
         status?: string;
         curation?: { tool_name?: string; projection?: string[] };
       }>;
@@ -126,11 +127,23 @@ describe('catalog build', () => {
       expect(ids.size).toBe(catalog.operations.length);
     });
 
-    it('carries both spec sources and marks V3 entries with a status', () => {
-      expect(catalog.sources.map((s) => s.source)).toEqual(['v1', 'v3']);
+    it('carries every spec source and marks V3 entries with a status', () => {
+      expect(catalog.sources.map((s) => s.source)).toEqual(['v1', 'v2', 'v3']);
       const v3 = catalog.operations.filter((o) => o.source === 'v3');
       expect(v3.length).toBeGreaterThan(0);
       for (const op of v3) expect(op.status).toBeDefined();
+    });
+
+    it('suffixes a V2 operation that reuses a V1 operationId and keeps the spec id', () => {
+      const v1 = catalog.operations.find((o) => o.operationId === 'get_event');
+      const v2 = catalog.operations.find(
+        (o) => o.operationId === 'get_event_v2'
+      );
+      expect(v1?.source).toBe('v1');
+      expect(v1?.specOperationId).toBeUndefined();
+      expect(v2?.source).toBe('v2');
+      expect(v2?.specOperationId).toBe('get_event');
+      expect(v2?.path).toBe('/locations/{location_id}/events/{event_id}');
     });
 
     it('renames legacy path segments only in displayPath', () => {

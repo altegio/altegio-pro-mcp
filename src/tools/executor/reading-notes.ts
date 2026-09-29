@@ -58,6 +58,10 @@ const NOTES_BY_DOMAIN: Readonly<Record<string, readonly string[]>> = {
   memberships: [
     'Memberships and gift cards are prepaid: sold once (revenue then), redeemed later (a write-off against the visit, no new cash). Value remaining and expiry are what the loyalty dataset reports.',
   ],
+  events: [
+    'An event is a group class or other session many clients book into (the specs call it an `activity`); `capacity` is its seat count and each booking is an appointment on the event.',
+    'The V2 event reads (`list_events`, `list_event_dates`, `get_event_date_range_v2`, `list_event_filters`) require `filter[from]` and `filter[to]` as `YYYY-MM-DD HH:MM:SS`, and the period must not start before the current time in the location’s time zone — an earlier start is refused with 422. Start from tomorrow 00:00:00 when unsure of the time zone.',
+  ],
   schedule: [
     'Occupancy is booked time over scheduled time. A team member with no schedule contributes no scheduled time, so their occupancy is blank, not zero.',
   ],

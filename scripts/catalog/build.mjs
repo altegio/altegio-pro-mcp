@@ -2,10 +2,10 @@
 /**
  * Catalog build — ADR-001 D4.
  *
- * Reads the corporate OpenAPI specs (B2B v1, live; B2B v3, preview contract),
- * resolves `$ref`-ed path items and local/relative schema refs, merges the
- * curation overlay from `catalog/overlay/*.yaml`, and writes a deterministic
- * `src/generated/catalog.json` — one entry per operation.
+ * Reads the corporate OpenAPI specs (B2B v1 and v2, live; B2B v3, preview
+ * contract), resolves `$ref`-ed path items and local/relative schema refs,
+ * merges the curation overlay from `catalog/overlay/*.yaml`, and writes a
+ * deterministic `src/generated/catalog.json` — one entry per operation.
  *
  * The catalog is the source of truth for the executor tools
  * (`api_search_operations`, `api_describe_operation`,
@@ -72,9 +72,16 @@ const PLUMBING_HEADERS = new Set([
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'];
 const METHOD_RANK = new Map(METHODS.map((m, i) => [m, i]));
 
-/** Specs that feed the catalog. `b2b-v2` is internal-only by API-team policy. */
+/**
+ * Specs that feed the catalog, in precedence order. V2 reuses a number of V1
+ * operationIds (`get_event`, `duplicate_event`, …); a clashing V2 operation is
+ * catalogued under `<operationId><clashSuffix>` — the `_v2` suffix the V2 spec
+ * already uses for some of its own ids — and keeps the spec id in
+ * `specOperationId`. Any other clash still fails the build.
+ */
 const SPECS = [
   { source: 'v1', rel: 'docs/en/b2b-v1/openapi.yaml' },
+  { source: 'v2', rel: 'docs/en/b2b-v2/openapi.yaml', clashSuffix: '_v2' },
   { source: 'v3', rel: 'docs/en/b2b-v3/openapi.yaml' },
 ];
 
@@ -127,6 +134,7 @@ const TAG_DOMAINS = {
   notifications: 'notifications',
   'online booking settings': 'online_booking',
   'custom fields': 'custom_fields',
+  'booking users': 'clients',
   tags: 'tags',
   utilities: 'utilities',
 };
@@ -163,6 +171,7 @@ const KEY_ORDER = [
   'version',
   // operation entry
   'operationId',
+  'specOperationId',
   'method',
   'path',
   'displayPath',
@@ -535,10 +544,11 @@ function resolveTopSchema(schema, ctx) {
 }
 
 /**
- * The V1 `{success, data, meta}` wrapper is transport, not payload: the client
- * unwraps it and so does `api_call_operation`. Storing `data` directly keeps
- * the catalog describing what a caller actually receives and spends the depth
- * budget on the payload instead of the envelope.
+ * The V1 `{success, data, meta}` wrapper and the V2 JSON:API `{data, meta}`
+ * document are transport, not payload: the client unwraps the first and
+ * `api_call_operation` the second. Storing `data` directly keeps the catalog
+ * describing what a caller actually receives and spends the depth budget on
+ * the payload instead of the envelope.
  */
 function unwrapEnvelope(schema, ctx) {
   const { node, file } = resolveTopSchema(schema, ctx);
@@ -547,10 +557,14 @@ function unwrapEnvelope(schema, ctx) {
     node?.type === 'object' &&
     properties &&
     typeof properties === 'object' &&
-    properties.data !== undefined &&
-    properties.success !== undefined
+    properties.data !== undefined
   ) {
-    return { schema: properties.data, file, envelope: 'v1' };
+    if (properties.success !== undefined) {
+      return { schema: properties.data, file, envelope: 'v1' };
+    }
+    if (ctx.source === 'v2') {
+      return { schema: properties.data, file, envelope: 'jsonapi' };
+    }
   }
   return { schema, file: ctx.file };
 }
@@ -627,7 +641,7 @@ function readSpec({ source, rel }, docsRoot, warnings) {
       const operation = pathItem[method];
       if (!operation || typeof operation !== 'object') continue;
 
-      const ctx = { file: itemFile, rootFile: specFile, warnings };
+      const ctx = { file: itemFile, rootFile: specFile, source, warnings };
       const tags = Array.isArray(operation.tags) ? [...operation.tags] : [];
       const operationId =
         typeof operation.operationId === 'string' && operation.operationId
@@ -784,23 +798,27 @@ export function buildCatalog({ docsRoot, overlayDir }) {
   const sources = [];
   const operations = [];
 
+  const byId = new Map();
   for (const spec of SPECS) {
     const read = readSpec(spec, docsRoot, warnings);
     if (!read) continue;
     sources.push(read.meta);
-    operations.push(...read.operations);
-  }
 
-  const byId = new Map();
-  for (const op of operations) {
-    const clash = byId.get(op.operationId);
-    if (clash) {
-      throw new Error(
-        `duplicate operationId "${op.operationId}": ` +
-          `${clash.source} ${clash.method} ${clash.path} and ${op.source} ${op.method} ${op.path}`
-      );
+    for (const op of read.operations) {
+      if (spec.clashSuffix && byId.has(op.operationId)) {
+        op.specOperationId = op.operationId;
+        op.operationId = `${op.operationId}${spec.clashSuffix}`;
+      }
+      const clash = byId.get(op.operationId);
+      if (clash) {
+        throw new Error(
+          `duplicate operationId "${op.operationId}": ` +
+            `${clash.source} ${clash.method} ${clash.path} and ${op.source} ${op.method} ${op.path}`
+        );
+      }
+      byId.set(op.operationId, op);
+      operations.push(op);
     }
-    byId.set(op.operationId, op);
   }
 
   const curation = loadOverlay(overlayDir);

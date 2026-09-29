@@ -9,7 +9,7 @@
  */
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
-import { catalog } from '../executor/catalog.js';
+import { catalog, isLiveSource } from '../executor/catalog.js';
 import { MAX_SEARCH_RESULTS, searchOperations } from '../executor/search.js';
 import { describeOperation } from '../executor/describe.js';
 import { callOperation } from '../executor/call.js';
@@ -125,7 +125,11 @@ export const searchOperationsTool = defineTool({
 
     const lines = result.hits.map((hit, index) => {
       const flags = [
-        hit.source !== 'v1' ? `${hit.source} ${hit.status ?? 'preview'}` : null,
+        hit.source === 'v1'
+          ? null
+          : isLiveSource(hit.source)
+            ? hit.source
+            : `${hit.source} ${hit.status ?? 'preview'}`,
         hit.deprecated ? 'deprecated' : null,
       ].filter(Boolean);
       return (

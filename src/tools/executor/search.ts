@@ -10,6 +10,7 @@
 import {
   allOperations,
   curatedToolFor,
+  isLiveSource,
   type CatalogOperation,
 } from './catalog.js';
 
@@ -265,7 +266,7 @@ export function searchOperations(
   const offset = (page - 1) * limit;
 
   const candidates = allOperations().filter((op) => {
-    if (!filters.includePreview && op.source !== 'v1') return false;
+    if (!filters.includePreview && !isLiveSource(op.source)) return false;
     if (wantedDomain && op.domain !== wantedDomain) return false;
     if (wantedMethod && op.method !== wantedMethod) return false;
     return true;

@@ -6,6 +6,21 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — V2 operations in the API catalog, starting with events
+
+- **The catalog reads the B2B V2 spec** alongside V1 and the V3 preview:
+  51 operations, including the event endpoints the spec restored on
+  2026-09-29 — event list, dates and date range, filters, duplication
+  strategies, duplicate and bulk event appointments.
+- **`api_call_operation` runs V2 reads** (`list_events`, `list_event_dates`,
+  `get_event_date_range_v2`, `list_event_filters`,
+  `list_event_duplication_strategies_v2`, …) against `/api/v2` and unwraps the
+  JSON:API `{data, meta}` document. V2 writes are described but refused, like
+  every executor write.
+- `api_search_operations` finds V2 operations without `include_preview`; a V2
+  operation that reuses a V1 `operationId` is listed as `<operationId>_v2`,
+  and `api_describe_operation` names the spec id behind it.
+
 ### Fixed — an unknown session answers 404, so clients re-initialize
 
 - **HTTP transport** answers a request carrying an `Mcp-Session-Id` this

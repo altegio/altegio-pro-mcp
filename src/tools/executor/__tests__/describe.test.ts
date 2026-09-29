@@ -110,6 +110,25 @@ describe('api_describe_operation', () => {
     });
   });
 
+  it('marks a V2 read callable and names the spec id behind a suffixed one', () => {
+    const { text, structuredContent } = describeOperation(
+      'get_event_date_range_v2'
+    );
+    expect(structuredContent).toMatchObject({
+      operation_id: 'get_event_date_range_v2',
+      spec_operation_id: 'get_event_date_range',
+      source: 'v2',
+      path: '/locations/{location_id}/events/dates/range',
+      callable_by_executor: true,
+    });
+    expect(text).toContain('JSON:API `{data, meta}` document is unwrapped');
+    expect(text).not.toContain('Not callable');
+    // The live API refuses a period that starts in the past; the note says so.
+    expect(structuredContent.reading_notes).toEqual(
+      expect.arrayContaining([expect.stringContaining('filter[from]')])
+    );
+  });
+
   it('reports deprecation', () => {
     const { text, structuredContent } = describeOperation(
       'deprecated_get_service_category_list'

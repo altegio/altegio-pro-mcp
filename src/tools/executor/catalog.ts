@@ -48,7 +48,12 @@ export interface CatalogCuration {
 
 export interface CatalogOperation {
   operationId: string;
-  /** Which spec the operation comes from: `v1` is live, `v3` is a preview. */
+  /**
+   * The spec's own operationId when the catalog renamed the operation to keep
+   * ids unique — a V2 operation reusing a V1 id is catalogued as `<id>_v2`.
+   */
+  specOperationId?: string;
+  /** Which spec the operation comes from: `v1` and `v2` are live, `v3` is a preview. */
   source: string;
   method: string;
   /** Real HTTP path, with the spec's own parameter spelling. */
@@ -88,6 +93,14 @@ export interface Catalog {
 }
 
 export const catalog = catalogJson as unknown as Catalog;
+
+/** Specs served by the live API; anything else (`v3`) is a preview contract. */
+const LIVE_SOURCES = new Set(['v1', 'v2']);
+
+/** Whether an operation's spec is served by the live API today. */
+export function isLiveSource(source: string): boolean {
+  return LIVE_SOURCES.has(source);
+}
 
 /** Legacy spec name → canonical name (`staff_id` → `team_member_id`). */
 export const canonicalAliases: Record<string, string> =

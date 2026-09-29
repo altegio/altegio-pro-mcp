@@ -72,7 +72,7 @@ describe('api_search_operations ranking', () => {
 
   it('excludes V3 preview operations by default and includes them on request', () => {
     const hidden = searchOperations('oauth token', { limit: 10 });
-    expect(hidden.hits.every((h) => h.source === 'v1')).toBe(true);
+    expect(hidden.hits.every((h) => h.source !== 'v3')).toBe(true);
 
     const shown = searchOperations('oauth token', {
       includePreview: true,
@@ -80,6 +80,17 @@ describe('api_search_operations ranking', () => {
     });
     expect(shown.hits.some((h) => h.source === 'v3')).toBe(true);
     expect(shown.hits.find((h) => h.source === 'v3')?.status).toBe('preview');
+  });
+
+  it('finds live V2 operations without the preview flag', () => {
+    const { hits } = searchOperations('event dates', {
+      domain: 'events',
+      limit: 10,
+    });
+    expect(hits.map((h) => h.operationId)).toContain('list_event_dates');
+    expect(
+      hits.find((h) => h.operationId === 'list_event_dates')
+    ).toMatchObject({ source: 'v2', method: 'GET' });
   });
 
   it('filters by domain and by method', () => {
