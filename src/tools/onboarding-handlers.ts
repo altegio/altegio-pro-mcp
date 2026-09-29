@@ -923,12 +923,6 @@ export class OnboardingHandlers {
       const deletedCount = { success: 0, failed: 0 };
       const failedIds: number[] = [];
 
-      if (phase_name === 'positions') {
-        throw new Error(
-          'Positions cannot be rolled back: the supported public V1 API has list and quick-create operations but no position delete operation. The checkpoint was kept so the created IDs remain auditable.'
-        );
-      }
-
       // Delete entities based on phase type
       for (const id of entityIds) {
         try {
@@ -961,6 +955,9 @@ export class OnboardingHandlers {
             deletedCount.success++;
           } else if (phase_name === 'clients') {
             await this.client.deleteClient(location_id, id);
+            deletedCount.success++;
+          } else if (phase_name === 'positions') {
+            await this.client.deletePosition(location_id, id);
             deletedCount.success++;
           } else {
             deletedCount.success++;

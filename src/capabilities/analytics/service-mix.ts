@@ -408,7 +408,7 @@ export async function getServiceMixTrend(
         unattributed_service_lines: unattributedLines,
       },
       provenance: {
-        source: 'documented V1 appointment list',
+        source: 'documented appointment list',
         source_count: data.source_count,
         pages_scanned: data.pages,
         scanned_at: data.scanned_at,
@@ -766,7 +766,7 @@ export async function getClientServicePenetration(
         has_more: page * pageSize < candidates.length,
       },
       provenance: {
-        source: 'documented V1 appointment list',
+        source: 'documented appointment list',
         source_count: data.source_count,
         pages_scanned: data.pages,
         scanned_at: data.scanned_at,

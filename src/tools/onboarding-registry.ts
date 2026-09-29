@@ -74,7 +74,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_add_positions',
     description:
-      'Bulk create positions (for example Manager, Stylist, Receptionist) from a JSON array or CSV string. Create positions before team members so each team member can reference position_id. The documented public V1 operation accepts title only. Created IDs are checkpointed for audit, but public V1 has no position delete operation, so this phase cannot be automatically rolled back.',
+      'Bulk create positions (for example Manager, Stylist, Receptionist) from a JSON array or CSV string. Create positions before team members so each team member can reference position_id. Created IDs are checkpointed, so onboarding_rollback_phase can delete them again.',
     annotations: {
       title: 'Batch Add Positions',
       destructiveHint: false,
@@ -375,7 +375,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_rollback_phase',
     description:
-      'Delete all entities from a supported onboarding phase and reset its checkpoint. Supports staff, categories, services, schedules, clients, and test_appointments. Position rollback is refused because public V1 has no position delete operation. Failed IDs remain checkpointed. WARNING: Destructive operation.',
+      'Delete all entities from a supported onboarding phase and reset its checkpoint. Supports positions, staff, categories, services, schedules, clients, and test_appointments; roll back team members before the positions they use. Failed IDs remain checkpointed. WARNING: Destructive operation.',
     annotations: {
       title: 'Rollback Onboarding Phase',
       destructiveHint: true,

@@ -402,7 +402,7 @@ onboarding_rollback_phase({
 4. `services` (depends on categories) — deleted via API
 5. `categories` (standalone) — deleted via API
 6. `staff` (depends on positions) — deleted via API
-7. `positions` (standalone) — retained and reported because public V1 has no delete operation
+7. `positions` (standalone) — deleted via API; a position still assigned to a team member may be refused and stays checkpointed
 
 If an API deletion fails, the failed entity ID remains in the checkpoint so a
 later rollback can retry it and the audit trail is not lost.
@@ -745,11 +745,11 @@ Bob,"Prefers morning shifts, available Mon-Fri"
 
 6. **Save CSV templates** for future use or additional locations
 
-7. **Use rollback for corrections** rather than manual deletion. Positions are
-   the exception: public V1 cannot delete them, so the rollback reports and
-   retains their IDs:
+7. **Use rollback for corrections** rather than manual deletion. Roll back
+   team members before the positions they use:
    ```typescript
    onboarding_rollback_phase({ location_id: 123456, phase_name: 'staff' });
+   onboarding_rollback_phase({ location_id: 123456, phase_name: 'positions' });
    ```
 
 ## Next Steps

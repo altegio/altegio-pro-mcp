@@ -65,7 +65,7 @@ operations:
     write_allowed: false
     notes: >
       The V2 operation supersedes the V1 one with the same id; the curated tool
-      still calls the V1 route until it is migrated.
+      calls it.
 
   # --- team members --------------------------------------------------------
   list_team_members:
@@ -76,8 +76,9 @@ operations:
     supersedes: [get_team_member_list]
     write_allowed: false
     notes: >
-      Supersedes the unfiltered V1 list; the curated tool still calls the V1
-      route until it is migrated.
+      Supersedes the unfiltered V1 list in the catalog. The curated tool keeps
+      the V1 route because V2 does not return the rating, the online-booking
+      visibility or the dismissed flag the tool reports.
   create_team_member_quick:
     domain: team_members
     tier: core
@@ -110,8 +111,7 @@ operations:
     supersedes: [get_position_list]
     write_allowed: false
     notes: >
-      Supersedes the deprecated V1 list; the curated tool still calls the V1
-      route until it is migrated.
+      Supersedes the deprecated V1 list; the curated tool calls it.
   create_position:
     domain: positions
     tier: core
@@ -120,8 +120,7 @@ operations:
     supersedes: [create_position_quick]
     write_allowed: false
     notes: >
-      Supersedes the deprecated V1 quick create; the curated tool still calls
-      the V1 route until it is migrated.
+      Supersedes the deprecated V1 quick create; the curated tool calls it.
 
   # --- services ------------------------------------------------------------
   get_service_list:

@@ -167,10 +167,11 @@ export const apiMapping: Record<string, ApiMapping> = {
     bodyParams: ['staff_id', 'services', 'datetime', 'client'],
   },
   appointments_delete: {
-    path: '/locations/{location_id}/appointments/{record_id}',
+    path: '/locations/{location_id}/appointments/{appointment_id}',
     method: 'delete',
     operationId: 'delete_appointment',
-    pathParams: ['location_id', 'record_id'],
+    pathParams: ['location_id', 'appointment_id'],
+    spec: 'v2',
   },
 
   // ==========================================
@@ -436,20 +437,22 @@ export const apiMapping: Record<string, ApiMapping> = {
   },
 
   // ==========================================
-  // Positions (deprecated V1, pending V2 migration)
+  // Positions
   // ==========================================
   positions_list: {
-    path: '/locations/{location_id}/team_members/positions',
+    path: '/locations/{company_id}/positions',
     method: 'get',
-    operationId: 'get_position_list',
-    pathParams: ['location_id'],
+    operationId: 'list_positions',
+    pathParams: ['company_id'],
+    spec: 'v2',
   },
   positions_create: {
-    path: '/locations/{location_id}/positions/quick',
+    path: '/locations/{company_id}/positions',
     method: 'post',
-    operationId: 'create_position_quick',
-    pathParams: ['location_id'],
-    bodyParams: ['title'],
+    operationId: 'create_position',
+    pathParams: ['company_id'],
+    bodyParams: ['title', 'description'],
+    spec: 'v2',
   },
   // ==========================================
   // Schedule

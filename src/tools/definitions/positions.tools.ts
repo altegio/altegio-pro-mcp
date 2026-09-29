@@ -12,7 +12,7 @@ export const getPositionsTool = defineTool({
   name: 'positions_list',
   category: 'Positions',
   description:
-    'Get the positions that can be assigned to team members in a location. AUTHENTICATION REQUIRED. This uses the deprecated but still documented public V1 read; public V1 does not provide position update or delete operations.',
+    'Get the positions that can be assigned to team members in a location, with their descriptions. AUTHENTICATION REQUIRED.',
   annotations: {
     title: 'Get Positions',
     readOnlyHint: true,
@@ -40,10 +40,10 @@ export const getPositionsTool = defineTool({
     const lines = [
       `Found ${positions.length} position(s), ids: ${positions.map((p) => p.id).join(', ')}.`,
     ];
-    const untrusted: UntrustedField[] = positions.map((p) => ({
-      label: `position ${p.id} title`,
-      value: p.title,
-    }));
+    const untrusted: UntrustedField[] = positions.flatMap((p) => [
+      { label: `position ${p.id} title`, value: p.title },
+      { label: `position ${p.id} description`, value: p.description ?? null },
+    ]);
 
     return {
       text: withUntrustedBlock(lines.join('\n'), untrusted, { maxChars: 200 }),
@@ -51,6 +51,7 @@ export const getPositionsTool = defineTool({
         items: positions.map((p) => ({
           id: p.id,
           title: p.title,
+          description: p.description ?? null,
         })),
         pagination,
       },
@@ -62,7 +63,7 @@ export const createPositionTool = defineTool({
   name: 'positions_create',
   category: 'Positions',
   description:
-    'Create a new position through the deprecated but still documented public V1 quick-create operation. AUTHENTICATION REQUIRED. Positions categorize team-member roles (for example Manager, Stylist, Receptionist). Public V1 accepts only the title and does not provide position update or delete operations.',
+    'Create a new position with a title and an optional description. AUTHENTICATION REQUIRED. Positions categorize team-member roles (for example Manager, Stylist, Receptionist).',
   annotations: {
     title: 'Create Position',
     destructiveHint: false,
@@ -71,7 +72,12 @@ export const createPositionTool = defineTool({
   },
   input: z.object({
     location_id: z.number().int().positive().describe('Location ID'),
-    title: z.string().min(1).describe('Position title'),
+    title: z.string().min(1).max(100).describe('Position title'),
+    description: z
+      .string()
+      .max(1000)
+      .optional()
+      .describe('What the position does, shown to the team.'),
   }),
   outputSchema: positionEntityOutput,
   handler: async ({ input, client }) => {
@@ -85,6 +91,7 @@ export const createPositionTool = defineTool({
       structuredContent: {
         id: position.id,
         title: sanitizeUntrusted(position.title) ?? undefined,
+        description: sanitizeUntrusted(position.description ?? null),
       },
     };
   },
