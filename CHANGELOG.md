@@ -6,6 +6,26 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — curated tools call the canonical V1 URLs the spec documents
+
+- **API catalog** is rebuilt from the latest V1 specification, which documents
+  operations on canonical URLs: `/locations`, `/locations/{location_id}/…`,
+  `…/team_members`, `…/appointments`, `…/events`, `…/products`,
+  `…/product_categories` and `/chains`. 154 operation paths moved. The
+  catalog drops `fiscalize_document` and `update_team_member_schedule`, which
+  match no backend route. `api_search_operations`, `api_describe_operation` and
+  `api_call_operation` now show and call the canonical URLs. The catalog has 320
+  operations: V1 261, V3 59.
+- **Curated tools** call every documented operation on the URL the spec
+  documents, for example `/locations/{id}/team_members` for `/staff/{id}` and
+  `/locations/{id}/appointments/{id}` for `/record/{id}/{id}`. V1 routes both
+  spellings to the same handler with the same response, so tool results do not
+  change. Undocumented endpoints in `catalog/extended/` keep the legacy URL they
+  were observed on.
+- **Report builder closure** also matches the canonical
+  `/locations/{id}/ac/…` spelling, so it stays hidden from the executor
+  if the spec publishes it there.
+
 ### Fixed — an unknown session answers 404, so clients re-initialize
 
 - **HTTP transport** answers a request carrying an `Mcp-Session-Id` this

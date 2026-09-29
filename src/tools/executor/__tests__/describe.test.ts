@@ -11,7 +11,7 @@ describe('api_describe_operation', () => {
     expect(structuredContent).toMatchObject({
       operation_id: 'get_team_member_list',
       method: 'GET',
-      path: '/staff/{location_id}',
+      path: '/locations/{location_id}/team_members',
       source: 'v1',
       domain: 'team_members',
       deprecated: false,
@@ -42,35 +42,50 @@ describe('api_describe_operation', () => {
     // The V1 envelope is transport; the catalog stores the payload itself.
     expect(structuredContent.response).toMatchObject({ envelope: 'v1' });
 
-    expect(text).toContain('get_team_member_list — GET /staff/{location_id}');
+    expect(text).toContain(
+      'get_team_member_list — GET /locations/{location_id}/team_members'
+    );
     expect(text).toContain('location_id (path, required, integer)');
     expect(text).toContain('team_members_list');
   });
 
   it('notes which legacy parameter names are accepted as canonical ones', () => {
-    const { text, structuredContent } = describeOperation('get_service_list');
+    const { text, structuredContent } = describeOperation('get_appointment');
     const notes = structuredContent.terminology_notes as string[];
 
-    expect(notes).toContain('`staff_id` is accepted as `team_member_id`');
-    expect(text).toContain('`staff_id` is accepted as `team_member_id`');
+    expect(notes).toContain('`record_id` is accepted as `appointment_id`');
+    expect(text).toContain('`record_id` is accepted as `appointment_id`');
 
     const params = structuredContent.parameters as Array<{
       name: string;
       spec_name?: string;
       accepted_names?: string[];
     }>;
+    const appointment = params.find((p) => p.name === 'appointment_id');
+    expect(appointment?.spec_name).toBe('record_id');
+    expect(appointment?.accepted_names).toContain('record_id');
+  });
+
+  it('still accepts the legacy spelling where the spec is already canonical', () => {
+    const { structuredContent } = describeOperation('get_service_list');
+    const params = structuredContent.parameters as Array<{
+      name: string;
+      spec_name?: string;
+      accepted_names?: string[];
+    }>;
     const teamMember = params.find((p) => p.name === 'team_member_id');
-    expect(teamMember?.spec_name).toBe('staff_id');
+    expect(teamMember?.spec_name).toBeUndefined();
     expect(teamMember?.accepted_names).toContain('staff_id');
+    expect(structuredContent.terminology_notes ?? []).toEqual([]);
   });
 
   it('shows the canonical path and the spec spelling when they differ', () => {
     const { structuredContent } = describeOperation('get_appointment');
     expect(structuredContent.path).toBe(
-      '/record/{location_id}/{appointment_id}'
+      '/locations/{location_id}/appointments/{appointment_id}'
     );
     expect(structuredContent.spec_path).toBe(
-      '/record/{location_id}/{record_id}'
+      '/locations/{location_id}/appointments/{record_id}'
     );
     expect(structuredContent.terminology_notes).toContain(
       '`record_id` is accepted as `appointment_id`'

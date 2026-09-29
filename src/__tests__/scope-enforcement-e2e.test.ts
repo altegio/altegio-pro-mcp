@@ -214,7 +214,7 @@ describe('token scopes gate execution, end to end', () => {
     // The handler reached Altegio (it reads the location back around the PUT),
     // which is all this case needs: the gate did not stand in the way.
     expect(upstreamCalls.length).toBeGreaterThan(0);
-    expect(upstreamCalls[0]).toContain('/company/4564');
+    expect(upstreamCalls[0]).toContain('/locations/4564');
   });
 
   /**

@@ -73,7 +73,7 @@ describe('client-file upload boundary', () => {
       expect(result).toEqual([{ id: 91, name: 'signed.pdf' }]);
       expect(seen).toHaveLength(1);
       expect(seen[0]!.url).toBe(
-        'https://api.alteg.io/api/v1/company/7/clients/files/8'
+        'https://api.alteg.io/api/v1/locations/7/clients/files/8'
       );
       expect(seen[0]!.init.method).toBe('POST');
       expect(

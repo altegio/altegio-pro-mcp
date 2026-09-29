@@ -59,7 +59,7 @@ export async function scanRecords(
   let pages = 0;
   const scannedAt = new Date().toISOString();
   for (let page = 1; ; page += 1) {
-    const path = `/records/${locationId}${queryString({
+    const path = `/locations/${locationId}/appointments${queryString({
       start_date: dateFrom,
       // The backend ends at 23:59:00. Include the following day and discard
       // it locally, so the last minute of the requested day is covered.

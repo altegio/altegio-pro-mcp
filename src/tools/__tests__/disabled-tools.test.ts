@@ -30,9 +30,20 @@ describe('disabled report builder', () => {
   });
 
   it('hides the report-builder routes from the universal executor', () => {
+    for (const path of [
+      '/company/{location_id}/ac/{report_id}',
+      '/locations/{location_id}/ac/{report_id}',
+      '/locations/{location_id}/ac',
+      '/locations/{location_id}/analytics_constructor/reports',
+    ]) {
+      expect(isDisabledOperationPath(path)).toBe(true);
+    }
     expect(
-      isDisabledOperationPath('/company/{location_id}/ac/{report_id}')
-    ).toBe(true);
+      isDisabledOperationPath('/locations/{location_id}/analytics/overall')
+    ).toBe(false);
+    expect(isDisabledOperationPath('/locations/{location_id}/access')).toBe(
+      false
+    );
     for (const op of allOperations()) {
       expect(op.path).not.toContain('analytics_constructor');
     }

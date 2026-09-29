@@ -21,7 +21,7 @@ export interface AltegioHttp {
   /**
    * Perform one request against the Altegio API.
    *
-   * @param path  path below the API base, e.g. `/company/1/analytics/overall`.
+   * @param path  path below the API base, e.g. `/locations/1/analytics/overall`.
    * @param init  standard fetch options; `Accept`, `Accept-Language` and
    *              `Authorization` are supplied by the transport.
    */

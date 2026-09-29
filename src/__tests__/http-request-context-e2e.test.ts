@@ -45,7 +45,7 @@ describe('HTTP direct-token propagation, end to end', () => {
     let upstreamAuthorization: string | null = null;
     jest.spyOn(global, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input);
-      if (url.startsWith('https://api.alteg.io/api/v1/companies')) {
+      if (url.startsWith('https://api.alteg.io/api/v1/locations')) {
         upstreamAuthorization = new Headers(init?.headers).get('authorization');
         return new Response(JSON.stringify({ success: true, data: [] }), {
           status: 200,

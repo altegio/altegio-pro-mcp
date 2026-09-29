@@ -44,7 +44,7 @@ describe('AltegioClient - Staff CRUD', () => {
 
       expect(result.id).toBe(123);
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/company/456/staff/quick'),
+        expect.stringContaining('/locations/456/team_members/quick'),
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
@@ -119,7 +119,7 @@ describe('AltegioClient - Staff CRUD', () => {
 
       expect(result.name).toBe('John Smith');
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/staff/456/123'),
+        expect.stringContaining('/locations/456/team_members/123'),
         expect.objectContaining({ method: 'PUT' })
       );
     });
@@ -135,7 +135,7 @@ describe('AltegioClient - Staff CRUD', () => {
       await client.deleteStaff(456, 123);
 
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/staff/456/123'),
+        expect.stringContaining('/locations/456/team_members/123'),
         expect.objectContaining({ method: 'DELETE' })
       );
     });

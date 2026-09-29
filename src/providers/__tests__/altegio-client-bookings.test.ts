@@ -40,7 +40,7 @@ describe('AltegioClient - Bookings CRUD', () => {
 
       expect(result.id).toBe(999);
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/records/456'),
+        expect.stringContaining('/locations/456/appointments'),
         expect.objectContaining({ method: 'POST' })
       );
     });
@@ -105,7 +105,7 @@ describe('AltegioClient - Bookings CRUD', () => {
 
       expect(result.datetime).toContain('2025-11-02');
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/record/456/999'),
+        expect.stringContaining('/locations/456/appointments/999'),
         expect.objectContaining({ method: 'PUT' })
       );
     });
@@ -121,7 +121,7 @@ describe('AltegioClient - Bookings CRUD', () => {
       await client.deleteBooking(456, 999);
 
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/record/456/999'),
+        expect.stringContaining('/locations/456/appointments/999'),
         expect.objectContaining({ method: 'DELETE' })
       );
     });

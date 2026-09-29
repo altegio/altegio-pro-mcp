@@ -39,10 +39,12 @@ import {
  *
  * Curated location-scoped methods supported by this client carry the
  * company/location ID as the first purely-numeric path segment:
- * `/records/{id}`, `/staff/{id}/{staffId}`, `/company/{id}/analytics/…`,
- * `/client/{id}/{clientId}`, even the v2 `/../v2/locations/{id}/clients/{cid}/…`
- * bridge. Company-less curated paths such as `/companies` and `/auth` carry no
- * numeric segment and return `undefined`.
+ * `/locations/{id}/appointments`, `/locations/{id}/team_members/{staffId}`,
+ * `/services/{id}`, `/client/{id}/{clientId}`, the legacy
+ * `/company/{id}/analytics/…` of an undocumented stub, even the v2
+ * `/../v2/locations/{id}/clients/{cid}/…` bridge. Company-less curated paths
+ * such as `/locations` and `/auth` carry no numeric segment and return
+ * `undefined`.
  *
  * The universal executor does not rely on this heuristic: its catalog metadata
  * supplies the explicit company override, including routes whose first numeric
@@ -542,7 +544,7 @@ export class AltegioClient {
     const declaredCompanyIds = getRequestCompanyIds();
     if (params?.my === 1 && declaredCompanyIds) {
       // A UC2 application's technical user can successfully access a declared
-      // location directly while `/companies?my=1` still returns an empty list.
+      // location directly while `/locations?my=1` still returns an empty list.
       // The trusted proxy has already bound this request to the declared
       // location set. Resolve only those exact IDs through the documented
       // single-location read instead of trusting an unrelated account listing.
@@ -556,7 +558,7 @@ export class AltegioClient {
     const queryParams = params
       ? `?${new URLSearchParams(params as Record<string, string>).toString()}`
       : '';
-    const response = await this.apiRequest(`/companies${queryParams}`);
+    const response = await this.apiRequest(`/locations${queryParams}`);
 
     const locations = await this.handleResponse<AltegioCompany[]>(
       response,
@@ -580,7 +582,7 @@ export class AltegioClient {
       ? `?${new URLSearchParams(params as Record<string, string>).toString()}`
       : '';
     const response = await this.apiRequest(
-      `/company/${companyId}${queryParams}`
+      `/locations/${companyId}${queryParams}`
     );
 
     return this.handleResponse<AltegioCompany>(response, 'fetch location');
@@ -596,7 +598,7 @@ export class AltegioClient {
   ): Promise<AltegioCompany> {
     this.requireAuth();
 
-    const response = await this.apiRequest(`/company/${companyId}`, {
+    const response = await this.apiRequest(`/locations/${companyId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -617,7 +619,7 @@ export class AltegioClient {
       ? `?${new URLSearchParams(params as Record<string, string>).toString()}`
       : '';
     const response = await this.apiRequest(
-      `/records/${companyId}${queryParams}`
+      `/locations/${companyId}/appointments${queryParams}`
     );
 
     return this.handleResponse<AltegioBooking[]>(
@@ -638,7 +640,9 @@ export class AltegioClient {
     const queryParams = params
       ? `?${new URLSearchParams(params as Record<string, string>).toString()}`
       : '';
-    const response = await this.apiRequest(`/staff/${companyId}${queryParams}`);
+    const response = await this.apiRequest(
+      `/locations/${companyId}/team_members${queryParams}`
+    );
 
     return this.handleResponse<AltegioStaff[]>(response, 'fetch staff');
   }
@@ -786,7 +790,7 @@ export class AltegioClient {
     this.requireAuth();
 
     const response = await this.apiRequest(
-      `/company/${companyId}/staff/positions`
+      `/locations/${companyId}/team_members/positions`
     );
 
     return this.handleResponse<AltegioPosition[]>(response, 'fetch positions');
@@ -841,7 +845,7 @@ export class AltegioClient {
     }
 
     const response = await this.apiRequest(
-      `/company/${companyId}/staff/schedule?${query.toString()}`
+      `/locations/${companyId}/team_members/schedule?${query.toString()}`
     );
     return this.handleResponse<AltegioScheduleEntry[]>(
       response,
@@ -888,7 +892,7 @@ export class AltegioClient {
     }
 
     const response = await this.apiRequest(
-      `/company/${companyId}/staff/schedule`,
+      `/locations/${companyId}/team_members/schedule`,
       {
         method: 'PUT',
         headers: {
@@ -913,7 +917,7 @@ export class AltegioClient {
     this.requireAuth();
 
     const response = await this.apiRequest(
-      `/company/${companyId}/staff/quick`,
+      `/locations/${companyId}/team_members/quick`,
       {
         method: 'POST',
         headers: {
@@ -933,13 +937,16 @@ export class AltegioClient {
   ): Promise<AltegioStaff> {
     this.requireAuth();
 
-    const response = await this.apiRequest(`/staff/${companyId}/${staffId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
+    const response = await this.apiRequest(
+      `/locations/${companyId}/team_members/${staffId}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      }
+    );
 
     return this.handleResponse<AltegioStaff>(response, 'update staff');
   }
@@ -947,9 +954,12 @@ export class AltegioClient {
   async deleteStaff(companyId: number, staffId: number): Promise<void> {
     this.requireAuth();
 
-    const response = await this.apiRequest(`/staff/${companyId}/${staffId}`, {
-      method: 'DELETE',
-    });
+    const response = await this.apiRequest(
+      `/locations/${companyId}/team_members/${staffId}`,
+      {
+        method: 'DELETE',
+      }
+    );
 
     await this.handleVoidResponse(response, 'delete staff');
   }
@@ -1071,7 +1081,7 @@ export class AltegioClient {
     this.requireAuth();
 
     const response = await this.apiRequest(
-      `/company/${companyId}/services/${serviceId}/staff`,
+      `/locations/${companyId}/services/${serviceId}/team_members`,
       {
         method: 'POST',
         headers: {
@@ -1102,7 +1112,7 @@ export class AltegioClient {
     this.requireAuth();
 
     const response = await this.apiRequest(
-      `/company/${companyId}/services/${serviceId}/staff/${teamMemberId}`,
+      `/locations/${companyId}/services/${serviceId}/team_members/${teamMemberId}`,
       {
         method: 'PUT',
         headers: {
@@ -1132,7 +1142,7 @@ export class AltegioClient {
     this.requireAuth();
 
     const response = await this.apiRequest(
-      `/company/${companyId}/services/${serviceId}/staff/${teamMemberId}`,
+      `/locations/${companyId}/services/${serviceId}/team_members/${teamMemberId}`,
       {
         method: 'DELETE',
       }
@@ -1150,7 +1160,7 @@ export class AltegioClient {
     this.requireAuth();
 
     const response = await this.apiRequest(
-      `/company/${companyId}/positions/quick`,
+      `/locations/${companyId}/positions/quick`,
       {
         method: 'POST',
         headers: {
@@ -1175,7 +1185,7 @@ export class AltegioClient {
     this.requireAuth();
 
     const response = await this.apiRequest(
-      `/company/${companyId}/settings/timetable`
+      `/locations/${companyId}/settings/timetable`
     );
 
     return this.handleResponse<AppointmentSettings>(
@@ -1195,7 +1205,7 @@ export class AltegioClient {
     this.requireAuth();
 
     const response = await this.apiRequest(
-      `/company/${companyId}/settings/timetable`,
+      `/locations/${companyId}/settings/timetable`,
       {
         method: 'PATCH',
         headers: {
@@ -1221,7 +1231,7 @@ export class AltegioClient {
     this.requireAuth();
 
     const response = await this.apiRequest(
-      `/company/${companyId}/settings/online`
+      `/locations/${companyId}/settings/online`
     );
 
     return this.handleResponse<OnlineBookingSettings>(
@@ -1241,7 +1251,7 @@ export class AltegioClient {
     this.requireAuth();
 
     const response = await this.apiRequest(
-      `/company/${companyId}/settings/online`,
+      `/locations/${companyId}/settings/online`,
       {
         method: 'PATCH',
         headers: {
@@ -1265,7 +1275,7 @@ export class AltegioClient {
     this.requireAuth();
 
     const response = await this.apiRequest(
-      `/company/${companyId}/booking_forms`
+      `/locations/${companyId}/booking_forms`
     );
 
     return this.handleResponse<BookingForm[]>(response, 'fetch booking forms');
@@ -1282,7 +1292,7 @@ export class AltegioClient {
     this.requireAuth();
 
     const response = await this.apiRequest(
-      `/company/${companyId}/booking_forms`,
+      `/locations/${companyId}/booking_forms`,
       {
         method: 'POST',
         headers: {
@@ -1300,7 +1310,7 @@ export class AltegioClient {
     this.requireAuth();
 
     const response = await this.apiRequest(
-      `/company/${companyId}/booking_forms/${formId}`,
+      `/locations/${companyId}/booking_forms/${formId}`,
       { method: 'DELETE' }
     );
     await this.handleVoidResponse(response, 'delete booking form');
@@ -1327,13 +1337,16 @@ export class AltegioClient {
   ): Promise<AltegioBooking> {
     this.requireAuth();
 
-    const response = await this.apiRequest(`/records/${companyId}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
+    const response = await this.apiRequest(
+      `/locations/${companyId}/appointments`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      }
+    );
 
     return this.handleResponse<AltegioBooking>(response, 'create appointment');
   }
@@ -1345,13 +1358,16 @@ export class AltegioClient {
   ): Promise<AltegioBooking> {
     this.requireAuth();
 
-    const response = await this.apiRequest(`/record/${companyId}/${recordId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
+    const response = await this.apiRequest(
+      `/locations/${companyId}/appointments/${recordId}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      }
+    );
 
     return this.handleResponse<AltegioBooking>(response, 'update appointment');
   }
@@ -1359,9 +1375,12 @@ export class AltegioClient {
   async deleteBooking(companyId: number, recordId: number): Promise<void> {
     this.requireAuth();
 
-    const response = await this.apiRequest(`/record/${companyId}/${recordId}`, {
-      method: 'DELETE',
-    });
+    const response = await this.apiRequest(
+      `/locations/${companyId}/appointments/${recordId}`,
+      {
+        method: 'DELETE',
+      }
+    );
 
     await this.handleVoidResponse(response, 'delete appointment');
   }
@@ -1438,7 +1457,7 @@ export class AltegioClient {
     this.requireAuth();
 
     const response = await this.apiRequest(
-      `/company/${companyId}/users/${userId}`,
+      `/locations/${companyId}/users/${userId}`,
       { method: 'DELETE' }
     );
     await this.handleVoidResponse(response, 'remove location user');
@@ -1529,7 +1548,7 @@ export class AltegioClient {
       new Blob([new Uint8Array(bytes)], { type: mime }),
       filename
     );
-    const path = `/company/${locationId}/clients/files/${clientId}`;
+    const path = `/locations/${locationId}/clients/files/${clientId}`;
     const response = await this.apiRequest(path, {
       method: 'POST',
       body: form,

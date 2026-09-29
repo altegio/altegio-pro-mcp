@@ -32,7 +32,7 @@ describe('AltegioClient - Location settings & resources', () => {
 
       expect(result.record_type).toBe(0);
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/company/456/settings/timetable'),
+        expect.stringContaining('/locations/456/settings/timetable'),
         expect.objectContaining({ headers: expect.any(Object) })
       );
     });
@@ -47,7 +47,7 @@ describe('AltegioClient - Location settings & resources', () => {
 
       expect(result.record_type).toBe(2);
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/company/456/settings/timetable'),
+        expect.stringContaining('/locations/456/settings/timetable'),
         expect.objectContaining({ method: 'PATCH' })
       );
     });
@@ -73,7 +73,7 @@ describe('AltegioClient - Location settings & resources', () => {
 
       expect(result.any_master).toBe(true);
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/company/456/settings/online'),
+        expect.stringContaining('/locations/456/settings/online'),
         expect.any(Object)
       );
     });
@@ -95,7 +95,7 @@ describe('AltegioClient - Location settings & resources', () => {
 
       expect(result.confirm_number).toBe(true);
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/company/456/settings/online'),
+        expect.stringContaining('/locations/456/settings/online'),
         expect.objectContaining({ method: 'PATCH' })
       );
     });
@@ -120,7 +120,7 @@ describe('AltegioClient - Location settings & resources', () => {
 
       expect(result.id).toBe(7);
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/company/456/booking_forms'),
+        expect.stringContaining('/locations/456/booking_forms'),
         expect.objectContaining({ method: 'POST' })
       );
     });

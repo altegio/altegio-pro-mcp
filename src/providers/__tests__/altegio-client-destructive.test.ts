@@ -24,12 +24,12 @@ describe('documented exact-ID destructive operations', () => {
     [
       'booking form',
       () => client.deleteBookingForm(456, 56),
-      '/company/456/booking_forms/56',
+      '/locations/456/booking_forms/56',
     ],
     [
       'location user',
       () => client.removeLocationUser(456, 78),
-      '/company/456/users/78',
+      '/locations/456/users/78',
     ],
   ])(
     'deletes one %s through the documented path',

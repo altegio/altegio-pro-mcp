@@ -51,7 +51,9 @@ describe('api_search_operations ranking', () => {
   it('shows the canonical path, not the legacy spelling', () => {
     const { hits } = searchOperations('get_appointment');
     const hit = hits.find((h) => h.operationId === 'get_appointment');
-    expect(hit?.path).toBe('/record/{location_id}/{appointment_id}');
+    expect(hit?.path).toBe(
+      '/locations/{location_id}/appointments/{appointment_id}'
+    );
   });
 
   it('is deterministic — the same query twice gives the same ranking', () => {

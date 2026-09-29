@@ -242,7 +242,7 @@ export class V1ClientsAdapter implements ClientsApi {
 
     const { data, meta } = await callEnveloped<unknown>(
       this.http,
-      `/company/${query.location_id}/clients/search`,
+      `/locations/${query.location_id}/clients/search`,
       { method: 'POST', body, context: 'search the client base' }
     );
 
@@ -368,7 +368,7 @@ export class V1ClientsAdapter implements ClientsApi {
 
     const { data, meta } = await callEnveloped<unknown>(
       this.http,
-      `/company/${query.location_id}/clients/search`,
+      `/locations/${query.location_id}/clients/search`,
       {
         method: 'POST',
         body,
@@ -436,7 +436,7 @@ export class V1ClientsAdapter implements ClientsApi {
 
     const { data, meta } = await callEnveloped<Record<string, unknown>>(
       this.http,
-      `/company/${query.location_id}/clients/visits/search`,
+      `/locations/${query.location_id}/clients/visits/search`,
       { method: 'POST', body, context: 'read the client visit history' }
     );
 

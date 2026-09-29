@@ -190,7 +190,7 @@ export class V1AnalyticsAdapter implements AnalyticsApi {
   async getOverview(query: AnalyticsFilterQuery): Promise<AnalyticsOverview> {
     const data = await callEnveloped<Record<string, unknown>>(
       this.http,
-      `/company/${query.location_id}/analytics/overall${filterQuery(query)}`,
+      `/locations/${query.location_id}/analytics/overall${filterQuery(query)}`,
       { kind: 'metrics', context: 'read the key metrics of this location' }
     );
 
@@ -238,14 +238,20 @@ export class V1AnalyticsAdapter implements AnalyticsApi {
 
   // ---------- daily series ----------
 
+  /**
+   * Charts the published spec documents are called on their canonical
+   * `/locations/…` URL. `clients_daily` is undocumented: its stub in
+   * `catalog/extended/analytics.yaml` records the legacy URL it was observed on.
+   */
   private async chart(
     query: AnalyticsFilterQuery,
     chart: string,
     context: string
   ): Promise<unknown[]> {
+    const root = chart === 'clients_daily' ? 'company' : 'locations';
     return callRawArray(
       this.http,
-      `/company/${query.location_id}/analytics/overall/charts/${chart}${filterQuery(query)}`,
+      `/${root}/${query.location_id}/analytics/overall/charts/${chart}${filterQuery(query)}`,
       { kind: 'charts', context }
     );
   }
@@ -506,7 +512,7 @@ export class V1AnalyticsAdapter implements AnalyticsApi {
       date_from: query.date_from,
       date_to: query.date_to,
     });
-    const base = `/company/${query.location_id}/analytics/loyalty_programs`;
+    const base = `/locations/${query.location_id}/analytics/loyalty_programs`;
 
     const [visits, revenue, perMember] = await Promise.all([
       callEnveloped<Record<string, unknown>>(
@@ -519,7 +525,7 @@ export class V1AnalyticsAdapter implements AnalyticsApi {
         `${base}/income${search}&include[]=income_stats_by_day`,
         { kind: 'loyalty', context: 'read loyalty program revenue' }
       ),
-      callEnveloped<unknown[]>(this.http, `${base}/staff${search}`, {
+      callEnveloped<unknown[]>(this.http, `${base}/team_members${search}`, {
         kind: 'loyalty',
         context: 'read loyalty program results per team member',
       }),

@@ -318,7 +318,7 @@ describe('V1AnalyticsAdapter — loyalty programs', () => {
     const { api, calls } = adapter([
       [/loyalty_programs\/visits/, 'loyalty-visits'],
       [/loyalty_programs\/income/, 'loyalty-income'],
-      [/loyalty_programs\/staff/, 'loyalty-staff'],
+      [/loyalty_programs\/team_members/, 'loyalty-staff'],
     ]);
 
     const results = await api.getLoyaltyProgramResults({

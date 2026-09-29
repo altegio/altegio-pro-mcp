@@ -137,9 +137,11 @@ describe('catalog build', () => {
       const appointment = catalog.operations.find(
         (o) => o.operationId === 'get_appointment'
       );
-      expect(appointment?.path).toBe('/record/{location_id}/{record_id}');
+      expect(appointment?.path).toBe(
+        '/locations/{location_id}/appointments/{record_id}'
+      );
       expect(appointment?.displayPath).toBe(
-        '/record/{location_id}/{appointment_id}'
+        '/locations/{location_id}/appointments/{appointment_id}'
       );
     });
 

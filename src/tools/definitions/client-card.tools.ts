@@ -188,7 +188,7 @@ async function saleEvidence(
       : await probe(() =>
           client.request<unknown>(
             'GET',
-            `/company/${locationIdValue}/sale/${documentId}`
+            `/locations/${locationIdValue}/sale/${documentId}`
           )
         );
   return {
@@ -278,7 +278,7 @@ export const clientsGetMembershipPurchasesTool = defineTool({
       const owner = await probe(() =>
         client.request<unknown>(
           'GET',
-          `/company/${input.location_id}/client/${input.client_id}/loyalty/abonements/${membershipId}/history`
+          `/locations/${input.location_id}/client/${input.client_id}/loyalty/abonements/${membershipId}/history`
         )
       );
       if (owner.status !== 'ok') {
@@ -368,7 +368,7 @@ export const clientsListCommentsTool = defineTool({
       (
         await client.request<unknown>(
           'GET',
-          `/company/${input.location_id}/clients/${input.client_id}/comments`
+          `/locations/${input.location_id}/clients/${input.client_id}/comments`
         )
       ).data
     );
@@ -431,7 +431,7 @@ export const clientsAddCommentTool = defineTool({
   handler: async ({ input, client }) => {
     const created = asRecord(
       await client.postJson(
-        `/company/${input.location_id}/clients/${input.client_id}/comments`,
+        `/locations/${input.location_id}/clients/${input.client_id}/comments`,
         { text: input.text }
       )
     );
@@ -522,7 +522,7 @@ export const clientsListFilesTool = defineTool({
         (
           await client.request<unknown>(
             'GET',
-            `/company/${input.location_id}/clients/files/${input.client_id}`
+            `/locations/${input.location_id}/clients/files/${input.client_id}`
           )
         ).data
       ),

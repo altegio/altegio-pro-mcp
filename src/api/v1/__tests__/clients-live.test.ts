@@ -121,7 +121,7 @@ describeLive('client endpoints against an accessible location', () => {
     // A raw recording of the endpoint's own shape…
     const raw = await callClients(
       httpFromClient(client),
-      `/company/${liveLocationId}/clients/search`,
+      `/locations/${liveLocationId}/clients/search`,
       {
         method: 'POST',
         body: { page: 1, page_size: 5, operation: 'AND', filters: [] },
@@ -155,7 +155,7 @@ describeLive('client endpoints against an accessible location', () => {
 
       const visits = await callClients(
         httpFromClient(client),
-        `/company/${liveLocationId}/clients/visits/search`,
+        `/locations/${liveLocationId}/clients/visits/search`,
         {
           method: 'POST',
           body: {

@@ -245,12 +245,15 @@ describeLive('analytics endpoints against the demo location', () => {
   }
 
   const query = `?date_from=${PERIOD.date_from}&date_to=${PERIOD.date_to}`;
+  // Documented routes are recorded on the canonical URL the adapter calls;
+  // undocumented stubs keep the legacy URL they were observed on.
+  const canonical = `/locations/${DEMO_LOCATION_ID}`;
   const base = `/company/${DEMO_LOCATION_ID}`;
 
   it('records the key metrics and every chart', async () => {
     await capture(
       'analytics-overall',
-      `${base}/analytics/overall${query}`,
+      `${canonical}/analytics/overall${query}`,
       'metrics'
     );
     for (const [fixtureName, chart] of [
@@ -263,7 +266,7 @@ describeLive('analytics endpoints against the demo location', () => {
     ] as const) {
       await capture(
         fixtureName,
-        `${base}/analytics/overall/charts/${chart}${query}`,
+        `${chart === 'clients_daily' ? base : canonical}/analytics/overall/charts/${chart}${query}`,
         'charts'
       );
     }
