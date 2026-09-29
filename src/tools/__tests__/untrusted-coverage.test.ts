@@ -319,13 +319,21 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
   },
 
   positions_list: {
-    what: 'position title',
+    what: 'position title and description',
     canary: {
       args: { location_id: 1 },
       routes: [
         {
-          match: /\/locations\/1\/team_members\/positions/,
-          body: ok(envelope([{ id: 5, title: CANARY }])),
+          match: /\/v2\/locations\/1\/positions/,
+          body: ok({
+            data: [
+              {
+                type: 'position',
+                id: '5',
+                attributes: { title: CANARY, description: CANARY },
+              },
+            ],
+          }),
         },
       ],
     },

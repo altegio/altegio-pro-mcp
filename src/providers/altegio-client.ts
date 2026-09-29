@@ -23,6 +23,7 @@ import { CredentialManager } from './credential-manager.js';
 import { prepareClientFile } from './client-file-upload.js';
 import { AuthenticationError, AltegioApiError } from '../utils/errors.js';
 import { upstreamDetail } from '../tools/tool-result.js';
+import { v2Path } from '../api/altegio-http.js';
 import {
   assertCompanyAllowed,
   getRequestCompanyIds,
@@ -102,6 +103,26 @@ function unexpectedResponseMessage(context: string, raw: unknown): string {
   const detail = upstreamDetail(raw);
   const base = `Unexpected response for ${context}.`;
   return detail ? `${base} ${detail}` : base;
+}
+
+/**
+ * A V2 `position` resource → the position the tools speak. Wire-only fields
+ * (`chain_id`, `salon_ids`, `services_binding_type`, …) stop here.
+ */
+function positionFromJsonApi(resource: unknown): AltegioPosition | null {
+  if (!resource || typeof resource !== 'object') return null;
+  const { id, attributes } = resource as {
+    id?: unknown;
+    attributes?: { title?: unknown; description?: unknown };
+  };
+  const numericId = Number(id);
+  if (!Number.isInteger(numericId) || numericId <= 0) return null;
+  const title = typeof attributes?.title === 'string' ? attributes.title : '';
+  const description =
+    typeof attributes?.description === 'string' && attributes.description
+      ? attributes.description
+      : null;
+  return { id: numericId, title, description };
 }
 
 export interface AltegioClientOptions {
@@ -415,6 +436,33 @@ export class AltegioClient {
     if (!result.success || result.data === undefined || result.data === null) {
       throw new AltegioApiError(
         unexpectedResponseMessage(context, result.meta?.message),
+        response.status,
+        result
+      );
+    }
+    return result.data;
+  }
+
+  /**
+   * Read the primary `data` of a V2 JSON:API document. V2 refusals share the
+   * V1 `{success: false, meta}` envelope, so they map the same way.
+   */
+  private async handleJsonApiData(
+    response: Response,
+    context: string
+  ): Promise<unknown> {
+    if (!response.ok) {
+      await this.throwApiError(response, context);
+    }
+
+    const result = (await response.json()) as {
+      success?: boolean;
+      data?: unknown;
+      meta?: { message?: string };
+    };
+    if (result?.success === false || result?.data === undefined) {
+      throw new AltegioApiError(
+        unexpectedResponseMessage(context, result?.meta?.message),
         response.status,
         result
       );
@@ -783,17 +831,18 @@ export class AltegioClient {
     return null;
   }
 
-  /**
-   * Get location positions (B2B API, requires user auth)
-   */
+  /** Positions that can be assigned to team members at a location. */
   async getPositions(companyId: number): Promise<AltegioPosition[]> {
     this.requireAuth();
 
     const response = await this.apiRequest(
-      `/locations/${companyId}/team_members/positions`
+      v2Path(`/locations/${companyId}/positions`)
     );
-
-    return this.handleResponse<AltegioPosition[]>(response, 'fetch positions');
+    const data = await this.handleJsonApiData(response, 'fetch positions');
+    return (Array.isArray(data) ? data : []).flatMap((resource) => {
+      const position = positionFromJsonApi(resource);
+      return position ? [position] : [];
+    });
   }
 
   /**
@@ -1151,7 +1200,7 @@ export class AltegioClient {
     await this.handleVoidResponse(response, 'unlink team member from service');
   }
 
-  // ========== Supported public V1 Position Operations ==========
+  // ========== Positions ==========
 
   async createPosition(
     companyId: number,
@@ -1160,17 +1209,39 @@ export class AltegioClient {
     this.requireAuth();
 
     const response = await this.apiRequest(
-      `/locations/${companyId}/positions/quick`,
+      v2Path(`/locations/${companyId}/positions`),
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ title: data.title }),
+        body: JSON.stringify({
+          title: data.title,
+          ...(data.description ? { description: data.description } : {}),
+        }),
       }
     );
 
-    return this.handleResponse<AltegioPosition>(response, 'create position');
+    const position = positionFromJsonApi(
+      await this.handleJsonApiData(response, 'create position')
+    );
+    if (!position) {
+      throw new AltegioApiError(
+        unexpectedResponseMessage('create position', undefined),
+        response.status
+      );
+    }
+    return position;
+  }
+
+  async deletePosition(companyId: number, positionId: number): Promise<void> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      v2Path(`/locations/${companyId}/positions/${positionId}`),
+      { method: 'DELETE' }
+    );
+    await this.handleVoidResponse(response, 'delete position');
   }
 
   // ========== Location Settings & Resources ==========
@@ -1376,7 +1447,7 @@ export class AltegioClient {
     this.requireAuth();
 
     const response = await this.apiRequest(
-      `/locations/${companyId}/appointments/${recordId}`,
+      v2Path(`/locations/${companyId}/appointments/${recordId}`),
       {
         method: 'DELETE',
       }

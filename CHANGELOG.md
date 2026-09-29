@@ -6,6 +6,21 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — the remaining V1 calls that V2 covers
+
+- `positions_list`, `positions_create` and `appointments_delete` now call V2,
+  following the rule that V2 is canonical and V1 serves only what V2 lacks.
+  Live, the V2 position list matches the V1 list on every location checked.
+  Positions now carry a description, which `positions_create` can set.
+- `onboarding_rollback_phase` rolls back `positions` through the V2 delete
+  instead of refusing. A position the API keeps (for example one still assigned
+  to a team member) stays checkpointed.
+- `team_members_list` stays on V1: the V2 list lacks the rating, the
+  online-booking visibility and the dismissed flag the tool reports.
+- Tool descriptions and resources no longer name API versions ("public V1",
+  "pending V3") or the report source's internals; the executor's V3 preview
+  marking is unchanged.
+
 ### Fixed — found by a production audit on real location data
 
 - `events_list_dates` read "from today" as a refusal after midnight, because

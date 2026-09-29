@@ -181,6 +181,7 @@ export interface AltegioError extends Error {
 export interface AltegioPosition {
   id: number;
   title: string;
+  description?: string | null;
   api_id?: string | null;
   [key: string]: unknown;
 }
@@ -483,6 +484,7 @@ export interface UpdateLocationRequest {
 // Positions
 export interface CreatePositionRequest {
   title: string;
+  description?: string;
 }
 
 // ========== Location Settings & Resources ==========

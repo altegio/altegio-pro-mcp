@@ -178,7 +178,7 @@ export const updateServiceTool = defineTool({
   name: 'services_update',
   category: 'Services',
   description:
-    'Safely update an existing service. AUTHENTICATION REQUIRED. Provide only fields to change; the tool reads the current service and preserves all unchanged writable fields and team-member links before sending the documented V1 PUT.',
+    'Safely update an existing service. AUTHENTICATION REQUIRED. Provide only fields to change; the tool reads the current service and preserves all unchanged writable fields and team-member links, because the update replaces the whole service.',
   annotations: {
     title: 'Update Service',
     destructiveHint: false,

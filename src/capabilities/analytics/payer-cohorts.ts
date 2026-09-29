@@ -291,7 +291,7 @@ export async function getClientPayerCohorts(
         selected_transaction_count: details.length,
         scanned_at: new Date().toISOString(),
         source:
-          'authenticated finance transaction list and documented V1 finance detail, reconciled to the monthly finance report',
+          'authenticated finance transaction list and documented finance transaction detail, reconciled to the monthly finance report',
         basis:
           'signed net receipts in service payments, product sales, miscellaneous income and client-account top-ups; only identified clients with positive period net enter payer ranks',
         rank_rule:

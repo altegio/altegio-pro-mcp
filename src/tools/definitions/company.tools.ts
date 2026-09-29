@@ -124,7 +124,7 @@ export const updateLocationTool = defineTool({
       .array(z.string())
       .optional()
       .describe(
-        'Location phone numbers (without +). Documented by V1, but some locations accept this field without persisting it; the tool reports the read-back mismatch.'
+        'Location phone numbers (without +). Some locations accept this field without persisting it; the tool reports the read-back mismatch.'
       ),
     website: z.string().optional().describe('Website URL'),
     coordinate_lat: z.number().optional().describe('Latitude'),

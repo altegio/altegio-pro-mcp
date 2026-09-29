@@ -121,7 +121,7 @@ describe('AltegioClient - Bookings CRUD', () => {
       await client.deleteBooking(456, 999);
 
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/locations/456/appointments/999'),
+        expect.stringContaining('/../v2/locations/456/appointments/999'),
         expect.objectContaining({ method: 'DELETE' })
       );
     });

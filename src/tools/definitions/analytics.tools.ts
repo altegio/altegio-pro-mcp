@@ -609,7 +609,7 @@ export const analyticsGetClientSalesTool = defineTool({
   name: 'analytics_get_client_sales',
   category: 'Analytics',
   description:
-    'Revenue and visit totals by client from the stable sales-by-client report: client id, revenue, share of location revenue, average check and visit count. Use it for “top clients this month” and per-client sales analysis; use clients_search for lifetime segmentation instead. Results are source-paginated. Client phone and email are withheld unless include_contacts=true. Temporary legacy-report adapter pending V3; it never creates a saved report. Needs the Sales by clients report permission.',
+    'Revenue and visit totals by client from the stable sales-by-client report: client id, revenue, share of location revenue, average check and visit count. Use it for “top clients this month” and per-client sales analysis; use clients_search for lifetime segmentation instead. Results are source-paginated. Client phone and email are withheld unless include_contacts=true. Read from a temporary report source; it never creates a saved report. Needs the Sales by clients report permission.',
   annotations: { title: 'Analytics: sales by client', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -659,7 +659,7 @@ export const analyticsGetClientRetentionTool = defineTool({
   name: 'analytics_get_client_retention',
   category: 'Analytics',
   description:
-    'Client retention by team member for a period: unique, new and returning clients, the clients considered lost before the period, how many returned, and the retention percentage. Optionally restrict to one service. Legacy rows are matched to a current team-member id only when name and position identify exactly one member; stale or ambiguous identities return a null id and explicit status. Use it for “which team members bring clients back”; use analytics_get_client_sales for revenue by client. Temporary stable legacy-report adapter pending V3; it never creates a saved report. Needs the Client retention report permission.',
+    'Client retention by team member for a period: unique, new and returning clients, the clients considered lost before the period, how many returned, and the retention percentage. Optionally restrict to one service. Legacy rows are matched to a current team-member id only when name and position identify exactly one member; stale or ambiguous identities return a null id and explicit status. Use it for “which team members bring clients back”; use analytics_get_client_sales for revenue by client. Read from a temporary report source; it never creates a saved report. Needs the Client retention report permission.',
   annotations: { title: 'Analytics: client retention', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -702,7 +702,7 @@ export const analyticsGetClientForecastTool = defineTool({
   name: 'analytics_get_client_forecast',
   category: 'Analytics',
   description:
-    'Per-client RFM forecast from the location’s stable forecast export: average check, predicted visits and revenue, expected return window, prior return visits and last visit date. Use analytics_get_forecast for aggregate location forecast versus actuals. The legacy workbook does not expose client ids, so client_id is explicitly null and never guessed. Results are paginated after a size-bounded workbook read; contacts are withheld unless include_contacts=true. Temporary adapter pending V3; it never creates a saved report. Needs Analytics, client-export and forecast-module access.',
+    'Per-client RFM forecast from the location’s stable forecast export: average check, predicted visits and revenue, expected return window, prior return visits and last visit date. Use analytics_get_forecast for aggregate location forecast versus actuals. The forecast export does not expose client ids, so client_id is explicitly null and never guessed. Results are paginated after a size-bounded workbook read; contacts are withheld unless include_contacts=true. Read from a temporary report source; it never creates a saved report. Needs Analytics, client-export and forecast-module access.',
   annotations: { title: 'Analytics: client forecast', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -762,7 +762,7 @@ export const analyticsGetServiceProfitabilityTool = defineTool({
   name: 'analytics_get_service_profitability',
   category: 'Analytics',
   description:
-    'Service contribution by service or service category: rendered-service count, discounts and loyalty write-offs, client-account and cash/card revenue, consumables cost, team-member compensation, contribution result and share of revenue. Filter by one team member or service category and paginate at source. Temporary stable legacy-report adapter pending V3; it never creates a saved report. Needs the Sales by services report permission.',
+    'Service contribution by service or service category: rendered-service count, discounts and loyalty write-offs, client-account and cash/card revenue, consumables cost, team-member compensation, contribution result and share of revenue. Filter by one team member or service category and paginate at source. Read from a temporary report source; it never creates a saved report. Needs the Sales by services report permission.',
   annotations: { title: 'Analytics: service profitability', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -1064,7 +1064,7 @@ export const analyticsGetTeamMemberSalesTool = defineTool({
   name: 'analytics_get_team_member_sales',
   category: 'Analytics',
   description:
-    'Sales by team member: total revenue, service and product revenue and quantities, discounts and loyalty write-offs, client-account payments, upcoming-appointment revenue, worked hours, revenue per worked hour and share of location revenue. Legacy rows are matched to a current team-member id only when name and position identify exactly one member; stale or ambiguous identities return a null id and explicit status. Supports the source report’s filters for positions, services, service categories, products and product categories. Temporary stable legacy-report adapter pending V3; it never creates a saved report. Needs the Sales by team members report permission.',
+    'Sales by team member: total revenue, service and product revenue and quantities, discounts and loyalty write-offs, client-account payments, upcoming-appointment revenue, worked hours, revenue per worked hour and share of location revenue. Legacy rows are matched to a current team-member id only when name and position identify exactly one member; stale or ambiguous identities return a null id and explicit status. Supports the source report’s filters for positions, services, service categories, products and product categories. Read from a temporary report source; it never creates a saved report. Needs the Sales by team members report permission.',
   annotations: { title: 'Analytics: sales by team member', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -2190,7 +2190,7 @@ export const analyticsGetTeamMemberCapacityTool = defineTool({
   name: 'analytics_get_team_member_capacity',
   category: 'Analytics',
   description:
-    'Working days and hours, booked hours, idle hours, occupancy percentage and upcoming appointments by team member, with source totals. Use for capacity planning; analytics_get_team_member_occupancy gives daily occupancy. Temporary read-only report pending V3. Requires team occupancy report permission. Narrow the period if the result is too large.',
+    'Working days and hours, booked hours, idle hours, occupancy percentage and upcoming appointments by team member, with source totals. Use for capacity planning; analytics_get_team_member_occupancy gives daily occupancy. Read from a temporary report source. Requires team occupancy report permission. Narrow the period if the result is too large.',
   annotations: { title: 'Analytics: team-member capacity', ...READ_ONLY },
   input: z.object({ location_id: locationId, ...periodFields }),
   outputSchema: objectSchema({
@@ -2300,7 +2300,7 @@ export const analyticsGetGroupEventPerformanceTool = defineTool({
   name: 'analytics_get_group_event_performance',
   category: 'Analytics',
   description:
-    'Group events with capacity, booked participants, attended and fully paid clients, appointment value and aggregate fill, attendance, payment and average occupancy metrics. Appointment value is not collected revenue. Source dates retain their display format; service ids are unavailable. Team-member ids are matched only when name and position identify one current member; stale/deleted or ambiguous identities remain null with an explicit status. Filter by team member, service, service category, label and active/deleted status; deleted does not imply cancelled. Requires group-event dashboard access. Temporary read-only report pending V3, paginated at source.',
+    'Group events with capacity, booked participants, attended and fully paid clients, appointment value and aggregate fill, attendance, payment and average occupancy metrics. Appointment value is not collected revenue. Source dates retain their display format; service ids are unavailable. Team-member ids are matched only when name and position identify one current member; stale/deleted or ambiguous identities remain null with an explicit status. Filter by team member, service, service category, label and active/deleted status; deleted does not imply cancelled. Requires group-event dashboard access. Read from a temporary report source, paginated at source.',
   annotations: { title: 'Analytics: group-event performance', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -2374,7 +2374,7 @@ export const analyticsGetProductSalesTool = defineTool({
   name: 'analytics_get_product_sales',
   category: 'Analytics',
   description:
-    'Product sales by product or product category with quantity, SKU, barcode, unit, total cost, total markup, markup percentage and revenue including client-account payments. Total cost is for the sold quantity, not unit cost; missing cost permission produces nulls. Category costs are always withheld because the source category report does not enforce that permission. Category rows include hierarchy and must not be summed; use totals. Product pages come from source; category pagination is local. Requires inventory sales-report access, not export access. Temporary read-only report pending V3.',
+    'Product sales by product or product category with quantity, SKU, barcode, unit, total cost, total markup, markup percentage and revenue including client-account payments. Total cost is for the sold quantity, not unit cost; missing cost permission produces nulls. Category costs are always withheld because the source category report does not enforce that permission. Category rows include hierarchy and must not be summed; use totals. Product pages come from source; category pagination is local. Requires inventory sales-report access, not export access. Read from a temporary report source.',
   annotations: { title: 'Analytics: product sales', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -2427,7 +2427,7 @@ export const analyticsGetCashFlowBreakdownTool = defineTool({
   name: 'analytics_get_cash_flow_breakdown',
   category: 'Analytics',
   description:
-    'Period cash movement by payment item, day, cash-account type and returned account columns, with signed inflow/outflow and net movement totals. Net movement is not an opening or closing account balance. Amount arrays align with columns; account and type views overlap and must not be summed. Source account ids are unavailable. Supports account, team-member, supplier, payment-item, service and product filters. Requires finance period-report access, not export access. Temporary read-only report pending V3; narrow the period or filters for large tables.',
+    'Period cash movement by payment item, day, cash-account type and returned account columns, with signed inflow/outflow and net movement totals. Net movement is not an opening or closing account balance. Amount arrays align with columns; account and type views overlap and must not be summed. Source account ids are unavailable. Supports account, team-member, supplier, payment-item, service and product filters. Requires finance period-report access, not export access. Read from a temporary report source; narrow the period or filters for large tables.',
   annotations: { title: 'Analytics: cash-flow breakdown', ...READ_ONLY },
   input: z.object({
     location_id: locationId,

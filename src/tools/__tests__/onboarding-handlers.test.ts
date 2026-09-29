@@ -587,22 +587,25 @@ describe('Onboarding Handlers', () => {
       expect(mockClient.deleteService).toHaveBeenCalledTimes(2);
     });
 
-    it('refuses unsupported position rollback and keeps the checkpoint', async () => {
+    it('deletes positions and keeps the ones the API refuses', async () => {
       await handlers.start({ location_id: 123 });
       await stateManager.checkpoint(123, 'positions', [5, 6]);
+      mockClient.deletePosition = jest
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('position is assigned'));
 
       const result = await handlers.rollbackPhase({
         location_id: 123,
         phase_name: 'positions',
       });
 
-      expect(result.isError).toBe(true);
-      expect(result.content[0]?.text).toContain(
-        'public V1 API has list and quick-create operations but no position delete'
-      );
+      expect(result.isError).toBeFalsy();
+      expect(mockClient.deletePosition).toHaveBeenCalledWith(123, 5);
+      expect(mockClient.deletePosition).toHaveBeenCalledWith(123, 6);
       expect(
-        (await stateManager.load(123))?.checkpoints.positions
-      ).toBeDefined();
+        (await stateManager.load(123))?.checkpoints.positions?.entity_ids
+      ).toEqual([6]);
     });
 
     it('deletes categories and clients through their documented APIs', async () => {

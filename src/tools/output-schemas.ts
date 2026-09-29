@@ -186,10 +186,10 @@ export const categoriesOutput = listSchema({ id: idProp, title: strProp }, [
   'title',
 ]);
 
-export const positionsOutput = listSchema({ id: idProp, title: strProp }, [
-  'id',
-  'title',
-]);
+export const positionsOutput = listSchema(
+  { id: idProp, title: strProp, description: nullableStrProp },
+  ['id', 'title']
+);
 
 const slotsProp = {
   type: 'array' as const,
@@ -244,7 +244,7 @@ export const serviceEntityOutput = entitySchema(
 );
 
 export const positionEntityOutput = entitySchema(
-  { id: idProp, title: strProp },
+  { id: idProp, title: strProp, description: nullableStrProp },
   ['id', 'title']
 );
 

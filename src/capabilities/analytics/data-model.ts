@@ -145,7 +145,7 @@ export const CODED_VALUES: readonly CodedValue[] = [
     field: 'money units',
     values: 'major units + ISO currency code',
     meaning:
-      'Analytics results are whole-currency amounts (two decimals) next to a currency code, never minor units. The minor-units rule applies only to write payloads on the V3 contract.',
+      'Analytics results are whole-currency amounts (two decimals) next to a currency code, never minor units.',
   },
 ] as const;
 
