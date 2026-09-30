@@ -6,6 +6,8 @@ is declared stable.
 
 ## [Unreleased]
 
+## [0.6.0-alpha.1] - 2026-09-30
+
 ### Fixed — every view names only what it serves
 
 - A signed-out call on an HTTP view no longer tells the model to call
