@@ -61,9 +61,8 @@ is declared stable.
   the API replaces it. After the first sale the API silently keeps price,
   validity, activation, sharing, balance and services; the tool compares the
   result and reports what was kept instead of claiming success.
-- `memberships_archive_type` reads the type through the access-checked
-  endpoint before switching the archive flag, because the backend does not
-  check access on that switch.
+- `memberships_archive_type` reads the type before switching the archive
+  flag.
 - New v3 placeholder scopes `chain_loyalty:read`, `chain_loyalty:configure` and
   `chain_loyalty:transact`, taken from the API team's scope catalog.
 - Server instructions now name group events and memberships among the live

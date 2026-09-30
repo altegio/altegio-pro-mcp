@@ -1670,7 +1670,7 @@
           "marketing"
         ],
         "tool_name": "memberships_get_type",
-        "notes": "Also read by memberships_update_type (PUT replaces the type) and memberships_archive_type (the archive switch is not access-checked).\n"
+        "notes": "Also read by memberships_update_type (PUT replaces the type) and memberships_archive_type (it reads the type before switching the flag).\n"
       }
     },
     {
