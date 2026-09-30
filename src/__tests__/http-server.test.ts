@@ -379,6 +379,9 @@ describe('HTTP server facet wiring, end to end', () => {
         'events_update_appointment',
         'events_update_duplication_strategy',
         'locations_list',
+        'memberships_freeze',
+        'memberships_list_for_client',
+        'memberships_unfreeze',
         'users_get_current',
       ]);
 

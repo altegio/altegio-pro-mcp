@@ -1,0 +1,126 @@
+# Memberships — the operations behind the curated `memberships_*` tools.
+#
+# Format: catalog/overlay/_schema.yaml. V2 has no membership operation, so the
+# pack runs on V1 (src/api/v1/memberships-adapter.ts). Membership types and the
+# memberships sold from them belong to a chain; one client's memberships are
+# found through a location client card.
+#
+# Spec drift found while building the pack (backend biz.erp, 2026-09-30), for
+# the specification repository:
+#   - expiration_type_id: 1 = from the first visit, 2 = from the sale (the
+#     create body documents them the other way round); 3 is not accepted.
+#   - balance_edit_type_id: 0 = not allowed, 1 = only at the selling location,
+#     2 = at every chain location (the type schema documents 1 = editable,
+#     2 = not editable).
+#   - PATCH (archive) runs no access check on the backend, and it accepts
+#     is_archived only as the string "0" or "1".
+#   - DELETE is a soft delete: the type leaves the list, the read by id still
+#     answers with it.
+#   - POST …/{id} (restore) is for Altegio super users only.
+
+version: 1
+
+operations:
+  # --- chains ----------------------------------------------------------------
+  get_chain_list:
+    domain: memberships
+    tier: core
+    facets: [marketing]
+    tool_name: memberships_list_chains
+    notes: >
+      The curated tool reports only the membership rights of each chain; the
+      executor still serves the whole access object.
+
+  # --- membership types ------------------------------------------------------
+  chain_loyalty_membership_types_list:
+    domain: memberships
+    tier: core
+    facets: [marketing]
+    tool_name: memberships_list_types
+  chain_loyalty_membership_types_read:
+    domain: memberships
+    tier: core
+    facets: [marketing]
+    tool_name: memberships_get_type
+    notes: >
+      Also read by memberships_update_type (PUT replaces the type) and
+      memberships_archive_type (the archive switch is not access-checked).
+  chain_loyalty_membership_types_create:
+    domain: memberships
+    tier: core
+    facets: [marketing]
+    tool_name: memberships_create_type
+    write_allowed: false
+  chain_loyalty_membership_types_update:
+    domain: memberships
+    tier: core
+    facets: [marketing]
+    tool_name: memberships_update_type
+    write_allowed: false
+    notes: >
+      PUT replaces the type. After the first sale the backend silently keeps
+      price, validity, activation, sharing, balance and services; the tool
+      compares the result and reports what was kept.
+  chain_loyalty_membership_types_archive:
+    domain: memberships
+    tier: core
+    facets: [marketing]
+    tool_name: memberships_archive_type
+    write_allowed: false
+  chain_loyalty_membership_types_delete:
+    domain: memberships
+    tier: core
+    facets: [marketing]
+    tool_name: memberships_delete_type
+    write_allowed: false
+  chain_loyalty_membership_types_restore:
+    domain: memberships
+    tier: executor-only
+    write_allowed: false
+    notes: Altegio super users only; no curated tool.
+  chain_loyalty_membership_types_clone:
+    domain: memberships
+    tier: executor-only
+    write_allowed: false
+    notes: No curated tool; memberships_get_type plus memberships_create_type cover it.
+
+  # --- sold memberships ------------------------------------------------------
+  get_membership_list:
+    domain: memberships
+    tier: core
+    facets: [marketing]
+    tool_name: memberships_list
+    notes: >
+      Also read back by the freeze, unfreeze, balance and validity tools.
+  get_client_memberships:
+    domain: memberships
+    tier: core
+    facets: [ops, marketing]
+    tool_name: memberships_list_for_client
+    notes: >
+      Also read by clients_get_membership_purchases. Returns issued and active
+      memberships only.
+  chain_loyalty_memberships_freeze:
+    domain: memberships
+    tier: core
+    facets: [ops, marketing]
+    tool_name: memberships_freeze
+    write_allowed: false
+  chain_loyalty_memberships_unfreeze:
+    domain: memberships
+    tier: core
+    facets: [ops, marketing]
+    tool_name: memberships_unfreeze
+    write_allowed: false
+  chain_loyalty_memberships_set_balance:
+    domain: memberships
+    tier: core
+    facets: [marketing]
+    tool_name: memberships_set_balance
+    write_allowed: false
+  chain_loyalty_memberships_set_period:
+    domain: memberships
+    tier: core
+    facets: [marketing]
+    tool_name: memberships_set_validity
+    write_allowed: false

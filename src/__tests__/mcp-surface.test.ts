@@ -27,6 +27,23 @@ import {
 } from '../resources/analytics.resources.js';
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 
+/** The memberships pack, served on marketing by prefix. */
+const MEMBERSHIP_TOOLS = [
+  'memberships_archive_type',
+  'memberships_create_type',
+  'memberships_delete_type',
+  'memberships_freeze',
+  'memberships_get_type',
+  'memberships_list',
+  'memberships_list_chains',
+  'memberships_list_for_client',
+  'memberships_list_types',
+  'memberships_set_balance',
+  'memberships_set_validity',
+  'memberships_unfreeze',
+  'memberships_update_type',
+];
+
 /**
  * The whole MCP surface as a client sees it, over an in-memory transport: the
  * facet-filtered tool list, the refusal of a tool the facet does not serve,
@@ -122,6 +139,9 @@ describe('tools/list per facet', () => {
       'events_update_appointment',
       'events_update_duplication_strategy',
       'locations_list',
+      'memberships_freeze',
+      'memberships_list_for_client',
+      'memberships_unfreeze',
       'users_get_current',
     ]);
     await client.close();
@@ -131,7 +151,11 @@ describe('tools/list per facet', () => {
     const client = await connect('marketing');
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name).sort()).toEqual(
-      [...FACET_BASE_TOOLS, 'clients_get_membership_purchases'].sort()
+      [
+        ...FACET_BASE_TOOLS,
+        'clients_get_membership_purchases',
+        ...MEMBERSHIP_TOOLS,
+      ].sort()
     );
     await client.close();
   });

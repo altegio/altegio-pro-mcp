@@ -167,7 +167,9 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
    * Daily work: the digital schedule, appointments, group events, clients. The
    * `events_*` pack (timetable, bookings, duplication) and the `clients_*` pack
    * (segmentation, client card, visit history, lookup) join by prefix; the
-   * journal tools do not exist yet.
+   * reception's membership tasks (a client's memberships, freeze, unfreeze)
+   * join by name, the rest of that pack lives on `marketing`. The journal
+   * tools do not exist yet.
    */
   ops: {
     tools: [
@@ -177,6 +179,9 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
       'appointments_delete',
       'appointments_preview_attendance',
       'appointments_apply_attendance',
+      'memberships_list_for_client',
+      'memberships_freeze',
+      'memberships_unfreeze',
     ],
     prefixes: ['events_', 'clients_'],
   },
@@ -233,12 +238,14 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
   },
 
   /**
-   * Reaching clients. Membership purchase evidence is the first loyalty
-   * workflow here; notifications and chain-level tools remain future work.
+   * Reaching clients and keeping them: loyalty. The `memberships_*` pack joins
+   * by prefix (membership types, sold memberships, the chains they belong to)
+   * next to the membership purchase evidence; notifications, gift cards and
+   * loyalty programs remain future work.
    */
   marketing: {
     tools: ['clients_get_membership_purchases'],
-    prefixes: [],
+    prefixes: ['memberships_'],
   },
 
   /**
