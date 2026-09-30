@@ -607,8 +607,7 @@ export class MembershipsAdapter implements MembershipsApi {
     typeId: number,
     archived: boolean
   ): Promise<void> {
-    // The archive switch is not access-checked on the backend: read through
-    // the checked endpoint first so it only reaches a type the user may see.
+    // Read the type first so the switch only reaches a type the user can read.
     await this.readType(chainId, typeId);
     await this.call(
       this.typesPath(chainId, typeId),

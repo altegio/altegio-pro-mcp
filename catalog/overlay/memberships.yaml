@@ -4,10 +4,6 @@
 # pack runs on V1 (src/api/v1/memberships-adapter.ts). Membership types and the
 # memberships sold from them belong to a chain; one client's memberships are
 # found through a location client card.
-#
-# Spec drift found while building the pack (backend biz.erp, 2026-09-30); the
-# rest was fixed in altegio/biz.erp.api.docs#129:
-#   - PATCH (archive) runs no access check on the backend.
 
 version: 1
 
@@ -35,7 +31,7 @@ operations:
     tool_name: memberships_get_type
     notes: >
       Also read by memberships_update_type (PUT replaces the type) and
-      memberships_archive_type (the archive switch is not access-checked).
+      memberships_archive_type (it reads the type before switching the flag).
   chain_loyalty_membership_types_create:
     domain: memberships
     tier: core
