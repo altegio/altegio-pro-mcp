@@ -9,6 +9,7 @@ import {
   FACET_BASE_TOOLS,
   PASSWORD_LOGIN_TOOLS,
   READONLY_VIEW,
+  VIEW_KEYS,
   type FacetKey,
 } from '../tools/facets.js';
 import {
@@ -597,5 +598,160 @@ describe('the ALTEGIO_EXPOSE_PASSWORD_LOGIN switch', () => {
       expect(names).not.toContain(name);
     }
     await client.close();
+  });
+});
+
+/**
+ * A view names only what it serves (`../tools/serving-view.ts`). Descriptions
+ * and replies point at neighbouring tools; on a narrower view the neighbour may
+ * be withheld, and a model told to call it gets a refusal instead of an answer.
+ */
+describe('names on a view', () => {
+  const NOTE = ' Not served on this address: ';
+  const toolNames = orderedToolEntries().map((entry) => entry.spec.name);
+  const textOf = (result: Awaited<ReturnType<Client['callTool']>>): string =>
+    (result.content as { type: string; text?: string }[])
+      .map((block) => block.text ?? '')
+      .join('\n');
+
+  it('lists every tool name a view withholds only with where it is served', async () => {
+    for (const view of VIEW_KEYS) {
+      const client = await connect(view);
+      const { tools } = await client.listTools();
+      const served = new Set(tools.map((tool) => tool.name));
+      for (const tool of tools) {
+        const description = tool.description ?? '';
+        const noteAt = description.indexOf(NOTE);
+        const note = noteAt >= 0 ? description.slice(noteAt) : '';
+        const text = JSON.stringify([
+          noteAt >= 0 ? description.slice(0, noteAt) : description,
+          tool.inputSchema,
+        ]);
+        const unexplained = toolNames.filter(
+          (name) =>
+            name !== tool.name &&
+            !served.has(name) &&
+            new RegExp(`\\b${name}\\b`).test(text) &&
+            !note.includes(`\`${name}\``)
+        );
+        expect({ view, tool: tool.name, unexplained }).toEqual({
+          view,
+          tool: tool.name,
+          unexplained: [],
+        });
+      }
+      await client.close();
+    }
+  });
+
+  it('leaves the complete surface’s descriptions as authored', async () => {
+    const client = await connect('all');
+    const { tools } = await client.listTools();
+    expect(tools.filter((tool) => tool.description?.includes(NOTE))).toEqual(
+      []
+    );
+    await client.close();
+  });
+
+  it('says where the attendance apply step is served on the read-only view', async () => {
+    const client = await connect(READONLY_VIEW);
+    const { tools } = await client.listTools();
+    const preview = tools.find(
+      (tool) => tool.name === 'appointments_preview_attendance'
+    );
+    expect(preview?.description).toMatch(
+      /Not served on this address: `appointments_apply_attendance` \(served on https:\/\/mcp\.alteg\.io\/pro\/ops and https:\/\/mcp\.alteg\.io\/pro\)\.$/
+    );
+    await client.close();
+  });
+
+  it('describes a write on the read-only view without offering its curated tool', async () => {
+    const client = await connect(READONLY_VIEW);
+    const result = await client.callTool({
+      name: 'api_describe_operation',
+      arguments: { operation_id: 'chain_loyalty_membership_types_create' },
+    });
+    const text = textOf(result);
+    expect(text).toContain(
+      'The curated tool `memberships_create_type` performs it, but this address does not serve it; it is served on https://mcp.alteg.io/pro/marketing and https://mcp.alteg.io/pro.'
+    );
+    expect(text).not.toContain('Use the curated tool');
+    expect(text).not.toContain('auth_login');
+    expect(result.structuredContent).toMatchObject({
+      curated_tool: 'memberships_create_type',
+      curated_tool_served: false,
+      curated_tool_addresses: [
+        'https://mcp.alteg.io/pro/marketing',
+        'https://mcp.alteg.io/pro',
+      ],
+    });
+    await client.close();
+  });
+
+  it('marks a search hit whose curated tool the view does not serve', async () => {
+    const client = await connect(READONLY_VIEW);
+    const result = await client.callTool({
+      name: 'api_search_operations',
+      arguments: {
+        query: 'chain_loyalty_membership_types_create',
+        method: 'POST',
+      },
+    });
+    const items = (
+      result.structuredContent as {
+        items: { operationId: string; tool?: string; tool_served?: boolean }[];
+      }
+    ).items;
+    expect(
+      items.find(
+        (item) => item.operationId === 'chain_loyalty_membership_types_create'
+      )
+    ).toMatchObject({ tool: 'memberships_create_type', tool_served: false });
+    expect(textOf(result)).toContain(
+      'curated tool: memberships_create_type — not served on this address; it is served on https://mcp.alteg.io/pro/marketing and https://mcp.alteg.io/pro'
+    );
+    await client.close();
+  });
+
+  it('keeps the complete surface’s describe text as it was', async () => {
+    const client = await connect('all');
+    const text = textOf(
+      await client.callTool({
+        name: 'api_describe_operation',
+        arguments: { operation_id: 'chain_loyalty_membership_types_create' },
+      })
+    );
+    expect(text).toContain('Use the curated tool `memberships_create_type`.');
+    expect(text).toContain(
+      'Auth: logged-in session required (call `auth_login` first).'
+    );
+    await client.close();
+  });
+
+  it('sends a signed-out caller to the host, not to a login tool the view withholds', async () => {
+    for (const view of [undefined, READONLY_VIEW] as const) {
+      const client = await connect(view);
+      const text = textOf(
+        await client.callTool({
+          name: 'appointments_list',
+          arguments: { location_id: 1 },
+        })
+      );
+      expect(text).toContain('Authentication required');
+      expect(text).toContain('reconnect Altegio there');
+      expect(text).not.toContain('auth_login');
+      await client.close();
+    }
+
+    const stdio = await connect('all');
+    expect(
+      textOf(
+        await stdio.callTool({
+          name: 'appointments_list',
+          arguments: { location_id: 1 },
+        })
+      )
+    ).toContain('Call auth_login before using appointments_list.');
+    await stdio.close();
   });
 });

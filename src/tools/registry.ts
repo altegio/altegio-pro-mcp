@@ -43,6 +43,7 @@ import {
   requiredScopesFor,
   type ToolScope,
 } from './scopes.js';
+import { listedOnView, runOnView, type ServingView } from './serving-view.js';
 
 type CallHandler = (args: unknown) => Promise<ToolResult>;
 
@@ -74,6 +75,28 @@ export interface RegisterToolsOptions {
  */
 export { orderedToolEntries, type ToolEntry } from './inventory.js';
 
+/**
+ * Absolute addresses of this endpoint's views that serve a tool the current
+ * view does not: the named facets first, then the complete surface. Absolute,
+ * because a relative /mcp/<view> is wrong on the short customer address, where
+ * /pro/mcp/… is the internal lane.
+ */
+function addressesServing(
+  name: string,
+  index: FacetIndex,
+  publicBaseUrl: string
+): string[] {
+  return [
+    ...index.facetsProviding(name).map((f) => viewUrl(publicBaseUrl, f)),
+    // Only offer the complete surface when it actually serves the tool: a tool
+    // withheld from the default view (access management, password login) must
+    // not be advertised back to the caller as available one path up.
+    ...(index.includes(DEFAULT_FACET, name)
+      ? [viewUrl(publicBaseUrl, DEFAULT_FACET)]
+      : []),
+  ];
+}
+
 function outOfFacetError(
   name: string,
   facet: FacetKey,
@@ -89,18 +112,7 @@ function outOfFacetError(
     );
   }
 
-  // Absolute addresses: a relative /mcp/<view> is wrong on the short customer
-  // address, where /pro/mcp/… is the internal lane.
-  const elsewhere = index.facetsProviding(name);
-  const paths = [
-    ...elsewhere.map((f) => viewUrl(publicBaseUrl, f)),
-    // Only offer the complete surface when it actually serves the tool: a tool
-    // withheld from the default view (access management, password login) must
-    // not be advertised back to the caller as available one path up.
-    ...(index.includes(DEFAULT_FACET, name)
-      ? [viewUrl(publicBaseUrl, DEFAULT_FACET)]
-      : []),
-  ];
+  const paths = addressesServing(name, index, publicBaseUrl);
   const where =
     paths.length > 0
       ? ` Reach it on ${paths.join(' or ')}.`
@@ -238,9 +250,17 @@ export function registerTools(
   const facet = options.facet ?? DEFAULT_FACET;
   const publicBaseUrl = options.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL;
   const visible = new Set(facetIndex.members(facet));
+  // What a reply or a description may name as callable here
+  // (`./serving-view.ts`).
+  const servingView: ServingView = {
+    serves: (name) => visible.has(name),
+    addressesServing: (name) =>
+      addressesServing(name, facetIndex, publicBaseUrl),
+  };
+  const toolNames = entries.map((entry) => entry.spec.name);
   const visibleToolDefs = entries
     .filter((entry) => visible.has(entry.spec.name))
-    .map((entry) => entry.spec);
+    .map((entry) => listedOnView(entry.spec, servingView, toolNames));
 
   // list handler — the same list for every connection to this facet
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -297,9 +317,10 @@ export function registerTools(
     // of the original HTTP headers at the actual tool-handler boundary. Stdio
     // has no requestInfo and keeps its existing single-user context.
     const headers = extra.requestInfo?.headers;
+    const onView = () => runOnView(servingView, execute);
     return headers
-      ? runWithContext(requestContextFromHeaders(headers), execute)
-      : execute();
+      ? runWithContext(requestContextFromHeaders(headers), onView)
+      : onView();
   });
 
   return visibleToolDefs.map((tool) => tool.name);

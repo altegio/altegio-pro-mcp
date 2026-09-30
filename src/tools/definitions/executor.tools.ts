@@ -13,6 +13,7 @@ import { catalog, isLiveSource } from '../executor/catalog.js';
 import { MAX_SEARCH_RESULTS, searchOperations } from '../executor/search.js';
 import { describeOperation } from '../executor/describe.js';
 import { callOperation } from '../executor/call.js';
+import { currentView, elsewhereClause } from '../serving-view.js';
 import {
   pageArg,
   pageMetadata,
@@ -40,6 +41,7 @@ const searchOutput = {
           deprecated: { type: 'boolean' as const },
           status: { type: 'string' as const },
           tool: { type: 'string' as const },
+          tool_served: { type: 'boolean' as const },
         },
         required: ['operationId', 'method', 'path', 'domain'],
       },
@@ -123,7 +125,14 @@ export const searchOperationsTool = defineTool({
       };
     }
 
-    const lines = result.hits.map((hit, index) => {
+    // A curated tool this view does not serve is still named — it is where the
+    // operation lives — but not offered as callable (`../serving-view.ts`).
+    const items = result.hits.map((hit) =>
+      hit.tool && !currentView().serves(hit.tool)
+        ? { ...hit, tool_served: false }
+        : hit
+    );
+    const lines = items.map((hit, index) => {
       const flags = [
         hit.source && !isLiveSource(hit.source)
           ? `${hit.source} ${hit.status ?? 'preview'}`
@@ -135,7 +144,9 @@ export const searchOperationsTool = defineTool({
         `   ${hit.summary || '(no summary in the spec)'}\n` +
         `   domain: ${hit.domain}${flags.length > 0 ? ` · ${flags.join(' · ')}` : ''}` +
         (hit.tool
-          ? `\n   curated tool: ${hit.tool} — prefer it over the executor`
+          ? 'tool_served' in hit
+            ? `\n   curated tool: ${hit.tool} — not served on this address; ${elsewhereClause(hit.tool)}`
+            : `\n   curated tool: ${hit.tool} — prefer it over the executor`
           : '')
       );
     });
@@ -147,7 +158,7 @@ export const searchOperationsTool = defineTool({
         'Next: `api_describe_operation` for the full contract, then ' +
         '`api_call_operation` to run a GET.',
       structuredContent: {
-        items: result.hits,
+        items,
         pagination,
         terms: result.terms,
       },

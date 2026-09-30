@@ -20,6 +20,11 @@ import {
 import { enforceBudget, NARROW_HINT } from './budget.js';
 import { searchOperations } from './search.js';
 import { readingNotesFor } from './reading-notes.js';
+import {
+  currentView,
+  elsewhereClause,
+  servesPasswordLogin,
+} from '../serving-view.js';
 
 export interface DescribedParameter {
   /** Canonical name to send. */
@@ -191,7 +196,9 @@ export function describeOperation(operationId: string): DescribeOutput {
       required: op.security.required,
       schemes: op.security.schemes,
       note: op.security.required
-        ? 'Requires a logged-in session — call `auth_login` first.'
+        ? servesPasswordLogin()
+          ? 'Requires a logged-in session — call `auth_login` first.'
+          : 'Requires a signed-in user; the app this connection runs in signs it in.'
         : 'Partner token only; no user session needed.',
     },
     parameters,
@@ -199,6 +206,13 @@ export function describeOperation(operationId: string): DescribeOutput {
     ...(op.response ? { response: responseForModel(op.response) } : {}),
     callable_by_executor: op.method === 'GET' && isLiveSource(op.source),
     ...(curatedTool ? { curated_tool: curatedTool } : {}),
+    // Named as callable only where this view serves it (`../serving-view.ts`).
+    ...(curatedTool && !currentView().serves(curatedTool)
+      ? {
+          curated_tool_served: false,
+          curated_tool_addresses: currentView().addressesServing(curatedTool),
+        }
+      : {}),
     ...(op.curation?.tier ? { tier: op.curation.tier } : {}),
     ...(op.curation?.projection ? { projection: op.curation.projection } : {}),
     ...(notes.length > 0 ? { terminology_notes: notes } : {}),
@@ -235,26 +249,39 @@ function renderText(
       `${op.deprecated ? ' · DEPRECATED' : ''}`
   );
   lines.push(
-    op.security.required
-      ? 'Auth: logged-in session required (call `auth_login` first).'
-      : 'Auth: partner token only.'
+    !op.security.required
+      ? 'Auth: partner token only.'
+      : servesPasswordLogin()
+        ? 'Auth: logged-in session required (call `auth_login` first).'
+        : 'Auth: signed-in user required (the app this connection runs in signs it in).'
   );
 
+  const curatedTool = op.curation?.tool_name;
+  // Where this view does not serve the curated tool, say where it is served
+  // instead of telling the caller to use a tool it does not have.
+  const elsewhere = curatedTool ? elsewhereClause(curatedTool) : undefined;
   if (op.method !== 'GET') {
     lines.push(
       `Not callable through \`api_call_operation\`: ${op.method} is a write. ` +
-        (op.curation?.tool_name
-          ? `Use the curated tool \`${op.curation.tool_name}\`.`
-          : 'Writes are available through curated tools only.')
+        (!curatedTool
+          ? 'Writes are available through curated tools only.'
+          : elsewhere === undefined
+            ? `Use the curated tool \`${curatedTool}\`.`
+            : `The curated tool \`${curatedTool}\` performs it, but this address does not serve it; ${elsewhere}.`)
     );
   } else if (!isLiveSource(op.source)) {
     lines.push(
       `Not callable yet: ${op.source} is a preview contract (${op.status ?? 'preview'}).`
     );
   }
-  if (op.curation?.tool_name && op.method === 'GET') {
+  if (curatedTool && op.method === 'GET') {
     lines.push(
-      `A curated tool already covers this: \`${op.curation.tool_name}\` — prefer it.`
+      elsewhere === undefined
+        ? `A curated tool already covers this: \`${curatedTool}\` — prefer it.`
+        : `The curated tool \`${curatedTool}\` covers this, but this address does not serve it (${elsewhere})` +
+            (isLiveSource(op.source)
+              ? '; here, use `api_call_operation`.'
+              : '.')
     );
   }
 

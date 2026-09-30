@@ -375,7 +375,7 @@ export const membershipsGetTypeTool = defineTool({
   name: 'memberships_get_type',
   category: 'Memberships',
   description:
-    'One membership type with every setting: price, covered services and service categories with their visits, balance, validity and activation, auto-activation, whether it is personal, freezing rules, price recalculation, who may correct balances, online sale, and the locations that sell it. Read it before memberships_update_type.',
+    'One membership type with every setting: price, covered services and service categories with their visits, balance, validity and activation, auto-activation, whether it is personal, freezing rules, price recalculation, who may correct balances, online sale, and the locations that sell it.',
   annotations: { title: 'Memberships: get a membership type', ...READ_ONLY },
   input: z.object({ chain_id: chainId, type_id: typeId }),
   outputSchema: typeSchema,
@@ -429,7 +429,7 @@ export const membershipsUpdateTypeTool = defineTool({
   name: 'memberships_update_type',
   category: 'Memberships',
   description:
-    'Change a membership type: pass only what changes, everything else is kept. services replaces the whole list of covered services. After the first membership of the type is sold, only the title, locations, freezing, price recalculation, balance corrections, online sale and type category can change (a shared balance can still gain services); a request for the fixed fields saves the rest and reports what was kept. For new terms create a new type and archive this one. An archived type must be unarchived first. Memberships already sold keep their own balance and validity.',
+    'Change a membership type: read its current settings with memberships_get_type, then pass only what changes; everything else is kept. services replaces the whole list of covered services. After the first membership of the type is sold, only the title, locations, freezing, price recalculation, balance corrections, online sale and type category can change (a shared balance can still gain services); a request for the fixed fields saves the rest and reports what was kept. For new terms create a new type and archive this one. An archived type must be unarchived first. Memberships already sold keep their own balance and validity.',
   annotations: {
     title: 'Memberships: update a membership type',
     destructiveHint: false,

@@ -345,7 +345,7 @@ export const eventsListServicesTool = defineTool({
   name: 'events_list_services',
   category: 'Events',
   description:
-    'The services of a location that can run as group events, each with its seat capacity, price range, category, the team members who can run it (with the session length each one takes) and the resources it can use. Use it before events_create to pick the service, team member, duration and resources. Filter by team member or by a part of the service title.',
+    'The services of a location that can run as group events, each with its seat capacity, price range, category, the team members who can run it (with the session length each one takes) and the resources it can use. Use it to pick the service, team member, duration and resources for a new event. Filter by team member or by a part of the service title.',
   annotations: {
     title: 'Events: services that can run as events',
     ...READ_ONLY,
@@ -395,7 +395,7 @@ export const eventsListDuplicationStrategiesTool = defineTool({
   name: 'events_list_duplication_strategies',
   category: 'Events',
   description:
-    'The saved duplication patterns of a location — how an event repeats (daily, working days, Mon/Wed/Fri, Tue/Thu, weekly on chosen weekdays, monthly, yearly), every how many units, and whether copies carry the bookings. They are presets the Altegio app offers when copying an event; to copy one here, work out the dates and call events_duplicate.',
+    'The saved duplication patterns of a location — how an event repeats (daily, working days, Mon/Wed/Fri, Tue/Thu, weekly on chosen weekdays, monthly, yearly), every how many units, and whether copies carry the bookings. They are presets the Altegio app offers when copying an event; here an event is copied to explicit start times, worked out from the pattern.',
   annotations: { title: 'Events: list duplication patterns', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -542,7 +542,7 @@ export const eventsDuplicateTool = defineTool({
   name: 'events_duplicate',
   category: 'Events',
   description:
-    'Copy a group event to other start times — "repeat this class every Monday in March". Give up to 100 start times in the location’s local time; one invalid time refuses the whole request. Each copy keeps the team member, service, duration, capacity, resources and tags; copy_bookings also copies the booked clients. An overlap with the team member’s or a resource’s other bookings is refused unless force is true. Returns the new events.',
+    'Copy a group event to other start times — "repeat this class every Monday in March". Give up to 100 start times in the location’s local time; one invalid time refuses the whole request. To repeat by a saved pattern, read it with events_list_duplication_strategies and work out the start times. Each copy keeps the team member, service, duration, capacity, resources and tags; copy_bookings also copies the booked clients. An overlap with the team member’s or a resource’s other bookings is refused unless force is true. Returns the new events.',
   annotations: {
     title: 'Events: duplicate an event to dates',
     destructiveHint: false,

@@ -11,6 +11,7 @@ import {
   AltegioApiError,
   ExecutorRefusalError,
 } from '../utils/errors.js';
+import { signInInstruction } from './serving-view.js';
 
 /** The ordinary text block every tool returns. */
 export interface TextContent {
@@ -62,7 +63,7 @@ export async function withErrorHandling(
         .join('; ');
       message = `Invalid parameters for ${toolName}: ${issues}`;
     } else if (error instanceof AuthenticationError) {
-      message = `Authentication required. Call auth_login before using ${toolName}.`;
+      message = signInInstruction(toolName);
     } else if (error instanceof ExecutorRefusalError) {
       // Already phrased as the instruction the caller needs; do not decorate.
       message = error.message;

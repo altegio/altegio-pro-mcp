@@ -13,6 +13,7 @@
  */
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
+import { elsewhereClause } from '../serving-view.js';
 import {
   mintConfirmationToken,
   verifyConfirmationToken,
@@ -36,6 +37,18 @@ import {
 
 const PREVIEW_TOOL = 'appointments_preview_attendance';
 const APPLY_TOOL = 'appointments_apply_attendance';
+
+/**
+ * The hand-over to the apply step. The preview itself only reads, so the
+ * read-only address serves it while withholding the apply that writes; there
+ * the reply says where applying is served instead of naming it as callable.
+ */
+function applyStep(): string {
+  const elsewhere = elsewhereClause(APPLY_TOOL);
+  return elsewhere === undefined
+    ? `Review, then call ${APPLY_TOOL} with the same selection and the preview token.`
+    : `Applying it is a write this address does not serve: ${APPLY_TOOL} takes the same selection and the preview token, and ${elsewhere}.`;
+}
 const MAX_APPOINTMENTS = 20;
 
 const STATUSES = ['waiting', 'confirmed', 'arrived', 'no_show'] as const;
@@ -207,7 +220,7 @@ export const appointmentsPreviewAttendanceTool = defineTool({
       (a) => a.status === input.target_status
     ).length;
     return {
-      text: `Previewed ${appointments.length} appointment(s) in ${groups.length} visit group(s); ${unchanged} already have status ${input.target_status}. One write per group can also change unselected appointments of the same visit, and the workflow is not atomic. Review, then call ${APPLY_TOOL} with the same selection and the preview token.`,
+      text: `Previewed ${appointments.length} appointment(s) in ${groups.length} visit group(s); ${unchanged} already have status ${input.target_status}. One write per group can also change unselected appointments of the same visit, and the workflow is not atomic. ${applyStep()}`,
       structuredContent: {
         location_id: input.location_id,
         appointment_ids: input.appointment_ids,
