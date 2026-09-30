@@ -6,6 +6,20 @@ is declared stable.
 
 ## [Unreleased]
 
+### Fixed — group events, found by live writes on a test location
+
+- `events_create` without `technical_break_minutes` makes the API add the
+  location's default break after `duration_minutes` (60 minutes became 80).
+  The descriptions said the break was always counted inside the duration; they
+  now describe both cases, and the result names the added break. `null` is
+  treated as "not given", which is what the API does with it.
+- `events_list` reported `technical_break_seconds: null` for every event
+  because it did not ask for the duration details; it now reports the break.
+- `events_duplicate` returned bare copies without team-member and service
+  names, without the break and without the time-zone offset. It now reads the
+  copies back from the list and fences their names as untrusted text; if the
+  read-back fails, the bare copies are still returned.
+
 ### Changed — the remaining V1 calls that V2 covers
 
 - `positions_list`, `positions_create` and `appointments_delete` now call V2,

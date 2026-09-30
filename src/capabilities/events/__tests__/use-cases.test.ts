@@ -629,6 +629,51 @@ describe('events_create and events_update', () => {
     expect(result.structuredContent).toMatchObject({ id: 5 });
   });
 
+  it('explains the default break the API appends when none is given', async () => {
+    const withBreak = INCLUDED.map((r) =>
+      r.type === 'activity_duration_details'
+        ? {
+            ...r,
+            attributes: {
+              services_duration: 3600,
+              technical_break_duration: 1200,
+            },
+          }
+        : r
+    );
+    const client = fakeClient(
+      [
+        [
+          'POST',
+          /\/v2\/locations\/1\/events$/,
+          201,
+          {
+            data: event(5, { length: 4800 }),
+            included: withBreak,
+            meta: [],
+          },
+        ],
+      ],
+      calls
+    );
+    const result = await createEvent(client, {
+      location_id: 1,
+      team_member_id: 7,
+      service_id: 3,
+      start: '2027-01-15T09:00',
+      duration_minutes: 60,
+      capacity: 10,
+      technical_break_minutes: null,
+    });
+    expect(calls[0]!.body).not.toHaveProperty('technical_break_duration');
+    expect(result.text).toMatch(
+      /added its default 20-minute break after the requested 60 minutes, so the event occupies 80 minutes/
+    );
+    expect(result.text.indexOf('default 20-minute break')).toBeLessThan(
+      result.text.indexOf('UNTRUSTED')
+    );
+  });
+
   it('refuses a duration off the five-minute grid before calling the API', async () => {
     await expect(
       createEvent(fakeClient([], calls), {
@@ -761,6 +806,96 @@ describe('events_duplicate', () => {
           free_seats: 6,
         },
       ],
+    });
+  });
+});
+
+describe('events_duplicate read-back', () => {
+  const bare = {
+    type: 'activities',
+    id: '8',
+    attributes: {
+      staff_id: 7,
+      service_id: 3,
+      date: '2027-01-22 09:00:00',
+      length: 3600,
+      capacity: 10,
+      records_count: 0,
+    },
+  };
+
+  it('reads the copies back with names, break and offset', async () => {
+    const client = fakeClient(
+      [
+        ['POST', /\/events\/5\/duplicate$/, 201, { data: [bare] }],
+        [
+          'GET',
+          /\/v2\/locations\/1\/events$/,
+          200,
+          {
+            data: [
+              event(9, { date: '2027-01-22T11:00:00+0200' }),
+              event(
+                8,
+                { date: '2027-01-22T09:00:00+0200' },
+                {
+                  duration_details: {
+                    data: { type: 'activity_duration_details', id: '5' },
+                  },
+                }
+              ),
+            ],
+            included: INCLUDED,
+          },
+        ],
+      ],
+      calls
+    );
+    const result = await duplicateEvent(client, {
+      location_id: 1,
+      event_id: 5,
+      starts: ['2027-01-22T09:00'],
+    });
+    const list = calls[1]!;
+    expect(list.query.get('filter[from]')).toBe('2027-01-22 00:00:00');
+    expect(list.query.get('filter[to]')).toBe('2027-01-22 23:59:59');
+    expect(list.query.getAll('filter[master_ids][]')).toEqual(['7']);
+    expect(list.query.getAll('filter[service_ids][]')).toEqual(['3']);
+    expect(list.query.getAll('include[]')).toContain('duration_details');
+    expect(result.structuredContent).toMatchObject({
+      items: [
+        {
+          id: 8,
+          start: '2027-01-22T09:00:00+02:00',
+          technical_break_seconds: 300,
+          service_title: 'Yoga',
+        },
+      ],
+    });
+    expect(
+      (result.structuredContent as { items: unknown[] }).items
+    ).toHaveLength(1);
+    // The team member's name is business text: fenced, never in our lines.
+    const [ours, fenced = ''] = result.text.split('UNTRUSTED');
+    expect(ours).not.toMatch(/ignore previous instructions/);
+    expect(fenced).toMatch(/event 8 team member/);
+  });
+
+  it('keeps the bare copies when the read-back fails', async () => {
+    const client = fakeClient(
+      [
+        ['POST', /\/events\/5\/duplicate$/, 201, { data: [bare] }],
+        ['GET', /\/events$/, 500, { meta: { message: 'down' } }],
+      ],
+      calls
+    );
+    const result = await duplicateEvent(client, {
+      location_id: 1,
+      event_id: 5,
+      starts: ['2027-01-22T09:00'],
+    });
+    expect(result.structuredContent).toMatchObject({
+      items: [{ id: 8, start: '2027-01-22T09:00:00' }],
     });
   });
 });

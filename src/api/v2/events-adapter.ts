@@ -106,6 +106,8 @@ const BOOKING_INCLUDES = [
 
 /** Largest page the V2 collections serve. */
 const MAX_V2_PAGE = 250;
+/** Pages of the event list read to find the copies a duplicate made. */
+const READ_BACK_PAGES = 4;
 
 // ========== coercions ==========
 
@@ -370,7 +372,7 @@ export class EventsAdapter implements EventsApi {
           'filter[sort]': query.order,
           page: query.page,
           limit: Math.min(query.page_size, MAX_V2_PAGE),
-          'include[]': ['staff', 'service', 'resource_instances', 'labels'],
+          'include[]': EVENT_INCLUDES,
         },
         hints: {
           invalid:
@@ -676,7 +678,64 @@ export class EventsAdapter implements EventsApi {
       }
     );
     const included = new IncludedIndex(doc?.included ?? []);
-    return primaryList(doc).map((r) => eventFromWire(r, included));
+    const created = primaryList(doc).map((r) => eventFromWire(r, included));
+    try {
+      return await this.readBack(input.location_id, created);
+    } catch {
+      // The copies exist; a failed read-back must not report the write failed.
+      return created;
+    }
+  }
+
+  /**
+   * The duplicate response carries bare events: no names, no break and a
+   * start without its offset. Read the copies back from the list, which
+   * side-loads them, and keep a bare one only if the list does not return it.
+   */
+  private async readBack(
+    locationId: number,
+    events: EventSummary[]
+  ): Promise<EventSummary[]> {
+    const days = events
+      .map((e) => e.date)
+      .filter((d): d is string => d !== null)
+      .sort();
+    if (days.length === 0) return events;
+    const ids = (values: (number | null)[]) => [
+      ...new Set(values.filter((v): v is number => v !== null)),
+    ];
+    const wanted = new Set(events.map((e) => e.id));
+    const found = new Map<number, EventSummary>();
+    for (
+      let page = 1;
+      page <= READ_BACK_PAGES && found.size < wanted.size;
+      page++
+    ) {
+      const doc = await this.call(
+        `/locations/${locationId}/events`,
+        'read the new events back',
+        {
+          query: {
+            'filter[from]': `${days[0]} 00:00:00`,
+            'filter[to]': `${days[days.length - 1]} 23:59:59`,
+            'filter[master_ids][]': ids(events.map((e) => e.team_member_id)),
+            'filter[service_ids][]': ids(events.map((e) => e.service_id)),
+            'filter[include_deleted]': 1,
+            page,
+            limit: MAX_V2_PAGE,
+            'include[]': EVENT_INCLUDES,
+          },
+        }
+      );
+      const rows = primaryList(doc);
+      const included = new IncludedIndex(doc?.included ?? []);
+      for (const row of rows) {
+        const event = eventFromWire(row, included);
+        if (wanted.has(event.id)) found.set(event.id, event);
+      }
+      if (rows.length < MAX_V2_PAGE) break;
+    }
+    return events.map((e) => found.get(e.id) ?? e);
   }
 
   async listDuplicationStrategies(
