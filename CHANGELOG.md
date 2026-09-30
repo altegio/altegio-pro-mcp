@@ -8,6 +8,12 @@ is declared stable.
 
 ## [0.6.0-alpha.0] - 2026-09-30
 
+### Security
+
+- Lockfile patch updates for published advisories: `ip-address` 10.7.2 and
+  `fast-uri` 3.1.8 (runtime, through the SDK's rate limiter and `ajv`) and
+  `brace-expansion` (development tooling only).
+
 ### Added — memberships
 
 - A `memberships_*` pack of 13 tools. Membership types of a chain:
