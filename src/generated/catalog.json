@@ -586,7 +586,7 @@
       "path": "/chains/{chain_id}/loyalty/abonement_types",
       "displayPath": "/chains/{chain_id}/loyalty/abonement_types",
       "summary": "List membership types",
-      "description": "Retrieves all membership types available in the chain.\n\n**Note:** Requires chain-level permissions.",
+      "description": "Retrieves the chain's membership types, one page at a time. By default only active\n(not archived) types are returned; pass `is_archived=1` to list archived ones.\nDeleted types are not listed. `meta.total_count` is the number of types matching the filters.\n\n**Note:** Requires chain-level permissions.",
       "tags": [
         "Chain Loyalty Programs"
       ],
@@ -606,6 +606,52 @@
           "required": true,
           "schema": {
             "type": "integer"
+          }
+        },
+        {
+          "description": "`0` = active types only (default), `1` = archived types only",
+          "name": "is_archived",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "default": "0",
+            "enum": [
+              "0",
+              "1"
+            ],
+            "type": "string"
+          }
+        },
+        {
+          "description": "Number of types per page. Values above 250 are rejected with `422`.",
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "default": 250,
+            "maximum": 250,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Page number",
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "default": 1,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Returns only types whose title contains this substring",
+          "name": "title",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
           }
         }
       ],
@@ -642,11 +688,11 @@
                 "type": "array"
               },
               "autoactivation_time": {
-                "description": "Time units for autoactivation",
+                "description": "Period after which an unused membership is activated automatically, in `autoactivation_time_unit_id` units; `0` = never. Set with `autoactivation_period` in the request.",
                 "type": "integer"
               },
               "autoactivation_time_unit_id": {
-                "description": "Autoactivation time unit: 1 = days, 2 = weeks, 3 = months, 4 = years",
+                "description": "Autoactivation period unit: 1 = day, 2 = week, 3 = month, 4 = year",
                 "type": "integer"
               },
               "availability": {
@@ -668,11 +714,16 @@
                 "type": "object"
               },
               "balance_edit_type_id": {
-                "description": "Balance edit type: 1 = editable, 2 = not editable",
+                "description": "Where a membership balance can be edited manually: 0 = not allowed, 1 = only at the Location that sold the membership, 2 = at every Location of the chain",
+                "enum": [
+                  0,
+                  1,
+                  2
+                ],
                 "type": "integer"
               },
               "category": {
-                "description": "Service category restriction (can be object, null, or string like \"standard\")",
+                "description": "Membership type kind: `standard` or `auto_renewal`",
                 "type": [
                   "object",
                   "null",
@@ -680,7 +731,7 @@
                 ]
               },
               "category_id": {
-                "description": "Category ID restriction (null if no category restriction)",
+                "description": "ID of the membership type category the type is grouped under (null if uncategorized)",
                 "type": [
                   "integer",
                   "null"
@@ -710,11 +761,11 @@
                 ]
               },
               "expiration_type_id": {
-                "description": "Activation type: 1 = on sale, 2 = on first use, 3 = from specific date",
+                "description": "When the validity period starts: 1 = at the first visit, 2 = at the sale",
                 "type": "integer"
               },
               "expiration_type_title": {
-                "description": "Human-readable expiration type",
+                "description": "Human-readable name of `expiration_type_id`",
                 "type": "string"
               },
               "freeze_limit": {
@@ -730,7 +781,7 @@
                 "type": "integer"
               },
               "is_allow_empty_code": {
-                "description": "Allow sale without code: true = personal membership, false = shared with code",
+                "description": "Personal membership: true = only the Booking User who bought it, matched by phone number, uses it without a number; false = paying with it requires the membership number",
                 "type": "boolean"
               },
               "is_archived": {
@@ -738,7 +789,7 @@
                 "type": "boolean"
               },
               "is_booking_when_frozen_allowed": {
-                "description": "Allow booking appointments when membership is frozen",
+                "description": "Whether a Booking User can book online while their membership is frozen",
                 "type": "boolean"
               },
               "is_chain": {
@@ -746,7 +797,7 @@
                 "type": "boolean"
               },
               "is_code_required": {
-                "description": "Whether activation code is required",
+                "description": "Whether paying with the membership requires its number; the opposite of `is_allow_empty_code`",
                 "type": "boolean"
               },
               "is_online_sale_enabled": {
@@ -831,7 +882,7 @@
       "path": "/chains/{chain_id}/loyalty/abonement_types",
       "displayPath": "/chains/{chain_id}/loyalty/abonement_types",
       "summary": "Create membership type",
-      "description": "Creates a new membership type at the chain level. Membership types define reusable packages\n(e.g., \"10 visits\", \"Monthly unlimited\") that can be sold across multiple locations in the chain.\n\n**Important API Differences:**\n- `services` and `service_categories` must be **objects** (key-value pairs), not arrays\n- Example: `{\"service_id\": count}` not `[service_id]`\n- Some legacy documentation shows arrays, but the real API requires objects\n\n**Note:** Requires chain-level permissions.",
+      "description": "Creates a membership type at the chain level. Membership types define reusable packages\n(e.g., \"10 visits\", \"Monthly unlimited\") that can be sold at the chain's Locations.\nOmitted optional fields take their defaults.\n\n**Covered services.** At least one service or service category is required. Which fields\nthe backend reads depends on whether the chain has the unlimited memberships feature:\n- Without it: `services` and `service_categories`, objects that map an ID to a number of visits,\n  e.g. `{\"13160808\": 5}`.\n- With it: `service_links`, an array of `{service_id, service_category_id, is_unlimited, count}` items.\n\nThe form that does not match the chain is silently ignored. A request that sends both\n`service_links` and `services` or `service_categories` is rejected with `422`.\n\n**Note:** Requires chain-level permissions.",
       "tags": [
         "Chain Loyalty Programs"
       ],
@@ -858,22 +909,22 @@
         "required": true,
         "contentType": "application/json",
         "schema": {
+          "description": "Membership type fields accepted by the create and update requests. Omitted optional fields take their default values.",
           "properties": {
             "allow_freeze": {
               "default": false,
-              "description": "Whether membership can be frozen",
+              "description": "Whether memberships of this type can be frozen. Not allowed when `period` is `0`.",
               "type": "boolean"
             },
             "autoactivation_period": {
-              "description": "Maximum autoactivation period",
-              "type": "integer"
-            },
-            "autoactivation_time_in_days": {
-              "description": "Time units for autoactivation",
+              "default": 0,
+              "description": "For a type whose validity starts at the first visit, activates an unused membership after this period in `autoactivation_time_unit_id` units; `0` = never. Returned as `autoactivation_time`.",
+              "minimum": 0,
               "type": "integer"
             },
             "autoactivation_time_unit_id": {
-              "description": "Autoactivation time unit: 1 = days, 2 = weeks, 3 = months, 4 = years",
+              "default": 1,
+              "description": "Autoactivation period unit: 1 = day, 2 = week, 3 = month, 4 = year",
               "enum": [
                 1,
                 2,
@@ -883,26 +934,31 @@
               "type": "integer"
             },
             "availability": {
-              "description": "Time-based availability rules. Empty array = available anytime.",
+              "description": "When the membership can be used. Each rule lists week days and time intervals. An empty array removes all rules (usable any time); omitting the field keeps the current rules.",
               "items": {
                 "properties": {
                   "intervals": {
-                    "description": "Time intervals when membership is valid",
+                    "description": "Time intervals on those days",
                     "type": "array",
                     "x-truncated": true
                   },
                   "week_days": {
-                    "description": "Days of week when rule applies: 1 = Monday, 7 = Sunday",
+                    "description": "Days of the week the rule applies to: 1 = Monday … 7 = Sunday",
                     "type": "array",
                     "x-truncated": true
                   }
                 },
+                "required": [
+                  "week_days",
+                  "intervals"
+                ],
                 "type": "object"
               },
               "type": "array"
             },
             "balance_edit_type_id": {
-              "description": "Balance adjustment permission: 0 = prohibited, 1 = only at sale location, 2 = at all locations",
+              "default": 0,
+              "description": "Where a membership balance can be edited manually: - `0` = balance edits are not allowed (default) - `1` = only at the Location that sold the membership - `2` = at every Location of the chain",
               "enum": [
                 0,
                 1,
@@ -912,37 +968,51 @@
             },
             "category": {
               "default": "standard",
-              "description": "Subscription category type (always \"standard\")",
+              "description": "Membership type kind: `standard` or `auto_renewal`",
+              "enum": [
+                "standard",
+                "auto_renewal"
+              ],
               "type": "string"
+            },
+            "category_id": {
+              "description": "ID of the membership type category the type is grouped under; `null` leaves it uncategorized.",
+              "type": [
+                "integer",
+                "null"
+              ]
             },
             "chain_id": {
               "description": "Chain ID",
               "type": "integer"
             },
             "cost": {
-              "description": "Subscription price",
+              "description": "Membership price. Must be greater than 0.",
               "format": "float",
               "type": "number"
             },
             "delete_online_image": {
               "default": false,
-              "description": "Whether to delete existing online sale image",
+              "description": "Whether to delete the current online sale image",
               "type": "boolean"
             },
             "expiration_type_id": {
-              "description": "Activation type: 1 = on sale, 2 = on first use, 3 = from specific date",
+              "default": 1,
+              "description": "When the validity period starts: - `1` = at the first visit (default) - `2` = at the sale A type with `category` = `auto_renewal` requires `2`.",
               "enum": [
                 1,
-                2,
-                3
+                2
               ],
               "type": "integer"
             },
             "freeze_limit": {
-              "description": "Maximum total freeze period",
+              "default": 0,
+              "description": "Maximum total freeze period in `freeze_limit_unit_id` units",
+              "minimum": 0,
               "type": "integer"
             },
             "freeze_limit_unit_id": {
+              "default": 1,
               "description": "Freeze period unit: 1 = day, 2 = week, 3 = month, 4 = year",
               "enum": [
                 1,
@@ -953,54 +1023,67 @@
               "type": "integer"
             },
             "is_allow_empty_code": {
-              "default": true,
-              "description": "Personal vs shared subscription. - true = personal (only purchaser can use) - false = shared (multiple people can use with code)",
+              "default": false,
+              "description": "Whether the membership is personal: - `true` = only the Booking User who bought it, matched by phone number, can use it, and no membership number is needed - `false` = paying with the membership requ…",
               "type": "boolean"
             },
             "is_archived": {
+              "description": "Whether the membership type is archived",
+              "type": "boolean"
+            },
+            "is_booking_when_frozen_allowed": {
               "default": false,
-              "description": "Whether membership type is archived",
+              "description": "Whether a Booking User can book online while their membership is frozen",
               "type": "boolean"
             },
             "is_online_sale_enabled": {
               "default": false,
-              "description": "Whether online sale is enabled. If true, online_sale_price becomes required.",
+              "description": "Whether the type is sold online. When `true`, `online_sale_price` must be greater than 0.",
               "type": "boolean"
             },
             "is_united_balance": {
-              "description": "Balance type: true = unified balance, false = separate balance",
+              "default": false,
+              "description": "Balance model: true = one shared balance for all covered services, false = a separate balance per service or category",
+              "type": "boolean"
+            },
+            "is_united_balance_unlimited": {
+              "default": false,
+              "description": "Whether the shared balance is unlimited. Needs the chain's unlimited memberships feature, `is_united_balance` = `true`, `united_balance_services_count` = `0` and a non-zero `period`.",
               "type": "boolean"
             },
             "location_ids": {
-              "description": "List of location IDs where this membership type is available",
+              "description": "IDs of the chain Locations where this membership type is sold",
               "items": {
                 "type": "integer"
               },
               "type": "array"
             },
             "online_image": {
-              "description": "Image URL for online sale",
+              "description": "Image for online sale as a base64 data URI (`data:image/png;base64,...`). Empty or omitted keeps the current image.",
               "type": "string"
             },
             "online_sale_description": {
-              "description": "Subscription description for online sale",
+              "description": "Membership type description for online sale",
               "type": "string"
             },
             "online_sale_price": {
-              "description": "Price for online sale (required if is_online_sale_enabled = true)",
+              "description": "Price for online sale",
               "format": "float",
               "type": "number"
             },
             "online_sale_title": {
-              "description": "Subscription title for online sale",
+              "description": "Membership type title for online sale",
+              "maxLength": 255,
               "type": "string"
             },
             "period": {
-              "description": "Validity period duration",
+              "default": 0,
+              "description": "Validity period length in `period_unit_id` units; `0` = no expiry",
+              "minimum": 0,
               "type": "integer"
             },
             "period_unit_id": {
-              "description": "Period unit type: 1 = day, 2 = week, 3 = month, 4 = year",
+              "description": "Period unit: 1 = day, 2 = week, 3 = month, 4 = year",
               "enum": [
                 1,
                 2,
@@ -1011,39 +1094,82 @@
             },
             "service_categories": {
               "additionalProperties": {
+                "minimum": 0,
                 "type": "integer"
               },
-              "description": "Object with service category IDs as keys and usage count as values. For separate balance: count = number of visits per category. For unified balance: count value is ignored (set to any number or 0).…",
+              "description": "Covered service categories for a chain without the unlimited memberships feature: category ID mapped to the number of visits. For a shared balance the counts are ignored (set them to `0`). Ignored fo…",
               "type": "object"
+            },
+            "service_links": {
+              "description": "Covered services and categories for a chain with the unlimited memberships feature. Ignored for a chain without the feature; cannot be sent together with `services` or `service_categories`. Each item…",
+              "items": {
+                "properties": {
+                  "count": {
+                    "description": "Number of visits to this service or category",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "is_unlimited": {
+                    "description": "Whether visits to this service or category are unlimited. Requires a non-zero `period`.",
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "service_category_id": {
+                    "description": "Service category ID, or `null` for a service link",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "service_id": {
+                    "description": "Service ID, or `null` for a category link",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  }
+                },
+                "required": [
+                  "service_id",
+                  "service_category_id",
+                  "is_unlimited",
+                  "count"
+                ],
+                "type": "object"
+              },
+              "type": "array"
             },
             "service_price_correction": {
               "default": false,
-              "description": "Whether service price can be adjusted when using membership",
+              "description": "Whether the service price is recalculated when paying with the membership. Not allowed for unlimited memberships.",
               "type": "boolean"
             },
             "services": {
               "additionalProperties": {
+                "minimum": 0,
                 "type": "integer"
               },
-              "description": "Object with service IDs as keys and usage count as values. For separate balance: count = number of visits per service. For unified balance: use empty object {}. **Important:** This is an object (key-…",
+              "description": "Covered services for a chain without the unlimited memberships feature: service ID mapped to the number of visits. For a shared balance the counts are ignored (set them to `0`). Ignored for a chain w…",
               "type": "object"
             },
             "title": {
               "description": "Membership type name",
+              "maxLength": 255,
               "type": "string"
             },
             "united_balance_services_count": {
-              "description": "Number of visits for unified balance",
+              "default": 0,
+              "description": "Number of visits in the shared balance. Required above `0` when `is_united_balance` is `true`, unless `is_united_balance_unlimited` is `true`; ignored for a separate balance.",
+              "minimum": 0,
               "type": "integer"
             }
           },
           "required": [
             "title",
             "chain_id",
-            "cost",
-            "service_categories",
-            "is_united_balance",
-            "united_balance_services_count"
+            "cost"
           ],
           "type": "object"
         }
@@ -1078,11 +1204,11 @@
               "type": "array"
             },
             "autoactivation_time": {
-              "description": "Time units for autoactivation",
+              "description": "Period after which an unused membership is activated automatically, in `autoactivation_time_unit_id` units; `0` = never. Set with `autoactivation_period` in the request.",
               "type": "integer"
             },
             "autoactivation_time_unit_id": {
-              "description": "Autoactivation time unit: 1 = days, 2 = weeks, 3 = months, 4 = years",
+              "description": "Autoactivation period unit: 1 = day, 2 = week, 3 = month, 4 = year",
               "type": "integer"
             },
             "availability": {
@@ -1118,11 +1244,16 @@
               "type": "object"
             },
             "balance_edit_type_id": {
-              "description": "Balance edit type: 1 = editable, 2 = not editable",
+              "description": "Where a membership balance can be edited manually: 0 = not allowed, 1 = only at the Location that sold the membership, 2 = at every Location of the chain",
+              "enum": [
+                0,
+                1,
+                2
+              ],
               "type": "integer"
             },
             "category": {
-              "description": "Service category restriction (can be object, null, or string like \"standard\")",
+              "description": "Membership type kind: `standard` or `auto_renewal`",
               "type": [
                 "object",
                 "null",
@@ -1130,7 +1261,7 @@
               ]
             },
             "category_id": {
-              "description": "Category ID restriction (null if no category restriction)",
+              "description": "ID of the membership type category the type is grouped under (null if uncategorized)",
               "type": [
                 "integer",
                 "null"
@@ -1160,11 +1291,11 @@
               ]
             },
             "expiration_type_id": {
-              "description": "Activation type: 1 = on sale, 2 = on first use, 3 = from specific date",
+              "description": "When the validity period starts: 1 = at the first visit, 2 = at the sale",
               "type": "integer"
             },
             "expiration_type_title": {
-              "description": "Human-readable expiration type",
+              "description": "Human-readable name of `expiration_type_id`",
               "type": "string"
             },
             "freeze_limit": {
@@ -1180,7 +1311,7 @@
               "type": "integer"
             },
             "is_allow_empty_code": {
-              "description": "Allow sale without code: true = personal membership, false = shared with code",
+              "description": "Personal membership: true = only the Booking User who bought it, matched by phone number, uses it without a number; false = paying with it requires the membership number",
               "type": "boolean"
             },
             "is_archived": {
@@ -1188,7 +1319,7 @@
               "type": "boolean"
             },
             "is_booking_when_frozen_allowed": {
-              "description": "Allow booking appointments when membership is frozen",
+              "description": "Whether a Booking User can book online while their membership is frozen",
               "type": "boolean"
             },
             "is_chain": {
@@ -1196,7 +1327,7 @@
               "type": "boolean"
             },
             "is_code_required": {
-              "description": "Whether activation code is required",
+              "description": "Whether paying with the membership requires its number; the opposite of `is_allow_empty_code`",
               "type": "boolean"
             },
             "is_online_sale_enabled": {
@@ -1280,7 +1411,7 @@
       "path": "/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}",
       "displayPath": "/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}",
       "summary": "Get membership type details",
-      "description": "Retrieves detailed information about a specific membership type.\n\n**Note:** Requires chain-level permissions.",
+      "description": "Retrieves detailed information about a specific membership type.\nA deleted type is still returned by its ID.\n\n**Note:** Requires chain-level permissions.",
       "tags": [
         "Chain Loyalty Programs"
       ],
@@ -1342,11 +1473,11 @@
               "type": "array"
             },
             "autoactivation_time": {
-              "description": "Time units for autoactivation",
+              "description": "Period after which an unused membership is activated automatically, in `autoactivation_time_unit_id` units; `0` = never. Set with `autoactivation_period` in the request.",
               "type": "integer"
             },
             "autoactivation_time_unit_id": {
-              "description": "Autoactivation time unit: 1 = days, 2 = weeks, 3 = months, 4 = years",
+              "description": "Autoactivation period unit: 1 = day, 2 = week, 3 = month, 4 = year",
               "type": "integer"
             },
             "availability": {
@@ -1382,11 +1513,16 @@
               "type": "object"
             },
             "balance_edit_type_id": {
-              "description": "Balance edit type: 1 = editable, 2 = not editable",
+              "description": "Where a membership balance can be edited manually: 0 = not allowed, 1 = only at the Location that sold the membership, 2 = at every Location of the chain",
+              "enum": [
+                0,
+                1,
+                2
+              ],
               "type": "integer"
             },
             "category": {
-              "description": "Service category restriction (can be object, null, or string like \"standard\")",
+              "description": "Membership type kind: `standard` or `auto_renewal`",
               "type": [
                 "object",
                 "null",
@@ -1394,7 +1530,7 @@
               ]
             },
             "category_id": {
-              "description": "Category ID restriction (null if no category restriction)",
+              "description": "ID of the membership type category the type is grouped under (null if uncategorized)",
               "type": [
                 "integer",
                 "null"
@@ -1424,11 +1560,11 @@
               ]
             },
             "expiration_type_id": {
-              "description": "Activation type: 1 = on sale, 2 = on first use, 3 = from specific date",
+              "description": "When the validity period starts: 1 = at the first visit, 2 = at the sale",
               "type": "integer"
             },
             "expiration_type_title": {
-              "description": "Human-readable expiration type",
+              "description": "Human-readable name of `expiration_type_id`",
               "type": "string"
             },
             "freeze_limit": {
@@ -1444,7 +1580,7 @@
               "type": "integer"
             },
             "is_allow_empty_code": {
-              "description": "Allow sale without code: true = personal membership, false = shared with code",
+              "description": "Personal membership: true = only the Booking User who bought it, matched by phone number, uses it without a number; false = paying with it requires the membership number",
               "type": "boolean"
             },
             "is_archived": {
@@ -1452,7 +1588,7 @@
               "type": "boolean"
             },
             "is_booking_when_frozen_allowed": {
-              "description": "Allow booking appointments when membership is frozen",
+              "description": "Whether a Booking User can book online while their membership is frozen",
               "type": "boolean"
             },
             "is_chain": {
@@ -1460,7 +1596,7 @@
               "type": "boolean"
             },
             "is_code_required": {
-              "description": "Whether activation code is required",
+              "description": "Whether paying with the membership requires its number; the opposite of `is_allow_empty_code`",
               "type": "boolean"
             },
             "is_online_sale_enabled": {
@@ -1610,7 +1746,7 @@
       "path": "/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}",
       "displayPath": "/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}",
       "summary": "Update membership type",
-      "description": "Updates an existing membership type. You can update basic information\n(title, cost, period) without modifying the service/category links.\n\n**Note:** To preserve existing services, pass empty arrays for\n`services` and `service_categories` fields.",
+      "description": "Replaces the settings of a membership type. Send the full type: omitted optional fields\nare reset to their defaults. The request body and the covered-services rules are the same\nas in Create membership type.\nAn archived type cannot be updated (`422`); unarchive it first.\n\n**After the first membership of the type is sold**, the request still succeeds, but the\nbackend silently keeps the current `cost`, `period`, `period_unit_id`, `expiration_type_id`,\n`is_allow_empty_code`, the balance model (`is_united_balance`, `is_united_balance_unlimited`,\n`united_balance_services_count`), `category`, `availability` and the covered services.\nOnly a type with a shared balance can gain services or categories: the ones sent are added\nto the type and to the memberships already sold; none are removed.\nCompare the response with the request to see what was kept.\n\n**Note:** Requires chain-level permissions.",
       "tags": [
         "Chain Loyalty Programs"
       ],
@@ -1646,22 +1782,22 @@
         "required": true,
         "contentType": "application/json",
         "schema": {
+          "description": "Membership type fields accepted by the create and update requests. Omitted optional fields take their default values.",
           "properties": {
             "allow_freeze": {
               "default": false,
-              "description": "Whether membership can be frozen",
+              "description": "Whether memberships of this type can be frozen. Not allowed when `period` is `0`.",
               "type": "boolean"
             },
             "autoactivation_period": {
-              "description": "Maximum autoactivation period",
-              "type": "integer"
-            },
-            "autoactivation_time_in_days": {
-              "description": "Time units for autoactivation",
+              "default": 0,
+              "description": "For a type whose validity starts at the first visit, activates an unused membership after this period in `autoactivation_time_unit_id` units; `0` = never. Returned as `autoactivation_time`.",
+              "minimum": 0,
               "type": "integer"
             },
             "autoactivation_time_unit_id": {
-              "description": "Autoactivation time unit: 1 = days, 2 = weeks, 3 = months, 4 = years",
+              "default": 1,
+              "description": "Autoactivation period unit: 1 = day, 2 = week, 3 = month, 4 = year",
               "enum": [
                 1,
                 2,
@@ -1671,26 +1807,31 @@
               "type": "integer"
             },
             "availability": {
-              "description": "Time-based availability rules. Empty array = available anytime.",
+              "description": "When the membership can be used. Each rule lists week days and time intervals. An empty array removes all rules (usable any time); omitting the field keeps the current rules.",
               "items": {
                 "properties": {
                   "intervals": {
-                    "description": "Time intervals when membership is valid",
+                    "description": "Time intervals on those days",
                     "type": "array",
                     "x-truncated": true
                   },
                   "week_days": {
-                    "description": "Days of week when rule applies: 1 = Monday, 7 = Sunday",
+                    "description": "Days of the week the rule applies to: 1 = Monday … 7 = Sunday",
                     "type": "array",
                     "x-truncated": true
                   }
                 },
+                "required": [
+                  "week_days",
+                  "intervals"
+                ],
                 "type": "object"
               },
               "type": "array"
             },
             "balance_edit_type_id": {
-              "description": "Balance adjustment permission: 0 = prohibited, 1 = only at sale location, 2 = at all locations",
+              "default": 0,
+              "description": "Where a membership balance can be edited manually: - `0` = balance edits are not allowed (default) - `1` = only at the Location that sold the membership - `2` = at every Location of the chain",
               "enum": [
                 0,
                 1,
@@ -1698,29 +1839,53 @@
               ],
               "type": "integer"
             },
+            "category": {
+              "default": "standard",
+              "description": "Membership type kind: `standard` or `auto_renewal`",
+              "enum": [
+                "standard",
+                "auto_renewal"
+              ],
+              "type": "string"
+            },
+            "category_id": {
+              "description": "ID of the membership type category the type is grouped under; `null` leaves it uncategorized.",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
             "chain_id": {
               "description": "Chain ID",
               "type": "integer"
             },
             "cost": {
-              "description": "Subscription price",
+              "description": "Membership price. Must be greater than 0.",
               "format": "float",
               "type": "number"
             },
+            "delete_online_image": {
+              "default": false,
+              "description": "Whether to delete the current online sale image",
+              "type": "boolean"
+            },
             "expiration_type_id": {
-              "description": "Activation type: 1 = on sale, 2 = on first use, 3 = from specific date",
+              "default": 1,
+              "description": "When the validity period starts: - `1` = at the first visit (default) - `2` = at the sale A type with `category` = `auto_renewal` requires `2`.",
               "enum": [
                 1,
-                2,
-                3
+                2
               ],
               "type": "integer"
             },
             "freeze_limit": {
-              "description": "Maximum total freeze period",
+              "default": 0,
+              "description": "Maximum total freeze period in `freeze_limit_unit_id` units",
+              "minimum": 0,
               "type": "integer"
             },
             "freeze_limit_unit_id": {
+              "default": 1,
               "description": "Freeze period unit: 1 = day, 2 = week, 3 = month, 4 = year",
               "enum": [
                 1,
@@ -1731,37 +1896,47 @@
               "type": "integer"
             },
             "is_allow_empty_code": {
-              "default": true,
-              "description": "Personal vs shared subscription. - true = personal (only purchaser can use) - false = shared (multiple people can use with code)",
+              "default": false,
+              "description": "Whether the membership is personal: - `true` = only the Booking User who bought it, matched by phone number, can use it, and no membership number is needed - `false` = paying with the membership requ…",
               "type": "boolean"
             },
             "is_archived": {
+              "description": "Whether the membership type is archived",
+              "type": "boolean"
+            },
+            "is_booking_when_frozen_allowed": {
               "default": false,
-              "description": "Whether membership type is archived",
+              "description": "Whether a Booking User can book online while their membership is frozen",
               "type": "boolean"
             },
             "is_online_sale_enabled": {
               "default": false,
-              "description": "Whether online sale is enabled",
+              "description": "Whether the type is sold online. When `true`, `online_sale_price` must be greater than 0.",
               "type": "boolean"
             },
             "is_united_balance": {
-              "description": "Balance type: true = unified balance, false = separate balance",
+              "default": false,
+              "description": "Balance model: true = one shared balance for all covered services, false = a separate balance per service or category",
+              "type": "boolean"
+            },
+            "is_united_balance_unlimited": {
+              "default": false,
+              "description": "Whether the shared balance is unlimited. Needs the chain's unlimited memberships feature, `is_united_balance` = `true`, `united_balance_services_count` = `0` and a non-zero `period`.",
               "type": "boolean"
             },
             "location_ids": {
-              "description": "List of location IDs where this membership type is available",
+              "description": "IDs of the chain Locations where this membership type is sold",
               "items": {
                 "type": "integer"
               },
               "type": "array"
             },
             "online_image": {
-              "description": "Image URL for online sale",
+              "description": "Image for online sale as a base64 data URI (`data:image/png;base64,...`). Empty or omitted keeps the current image.",
               "type": "string"
             },
             "online_sale_description": {
-              "description": "Subscription description for online sale",
+              "description": "Membership type description for online sale",
               "type": "string"
             },
             "online_sale_price": {
@@ -1770,15 +1945,18 @@
               "type": "number"
             },
             "online_sale_title": {
-              "description": "Subscription title for online sale",
+              "description": "Membership type title for online sale",
+              "maxLength": 255,
               "type": "string"
             },
             "period": {
-              "description": "Validity period duration",
+              "default": 0,
+              "description": "Validity period length in `period_unit_id` units; `0` = no expiry",
+              "minimum": 0,
               "type": "integer"
             },
             "period_unit_id": {
-              "description": "Period unit type: 1 = day, 2 = week, 3 = month, 4 = year",
+              "description": "Period unit: 1 = day, 2 = week, 3 = month, 4 = year",
               "enum": [
                 1,
                 2,
@@ -1788,40 +1966,83 @@
               "type": "integer"
             },
             "service_categories": {
-              "description": "List of service category IDs. Pass empty array to preserve existing categories.",
-              "items": {
+              "additionalProperties": {
+                "minimum": 0,
                 "type": "integer"
+              },
+              "description": "Covered service categories for a chain without the unlimited memberships feature: category ID mapped to the number of visits. For a shared balance the counts are ignored (set them to `0`). Ignored fo…",
+              "type": "object"
+            },
+            "service_links": {
+              "description": "Covered services and categories for a chain with the unlimited memberships feature. Ignored for a chain without the feature; cannot be sent together with `services` or `service_categories`. Each item…",
+              "items": {
+                "properties": {
+                  "count": {
+                    "description": "Number of visits to this service or category",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "is_unlimited": {
+                    "description": "Whether visits to this service or category are unlimited. Requires a non-zero `period`.",
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "service_category_id": {
+                    "description": "Service category ID, or `null` for a service link",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "service_id": {
+                    "description": "Service ID, or `null` for a category link",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  }
+                },
+                "required": [
+                  "service_id",
+                  "service_category_id",
+                  "is_unlimited",
+                  "count"
+                ],
+                "type": "object"
               },
               "type": "array"
             },
             "service_price_correction": {
               "default": false,
-              "description": "Whether service price can be adjusted when using membership",
+              "description": "Whether the service price is recalculated when paying with the membership. Not allowed for unlimited memberships.",
               "type": "boolean"
             },
             "services": {
-              "description": "List of service IDs. Pass empty array to preserve existing services.",
-              "items": {
+              "additionalProperties": {
+                "minimum": 0,
                 "type": "integer"
               },
-              "type": "array"
+              "description": "Covered services for a chain without the unlimited memberships feature: service ID mapped to the number of visits. For a shared balance the counts are ignored (set them to `0`). Ignored for a chain w…",
+              "type": "object"
             },
             "title": {
               "description": "Membership type name",
+              "maxLength": 255,
               "type": "string"
             },
             "united_balance_services_count": {
-              "description": "Number of visits for unified balance",
+              "default": 0,
+              "description": "Number of visits in the shared balance. Required above `0` when `is_united_balance` is `true`, unless `is_united_balance_unlimited` is `true`; ignored for a separate balance.",
+              "minimum": 0,
               "type": "integer"
             }
           },
           "required": [
             "title",
             "chain_id",
-            "cost",
-            "service_categories",
-            "is_united_balance",
-            "united_balance_services_count"
+            "cost"
           ],
           "type": "object"
         }
@@ -1856,11 +2077,11 @@
               "type": "array"
             },
             "autoactivation_time": {
-              "description": "Time units for autoactivation",
+              "description": "Period after which an unused membership is activated automatically, in `autoactivation_time_unit_id` units; `0` = never. Set with `autoactivation_period` in the request.",
               "type": "integer"
             },
             "autoactivation_time_unit_id": {
-              "description": "Autoactivation time unit: 1 = days, 2 = weeks, 3 = months, 4 = years",
+              "description": "Autoactivation period unit: 1 = day, 2 = week, 3 = month, 4 = year",
               "type": "integer"
             },
             "availability": {
@@ -1896,11 +2117,16 @@
               "type": "object"
             },
             "balance_edit_type_id": {
-              "description": "Balance edit type: 1 = editable, 2 = not editable",
+              "description": "Where a membership balance can be edited manually: 0 = not allowed, 1 = only at the Location that sold the membership, 2 = at every Location of the chain",
+              "enum": [
+                0,
+                1,
+                2
+              ],
               "type": "integer"
             },
             "category": {
-              "description": "Service category restriction (can be object, null, or string like \"standard\")",
+              "description": "Membership type kind: `standard` or `auto_renewal`",
               "type": [
                 "object",
                 "null",
@@ -1908,7 +2134,7 @@
               ]
             },
             "category_id": {
-              "description": "Category ID restriction (null if no category restriction)",
+              "description": "ID of the membership type category the type is grouped under (null if uncategorized)",
               "type": [
                 "integer",
                 "null"
@@ -1938,11 +2164,11 @@
               ]
             },
             "expiration_type_id": {
-              "description": "Activation type: 1 = on sale, 2 = on first use, 3 = from specific date",
+              "description": "When the validity period starts: 1 = at the first visit, 2 = at the sale",
               "type": "integer"
             },
             "expiration_type_title": {
-              "description": "Human-readable expiration type",
+              "description": "Human-readable name of `expiration_type_id`",
               "type": "string"
             },
             "freeze_limit": {
@@ -1958,7 +2184,7 @@
               "type": "integer"
             },
             "is_allow_empty_code": {
-              "description": "Allow sale without code: true = personal membership, false = shared with code",
+              "description": "Personal membership: true = only the Booking User who bought it, matched by phone number, uses it without a number; false = paying with it requires the membership number",
               "type": "boolean"
             },
             "is_archived": {
@@ -1966,7 +2192,7 @@
               "type": "boolean"
             },
             "is_booking_when_frozen_allowed": {
-              "description": "Allow booking appointments when membership is frozen",
+              "description": "Whether a Booking User can book online while their membership is frozen",
               "type": "boolean"
             },
             "is_chain": {
@@ -1974,7 +2200,7 @@
               "type": "boolean"
             },
             "is_code_required": {
-              "description": "Whether activation code is required",
+              "description": "Whether paying with the membership requires its number; the opposite of `is_allow_empty_code`",
               "type": "boolean"
             },
             "is_online_sale_enabled": {
@@ -2059,7 +2285,7 @@
       "path": "/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}",
       "displayPath": "/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}",
       "summary": "Archive or unarchive membership type",
-      "description": "Archives or unarchives a membership type.\n\nArchived membership types:\n- Cannot be sold to new clients\n- Existing active memberships remain functional\n- Can be unarchived at any time\n\n**Note:** Requires chain-level permissions.",
+      "description": "Archives or unarchives a membership type. Send `is_archived` as the string `\"1\"` or `\"0\"`.\n\nArchived membership types:\n- Cannot be sold to new clients\n- Existing active memberships remain functional\n- Are listed only with `is_archived=1` and cannot be updated\n- Can be unarchived at any time\n\n**Note:** Requires chain-level permissions.",
       "tags": [
         "Chain Loyalty Programs"
       ],
@@ -2097,7 +2323,7 @@
         "schema": {
           "properties": {
             "is_archived": {
-              "description": "Archive status, sent as a string: - `\"1\"` = archived (cannot be sold) - `\"0\"` = active (available for sale) JSON booleans and integers are rejected with `422`.",
+              "description": "Archive status, sent as a string: - `\"1\"` = archived (cannot be sold) - `\"0\"` = active (available for sale) JSON booleans (`true`, `false`) and numbers (`1`, `0`) are rejected with `422`.",
               "enum": [
                 "0",
                 "1"
@@ -2112,7 +2338,6 @@
         }
       },
       "response": {
-        "contentType": "application/json",
         "statusCode": "204"
       },
       "curation": {
@@ -2132,7 +2357,7 @@
       "path": "/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}",
       "displayPath": "/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}",
       "summary": "Delete membership type",
-      "description": "Deletes a membership type from the chain.\n\n**Warning:** This action cannot be undone. Active subscriptions using this type\nmay be affected.",
+      "description": "Deletes a membership type from the chain. This is a soft delete: the type disappears\nfrom List membership types, but Get membership type details still returns it by its ID.\n\nA type with sold memberships cannot be deleted: the request is rejected with `400`\nand a message. Archive such a type instead.",
       "tags": [
         "Chain Loyalty Programs"
       ],
@@ -2165,12 +2390,7 @@
         }
       ],
       "response": {
-        "contentType": "application/json",
-        "statusCode": "204",
-        "envelope": "v1",
-        "schema": {
-          "type": "null"
-        }
+        "statusCode": "204"
       },
       "curation": {
         "domain": "memberships",
@@ -2260,11 +2480,11 @@
               "type": "array"
             },
             "autoactivation_time": {
-              "description": "Time units for autoactivation",
+              "description": "Period after which an unused membership is activated automatically, in `autoactivation_time_unit_id` units; `0` = never. Set with `autoactivation_period` in the request.",
               "type": "integer"
             },
             "autoactivation_time_unit_id": {
-              "description": "Autoactivation time unit: 1 = days, 2 = weeks, 3 = months, 4 = years",
+              "description": "Autoactivation period unit: 1 = day, 2 = week, 3 = month, 4 = year",
               "type": "integer"
             },
             "availability": {
@@ -2300,11 +2520,16 @@
               "type": "object"
             },
             "balance_edit_type_id": {
-              "description": "Balance edit type: 1 = editable, 2 = not editable",
+              "description": "Where a membership balance can be edited manually: 0 = not allowed, 1 = only at the Location that sold the membership, 2 = at every Location of the chain",
+              "enum": [
+                0,
+                1,
+                2
+              ],
               "type": "integer"
             },
             "category": {
-              "description": "Service category restriction (can be object, null, or string like \"standard\")",
+              "description": "Membership type kind: `standard` or `auto_renewal`",
               "type": [
                 "object",
                 "null",
@@ -2312,7 +2537,7 @@
               ]
             },
             "category_id": {
-              "description": "Category ID restriction (null if no category restriction)",
+              "description": "ID of the membership type category the type is grouped under (null if uncategorized)",
               "type": [
                 "integer",
                 "null"
@@ -2342,11 +2567,11 @@
               ]
             },
             "expiration_type_id": {
-              "description": "Activation type: 1 = on sale, 2 = on first use, 3 = from specific date",
+              "description": "When the validity period starts: 1 = at the first visit, 2 = at the sale",
               "type": "integer"
             },
             "expiration_type_title": {
-              "description": "Human-readable expiration type",
+              "description": "Human-readable name of `expiration_type_id`",
               "type": "string"
             },
             "freeze_limit": {
@@ -2362,7 +2587,7 @@
               "type": "integer"
             },
             "is_allow_empty_code": {
-              "description": "Allow sale without code: true = personal membership, false = shared with code",
+              "description": "Personal membership: true = only the Booking User who bought it, matched by phone number, uses it without a number; false = paying with it requires the membership number",
               "type": "boolean"
             },
             "is_archived": {
@@ -2370,7 +2595,7 @@
               "type": "boolean"
             },
             "is_booking_when_frozen_allowed": {
-              "description": "Allow booking appointments when membership is frozen",
+              "description": "Whether a Booking User can book online while their membership is frozen",
               "type": "boolean"
             },
             "is_chain": {
@@ -2378,7 +2603,7 @@
               "type": "boolean"
             },
             "is_code_required": {
-              "description": "Whether activation code is required",
+              "description": "Whether paying with the membership requires its number; the opposite of `is_allow_empty_code`",
               "type": "boolean"
             },
             "is_online_sale_enabled": {
