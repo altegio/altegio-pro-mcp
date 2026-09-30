@@ -86,7 +86,7 @@ function typeLine(t: MembershipType): string {
   return (
     `- Membership type ${t.id} (chain ${t.chain_id ?? '?'}): price ${t.price ?? 'not reported'}` +
     ` · ${balanceText(t.balance_type, t.shared_visits, t.shared_unlimited, t.services, 'visits')}` +
-    ` · valid ${durationText(t.validity, 'with no expiry')}` +
+    ` · valid ${durationText(t.validity, 'with no expiration')}` +
     (t.activation
       ? ` from the ${t.activation === 'sale' ? 'sale' : 'first visit'}`
       : '') +
@@ -359,7 +359,7 @@ export interface TypeFieldsInput {
   personal?: boolean;
   freeze_allowed?: boolean;
   freeze_limit?: Duration | null;
-  booking_while_frozen?: boolean;
+  online_booking_while_frozen?: boolean;
   recalculate_service_price?: boolean;
   balance_edit?: BalanceEditPolicy;
   online_sale_enabled?: boolean;
@@ -383,7 +383,7 @@ const FIELD_KEYS: readonly (keyof TypeFieldsInput)[] = [
   'personal',
   'freeze_allowed',
   'freeze_limit',
-  'booking_while_frozen',
+  'online_booking_while_frozen',
   'recalculate_service_price',
   'balance_edit',
   'online_sale_enabled',
@@ -428,7 +428,7 @@ function fieldsFromType(t: MembershipType): MembershipTypeFields {
     personal: t.personal ?? false,
     freeze_allowed: t.freeze_allowed,
     freeze_limit: t.freeze_limit,
-    booking_while_frozen: t.booking_while_frozen,
+    online_booking_while_frozen: t.online_booking_while_frozen,
     recalculate_service_price: t.recalculate_service_price,
     balance_edit: t.balance_edit ?? 'not_allowed',
     online_sale_enabled: t.online_sale_enabled,
@@ -452,7 +452,7 @@ const DEFAULT_FIELDS: Omit<
   personal: false,
   freeze_allowed: false,
   freeze_limit: null,
-  booking_while_frozen: false,
+  online_booking_while_frozen: false,
   recalculate_service_price: false,
   balance_edit: 'not_allowed',
   online_sale_enabled: false,
@@ -823,8 +823,8 @@ export async function freezeMembership(
   );
   return savedMembership('Froze', m, [
     until
-      ? `It unfreezes by itself on ${until}; its expiry moves out by the days it stays frozen.`
-      : 'It stays frozen until memberships_unfreeze; its expiry moves out by the days it stays frozen.',
+      ? `It unfreezes by itself on ${until}; its expiration date moves out by the days it stays frozen.`
+      : 'It stays frozen until memberships_unfreeze; its expiration date moves out by the days it stays frozen.',
   ]);
 }
 
@@ -925,7 +925,7 @@ export async function setValidity(
     m,
     m.status === 'issued'
       ? [
-          'It is not activated yet, so the expiry is counted from its activation.',
+          'It is not activated yet, so the expiration date is counted from its activation.',
         ]
       : m.status === 'expired'
         ? ['With the new validity the membership has already expired.']

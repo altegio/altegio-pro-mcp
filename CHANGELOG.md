@@ -6,6 +6,8 @@ is declared stable.
 
 ## [Unreleased]
 
+## [0.6.0-alpha.0] - 2026-09-30
+
 ### Added — memberships
 
 - A `memberships_*` pack of 13 tools. Membership types of a chain:
@@ -30,6 +32,8 @@ is declared stable.
   check access on that switch.
 - New v3 placeholder scopes `chain_loyalty:read`, `chain_loyalty:configure` and
   `chain_loyalty:transact`, taken from the API team's scope catalog.
+- Server instructions now name group events and memberships among the live
+  domains.
 
 ### Fixed — group events, found by live writes on a test location
 

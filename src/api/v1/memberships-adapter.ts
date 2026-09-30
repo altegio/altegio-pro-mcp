@@ -211,7 +211,7 @@ function typeFromWire(t: Row): MembershipType {
     services: allowances(t.balance_container, shared),
     freeze_allowed: flag(t.allow_freeze),
     freeze_limit: duration(t.freeze_limit, t.freeze_limit_unit_id),
-    booking_while_frozen: flag(t.is_booking_when_frozen_allowed),
+    online_booking_while_frozen: flag(t.is_booking_when_frozen_allowed),
     recalculate_service_price: flag(t.service_price_correction),
     balance_edit:
       BALANCE_EDIT_FROM_WIRE[int(t.balance_edit_type_id) ?? -1] ?? null,
@@ -357,7 +357,7 @@ export function toWireFields(
       'freeze_limit',
       'freeze_limit_unit_id'
     ),
-    is_booking_when_frozen_allowed: fields.booking_while_frozen,
+    is_booking_when_frozen_allowed: fields.online_booking_while_frozen,
     service_price_correction: fields.recalculate_service_price,
     balance_edit_type_id: BALANCE_EDIT_TO_WIRE[fields.balance_edit],
     is_online_sale_enabled: fields.online_sale_enabled,
@@ -802,7 +802,7 @@ export class MembershipsAdapter implements MembershipsApi {
       'set_period',
       `change the validity of membership ${membershipId}`,
       { period: validity.length, period_unit_id: UNIT_TO_WIRE[validity.unit] },
-      'The new expiry date cannot fall before the membership was last used.'
+      'The new expiration date cannot fall before the membership was last used.'
     );
     const row = asRow(data);
     return int(row.id) !== null

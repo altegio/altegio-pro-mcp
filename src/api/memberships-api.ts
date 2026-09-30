@@ -31,7 +31,7 @@ export interface Duration {
 /** When a sold membership starts to count its validity. */
 export type MembershipActivation = 'first_visit' | 'sale';
 
-/** Where staff may correct the balance of a sold membership by hand. */
+/** Where team members may correct the balance of a sold membership by hand. */
 export type BalanceEditPolicy =
   'not_allowed' | 'sale_location' | 'any_location';
 
@@ -93,14 +93,15 @@ export interface MembershipType {
   price: number | null;
   archived: boolean;
   archived_at: string | null;
-  /** How long a membership stays valid once activated; null — no expiry. */
+  /** How long a membership stays valid once activated; null — it never expires. */
   validity: Duration | null;
   activation: MembershipActivation | null;
   /** An unused membership activates by itself this long after the sale. */
   auto_activation_after: Duration | null;
   /**
    * true — only the client who bought it (or the one it was given to) uses it,
-   * without a code; false — whoever presents its number can use it.
+   * without entering its number; false — whoever presents its number can
+   * use it.
    */
   personal: boolean | null;
   balance_type: MembershipBalanceType;
@@ -111,7 +112,7 @@ export interface MembershipType {
   freeze_allowed: boolean;
   /** Longest total freeze per membership; null — no limit. */
   freeze_limit: Duration | null;
-  booking_while_frozen: boolean;
+  online_booking_while_frozen: boolean;
   /** Recalculate the service price when the visit is paid with a membership. */
   recalculate_service_price: boolean;
   balance_edit: BalanceEditPolicy | null;
@@ -158,7 +159,7 @@ export interface MembershipTypeFields {
   services: AllowanceInput[];
   freeze_allowed: boolean;
   freeze_limit: Duration | null;
-  booking_while_frozen: boolean;
+  online_booking_while_frozen: boolean;
   recalculate_service_price: boolean;
   balance_edit: BalanceEditPolicy;
   online_sale_enabled: boolean;

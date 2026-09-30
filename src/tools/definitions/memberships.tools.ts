@@ -134,7 +134,7 @@ const typeFieldInputs = {
   personal: z
     .boolean()
     .describe(
-      'true: only the client who bought it (or the one it was given to) uses it, without a code. false (default): paying with it needs its number, and whoever has the number can use it.'
+      'true: only the client who bought it (or the one it was given to) uses it, without entering its number. false (default): paying with it needs its number, and whoever has the number can use it.'
     ),
   freeze_allowed: z
     .boolean()
@@ -144,10 +144,10 @@ const typeFieldInputs = {
   freeze_limit: duration(
     'Longest total freeze per membership. Omitted: no limit.'
   ).nullable(),
-  booking_while_frozen: z
+  online_booking_while_frozen: z
     .boolean()
     .describe(
-      'Whether a frozen membership can still be booked. Default false.'
+      'Whether clients can still book online with a frozen membership. Default false.'
     ),
   recalculate_service_price: z
     .boolean()
@@ -157,7 +157,7 @@ const typeFieldInputs = {
   balance_edit: z
     .enum(['not_allowed', 'sale_location', 'any_location'])
     .describe(
-      'Where staff may correct the balance of a sold membership by hand: not_allowed (default), sale_location or any_location of the chain.'
+      'Where team members may correct the balance of a sold membership by hand: not_allowed (default), sale_location or any_location of the chain.'
     ),
   online_sale_enabled: z
     .boolean()
@@ -232,7 +232,7 @@ const typeSchema = {
     services: { type: 'array' as const, items: allowanceSchema },
     freeze_allowed: bool,
     freeze_limit: durationSchema,
-    booking_while_frozen: bool,
+    online_booking_while_frozen: bool,
     recalculate_service_price: bool,
     balance_edit: {
       type: ['string', 'null'] as const,
@@ -410,7 +410,8 @@ export const membershipsCreateTypeTool = defineTool({
     personal: typeFieldInputs.personal.optional(),
     freeze_allowed: typeFieldInputs.freeze_allowed.optional(),
     freeze_limit: typeFieldInputs.freeze_limit.optional(),
-    booking_while_frozen: typeFieldInputs.booking_while_frozen.optional(),
+    online_booking_while_frozen:
+      typeFieldInputs.online_booking_while_frozen.optional(),
     recalculate_service_price:
       typeFieldInputs.recalculate_service_price.optional(),
     balance_edit: typeFieldInputs.balance_edit.optional(),
@@ -451,7 +452,8 @@ export const membershipsUpdateTypeTool = defineTool({
     personal: typeFieldInputs.personal.optional(),
     freeze_allowed: typeFieldInputs.freeze_allowed.optional(),
     freeze_limit: typeFieldInputs.freeze_limit.optional(),
-    booking_while_frozen: typeFieldInputs.booking_while_frozen.optional(),
+    online_booking_while_frozen:
+      typeFieldInputs.online_booking_while_frozen.optional(),
     recalculate_service_price:
       typeFieldInputs.recalculate_service_price.optional(),
     balance_edit: typeFieldInputs.balance_edit.optional(),
@@ -506,7 +508,7 @@ export const membershipsDeleteTypeTool = defineTool({
       `membership type ${input.type_id} in chain ${input.chain_id}`,
     resolve: (input, client) => memberships.describeType(client, input),
     consequence:
-      'The membership type is removed from the whole chain: no location can sell it any more and its product entry goes with it. The API refuses when memberships of the type were already sold. A deleted type cannot be restored from here; to only stop selling it, archive it instead.',
+      'The membership type is removed from the whole chain: no location can sell it any more. The API refuses when memberships of the type were already sold. A deleted type cannot be restored from here; to only stop selling it, archive it instead.',
   },
   handler: async ({ input, client }) => memberships.deleteType(client, input),
 });
@@ -517,7 +519,7 @@ export const membershipsListTool = defineTool({
   name: 'memberships_list',
   category: 'Memberships',
   description:
-    'Sold memberships of a chain, by id or by the period they were created in (created_from and created_to, YYYY-MM-DD) — with number, type, status (issued, active, expired, used_up), frozen flag, visits left per service or in the shared pool, activation and expiry. The creation date is not a sale date and the list does not name clients: for one client’s memberships use memberships_list_for_client. Paged: follow pagination.next_page until it is null.',
+    'Sold memberships of a chain, by id or by the period they were created in (created_from and created_to, YYYY-MM-DD) — with number, type, status (issued, active, expired, used_up), frozen flag, visits left per service or in the shared pool, activation and expiration dates. The creation date is not a sale date and the list does not name clients: for one client’s memberships use memberships_list_for_client. Paged: follow pagination.next_page until it is null.',
   annotations: { title: 'Memberships: list sold memberships', ...READ_ONLY },
   input: z.object({
     chain_id: chainId,
@@ -553,7 +555,7 @@ export const membershipsListForClientTool = defineTool({
   name: 'memberships_list_for_client',
   category: 'Memberships',
   description:
-    'A client’s current memberships — issued, active or frozen — with number, type, visits left per service or in the shared pool, activation and expiry, and the chain_id each belongs to (the id the freeze, balance and validity tools take). Found by the phone on the client card in the given location; expired and used-up memberships are not listed, and one sold under an earlier phone is missed. For how and when each was paid use clients_get_membership_purchases.',
+    'A client’s current memberships — issued, active or frozen — with number, type, visits left per service or in the shared pool, activation and expiration dates, and the chain_id each belongs to (the id the freeze, balance and validity tools take). Found by the phone on the client card in the given location; expired and used-up memberships are not listed, and one sold under an earlier phone is missed. For how and when each was paid use clients_get_membership_purchases.',
   annotations: {
     title: 'Memberships: a client’s current memberships',
     ...READ_ONLY,
@@ -598,7 +600,7 @@ export const membershipsFreezeTool = defineTool({
   name: 'memberships_freeze',
   category: 'Memberships',
   description:
-    'Freeze a sold membership — the client is away or ill. Until a date (until, YYYY-MM-DD, unfreezes by itself) or until memberships_unfreeze. The days it stays frozen are added to its expiry. The membership type must allow freezing, and the date must fit the freeze limit left.',
+    'Freeze a sold membership — the client is away or ill. Until a date (until, YYYY-MM-DD, unfreezes by itself) or until memberships_unfreeze. The days it stays frozen are added to its expiration date. The membership type must allow freezing, and the date must fit the freeze limit left.',
   annotations: {
     title: 'Memberships: freeze a membership',
     destructiveHint: false,
@@ -619,7 +621,7 @@ export const membershipsUnfreezeTool = defineTool({
   name: 'memberships_unfreeze',
   category: 'Memberships',
   description:
-    'Unfreeze a frozen membership now; its expiry keeps the days it spent frozen.',
+    'Unfreeze a frozen membership now; its expiration date keeps the days it spent frozen.',
   annotations: {
     title: 'Memberships: unfreeze a membership',
     destructiveHint: false,
@@ -690,7 +692,7 @@ export const membershipsSetValidityTool = defineTool({
   name: 'memberships_set_validity',
   category: 'Memberships',
   description:
-    'Change how long a sold membership is valid — to extend it or correct it. The expiry is recalculated from its activation; a membership not activated yet keeps no expiry until it activates. The new expiry cannot fall before its last use, and a validity that ends in the past expires it. Asks for confirmation first.',
+    'Change how long a sold membership is valid — to extend it or correct it. The expiration date is recalculated from its activation; a membership not activated yet has none until it activates. The new expiration date cannot fall before its last use, and a validity that ends in the past expires it. Asks for confirmation first.',
   annotations: {
     title: 'Memberships: change the validity',
     destructiveHint: true,
@@ -710,7 +712,7 @@ export const membershipsSetValidityTool = defineTool({
       `membership ${input.membership_id} in chain ${input.chain_id}`,
     resolve: (input, client) => memberships.describeMembership(client, input),
     consequence: (input) =>
-      `The membership's validity becomes ${input.validity?.length ?? '?'} ${input.validity?.unit ?? ''}(s) from its activation and its expiry date is recalculated; a shorter validity can expire it at once, after which it no longer pays for visits.`,
+      `The membership's validity becomes ${input.validity?.length ?? '?'} ${input.validity?.unit ?? ''}(s) from its activation and its expiration date is recalculated; a shorter validity can expire it at once, after which it no longer pays for visits.`,
   },
   handler: async ({ input, client }) => memberships.setValidity(client, input),
 });
