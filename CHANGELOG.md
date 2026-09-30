@@ -6,6 +6,34 @@ is declared stable.
 
 ## [Unreleased]
 
+## [0.6.0-alpha.1] - 2026-09-30
+
+### Fixed — every view names only what it serves
+
+- A signed-out call on an HTTP view no longer tells the model to call
+  `auth_login`, which those views withhold. It says the app the connection runs
+  in signs it in. Stdio, and the staff deployment that serves password login,
+  still name `auth_login`.
+- `api_describe_operation` and `api_search_operations` name a curated tool as
+  callable only where the view serves it. On the read-only view a write
+  operation's curated tool comes with the addresses that serve it
+  (`curated_tool_served: false` and `curated_tool_addresses` in the describe
+  output, `tool_served: false` on the search hit). The authentication line
+  names `auth_login` only where the view serves it.
+- `appointments_preview_attendance` on the read-only view says where
+  `appointments_apply_attendance` is served instead of telling the model to call
+  it.
+- A `tools/list` description that names a tool its view withholds ends with one
+  sentence saying where that tool is served. The complete surface lists every
+  description as authored.
+- `memberships_get_type`, `events_list_services` and
+  `events_list_duplication_strategies` no longer point at writing tools. The
+  writing tools point at the reads instead: `memberships_update_type` at
+  `memberships_get_type`, and `events_duplicate` at
+  `events_list_duplication_strategies`.
+- A test holds every `readOnlyHint` to the HTTP methods the tool is mapped to.
+  POST searches that only read are named by operation.
+
 ## [0.6.0-alpha.0] - 2026-09-30
 
 ### Security

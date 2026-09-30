@@ -1,6 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import * as definitions from '../tools/definitions/index.js';
 import { onboardingTools } from '../tools/onboarding-registry.js';
+import { allApiMappings } from '../tools/api-mapping.js';
 import type {
   DefinedTool,
   McpToolSpec,
@@ -166,5 +167,56 @@ describe('tool annotations', () => {
       .filter((spec) => annotationsOf(spec).destructiveHint === true)
       .map((spec) => spec.name);
     expect(contradictory).toEqual([]);
+  });
+
+  /**
+   * `readOnlyHint` decides the read-only address: a tool annotated read-only is
+   * served there, anything else is withheld and refused. So the annotation has
+   * to agree with what the tool sends. Checked against the HTTP methods each
+   * tool is mapped to in `api-mapping.ts`, which the spec-compliance tests hold
+   * to the calls the adapters make.
+   */
+  describe('against the API calls each tool makes', () => {
+    // POST operations that only read: the query travels in the body because it
+    // does not fit a query string. Named by operation, not by tool, so a new
+    // tool reading through them needs no entry, and a new POST does.
+    const readingPosts = new Set([
+      'get_client_list', // client segment search
+      'search_client_visits', // visit history search
+      'run_report_builder_report', // runs a saved report
+      'run_report_builder_report_legacy',
+    ]);
+    const callsByTool = new Map<string, { method: string; op: string }[]>();
+    for (const [tool, mapping] of allApiMappings()) {
+      callsByTool.set(tool, [
+        ...(callsByTool.get(tool) ?? []),
+        { method: mapping.method, op: mapping.operationId },
+      ]);
+    }
+    const writesOf = (name: string) =>
+      (callsByTool.get(name) ?? []).filter(
+        (call) => call.method !== 'get' && !readingPosts.has(call.op)
+      );
+
+    it('maps the tools it checks', () => {
+      expect(callsByTool.size).toBeGreaterThan(60);
+    });
+
+    it('never marks read-only a tool that sends a write', () => {
+      const writing = specs
+        .filter(isReadOnly)
+        .filter((spec) => writesOf(spec.name).length > 0)
+        .map((spec) => `${spec.name}: ${JSON.stringify(writesOf(spec.name))}`);
+      expect(writing).toEqual([]);
+    });
+
+    it('never withholds from the read-only view a mapped tool that only reads', () => {
+      const readingOnly = specs
+        .filter((spec) => !isReadOnly(spec))
+        .filter((spec) => callsByTool.has(spec.name))
+        .filter((spec) => writesOf(spec.name).length === 0)
+        .map((spec) => spec.name);
+      expect(readingOnly).toEqual([]);
+    });
   });
 });
