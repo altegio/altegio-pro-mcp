@@ -5,18 +5,9 @@
 # memberships sold from them belong to a chain; one client's memberships are
 # found through a location client card.
 #
-# Spec drift found while building the pack (backend biz.erp, 2026-09-30), for
-# the specification repository:
-#   - expiration_type_id: 1 = from the first visit, 2 = from the sale (the
-#     create body documents them the other way round); 3 is not accepted.
-#   - balance_edit_type_id: 0 = not allowed, 1 = only at the selling location,
-#     2 = at every chain location (the type schema documents 1 = editable,
-#     2 = not editable).
-#   - PATCH (archive) runs no access check on the backend, and it accepts
-#     is_archived only as the string "0" or "1".
-#   - DELETE is a soft delete: the type leaves the list, the read by id still
-#     answers with it.
-#   - POST …/{id} (restore) is for Altegio super users only.
+# Spec drift found while building the pack (backend biz.erp, 2026-09-30); the
+# rest was fixed in altegio/biz.erp.api.docs#129:
+#   - PATCH (archive) runs no access check on the backend.
 
 version: 1
 
