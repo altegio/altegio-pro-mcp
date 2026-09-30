@@ -6,6 +6,31 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — memberships
+
+- A `memberships_*` pack of 13 tools. Membership types of a chain:
+  `memberships_list_types`, `memberships_get_type`, `memberships_create_type`,
+  `memberships_update_type`, `memberships_archive_type` and
+  `memberships_delete_type` (confirmation first). Sold memberships:
+  `memberships_list` (by id or creation period), `memberships_list_for_client`,
+  `memberships_freeze`, `memberships_unfreeze`, and `memberships_set_balance` and
+  `memberships_set_validity` (confirmation first). `memberships_list_chains`
+  lists the user's chains with the membership rights in each, because types and
+  sold memberships belong to a chain and a refusal is usually a missing chain
+  right — a location's main chain is not necessarily one the user belongs to.
+- The pack runs on V1: V2 has no membership operation. It is served on the
+  default view and on `/mcp/marketing`; the reception tasks (a client's
+  memberships, freeze, unfreeze) are also on `/mcp/ops`.
+- `memberships_update_type` reads the type and sends every field back, since
+  the API replaces it. After the first sale the API silently keeps price,
+  validity, activation, sharing, balance and services; the tool compares the
+  result and reports what was kept instead of claiming success.
+- `memberships_archive_type` reads the type through the access-checked
+  endpoint before switching the archive flag, because the backend does not
+  check access on that switch.
+- New v3 placeholder scopes `chain_loyalty:read`, `chain_loyalty:configure` and
+  `chain_loyalty:transact`, taken from the API team's scope catalog.
+
 ### Fixed — group events, found by live writes on a test location
 
 - `events_create` without `technical_break_minutes` makes the API add the

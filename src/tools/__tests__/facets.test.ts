@@ -17,6 +17,23 @@ import {
 } from '../facets.js';
 import { orderedToolEntries } from '../registry.js';
 
+/** The memberships pack, served on marketing by prefix. */
+const MEMBERSHIP_TOOLS = [
+  'memberships_archive_type',
+  'memberships_create_type',
+  'memberships_delete_type',
+  'memberships_freeze',
+  'memberships_get_type',
+  'memberships_list',
+  'memberships_list_chains',
+  'memberships_list_for_client',
+  'memberships_list_types',
+  'memberships_set_balance',
+  'memberships_set_validity',
+  'memberships_unfreeze',
+  'memberships_update_type',
+];
+
 const allNames = () => orderedToolEntries().map((entry) => entry.spec.name);
 const allTools = (): FacetTool[] =>
   facetToolsFromSpecs(orderedToolEntries().map((entry) => entry.spec));
@@ -122,6 +139,9 @@ describe('static views', () => {
         'events_update_appointment',
         'events_update_duplication_strategy',
         'locations_list',
+        'memberships_freeze',
+        'memberships_list_for_client',
+        'memberships_unfreeze',
         'users_get_current',
         'appointments_update',
       ].sort()
@@ -148,7 +168,11 @@ describe('static views', () => {
   it('serves membership evidence on marketing', () => {
     const index = buildFacetIndex(tools);
     expect([...index.members('marketing')].sort()).toEqual(
-      [...FACET_BASE_TOOLS, 'clients_get_membership_purchases'].sort()
+      [
+        ...FACET_BASE_TOOLS,
+        'clients_get_membership_purchases',
+        ...MEMBERSHIP_TOOLS,
+      ].sort()
     );
   });
 

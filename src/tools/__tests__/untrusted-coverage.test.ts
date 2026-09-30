@@ -149,6 +149,47 @@ function strategyDoc(): { data: unknown[] } {
   };
 }
 
+/** A V1 membership type whose free text is the canary. */
+function membershipTypeRow(): Record<string, unknown> {
+  return {
+    id: 71,
+    salon_group_id: 9,
+    title: CANARY,
+    cost: 100,
+    period: 1,
+    period_unit_id: 3,
+    expiration_type_id: 1,
+    is_united_balance: false,
+    is_allow_empty_code: true,
+    online_sale_title: CANARY,
+    online_sale_description: CANARY,
+    attached_salon_ids: [1],
+    balance_container: {
+      links: [
+        { count: 5, is_unlimited: false, service: { id: 3, title: CANARY } },
+      ],
+    },
+  };
+}
+
+/** A V1 sold membership whose number and titles are the canary. */
+function membershipRow(): Record<string, unknown> {
+  return {
+    id: 81,
+    number: CANARY,
+    status: { id: 2, slug: 'active' },
+    is_frozen: false,
+    is_united_balance: true,
+    united_balance_services_count: 4,
+    balance_container: {
+      links: [
+        { count: 0, category: { id: 5, is_category: true, title: CANARY } },
+      ],
+    },
+    type: { id: 71, salon_group_id: 9, title: CANARY },
+  };
+}
+
 // ===========================================================================
 // The tools that hand over other people's text
 // ===========================================================================
@@ -631,6 +672,178 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     },
   },
 
+  memberships_list_chains: {
+    what: 'chain and location names',
+    canary: {
+      args: {},
+      routes: [
+        {
+          match: /\/chains$/,
+          body: ok(
+            envelope([
+              {
+                id: 9,
+                title: CANARY,
+                companies: [{ id: 1, title: CANARY }],
+                access: { loyalty_access: 1 },
+              },
+            ])
+          ),
+        },
+      ],
+    },
+  },
+  memberships_list_types: {
+    what: 'membership type titles, online-sale texts and covered service titles',
+    canary: {
+      args: { chain_id: 9 },
+      routes: [
+        {
+          match: /\/chains\/9\/loyalty\/abonement_types/,
+          body: ok(envelope([membershipTypeRow()], { total_count: 1 })),
+        },
+      ],
+    },
+  },
+  memberships_get_type: {
+    what: 'the membership type’s title, online-sale texts and service titles',
+    canary: {
+      args: { chain_id: 9, type_id: 71 },
+      routes: [
+        {
+          match: /\/chains\/9\/loyalty\/abonement_types\/71/,
+          body: ok(envelope(membershipTypeRow())),
+        },
+      ],
+    },
+  },
+  memberships_create_type: {
+    what: 'the created type’s free text as the API stored it',
+    canary: {
+      args: {
+        chain_id: 9,
+        title: 'Ten visits',
+        price: 100,
+        location_ids: [1],
+        services: [{ service_id: 3, visits: 5 }],
+        validity: { length: 1, unit: 'month' },
+      },
+      routes: [
+        {
+          match: /\/chains\/9\/loyalty\/abonement_types/,
+          body: ok(envelope({ ...membershipTypeRow(), title: 'Ten visits' })),
+        },
+      ],
+    },
+  },
+  memberships_update_type: {
+    what: 'the updated type’s free text as the API stored it',
+    canary: {
+      args: { chain_id: 9, type_id: 71, location_ids: [1] },
+      routes: [
+        {
+          match: /\/chains\/9\/loyalty\/abonement_types\/71/,
+          body: ok(envelope(membershipTypeRow())),
+        },
+      ],
+    },
+  },
+  memberships_archive_type: {
+    what: 'the archived type’s title and texts',
+    canary: {
+      args: { chain_id: 9, type_id: 71, archived: false },
+      routes: [
+        {
+          match: /\/chains\/9\/loyalty\/abonement_types\/71/,
+          body: ok(envelope(membershipTypeRow())),
+        },
+      ],
+    },
+  },
+  memberships_list: {
+    what: 'membership numbers, type titles and covered service titles',
+    canary: {
+      args: { chain_id: 9, membership_ids: [81] },
+      routes: [
+        {
+          match: /\/chains\/9\/loyalty\/abonements/,
+          body: ok(envelope([membershipRow()])),
+        },
+      ],
+    },
+  },
+  memberships_list_for_client: {
+    what: 'membership numbers, type titles and covered service titles',
+    canary: {
+      args: { location_id: 1, client_id: 21 },
+      routes: [
+        {
+          match: /\/client\/1\/21/,
+          body: ok(envelope({ id: 21, phone: '+10000000000' })),
+        },
+        {
+          match: /\/loyalty\/abonements/,
+          body: ok(envelope([membershipRow()])),
+        },
+      ],
+    },
+  },
+  memberships_freeze: {
+    what: 'the frozen membership’s number and titles',
+    canary: {
+      args: { chain_id: 9, membership_id: 81 },
+      routes: [
+        {
+          match: /\/abonements\/81\/freeze/,
+          body: ok(envelope({ ...membershipRow(), is_frozen: true })),
+        },
+      ],
+    },
+  },
+  memberships_unfreeze: {
+    what: 'the unfrozen membership’s number and titles',
+    canary: {
+      args: { chain_id: 9, membership_id: 81 },
+      routes: [
+        {
+          match: /\/abonements\/81\/unfreeze/,
+          body: ok(envelope(membershipRow())),
+        },
+      ],
+    },
+  },
+  memberships_set_balance: {
+    what: 'the membership’s number and titles read back after the change',
+    canary: {
+      args: { chain_id: 9, membership_id: 81, shared_visits: 3 },
+      routes: [
+        {
+          match: /\/abonements\/81\/set_balance/,
+          body: ok({ success: true, data: null }),
+        },
+        {
+          match: /\/chains\/9\/loyalty\/abonements/,
+          body: ok(envelope([membershipRow()])),
+        },
+      ],
+    },
+  },
+  memberships_set_validity: {
+    what: 'the membership’s number and titles as the API stored them',
+    canary: {
+      args: {
+        chain_id: 9,
+        membership_id: 81,
+        validity: { length: 2, unit: 'month' },
+      },
+      routes: [
+        {
+          match: /\/abonements\/81\/set_period/,
+          body: ok(envelope(membershipRow())),
+        },
+      ],
+    },
+  },
   clients_lookup: {
     what: 'client names matching the typed fragment',
     canary: {
@@ -773,6 +986,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
 const NO_FREE_TEXT: Record<string, string> = {
   // --- group events ---
   events_delete: 'the event and location ids only',
+  memberships_delete_type: 'the membership type and chain ids only',
   events_duplicate: 'ids, start times and seat counts of the copies only',
   events_delete_duplication_strategy: 'the pattern and location ids only',
   locations_diagnose_access:

@@ -68,6 +68,9 @@ const V3_CATALOG_SCOPES = [
   'appointments:write',
   'loyalty:read',
   'products:read',
+  'chain_loyalty:read',
+  'chain_loyalty:configure',
+  'chain_loyalty:transact',
 ] as const;
 
 /**
@@ -295,6 +298,28 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   events_book_clients: 'appointments:create',
   events_update_appointment: 'appointments:write',
   events_reschedule_appointment: 'appointments:write',
+
+  // --- Memberships -----------------------------------------------------------
+  // Membership types and sold memberships belong to a chain, and the v3
+  // catalog keeps chain grants apart from location ones: reading them is
+  // `chain_loyalty:read`, the types are `chain_loyalty:configure`, and
+  // freezing or correcting a sold membership's validity or balance is
+  // `chain_loyalty:transact` ("ручные операции, правка баланса и срока"). One
+  // client's memberships are found through a location client card, so that
+  // read needs the location scopes instead.
+  memberships_list_chains: 'chain_loyalty:read',
+  memberships_list_types: 'chain_loyalty:read',
+  memberships_get_type: 'chain_loyalty:read',
+  memberships_list: 'chain_loyalty:read',
+  memberships_list_for_client: ['clients:read', 'loyalty:read'],
+  memberships_create_type: 'chain_loyalty:configure',
+  memberships_update_type: 'chain_loyalty:configure',
+  memberships_archive_type: 'chain_loyalty:configure',
+  memberships_delete_type: 'chain_loyalty:configure',
+  memberships_freeze: 'chain_loyalty:transact',
+  memberships_unfreeze: 'chain_loyalty:transact',
+  memberships_set_balance: 'chain_loyalty:transact',
+  memberships_set_validity: 'chain_loyalty:transact',
 
   // --- Client base ----------------------------------------------------------
   clients_search: 'clients:read',

@@ -16,13 +16,13 @@ the code disagree, which is how a surface change reaches a reviewer’s diff
 
 ## Counts
 
-**111 tools served (117 defined, 6 withheld from every view).**
+**124 tools served (130 defined, 6 withheld from every view).**
 
 | What | Count | Where |
 | --- | --- | --- |
-| Defined | 117 | 105 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
+| Defined | 130 | 118 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
 | Withheld from every view | 6 | `src/tools/disabled-tools.ts` (the report builder) |
-| **Served** | **111** | what `stdio` lists; every HTTP view is a subset |
+| **Served** | **124** | what `stdio` lists; every HTTP view is a subset |
 
 Served tools per category, in `tools/list` order:
 
@@ -36,6 +36,7 @@ Served tools per category, in `tools/list` order:
 | Clients | 12 |
 | Events | 15 |
 | Location | 3 |
+| Memberships | 13 |
 | Onboarding | 12 |
 | Positions | 2 |
 | Resources | 1 |
@@ -47,17 +48,17 @@ Served tools per category, in `tools/list` order:
 
 ## Views
 
-| View | Address | Serves (of 117 defined) | Reasons |
+| View | Address | Serves (of 130 defined) | Reasons |
 | --- | --- | --- | --- |
-| `all` | stdio (no HTTP route) | 111 | all ×111, -off ×6 |
-| `default` | `/mcp` | 81 | dflt ×78, -pack ×27, -off ×6, base ×2, -pwd ×2, -name ×1, xtra ×1 |
-| `readonly` | `/mcp/readonly` | 62 | ro ×62, -write ×47, -off ×6, -pwd ×2 |
-| `ops` | `/mcp/ops` | 35 | - ×74, pfx ×27, -off ×6, rule ×6, base ×2, -pwd ×2 |
-| `catalog` | `/mcp/catalog` | 33 | - ×76, rule ×31, -off ×6, base ×2, -pwd ×2 |
-| `finance` | `/mcp/finance` | 31 | - ×78, pfx ×28, -off ×6, base ×2, -pwd ×2, rule ×1 |
-| `marketing` | `/mcp/marketing` | 3 | - ×106, -off ×6, base ×2, -pwd ×2, rule ×1 |
-| `analytics` | `/mcp/analytics` | 30 | - ×79, pfx ×28, -off ×6, base ×2, -pwd ×2 |
-| `onboarding` | `/mcp/onboarding` | 14 | - ×95, pfx ×12, -off ×6, base ×2, -pwd ×2 |
+| `all` | stdio (no HTTP route) | 124 | all ×124, -off ×6 |
+| `default` | `/mcp` | 94 | dflt ×91, -pack ×27, -off ×6, base ×2, -pwd ×2, -name ×1, xtra ×1 |
+| `readonly` | `/mcp/readonly` | 67 | ro ×67, -write ×55, -off ×6, -pwd ×2 |
+| `ops` | `/mcp/ops` | 38 | - ×84, pfx ×27, rule ×9, -off ×6, base ×2, -pwd ×2 |
+| `catalog` | `/mcp/catalog` | 33 | - ×89, rule ×31, -off ×6, base ×2, -pwd ×2 |
+| `finance` | `/mcp/finance` | 31 | - ×91, pfx ×28, -off ×6, base ×2, -pwd ×2, rule ×1 |
+| `marketing` | `/mcp/marketing` | 16 | - ×106, pfx ×13, -off ×6, base ×2, -pwd ×2, rule ×1 |
+| `analytics` | `/mcp/analytics` | 30 | - ×92, pfx ×28, -off ×6, base ×2, -pwd ×2 |
+| `onboarding` | `/mcp/onboarding` | 14 | - ×108, pfx ×12, -off ×6, base ×2, -pwd ×2 |
 
 A facet answers *how many tools fit in this host’s context*; `readonly`
 answers *what may this agent do at all*. They are different kinds of view —
@@ -221,6 +222,24 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | `locations_diagnose_access` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
 | `locations_list` | `all` | `base` | `ro` | `base` | `base` | `base` | `base` | `base` | `base` | locations:read |
 | `locations_update` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write |
+
+### Memberships
+
+| Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `memberships_archive_type` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:configure |
+| `memberships_create_type` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:configure |
+| `memberships_delete_type` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:configure, confirm |
+| `memberships_freeze` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:transact |
+| `memberships_get_type` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:read |
+| `memberships_list` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:read |
+| `memberships_list_chains` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:read |
+| `memberships_list_for_client` | `all` | `dflt` | `ro` | `rule` | `-` | `-` | `pfx` | `-` | `-` | clients:read + loyalty:read |
+| `memberships_list_types` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:read |
+| `memberships_set_balance` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:transact, confirm |
+| `memberships_set_validity` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:transact, confirm |
+| `memberships_unfreeze` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:transact |
+| `memberships_update_type` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:configure |
 
 ### Onboarding
 
