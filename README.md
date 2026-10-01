@@ -115,9 +115,14 @@ request reads current data, so concurrent changes can shift page boundaries.
 
 Client contacts are opt-in where supported: pass `include_contacts: true` when
 contact details are needed. Business names and comments are untrusted data.
-Destructive tools require confirmation; a read-only annotation alone is not an
-authorization boundary. Report download links are temporary, process-local, and
-bound to their creating principal and permitted location.
+Destructive tools request confirmation through MCP form elicitation. The prompt
+names the target and consequences; the standard `accept` action approves it,
+while `decline` or `cancel` leaves everything unchanged. No extra form field is
+required. Clients without form elicitation receive a `confirmation_token` and
+must repeat the identical call with it after the user agrees. A read-only
+annotation alone is not an authorization boundary. Report download links are
+temporary, process-local, and bound to their creating principal and permitted
+location.
 
 ## Resources and prompts
 
