@@ -134,7 +134,7 @@ describe('confirmation token', () => {
 
 describe('gate on a host WITH elicitation', () => {
   it('asks the operator, naming the target and the consequence', async () => {
-    const elicit = jest.fn<Promise<ConfirmationAnswer>, [string, string]>(
+    const elicit = jest.fn<Promise<ConfirmationAnswer>, [string]>(
       async () => 'accept'
     );
     const result = await gate(
@@ -145,26 +145,26 @@ describe('gate on a host WITH elicitation', () => {
     // undefined = the operation may proceed
     expect(result).toBeUndefined();
     expect(elicit).toHaveBeenCalledTimes(1);
-    const [message, title] = elicit.mock.calls[0]!;
+    const [message] = elicit.mock.calls[0]!;
     expect(message).toContain('client 5 at location 4564');
     expect(message).toContain('The whole client card leaves the base.');
-    expect(title).toBe('Delete client');
+    expect(message).toContain('Delete client');
   });
 
-  it.each(['decline', 'cancel'] as const)(
-    'stops the operation on %s',
-    async (answer) => {
-      const result = await gate(
-        ARGS,
-        runtime({ supportsElicitation: () => true, elicit: async () => answer })
-      );
-      // Every gate outcome is an isError result: the tool did not do its job,
-      // and a plain result would be legal only for a tool without outputSchema.
-      expect(result?.isError).toBe(true);
-      expect(result?.content[0]?.text).toContain('Cancelled by the operator');
-      expect(result?.content[0]?.text).toContain('nothing was changed');
-    }
-  );
+  it.each([
+    ['decline', 'Confirmation declined'],
+    ['cancel', 'Confirmation dismissed by the host'],
+  ] as const)('stops the operation on %s', async (answer, message) => {
+    const result = await gate(
+      ARGS,
+      runtime({ supportsElicitation: () => true, elicit: async () => answer })
+    );
+    // Every gate outcome is an isError result: the tool did not do its job,
+    // and a plain result would be legal only for a tool without outputSchema.
+    expect(result?.isError).toBe(true);
+    expect(result?.content[0]?.text).toContain(message);
+    expect(result?.content[0]?.text).toContain('nothing was changed');
+  });
 
   it('fails closed when the host breaks its own elicitation promise', async () => {
     const result = await gate(
@@ -183,7 +183,7 @@ describe('gate on a host WITH elicitation', () => {
   });
 
   it('uses the resolved name when the API read succeeds', async () => {
-    const elicit = jest.fn<Promise<ConfirmationAnswer>, [string, string]>(
+    const elicit = jest.fn<Promise<ConfirmationAnswer>, [string]>(
       async () => 'accept'
     );
     const prepared = prepareConfirmation<DemoInput>(
@@ -205,7 +205,7 @@ describe('gate on a host WITH elicitation', () => {
     // The name is read back from the API, so a client can choose it. The
     // headline is one sentence shown to a person, with nowhere to put a fence,
     // so the value is sanitized in place instead.
-    const elicit = jest.fn<Promise<ConfirmationAnswer>, [string, string]>(
+    const elicit = jest.fn<Promise<ConfirmationAnswer>, [string]>(
       async () => 'accept'
     );
     const prepared = prepareConfirmation<DemoInput>(
@@ -232,7 +232,7 @@ describe('gate on a host WITH elicitation', () => {
   });
 
   it('falls back to the IDs when the resolved name cleans away to nothing', async () => {
-    const elicit = jest.fn<Promise<ConfirmationAnswer>, [string, string]>(
+    const elicit = jest.fn<Promise<ConfirmationAnswer>, [string]>(
       async () => 'accept'
     );
     const prepared = prepareConfirmation<DemoInput>(
@@ -251,7 +251,7 @@ describe('gate on a host WITH elicitation', () => {
   });
 
   it('still asks when the name lookup fails, falling back to the IDs', async () => {
-    const elicit = jest.fn<Promise<ConfirmationAnswer>, [string, string]>(
+    const elicit = jest.fn<Promise<ConfirmationAnswer>, [string]>(
       async () => 'accept'
     );
     const prepared = prepareConfirmation<DemoInput>(

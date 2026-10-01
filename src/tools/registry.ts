@@ -4,7 +4,6 @@ import {
   ListToolsRequestSchema,
   McpError,
   ErrorCode,
-  type ElicitRequestFormParams,
   type RequestId,
 } from '@modelcontextprotocol/sdk/types.js';
 import { AltegioClient } from '../providers/altegio-client.js';
@@ -124,29 +123,6 @@ function outOfFacetError(
 }
 
 /**
- * The elicitation form the operator sees. A single required enum, with no
- * default, so nothing can be auto-filled into an approval: the server treats
- * only an explicit `accept` carrying `decision: "confirm"` as consent.
- */
-function confirmationSchema(
-  title: string
-): ElicitRequestFormParams['requestedSchema'] {
-  return {
-    type: 'object',
-    properties: {
-      decision: {
-        type: 'string',
-        title,
-        description: 'Perform this destructive operation?',
-        enum: ['confirm', 'cancel'],
-        enumNames: ['Yes, perform it', 'No, cancel'],
-      },
-    },
-    required: ['decision'],
-  };
-}
-
-/**
  * Bind the confirmation gate to one MCP request.
  *
  * `relatedRequestId` ties the prompt to the tool call that triggered it, which
@@ -164,17 +140,19 @@ function confirmationRuntime(
     supportsElicitation: () =>
       Boolean(server.getClientCapabilities()?.elicitation?.form),
 
-    elicit: async (message, title): Promise<ConfirmationAnswer> => {
+    elicit: async (message): Promise<ConfirmationAnswer> => {
       const result = await server.elicitInput(
         {
           mode: 'form',
           message,
-          requestedSchema: confirmationSchema(title),
+          // This is a confirmation, with no data to collect. MCP's action
+          // already expresses consent; a second decision field makes hosts
+          // reject an otherwise explicit accept or display two choices.
+          requestedSchema: { type: 'object', properties: {} },
         },
         { relatedRequestId }
       );
-      if (result.action !== 'accept') return result.action;
-      return result.content?.decision === 'confirm' ? 'accept' : 'decline';
+      return result.action;
     },
   };
 }

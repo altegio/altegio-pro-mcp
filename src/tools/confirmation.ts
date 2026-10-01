@@ -184,10 +184,7 @@ export interface ConfirmationRuntime {
   /** Did the client declare form elicitation at `initialize`? */
   readonly supportsElicitation: () => boolean;
   /** Ask the operator. Rejecting is treated as a failure to confirm. */
-  readonly elicit: (
-    message: string,
-    title: string
-  ) => Promise<ConfirmationAnswer>;
+  readonly elicit: (message: string) => Promise<ConfirmationAnswer>;
 }
 
 /**
@@ -247,10 +244,7 @@ export async function requireConfirmation(options: {
   if (runtime.supportsElicitation()) {
     let answer: ConfirmationAnswer;
     try {
-      answer = await runtime.elicit(
-        `${headline}\n\n${prepared.consequence}`,
-        prepared.action
-      );
+      answer = await runtime.elicit(`${headline}\n\n${prepared.consequence}`);
     } catch (error) {
       // The host advertised elicitation and then failed to deliver it. Fail
       // closed: minting a token here would let the caller route around the
@@ -263,7 +257,9 @@ export async function requireConfirmation(options: {
 
     if (answer === 'accept') return undefined;
     return refusal(
-      `Cancelled by the operator — nothing was changed. ${headline}`
+      answer === 'decline'
+        ? `Confirmation declined — nothing was changed. ${headline}`
+        : `Confirmation dismissed by the host — nothing was changed. ${headline} Ask the user to confirm before retrying.`
     );
   }
 
