@@ -57,7 +57,12 @@ curl --fail http://localhost:3000/health
 ```
 
 The local MCP route is `/mcp`, with `/mcp/<facet>` and `/mcp/readonly` variants.
-HTTP uses the SDK's Streamable HTTP transport and session handling.
+HTTP uses the SDK's Streamable HTTP transport and session handling. All views
+share `MCP_HTTP_MAX_SESSIONS` (default 512), including pending initializes. Tune
+it against the container's JS heap budget; the internal 256 MiB old-space
+deployment uses 256 sessions. Sessions expire after 30 idle minutes, with active
+POST responses protected. At capacity, initialization returns 503 with
+`Retry-After: 60`; expired IDs return 404 and require reinitialization.
 
 ## Self-hosting and authentication
 

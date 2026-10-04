@@ -125,6 +125,9 @@ export const EnvSchema = z.object({
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
     .default('info'),
 
+  // Retained HTTP servers; deployments tune this against their JS heap budget.
+  MCP_HTTP_MAX_SESSIONS: z.coerce.number().int().min(1).default(512),
+
   // Credentials storage
   CREDENTIALS_DIR: z.string().optional(),
 
@@ -276,6 +279,7 @@ export class ConfigLoader {
         ALTEGIO_LEGACY_WEB_BASE: env.ALTEGIO_LEGACY_WEB_BASE,
         NODE_ENV: env.NODE_ENV,
         LOG_LEVEL: env.LOG_LEVEL,
+        MCP_HTTP_MAX_SESSIONS: env.MCP_HTTP_MAX_SESSIONS,
         CREDENTIALS_DIR: env.CREDENTIALS_DIR,
         MCP_SERVER_INSTRUCTIONS: env.MCP_SERVER_INSTRUCTIONS,
         MCP_PUBLIC_BASE_URL: env.MCP_PUBLIC_BASE_URL,

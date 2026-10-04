@@ -111,7 +111,7 @@ export function createApp(
 } {
   const app = express();
   const budget = new HttpSessionBudget(
-    options.maxSessions,
+    options.maxSessions ?? loadConfig().env.MCP_HTTP_MAX_SESSIONS,
     options.idleTimeoutMs
   );
   const leases = new WeakMap<StreamableHTTPServerTransport, HttpSessionLease>();
@@ -346,6 +346,7 @@ async function startHTTPServer(): Promise<void> {
   // Start Express server
   app.listen(port, () => {
     logger.info(`Streamable HTTP server listening on port ${port}`);
+    logger.info(`HTTP session capacity: ${config.env.MCP_HTTP_MAX_SESSIONS}`);
     for (const { path } of FACET_ROUTES) {
       logger.info(`MCP endpoint: http://localhost:${port}${path}`);
     }

@@ -3,7 +3,7 @@ export class HttpSessionBudget {
   private readonly leases = new Set<HttpSessionLease>();
 
   constructor(
-    private readonly maxSessions = 128,
+    private readonly maxSessions: number,
     private readonly idleTimeoutMs = 30 * 60 * 1000
   ) {}
 
