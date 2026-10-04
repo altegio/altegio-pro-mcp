@@ -2,6 +2,7 @@ import { describe, it, expect } from '@jest/globals';
 import type { AddressInfo } from 'net';
 import type { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createApp, FACET_ROUTES } from '../http-server.js';
+import { loadConfig } from '../config/schema.js';
 import {
   ALL_TOOLS_FACET,
   DEFAULT_FACET,
@@ -666,7 +667,11 @@ describe('HTTP server session status codes', () => {
 
 describe('HTTP session capacity across views', () => {
   it('rejects excess initializes and reclaims a DELETEd session across views', async () => {
-    const { app, transportsByFacet } = createApp({ maxSessions: 1 });
+    const config = loadConfig();
+    const previousLimit = config.env.MCP_HTTP_MAX_SESSIONS;
+    config.env.MCP_HTTP_MAX_SESSIONS = 1;
+    const { app, transportsByFacet } = createApp();
+    config.env.MCP_HTTP_MAX_SESSIONS = previousLimit;
     const server = app.listen(0);
     const { port } = server.address() as AddressInfo;
     const headers = {

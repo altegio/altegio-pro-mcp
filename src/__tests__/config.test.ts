@@ -73,6 +73,33 @@ describe('Configuration Schema', () => {
     });
   });
 
+  describe('MCP_HTTP_MAX_SESSIONS', () => {
+    it('loads the deployment override and defaults to the measured customer budget', () => {
+      expect(
+        EnvSchema.parse({ ALTEGIO_API_TOKEN: 'test-token' })
+          .MCP_HTTP_MAX_SESSIONS
+      ).toBe(512);
+      expect(
+        loadConfig({
+          ALTEGIO_API_TOKEN: 'test-token',
+          MCP_HTTP_MAX_SESSIONS: '256',
+        }).env.MCP_HTTP_MAX_SESSIONS
+      ).toBe(256);
+    });
+
+    it.each(['', '0', '-1', '1.5', 'invalid', 'Infinity'])(
+      'rejects an invalid capacity %s at boot',
+      (value) => {
+        expect(() =>
+          loadConfig({
+            ALTEGIO_API_TOKEN: 'test-token',
+            MCP_HTTP_MAX_SESSIONS: value,
+          })
+        ).toThrow(ConfigurationError);
+      }
+    );
+  });
+
   describe('ALTEGIO_EXPOSE_PASSWORD_LOGIN', () => {
     // The default decides whether a public HTTP deployment hands a model a
     // tool that asks the user for a password, so pin it and pin the spellings
