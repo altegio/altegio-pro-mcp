@@ -18,6 +18,10 @@ import {
   runWithContext,
 } from './request-context.js';
 import { PACKAGE_VERSION } from './package-metadata.js';
+import {
+  HttpSessionBudget,
+  type HttpSessionLease,
+} from './utils/http-sessions.js';
 
 const logger = createLogger('http-server');
 
@@ -97,13 +101,30 @@ function rejectSessionlessRequest(
  * per-request identity. The identity wrapping is intentionally localized here
  * so a future transport change can move it in one place.
  */
-export function createApp(): {
+export function createApp(
+  options: { maxSessions?: number; idleTimeoutMs?: number } = {}
+): {
   app: express.Express;
   /** The default `/mcp` session registry. */
   transports: TransportRegistry;
   transportsByFacet: Record<FacetKey, TransportRegistry>;
 } {
   const app = express();
+  const budget = new HttpSessionBudget(
+    options.maxSessions,
+    options.idleTimeoutMs
+  );
+  const leases = new WeakMap<StreamableHTTPServerTransport, HttpSessionLease>();
+  const trackPost = (
+    transport: StreamableHTTPServerTransport,
+    res: express.Response
+  ) => {
+    const finish = leases.get(transport)?.beginPost();
+    if (finish) {
+      res.once('finish', finish);
+      res.once('close', finish);
+    }
+  };
 
   // Middleware
   // Base64 of a file smaller than 12 MiB is below 16 MiB; leave room for
@@ -130,6 +151,7 @@ export function createApp(): {
     app.post(path, async (req, res) => {
       const sessionId = req.headers['mcp-session-id'] as string | undefined;
       const requestContext = requestContextFromHeaders(req.headers);
+      const requestId: string | number | null = req.body?.id ?? null;
 
       try {
         let transport: StreamableHTTPServerTransport;
@@ -138,6 +160,7 @@ export function createApp(): {
         if (existing) {
           // Reuse existing transport
           transport = existing;
+          trackPost(transport, res);
         } else if (!sessionId && isInitializeRequest(req.body)) {
           // New initialization request — create transport + server
           transport = new StreamableHTTPServerTransport({
@@ -148,7 +171,26 @@ export function createApp(): {
             },
           });
 
+          // Reserve before the first await: concurrent initializes and views
+          // share one process-wide capacity rather than each growing forever.
+          const lease = budget.acquire(() => transport.close());
+          if (!lease) {
+            res.setHeader('Retry-After', '60');
+            res.status(503).json({
+              jsonrpc: '2.0',
+              error: {
+                code: -32000,
+                message: 'MCP session capacity reached; retry later',
+              },
+              id: requestId,
+            });
+            return;
+          }
+          leases.set(transport, lease);
+          trackPost(transport, res);
+
           transport.onclose = () => {
+            lease.release();
             const sid = transport.sessionId;
             if (sid && transports[sid]) {
               logger.info(`Transport closed for session ${sid}`);
@@ -156,11 +198,22 @@ export function createApp(): {
             }
           };
 
-          const server = createServer({ facet });
-          await server.connect(transport);
-          await runWithContext(requestContext, () =>
-            transport.handleRequest(req, res, req.body)
-          );
+          try {
+            const server = createServer({ facet });
+            await server.connect(transport);
+            await runWithContext(requestContext, () =>
+              transport.handleRequest(req, res, req.body)
+            );
+            // SDK validation may answer 400 without throwing or assigning an ID.
+            if (!transport.sessionId) {
+              lease.release();
+              await transport.close();
+            }
+          } catch (error) {
+            lease.release();
+            await transport.close();
+            throw error;
+          }
           return;
         } else {
           rejectSessionlessRequest(res, sessionId);
@@ -193,6 +246,7 @@ export function createApp(): {
         return;
       }
 
+      leases.get(transport)?.touch();
       try {
         await runWithContext(requestContextFromHeaders(req.headers), () =>
           transport.handleRequest(req, res)
@@ -216,6 +270,7 @@ export function createApp(): {
         return;
       }
 
+      leases.get(transport)?.touch();
       try {
         await runWithContext(requestContextFromHeaders(req.headers), () =>
           transport.handleRequest(req, res)

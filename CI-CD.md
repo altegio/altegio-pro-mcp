@@ -5,6 +5,13 @@ checks, and dependency auditing through `.github/workflows/ci.yml`.
 Tests run on Node.js 20, 22, and 24. Merge with a merge commit after required
 checks and reviews pass; do not bypass branch protection.
 
+HTTP sessions expire after 30 minutes without requests. Open SSE streams alone
+are not activity; in-flight POST responses remain protected until completion.
+All HTTP views share a limit of 128 sessions (including initializing sessions).
+At capacity, initialization returns 503 with `Retry-After: 60`; expired sessions
+return the existing 404 so clients initialize again. This bounds abandoned
+per-session servers when clients omit DELETE.
+
 ## Self-hosting
 
 ```sh
