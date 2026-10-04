@@ -663,3 +663,107 @@ describe('HTTP server session status codes', () => {
     });
   });
 });
+
+describe('HTTP session capacity across views', () => {
+  it('rejects excess initializes and reclaims a DELETEd session across views', async () => {
+    const { app, transportsByFacet } = createApp({ maxSessions: 1 });
+    const server = app.listen(0);
+    const { port } = server.address() as AddressInfo;
+    const headers = {
+      'content-type': 'application/json',
+      accept: 'application/json, text/event-stream',
+    };
+    const initialize = (path: string) =>
+      fetch(`http://127.0.0.1:${port}${path}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: {
+            protocolVersion: '2025-11-25',
+            capabilities: {},
+            clientInfo: { name: 'capacity-test', version: '1' },
+          },
+        }),
+      });
+    try {
+      const first = await initialize('/mcp');
+      await first.text();
+      const sid = first.headers.get('mcp-session-id')!;
+      const blocked = await initialize('/mcp/readonly');
+      expect(blocked.status).toBe(503);
+      expect(blocked.headers.get('retry-after')).toBe('60');
+      await blocked.text();
+      expect(Object.keys(transportsByFacet[READONLY_VIEW])).toHaveLength(0);
+      const deleted = await fetch(`http://127.0.0.1:${port}/mcp`, {
+        method: 'DELETE',
+        headers: { ...headers, 'mcp-session-id': sid },
+      });
+      await deleted.text();
+      expect(deleted.status).toBe(200);
+      const replacement = await initialize('/mcp/readonly');
+      await replacement.text();
+      expect(replacement.status).toBe(200);
+      expect(Object.keys(transportsByFacet[READONLY_VIEW])).toHaveLength(1);
+    } finally {
+      for (const transports of Object.values(transportsByFacet)) {
+        for (const transport of Object.values(transports))
+          await transport.close();
+      }
+      server.close();
+    }
+  });
+});
+
+describe('HTTP abandoned session expiry', () => {
+  it('closes the real transport, returns 404, and accepts a fresh session', async () => {
+    const { app, transports } = createApp({
+      maxSessions: 1,
+      idleTimeoutMs: 100,
+    });
+    const server = app.listen(0);
+    const { port } = server.address() as AddressInfo;
+    const headers = {
+      'content-type': 'application/json',
+      accept: 'application/json, text/event-stream',
+    };
+    const initialize = () =>
+      fetch(`http://127.0.0.1:${port}/mcp`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: {
+            protocolVersion: '2025-11-25',
+            capabilities: {},
+            clientInfo: { name: 'idle-test', version: '1' },
+          },
+        }),
+      });
+    try {
+      const first = await initialize();
+      await first.text();
+      const sid = first.headers.get('mcp-session-id')!;
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(Object.keys(transports)).toHaveLength(0);
+      const stale = await fetch(`http://127.0.0.1:${port}/mcp`, {
+        method: 'POST',
+        headers: { ...headers, 'mcp-session-id': sid },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'ping' }),
+      });
+      expect(stale.status).toBe(404);
+      await stale.text();
+      const replacement = await initialize();
+      await replacement.text();
+      expect(replacement.status).toBe(200);
+    } finally {
+      for (const transport of Object.values(transports))
+        await transport.close();
+      server.close();
+    }
+  });
+});
