@@ -143,6 +143,8 @@ export class CloudLoggingDestination {
             entries: batch.map(({ entry }) => entry),
           }),
         });
+        // Consume the native API response so Undici can reuse the socket.
+        await response.text();
         if (response.status === 401) this.token = undefined;
         if (!response.ok) throw new Error('Cloud Logging write failed');
       } catch {

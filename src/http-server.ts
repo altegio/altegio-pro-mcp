@@ -186,6 +186,14 @@ export function createApp(
         ? forwarded
         : randomUUID();
     req.headers['x-request-id'] = requestId;
+    // Hono builds the SDK Web Request from rawHeaders. Replace the caller's
+    // ID in both representations before the SDK copies request headers.
+    for (let i = req.rawHeaders.length - 2; i >= 0; i -= 2) {
+      if (req.rawHeaders[i]?.toLowerCase() === 'x-request-id') {
+        req.rawHeaders.splice(i, 2);
+      }
+    }
+    req.rawHeaders.push('X-Request-Id', requestId);
     res.setHeader('X-Request-Id', requestId);
     const started = performance.now();
     let logged = false;
@@ -492,8 +500,12 @@ process.on('SIGTERM', async () => {
 
 // Run if executed directly (not when imported by tests)
 if (process.argv[1] && !process.argv[1].includes('jest')) {
-  startHTTPServer().catch((error) => {
-    logger.error('Failed to start HTTP server', error);
+  startHTTPServer().catch(async (error) => {
+    logger.error(
+      { error_type: error instanceof Error ? error.name : 'unknown' },
+      'Failed to start HTTP server'
+    );
+    await flushLogs();
     process.exit(1);
   });
 }
