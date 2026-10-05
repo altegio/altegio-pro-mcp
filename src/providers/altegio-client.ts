@@ -19,6 +19,7 @@ import type {
   BookingForm,
   AltegioResource,
 } from '../types/altegio.types.js';
+import { isLocationMetadataRead } from './location-read-policy.js';
 import { CredentialManager } from './credential-manager.js';
 import { prepareClientFile } from './client-file-upload.js';
 import { AuthenticationError, AltegioApiError } from '../utils/errors.js';
@@ -271,6 +272,14 @@ export class AltegioClient {
       Authorization: authParts.join(', '),
       ...((options.headers as Record<string, string>) || {}),
     };
+
+    if (isLocationMetadataRead(endpoint, options.method)) {
+      this.requireAuth();
+      const [path, query = ''] = endpoint.split('?');
+      const params = new URLSearchParams(query);
+      params.set('my', '1');
+      endpoint = `${path}?${params.toString()}`;
+    }
 
     return fetch(`${this.apiUrl}${endpoint}`, {
       ...options,
@@ -589,8 +598,11 @@ export class AltegioClient {
   ): Promise<AltegioCompany[]> {
     this.requireAuth();
 
+    // B2B discovery never exposes the public directory, even if a legacy
+    // caller explicitly supplies my=0.
+    params = { ...params, my: 1 };
     const declaredCompanyIds = getRequestCompanyIds();
-    if (params?.my === 1 && declaredCompanyIds) {
+    if (declaredCompanyIds) {
       // A UC2 application's technical user can successfully access a declared
       // location directly while `/locations?my=1` still returns an empty list.
       // The trusted proxy has already bound this request to the declared
@@ -614,8 +626,8 @@ export class AltegioClient {
     );
     // Confine `locations_list` to the declared company scope: a request scoped
     // via `X-Altegio-Company-Id` only ever sees its own locations, so a shared
-    // user token cannot enumerate the other salons it happens to reach. Unscoped
-    // requests see everything (no-op).
+    // user token cannot enumerate the other locations it happens to reach.
+    // Without a declared scope, the upstream my=1 filter still applies.
     return locations.filter((location) => isCompanyAllowed(location.id));
   }
 

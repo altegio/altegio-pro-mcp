@@ -15,6 +15,12 @@ const BUILD_SCRIPT = path.join(REPO_ROOT, 'scripts/catalog/build.mjs');
 const COMMITTED = path.join(REPO_ROOT, 'src/generated/catalog.json');
 
 function findDocsRoot(): string | null {
+  const explicit = process.env.ALTEGIO_API_DOCS;
+  if (explicit) {
+    return fs.existsSync(path.join(explicit, 'docs/en/b2b-v1/openapi.yaml'))
+      ? explicit
+      : null;
+  }
   let dir = REPO_ROOT;
   for (let i = 0; i < 8; i++) {
     const candidate = path.join(dir, '..', 'biz.erp.api.docs');

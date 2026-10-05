@@ -441,7 +441,7 @@ describe('AltegioClient', () => {
       const companies = await client.getCompanies();
 
       expect(fetch).toHaveBeenLastCalledWith(
-        'https://api.alteg.io/api/v1/locations',
+        'https://api.alteg.io/api/v1/locations?my=1',
         {
           headers: {
             Accept: 'application/vnd.api.v2+json',
@@ -539,7 +539,7 @@ describe('AltegioClient', () => {
       const companies = await client.getCompanies({ page: 1, count: 10 });
 
       expect(fetch).toHaveBeenLastCalledWith(
-        'https://api.alteg.io/api/v1/locations?page=1&count=10',
+        'https://api.alteg.io/api/v1/locations?page=1&count=10&my=1',
         {
           headers: {
             Accept: 'application/vnd.api.v2+json',
@@ -952,7 +952,7 @@ describe('AltegioClient', () => {
       mockEmptyCompanies();
       await runWithIdentity(idA, () => client.getCompanies());
       expect(fetch).toHaveBeenLastCalledWith(
-        'https://api.alteg.io/api/v1/locations',
+        'https://api.alteg.io/api/v1/locations?my=1',
         {
           headers: {
             Accept: 'application/vnd.api.v2+json',
@@ -1011,7 +1011,7 @@ describe('AltegioClient', () => {
       mockEmptyCompanies();
       await stdioClient.getCompanies();
       expect(fetch).toHaveBeenLastCalledWith(
-        'https://api.alteg.io/api/v1/locations',
+        'https://api.alteg.io/api/v1/locations?my=1',
         {
           headers: {
             Accept: 'application/vnd.api.v2+json',
@@ -1065,7 +1065,7 @@ describe('AltegioClient', () => {
         client.getCompanies()
       );
       expect(fetch).toHaveBeenLastCalledWith(
-        'https://api.alteg.io/api/v1/locations',
+        'https://api.alteg.io/api/v1/locations?my=1',
         {
           headers: {
             Accept: 'application/vnd.api.v2+json',
@@ -1096,7 +1096,7 @@ describe('AltegioClient', () => {
         client.getCompanies()
       );
       expect(fetch).toHaveBeenLastCalledWith(
-        'https://api.alteg.io/api/v1/locations',
+        'https://api.alteg.io/api/v1/locations?my=1',
         {
           headers: {
             Accept: 'application/vnd.api.v2+json',
@@ -1144,7 +1144,7 @@ describe('AltegioClient', () => {
           () => client.getCompanies()
         );
         expect(fetch).toHaveBeenLastCalledWith(
-          'https://api.alteg.io/api/v1/locations',
+          'https://api.alteg.io/api/v1/locations?my=1',
           {
             headers: {
               Accept: 'application/vnd.api.v2+json',
@@ -1186,7 +1186,7 @@ describe('AltegioClient', () => {
           () => client.getCompanies()
         );
         expect(fetch).toHaveBeenLastCalledWith(
-          'https://api.alteg.io/api/v1/locations',
+          'https://api.alteg.io/api/v1/locations?my=1',
           {
             headers: {
               Accept: 'application/vnd.api.v2+json',
