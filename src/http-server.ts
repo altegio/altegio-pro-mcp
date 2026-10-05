@@ -13,7 +13,7 @@ import {
   READONLY_VIEW,
   type FacetKey,
 } from './tools/facets.js';
-import { createLogger } from './utils/logger.js';
+import { createLogger, flushLogs } from './utils/logger.js';
 import {
   requestContextFromHeaders,
   runWithContext,
@@ -478,13 +478,15 @@ async function startHTTPServer(): Promise<void> {
 }
 
 // Handle process signals
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   logger.info('Received SIGINT, shutting down...');
+  await flushLogs();
   process.exit(0);
 });
 
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   logger.info('Received SIGTERM, shutting down...');
+  await flushLogs();
   process.exit(0);
 });
 

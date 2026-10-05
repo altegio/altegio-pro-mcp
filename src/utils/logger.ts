@@ -5,6 +5,16 @@
 import pino from 'pino';
 import { COMMIT_SHA, PACKAGE_VERSION } from '../package-metadata.js';
 import type { Logger as PinoLogger } from 'pino';
+import { CloudLoggingDestination } from './cloud-logging.js';
+
+const cloudDestination =
+  process.env.GCP_STRUCTURED_LOGGING === 'true'
+    ? new CloudLoggingDestination()
+    : undefined;
+
+export const flushLogs = async (): Promise<void> => {
+  await cloudDestination?.flush();
+};
 
 interface LoggerConfig {
   level?: string;
@@ -45,7 +55,9 @@ class LoggerFactory {
       {
         name: mergedConfig.name,
         level: mergedConfig.level!,
-        ...(mergedConfig.pretty && process.env.NODE_ENV !== 'production'
+        ...(mergedConfig.pretty &&
+        process.env.NODE_ENV !== 'production' &&
+        !cloudDestination
           ? {
               transport: {
                 target: 'pino-pretty',
@@ -74,11 +86,13 @@ class LoggerFactory {
           level: (label) => {
             return {
               severity:
-                label === 'warn'
-                  ? 'WARNING'
-                  : label === 'fatal'
-                    ? 'CRITICAL'
-                    : label.toUpperCase(),
+                label === 'trace'
+                  ? 'DEBUG'
+                  : label === 'warn'
+                    ? 'WARNING'
+                    : label === 'fatal'
+                      ? 'CRITICAL'
+                      : label.toUpperCase(),
             };
           },
         },
@@ -103,7 +117,7 @@ class LoggerFactory {
           censor: '[REDACTED]',
         },
       },
-      pino.destination({ dest: 2, sync: false }) // Write to stderr (fd 2) instead of stdout
+      cloudDestination || pino.destination({ dest: 2, sync: false })
     );
 
     this.loggers.set(cacheKey, logger);

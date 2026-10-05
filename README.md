@@ -157,3 +157,5 @@ see [OPENAPI.md](OPENAPI.md). Never edit generated artifacts by hand.
 
 [MIT](LICENSE). Report reproducible problems through
 [GitHub Issues](https://github.com/altegio/altegio-pro-mcp/issues).
+
+Hosted VM deployments can enable `GCP_STRUCTURED_LOGGING=true` to write bounded batches directly to Cloud Logging using their existing metadata service account. Entries expose root severity and indexed service, version, commit, request ID and outcome fields. Failed writes fall back to stderr with a 30-second retry cooldown; shutdown waits at most five seconds to flush. Local and stdio clients continue to use stderr.
