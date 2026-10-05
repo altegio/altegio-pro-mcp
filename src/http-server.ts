@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import './config/env.js';
+import { parseProxyKeys, verifyProxyRequest } from './utils/proxy-auth.js';
 import { randomUUID } from 'node:crypto';
 import express from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -17,7 +18,7 @@ import {
   requestContextFromHeaders,
   runWithContext,
 } from './request-context.js';
-import { PACKAGE_VERSION } from './package-metadata.js';
+import { COMMIT_SHA, PACKAGE_VERSION } from './package-metadata.js';
 import {
   HttpSessionBudget,
   type HttpSessionLease,
@@ -129,13 +130,104 @@ export function createApp(
   // Middleware
   // Base64 of a file smaller than 12 MiB is below 16 MiB; leave room for
   // JSON-RPC metadata while bounding every hosted MCP request.
+  const proxyKeys = parseProxyKeys(process.env.MCP_PROXY_BACKEND_KEY);
+  if (
+    (process.env.MCP_PROXY_BACKEND_KEY ||
+      process.env.MCP_PROXY_REQUIRE_SIGNATURE === 'true') &&
+    proxyKeys.length === 0
+  ) {
+    throw new Error('MCP_PROXY_BACKEND_KEY contains no usable signing key');
+  }
+  if (proxyKeys.length === 0) {
+    logger.warn(
+      { event: 'proxy_trust_unconfigured' },
+      'Proxy signatures are not enforced; configure the existing backend key before enabling delegated clients'
+    );
+  }
+  app.use((req, res, next) => {
+    if (!req.path.startsWith('/mcp')) return next();
+    const localRequestId = randomUUID();
+    const delegated = Object.keys(req.headers).some((name) =>
+      name.startsWith('x-mcp-auth-')
+    );
+    const signed = req.headers['x-mcp-proxy-auth'] !== undefined;
+    if (proxyKeys.length > 0 && (delegated || signed)) {
+      const verification = verifyProxyRequest({
+        keys: proxyKeys,
+        method: req.method,
+        path: req.originalUrl,
+        headers: req.headers,
+      });
+      if (!verification.ok) {
+        logger.warn(
+          {
+            event: 'proxy_auth_rejected',
+            request_id: localRequestId,
+            latency_ms: 0,
+            route: req.path,
+            error_type: verification.reason,
+            outcome: 'error',
+            http_status: 401,
+          },
+          'Invalid delegated request'
+        );
+        res.status(401).json({ error: 'proxy_auth_required' });
+        return;
+      }
+    }
+    // The SDK copies these headers and later rebinds its asynchronous handler
+    // context. Only a verified proxy may supply the correlation identifier.
+    const forwarded = req.headers['x-mcp-auth-request-id'];
+    const requestId =
+      proxyKeys.length > 0 &&
+      signed &&
+      typeof forwarded === 'string' &&
+      /^[a-zA-Z0-9_-]{1,128}$/.test(forwarded)
+        ? forwarded
+        : randomUUID();
+    req.headers['x-request-id'] = requestId;
+    res.setHeader('X-Request-Id', requestId);
+    const started = performance.now();
+    let logged = false;
+    const record = () => {
+      if (logged) return;
+      logged = true;
+      logger.info(
+        {
+          event: 'request',
+          request_id: requestId,
+          route: req.path,
+          rpc_method:
+            typeof req.body?.method === 'string'
+              ? req.body.method.slice(0, 64)
+              : undefined,
+          http_status: res.statusCode,
+          ...(res.locals.limitedBy
+            ? { limited_by: res.locals.limitedBy, error_type: 'admission' }
+            : {}),
+          outcome: !res.writableFinished
+            ? 'cancelled'
+            : res.statusCode >= 400
+              ? 'error'
+              : 'success',
+          latency_ms: Math.round(performance.now() - started),
+        },
+        'MCP request completed'
+      );
+    };
+    res.once('finish', record);
+    res.once('close', record);
+    next();
+  });
   app.use(express.json({ limit: '17mb' }));
 
   // Health check endpoint
   app.get('/health', (_req, res) => {
     res.json({
       status: 'ok',
+      service: 'altegio-pro-mcp',
       version: PACKAGE_VERSION,
+      commit: COMMIT_SHA,
       timestamp: new Date().toISOString(),
     });
   });
@@ -166,7 +258,7 @@ export function createApp(
           transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
             onsessioninitialized: (id) => {
-              logger.info(`Session initialized on ${path}: ${id}`);
+              logger.info(`Session initialized on ${path}`);
               transports[id] = transport;
             },
           });
@@ -175,6 +267,7 @@ export function createApp(
           // share one process-wide capacity rather than each growing forever.
           const lease = budget.acquire(() => transport.close());
           if (!lease) {
+            res.locals.limitedBy = 'pro_session_capacity';
             res.setHeader('Retry-After', '60');
             res.status(503).json({
               jsonrpc: '2.0',
@@ -193,7 +286,7 @@ export function createApp(
             lease.release();
             const sid = transport.sessionId;
             if (sid && transports[sid]) {
-              logger.info(`Transport closed for session ${sid}`);
+              logger.info(`Transport closed`);
               delete transports[sid];
             }
           };
@@ -224,8 +317,15 @@ export function createApp(
           transport.handleRequest(req, res, req.body)
         );
       } catch (error) {
-        const errMsg = error instanceof Error ? error.message : String(error);
-        logger.error(`Failed to handle POST ${path}: ${errMsg}`);
+        logger.error(
+          {
+            event: 'request_failed',
+            route: path,
+            error_type: error instanceof Error ? error.name : 'unknown',
+            outcome: 'error',
+          },
+          'Failed to handle POST'
+        );
         if (!res.headersSent) {
           res.status(500).json({
             jsonrpc: '2.0',
@@ -252,8 +352,15 @@ export function createApp(
           transport.handleRequest(req, res)
         );
       } catch (error) {
-        const errMsg = error instanceof Error ? error.message : String(error);
-        logger.error(`Failed to handle GET SSE ${path}: ${errMsg}`);
+        logger.error(
+          {
+            event: 'request_failed',
+            route: path,
+            error_type: error instanceof Error ? error.name : 'unknown',
+            outcome: 'error',
+          },
+          'Failed to handle GET SSE'
+        );
         if (!res.headersSent) {
           res.status(500).json({ error: 'Failed to establish SSE stream' });
         }
@@ -276,8 +383,15 @@ export function createApp(
           transport.handleRequest(req, res)
         );
       } catch (error) {
-        const errMsg = error instanceof Error ? error.message : String(error);
-        logger.error(`Failed to handle DELETE ${path}: ${errMsg}`);
+        logger.error(
+          {
+            event: 'request_failed',
+            route: path,
+            error_type: error instanceof Error ? error.name : 'unknown',
+            outcome: 'error',
+          },
+          'Failed to handle DELETE'
+        );
         if (!res.headersSent) {
           res.status(500).json({ error: 'Failed to terminate session' });
         }

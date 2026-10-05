@@ -15,3 +15,5 @@ if (!parsed.name || !parsed.version) {
 export const PACKAGE_NAME = parsed.name;
 export const PACKAGE_VERSION = parsed.version;
 export const PACKAGE_DESCRIPTION = parsed.description;
+
+export const COMMIT_SHA = process.env.COMMIT_SHA || 'unknown';
