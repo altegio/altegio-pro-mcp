@@ -18,6 +18,7 @@ import {
   type CatalogOperation,
   type CatalogParameter,
 } from './catalog.js';
+import { isLocationMetadataRead } from '../../providers/location-read-policy.js';
 import { v2Path } from '../../api/altegio-http.js';
 import {
   applyProjection,
@@ -302,6 +303,12 @@ export function buildRequest(
       `Forwarded as query parameters although the spec does not document them ` +
         `for this operation: ${extras.join(', ')}.`
     );
+  }
+
+  // The executor obeys the same B2B location policy as curated tools. Keep
+  // its reported query consistent with the filter enforced by the transport.
+  if (op.source === 'v1' && isLocationMetadataRead(path, op.method)) {
+    query.my = 1;
   }
 
   return { path, query, warnings };

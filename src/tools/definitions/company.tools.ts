@@ -37,7 +37,7 @@ export const listLocationsTool = defineTool({
   name: 'locations_list',
   category: 'Location',
   description:
-    'List locations. Pass managed_only=true for the locations the signed-in user administers — the usual first call to find a location_id; when the user means "my locations", that is this. Ask which location to work with when several come back. Paged: 25 per page by default; follow pagination.next_page until it is null (a full last page may need one empty request).',
+    'List only locations the signed-in user has rights to manage. The server always applies my=1; callers cannot request the public location directory. Use this first to find a location_id. Ask which location to work with when several come back. Paged: 25 per page by default; follow pagination.next_page until it is null (a full last page may need one empty request).',
   annotations: {
     title: 'List Locations',
     readOnlyHint: true,
@@ -46,24 +46,23 @@ export const listLocationsTool = defineTool({
   input: z.object({
     managed_only: z
       .boolean()
-      .default(false)
+      .default(true)
       .describe(
-        'true: only locations the signed-in user administers. false (default): the location directory the current credentials can see.'
+        'Deprecated compatibility parameter. The server always returns managed locations, even when this is false.'
       ),
     ...paginationInput,
   }),
   outputSchema: companiesOutput,
   handler: async ({ input, client }) => {
     const locations = await client.getCompanies({
-      my: input.managed_only ? 1 : 0,
+      my: 1,
       page: input.page,
       count: input.page_size,
     });
 
-    // Name, address and phone of a location are typed by its owner, and the
-    // public list is not even limited to locations this user manages.
+    // Name, address and phone of a location are typed by its owner.
     const lines = [
-      `Found ${locations.length} ${locations.length === 1 ? 'location' : 'locations'}${input.managed_only ? ' (managed by the user)' : ''}, ids: ${locations.map((c) => c.id).join(', ')}.`,
+      `Found ${locations.length} ${locations.length === 1 ? 'location' : 'locations'} (managed by the user), ids: ${locations.map((c) => c.id).join(', ')}.`,
     ];
     const untrusted: UntrustedField[] = [];
     for (const c of locations) {

@@ -24,6 +24,11 @@ the path from the developers specification.
 
 ## Corrected MCP behavior
 
+- All V1 location list and single-location reads enforce `my=1`, including
+  calls through the universal executor and legacy URL aliases. The filter is
+  server policy, not a caller-controlled option. `locations_list` still accepts
+  the deprecated `managed_only` flag for compatibility, but neither value can
+  disable the filter; its advertised default is now `true`.
 - `locations_list` with a declared `X-Altegio-Company-Id` scope resolves those
   exact location IDs. It does not depend on `GET /locations?my=1`, which may be
   empty for per-request application credentials. Pagination is one-based.

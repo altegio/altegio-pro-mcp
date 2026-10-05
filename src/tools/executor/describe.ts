@@ -7,6 +7,7 @@
  * that may already do the job, and the canonical-terminology notes that say
  * which legacy parameter names the API accepts under canonical spellings.
  */
+import { isLocationMetadataRead } from '../../providers/location-read-policy.js';
 import {
   acceptedNames,
   canonicalName,
@@ -68,6 +69,10 @@ function describeParameter(
   const accepted = acceptedNames(param.name);
   if (!accepted.includes(exposed)) accepted.push(exposed);
   const schema = param.schema;
+  const managedLocationFilter =
+    param.name === 'my' &&
+    op.source === 'v1' &&
+    isLocationMetadataRead(op.path.replace(/\{[^}]+\}/g, '1'), op.method);
 
   return {
     name: exposed,
@@ -80,6 +85,14 @@ function describeParameter(
     ...(Array.isArray(schema?.enum) ? { enum: schema.enum } : {}),
     ...(schema?.default !== undefined ? { default: schema.default } : {}),
     ...(param.description ? { description: param.description } : {}),
+    ...(managedLocationFilter
+      ? {
+          enum: [1],
+          default: 1,
+          description:
+            'Always enforced as 1 by the server for B2B location reads; callers cannot disable this filter.',
+        }
+      : {}),
   };
 }
 

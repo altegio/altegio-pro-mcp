@@ -1,5 +1,36 @@
-import { updateLocationTool } from '../definitions/company.tools.js';
+import {
+  listLocationsTool,
+  updateLocationTool,
+} from '../definitions/company.tools.js';
 import type { AltegioClient } from '../../providers/altegio-client.js';
+
+describe('locations_list management filter', () => {
+  it('documents the legacy flag as compatibility-only and defaults it to true', () => {
+    expect(listLocationsTool.toMcpTool().inputSchema.properties).toMatchObject({
+      managed_only: {
+        default: true,
+        description: expect.stringContaining('even when this is false'),
+      },
+    });
+  });
+
+  it.each([{}, { managed_only: false }, { managed_only: true }])(
+    'lists managed locations even with legacy arguments %j',
+    async (args) => {
+      const client = { getCompanies: jest.fn().mockResolvedValue([]) };
+      const result = await listLocationsTool.createHandler(client as never)(
+        args
+      );
+      expect(result.isError).toBeUndefined();
+      expect(client.getCompanies).toHaveBeenCalledWith({
+        my: 1,
+        page: 1,
+        count: 25,
+      });
+      expect(result.content[0]?.text).toContain('managed by the user');
+    }
+  );
+});
 
 describe('locations_update verification', () => {
   it('does not claim a phone update that the location read-back contradicts', async () => {
