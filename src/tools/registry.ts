@@ -303,7 +303,11 @@ export function registerTools(
         request_id: headers?.['x-request-id'],
         route: `/mcp${facet === DEFAULT_FACET ? '' : '/' + facet}`,
         rpc_method: 'tools/call',
-        tool: request.params.name,
+        tool:
+          handlers.has(request.params.name) ||
+          Object.hasOwn(onboardingDispatch, request.params.name)
+            ? request.params.name
+            : 'unknown',
       };
       const log = createLogger('tool-calls');
       try {
