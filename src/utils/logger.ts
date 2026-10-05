@@ -3,6 +3,7 @@
  */
 
 import pino from 'pino';
+import { COMMIT_SHA, PACKAGE_VERSION } from '../package-metadata.js';
 import type { Logger as PinoLogger } from 'pino';
 
 interface LoggerConfig {
@@ -61,23 +62,31 @@ class LoggerFactory {
           error: pino.stdSerializers.err,
           request: (req) => ({
             method: req.method,
-            params: req.params,
             id: req.id,
           }),
           response: (res) => ({
             id: res.id,
             result: res.result ? 'success' : 'error',
-            error: res.error,
+            error: Boolean(res.error),
           }),
         },
         formatters: {
           level: (label) => {
-            return { level: label.toUpperCase() };
+            return {
+              severity:
+                label === 'warn'
+                  ? 'WARNING'
+                  : label === 'fatal'
+                    ? 'CRITICAL'
+                    : label.toUpperCase(),
+            };
           },
         },
         base: {
           env: process.env.NODE_ENV || 'development',
-          version: process.env.npm_package_version,
+          service: 'altegio-pro-mcp',
+          version: PACKAGE_VERSION,
+          commit: COMMIT_SHA,
         },
         redact: {
           paths: [

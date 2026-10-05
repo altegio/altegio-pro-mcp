@@ -114,7 +114,7 @@ export function parseIdentityHeaders(
   }
 
   logger.warn(
-    { kind },
+    { error_type: 'invalid_identity_kind' },
     'Unknown x-mcp-auth-kind value; treating request as anonymous'
   );
   return null;
@@ -198,7 +198,7 @@ export function parseCompanyIds(
     const id = Number(trimmed);
     if (!Number.isInteger(id) || id <= 0) {
       logger.warn(
-        { fragment: trimmed },
+        { error_type: 'invalid_company_scope' },
         'Ignoring non-integer X-Altegio-Company-Id fragment'
       );
       continue;

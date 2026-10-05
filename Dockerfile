@@ -42,6 +42,10 @@ COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 
 COPY --chown=nodejs:nodejs ["docs/product-logic.md", "docs/onboarding-guide.md", "./docs/"]
 
+ARG COMMIT_SHA=unknown
+ENV COMMIT_SHA=${COMMIT_SHA}
+LABEL org.opencontainers.image.revision=${COMMIT_SHA}
+
 # Switch to non-root user
 USER nodejs
 

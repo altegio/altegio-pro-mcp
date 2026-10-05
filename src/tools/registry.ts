@@ -1,3 +1,4 @@
+import { createLogger } from '../utils/logger.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   CallToolRequestSchema,
@@ -295,7 +296,41 @@ export function registerTools(
     // of the original HTTP headers at the actual tool-handler boundary. Stdio
     // has no requestInfo and keeps its existing single-user context.
     const headers = extra.requestInfo?.headers;
-    const onView = () => runOnView(servingView, execute);
+    const onView = async () => {
+      const started = performance.now();
+      const fields = {
+        event: 'tool_call',
+        request_id: headers?.['x-request-id'],
+        route: `/mcp${facet === DEFAULT_FACET ? '' : '/' + facet}`,
+        rpc_method: 'tools/call',
+        tool: request.params.name,
+      };
+      const log = createLogger('tool-calls');
+      try {
+        const result = await runOnView(servingView, execute);
+        log.info(
+          {
+            ...fields,
+            outcome: result.isError ? 'error' : 'success',
+            ...(result.isError ? { error_type: 'tool_result' } : {}),
+            latency_ms: Math.round(performance.now() - started),
+          },
+          'Tool completed'
+        );
+        return result;
+      } catch (error) {
+        log.error(
+          {
+            ...fields,
+            outcome: 'error',
+            error_type: error instanceof Error ? error.name : 'unknown',
+            latency_ms: Math.round(performance.now() - started),
+          },
+          'Tool failed'
+        );
+        throw error;
+      }
+    };
     return headers
       ? runWithContext(requestContextFromHeaders(headers), onView)
       : onView();
