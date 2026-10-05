@@ -1411,7 +1411,7 @@
       "path": "/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}",
       "displayPath": "/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}",
       "summary": "Get membership type details",
-      "description": "Retrieves detailed information about a specific membership type.\nA deleted type is still returned by its ID.\n\n**Note:** Requires chain-level permissions.",
+      "description": "Retrieves detailed information about a specific membership type.\nA deleted type answers `404`.\n\n**Note:** Requires chain-level permissions.",
       "tags": [
         "Chain Loyalty Programs"
       ],
@@ -2285,7 +2285,7 @@
       "path": "/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}",
       "displayPath": "/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}",
       "summary": "Archive or unarchive membership type",
-      "description": "Archives or unarchives a membership type. Send `is_archived` as the string `\"1\"` or `\"0\"`.\n\nArchived membership types:\n- Cannot be sold to new clients\n- Existing active memberships remain functional\n- Are listed only with `is_archived=1` and cannot be updated\n- Can be unarchived at any time\n\n**Note:** Requires chain-level permissions.",
+      "description": "Archives or unarchives a membership type.\n\nArchived membership types:\n- Cannot be sold to new clients\n- Existing active memberships remain functional\n- Are listed only with `is_archived=1` and cannot be updated\n- Can be unarchived at any time\n\n**Note:** Requires chain-level permissions.",
       "tags": [
         "Chain Loyalty Programs"
       ],
@@ -2323,12 +2323,22 @@
         "schema": {
           "properties": {
             "is_archived": {
-              "description": "Archive status, sent as a string: - `\"1\"` = archived (cannot be sold) - `\"0\"` = active (available for sale) JSON booleans (`true`, `false`) and numbers (`1`, `0`) are rejected with `422`.",
+              "description": "Archive status: - `true` = archived (cannot be sold) - `false` = active (available for sale) `1`/`0`, `\"1\"`/`\"0\"` and `\"true\"`/`\"false\"` are accepted as the same values. Any other value is rejected w…",
               "enum": [
+                true,
+                false,
+                1,
+                0,
+                "1",
                 "0",
-                "1"
+                "true",
+                "false"
               ],
-              "type": "string"
+              "type": [
+                "boolean",
+                "integer",
+                "string"
+              ]
             }
           },
           "required": [
@@ -2357,7 +2367,7 @@
       "path": "/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}",
       "displayPath": "/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}",
       "summary": "Delete membership type",
-      "description": "Deletes a membership type from the chain. This is a soft delete: the type disappears\nfrom List membership types, but Get membership type details still returns it by its ID.\n\nA type with sold memberships cannot be deleted: the request is rejected with `400`\nand a message. Archive such a type instead.",
+      "description": "Deletes a membership type from the chain. The type disappears from List membership types,\nand Get membership type details answers `404` for it. Only an Altegio super user can\nrestore a deleted type.\n\nA type with sold memberships cannot be deleted: the request is rejected with `400`\nand a message. Archive such a type instead.",
       "tags": [
         "Chain Loyalty Programs"
       ],
@@ -9025,6 +9035,7 @@
       "path": "/finance_transactions/{location_id}",
       "displayPath": "/finance_transactions/{location_id}",
       "summary": "Create a Financial Transaction",
+      "description": "The cash account must belong to the requested location and be accessible to the user. An empty restricted account selection permits no accounts.",
       "tags": [
         "Payments"
       ],
@@ -9251,6 +9262,7 @@
       "path": "/finance_transactions/{location_id}/{transaction_id}",
       "displayPath": "/finance_transactions/{location_id}/{transaction_id}",
       "summary": "Getting a financial transaction",
+      "description": "The transaction must belong to the requested location and an account accessible to the user.",
       "tags": [
         "Payments"
       ],
@@ -9273,12 +9285,13 @@
           }
         },
         {
-          "description": "transaction ID",
+          "description": "Positive decimal transaction ID; a numeric prefix followed by other text is invalid.",
           "name": "transaction_id",
           "in": "path",
           "required": true,
           "schema": {
-            "type": "number"
+            "minimum": 1,
+            "type": "integer"
           }
         }
       ],
@@ -9432,6 +9445,7 @@
       "path": "/finance_transactions/{location_id}/{transaction_id}",
       "displayPath": "/finance_transactions/{location_id}/{transaction_id}",
       "summary": "Financial Transaction Update",
+      "description": "Both the stored and requested cash accounts must belong to the requested location and be accessible to the user.",
       "tags": [
         "Payments"
       ],
@@ -9454,12 +9468,13 @@
           }
         },
         {
-          "description": "transaction ID",
+          "description": "Positive decimal transaction ID; a numeric prefix followed by other text is invalid.",
           "name": "transaction_id",
           "in": "path",
           "required": true,
           "schema": {
-            "type": "number"
+            "minimum": 1,
+            "type": "integer"
           }
         }
       ],
@@ -9657,6 +9672,7 @@
       "path": "/finance_transactions/{location_id}/{transaction_id}",
       "displayPath": "/finance_transactions/{location_id}/{transaction_id}",
       "summary": "Deleting a transaction",
+      "description": "The transaction must belong to the requested location and an account accessible to the user.",
       "tags": [
         "Payments"
       ],
@@ -9679,12 +9695,13 @@
           }
         },
         {
-          "description": "transaction ID",
+          "description": "Positive decimal transaction ID; a numeric prefix followed by other text is invalid.",
           "name": "transaction_id",
           "in": "path",
           "required": true,
           "schema": {
-            "type": "number"
+            "minimum": 1,
+            "type": "integer"
           }
         }
       ],
@@ -28558,7 +28575,7 @@
       "path": "/reports/z_report/{location_id}",
       "displayPath": "/reports/z_report/{location_id}",
       "summary": "Get day-end report data",
-      "description": "+ start_date: Report date\n\n+ team_member_id: team member ID",
+      "description": "Account payments, including certificate and subscription payments, are limited to accounts accessible to the user. An empty restricted account selection produces zero account payment totals. Attendance quantities and non-account payment methods retain their own permissions.\n+ start_date: Report date\n+ team_member_id: team member ID",
       "tags": [
         "Analytics & Reports"
       ],
@@ -31176,6 +31193,7 @@
       "path": "/storage_operations/documents/finance_transactions/{document_id}",
       "displayPath": "/storage_operations/documents/finance_transactions/{document_id}",
       "summary": "Get document financial transactions",
+      "description": "Returns only transactions on accounts accessible to the user in the document location. An empty restricted account selection returns an empty collection.",
       "tags": [
         "Payments"
       ],
