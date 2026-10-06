@@ -251,6 +251,32 @@ export function visitStatusFromLegacyCode(code: number): VisitStatus | null {
   return VISIT_STATUS_BY_LEGACY_CODE[code] ?? null;
 }
 
+/**
+ * The canonical status of one v1 appointment row. `attendance` (mirrored as
+ * `visit_attendance`) is the status itself: the code appointments_create,
+ * appointments_update and the attendance endpoint write, and the code the
+ * visit-status report counts. The separate `confirmed` 0/1 flag is a
+ * verification marker that admin-created appointments carry by default, so it
+ * never overrides the status: `attendance=0, confirmed=1` is still waiting.
+ */
+export function visitStatusOfAppointment(appointment: {
+  deleted?: boolean;
+  attendance?: number;
+  visit_attendance?: number;
+  status?: string;
+}): VisitStatus | 'unknown' {
+  if (appointment.deleted) return 'cancelled';
+  const code = appointment.attendance ?? appointment.visit_attendance;
+  if (typeof code === 'number') {
+    const mapped = visitStatusFromLegacyCode(code);
+    if (mapped) return mapped;
+  }
+  const reported = appointment.status?.trim().toLowerCase();
+  return (VISIT_STATUSES as readonly string[]).includes(reported ?? '')
+    ? (reported as VisitStatus)
+    : 'unknown';
+}
+
 /** Canonical visit status → the v1 `attendance` code the API filters on. */
 export function visitStatusToLegacyCode(status: VisitStatus): number | null {
   for (const [code, mapped] of Object.entries(VISIT_STATUS_BY_LEGACY_CODE)) {

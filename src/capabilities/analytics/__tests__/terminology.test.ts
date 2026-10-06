@@ -14,6 +14,7 @@ import {
   canonicalizeLabel,
   findForbiddenWords,
   visitStatusFromLabel,
+  visitStatusOfAppointment,
   appointmentSourceFromLabel,
   toFieldKey,
   VISIT_STATUSES,
@@ -218,6 +219,24 @@ describe('visit status and appointment source mapping', () => {
     expect(visitStatusFromLabel('Expectation')).toBe('waiting');
     expect(visitStatusFromLabel('Deleted')).toBe('cancelled');
     expect(visitStatusFromLabel('Something new')).toBeNull();
+  });
+
+  it('derives an appointment status from attendance, not the confirmed flag', () => {
+    // Admin-created appointments carry confirmed=1 by default; attendance is
+    // the status the write tools set and the visit-status report counts.
+    const adminCreatedWaiting = { attendance: 0, confirmed: 1 };
+    const confirmedUnflagged = { attendance: 2, confirmed: 0 };
+    expect(visitStatusOfAppointment(adminCreatedWaiting)).toBe('waiting');
+    expect(visitStatusOfAppointment(confirmedUnflagged)).toBe('confirmed');
+    expect(visitStatusOfAppointment({ attendance: 1 })).toBe('arrived');
+    expect(visitStatusOfAppointment({ attendance: -1 })).toBe('no_show');
+    expect(visitStatusOfAppointment({ visit_attendance: 0 })).toBe('waiting');
+    expect(visitStatusOfAppointment({ attendance: 2, deleted: true })).toBe(
+      'cancelled'
+    );
+    expect(visitStatusOfAppointment({ status: ' Arrived ' })).toBe('arrived');
+    expect(visitStatusOfAppointment({ attendance: 7 })).toBe('unknown');
+    expect(visitStatusOfAppointment({})).toBe('unknown');
   });
 
   it('uses the V3 appointment status enum', () => {

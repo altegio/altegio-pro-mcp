@@ -76,7 +76,7 @@ describe('ToolHandlers - Appointments CRUD', () => {
       });
 
       const text = result.content[0]?.text ?? '';
-      expect(text).toContain('confirmed');
+      expect(text).toContain('· waiting ·');
       expect(text).toContain('total 200');
       expect(text).not.toContain('undefined');
       // Names and service titles are free input: fenced, not in our own row.
@@ -99,7 +99,9 @@ describe('ToolHandlers - Appointments CRUD', () => {
           {
             id: 999,
             location_id: 456,
-            status: 'confirmed',
+            // attendance=0 is waiting; confirmed=1 is the admin-default
+            // verification flag, not the status.
+            status: 'waiting',
             client_id: 321,
             total_cost: 200,
             duration_seconds: 3600,
@@ -115,6 +117,49 @@ describe('ToolHandlers - Appointments CRUD', () => {
         count: 25,
       });
     });
+
+    it.each(['waiting', 'confirmed', 'arrived', 'no_show'] as const)(
+      'reads back %s after appointments_create wrote it',
+      async (status) => {
+        const stored: Array<Record<string, unknown>> = [];
+        mockClient.createBooking.mockImplementation(
+          async (locationId, data) => {
+            // V1 marks admin-created appointments confirmed=1 whatever the status.
+            const row = {
+              ...data,
+              id: 1001,
+              company_id: locationId,
+              confirmed: 1,
+            };
+            stored.push(row);
+            return row as unknown as Awaited<
+              ReturnType<AltegioClient['createBooking']>
+            >;
+          }
+        );
+        mockClient.getBookings.mockImplementation(
+          async () =>
+            stored as unknown as Awaited<
+              ReturnType<AltegioClient['getBookings']>
+            >
+        );
+
+        await handlers.createAppointment({
+          location_id: 456,
+          team_member_id: 123,
+          services: [{ id: 789 }],
+          datetime: '2026-10-20T10:00:00',
+          session_length: 3600,
+          client: { name: 'Jane', phone: '9876543210' },
+          status,
+        });
+        const result = await handlers.getAppointments({ location_id: 456 });
+
+        expect(result.structuredContent).toMatchObject({
+          items: [{ id: 1001, status }],
+        });
+      }
+    );
 
     it('reports an unknown status explicitly when V1 omits it', async () => {
       mockClient.getBookings.mockResolvedValue([

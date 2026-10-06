@@ -5,7 +5,7 @@ import { bookingsOutput, bookingEntityOutput } from '../output-schemas.js';
 import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
 import { includeContactsArg, CONTACTS_WITHHELD_NOTICE } from '../contacts.js';
 import {
-  visitStatusFromLegacyCode,
+  visitStatusOfAppointment,
   visitStatusToLegacyCode,
 } from '../../capabilities/analytics/vocabulary.js';
 import type { AltegioBooking } from '../../types/altegio.types.js';
@@ -35,28 +35,6 @@ const serviceItemSchema = z.object({
   amount: z.number().positive().optional().describe('Amount/quantity'),
 });
 
-function appointmentStatus(appointment: AltegioBooking): string {
-  if (appointment.deleted) return 'cancelled';
-  const code = appointment.attendance ?? appointment.visit_attendance;
-  // Some V1 responses keep attendance=0 but set the separate confirmation
-  // flag. Prefer the more specific state in that combination.
-  if (code === 0 && appointment.confirmed === 1) return 'confirmed';
-  if (typeof code === 'number') {
-    const mapped = visitStatusFromLegacyCode(code);
-    if (mapped) return mapped;
-  }
-  const reported = appointment.status?.trim().toLowerCase();
-  if (
-    reported &&
-    ['waiting', 'confirmed', 'arrived', 'no_show', 'cancelled'].includes(
-      reported
-    )
-  ) {
-    return reported;
-  }
-  return 'unknown';
-}
-
 function appointmentTotalCost(appointment: AltegioBooking): number | null {
   const priced = (appointment.services ?? []).filter(
     (service) => typeof service.cost === 'number'
@@ -77,7 +55,7 @@ function projectAppointment(
     location_id: appointment.company_id,
     datetime: appointment.datetime ?? null,
     date: appointment.date ?? null,
-    status: appointmentStatus(appointment),
+    status: visitStatusOfAppointment(appointment),
     team_member_id: appointment.staff_id ?? appointment.staff?.id ?? null,
     team_member_name: appointment.staff?.name ?? null,
     client_id: appointment.client?.id ?? null,
