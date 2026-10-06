@@ -276,6 +276,8 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   appointments_create: 'appointments:create',
   appointments_update: 'appointments:write',
   appointments_delete: 'appointments:write',
+  appointments_list_tags: 'appointments:read',
+  appointments_create_tag: 'appointments:write',
 
   // --- Group events ---------------------------------------------------------
   // The v3 P0 catalog has no events domain. An event is a timetable slot

@@ -6,6 +6,27 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — appointment tags and colors
+
+- `appointments_create` and `appointments_update` take `tag_ids` and a `color`
+  from the digital schedule's palette. The API silently drops any other color
+  while answering 201, so the tools accept only the twenty palette colors;
+  `color: null` and `tag_ids: []` remove them on update.
+- `appointments_list` items carry `tags` (`id`, `title`, `color`) and `color`
+  as `#rrggbb`; tag titles are fenced with the other free text.
+- `appointments_list_tags` (paged, optional title `query`) and
+  `appointments_create_tag` manage the location's appointment tags. Both are on
+  the default view and the `ops` facet.
+
+### Fixed — `appointments_update` sends a complete appointment
+
+- The API replaces the whole appointment on update and refused every partial
+  body with HTTP 422. The tool now reads the appointment first and resends its
+  team member, services as priced, client, start, length, comment and status,
+  so "pass only the fields to change" holds. Tags and color the call does not
+  mention are kept. A change that keeps the slot (comment, status, tags, color)
+  no longer fails when that slot has since become busy or unscheduled.
+
 ## [0.6.0-alpha.1] - 2026-09-30
 
 ### Fixed — every view names only what it serves

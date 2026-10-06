@@ -10,6 +10,7 @@ import type {
   AltegioServiceCategory,
   AltegioCurrentUser,
   AltegioPosition,
+  AltegioAppointmentTag,
   AltegioScheduleEntry,
   AltegioBookingParams,
   AltegioCompaniesParams,
@@ -25,6 +26,7 @@ import { prepareClientFile } from './client-file-upload.js';
 import { AuthenticationError, AltegioApiError } from '../utils/errors.js';
 import { upstreamDetail } from '../tools/tool-result.js';
 import { v2Path } from '../api/altegio-http.js';
+import { hexColor } from '../utils/color.js';
 import {
   assertCompanyAllowed,
   getRequestCompanyIds,
@@ -124,6 +126,35 @@ function positionFromJsonApi(resource: unknown): AltegioPosition | null {
       ? attributes.description
       : null;
   return { id: numericId, title, description };
+}
+
+/**
+ * A V2 `tag` resource → an appointment tag. Deleted tags and the wire-only
+ * fields (`salon_id`, `entity`, `entity_slug`, `font_color`, …) stop here.
+ */
+function appointmentTagFromJsonApi(
+  resource: unknown
+): AltegioAppointmentTag | null {
+  if (!resource || typeof resource !== 'object') return null;
+  const { id, attributes } = resource as {
+    id?: unknown;
+    attributes?: {
+      title?: unknown;
+      color?: unknown;
+      is_deleted?: unknown;
+      deleted?: unknown;
+    };
+  };
+  const numericId = Number(id);
+  if (!Number.isInteger(numericId) || numericId <= 0) return null;
+  if (attributes?.is_deleted === true || Number(attributes?.deleted) === 1) {
+    return null;
+  }
+  return {
+    id: numericId,
+    title: typeof attributes?.title === 'string' ? attributes.title : '',
+    color: hexColor(attributes?.color) ?? '',
+  };
 }
 
 export interface AltegioClientOptions {
@@ -1246,6 +1277,61 @@ export class AltegioClient {
     return position;
   }
 
+  // ========== Appointment tags ==========
+
+  /** The appointment tags of a location; deleted tags are left out. */
+  async getAppointmentTags(
+    companyId: number
+  ): Promise<AltegioAppointmentTag[]> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      `${v2Path(`/locations/${companyId}/tags`)}?entity=record`
+    );
+    const data = await this.handleJsonApiData(
+      response,
+      'fetch appointment tags'
+    );
+    return (Array.isArray(data) ? data : []).flatMap((resource) => {
+      const tag = appointmentTagFromJsonApi(resource);
+      return tag ? [tag] : [];
+    });
+  }
+
+  async createAppointmentTag(
+    companyId: number,
+    data: import('../types/altegio.types.js').CreateAppointmentTagRequest
+  ): Promise<AltegioAppointmentTag> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      v2Path(`/locations/${companyId}/tags`),
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        // `entity` 2 is the appointment kind of tag.
+        body: JSON.stringify({
+          title: data.title,
+          color: data.color,
+          entity: 2,
+        }),
+      }
+    );
+
+    const tag = appointmentTagFromJsonApi(
+      await this.handleJsonApiData(response, 'create appointment tag')
+    );
+    if (!tag) {
+      throw new AltegioApiError(
+        unexpectedResponseMessage('create appointment tag', undefined),
+        response.status
+      );
+    }
+    return tag;
+  }
+
   async deletePosition(companyId: number, positionId: number): Promise<void> {
     this.requireAuth();
 
@@ -1432,6 +1518,19 @@ export class AltegioClient {
     );
 
     return this.handleResponse<AltegioBooking>(response, 'create appointment');
+  }
+
+  async getBooking(
+    companyId: number,
+    recordId: number
+  ): Promise<AltegioBooking> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      `/locations/${companyId}/appointments/${recordId}`
+    );
+
+    return this.handleResponse<AltegioBooking>(response, 'fetch appointment');
   }
 
   async updateBooking(

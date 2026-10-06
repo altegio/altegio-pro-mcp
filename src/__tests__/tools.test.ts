@@ -69,6 +69,8 @@ describe('Tool Registration', () => {
     // Position management tools
     expect(toolNames).toContain('positions_list');
     expect(toolNames).toContain('positions_create');
+    expect(toolNames).toContain('appointments_list_tags');
+    expect(toolNames).toContain('appointments_create_tag');
     expect(toolNames).not.toContain('update_position');
     expect(toolNames).not.toContain('delete_position');
 
@@ -127,7 +129,7 @@ describe('Tool Registration', () => {
     }
 
     // Total: 84 served factory-defined + 12 onboarding = 96 tools
-    expect(toolNames.length).toBe(124);
+    expect(toolNames.length).toBe(126);
   });
 
   it('should create server with tools', () => {

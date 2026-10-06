@@ -177,6 +177,8 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
       'appointments_create',
       'appointments_update',
       'appointments_delete',
+      'appointments_list_tags',
+      'appointments_create_tag',
       'appointments_preview_attendance',
       'appointments_apply_attendance',
       'memberships_list_for_client',

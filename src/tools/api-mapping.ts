@@ -157,14 +157,46 @@ export const apiMapping: Record<string, ApiMapping> = {
     method: 'post',
     operationId: 'create_appointment',
     pathParams: ['location_id'],
-    bodyParams: ['staff_id', 'services', 'datetime', 'client'],
+    bodyParams: [
+      'staff_id',
+      'services',
+      'datetime',
+      'client',
+      'record_labels',
+      'custom_color',
+    ],
   },
+  // A full replacement upstream: the tool reads the appointment first
+  // (get_appointment) and resends what the call leaves out.
   appointments_update: {
     path: '/locations/{location_id}/appointments/{record_id}',
     method: 'put',
     operationId: 'update_appointment',
     pathParams: ['location_id', 'record_id'],
-    bodyParams: ['staff_id', 'services', 'datetime', 'client'],
+    bodyParams: [
+      'staff_id',
+      'services',
+      'datetime',
+      'client',
+      'record_labels',
+      'custom_color',
+    ],
+  },
+  appointments_list_tags: {
+    path: '/locations/{company_id}/tags',
+    method: 'get',
+    operationId: 'list_tags',
+    pathParams: ['company_id'],
+    queryParams: ['entity'],
+    spec: 'v2',
+  },
+  appointments_create_tag: {
+    path: '/locations/{company_id}/tags',
+    method: 'post',
+    operationId: 'create_tag',
+    pathParams: ['company_id'],
+    bodyParams: ['title', 'color', 'entity'],
+    spec: 'v2',
   },
   appointments_delete: {
     path: '/locations/{location_id}/appointments/{appointment_id}',

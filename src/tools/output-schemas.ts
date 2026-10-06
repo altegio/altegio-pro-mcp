@@ -126,6 +126,15 @@ export const bookingsOutput = listSchema(
         required: ['id', 'title'],
       },
     },
+    tags: {
+      type: 'array' as const,
+      items: {
+        type: 'object' as const,
+        properties: { id: idProp, title: strProp, color: nullableStrProp },
+        required: ['id', 'title'],
+      },
+    },
+    color: nullableStrProp,
     total_cost: nullableNumProp,
     duration_seconds: nullableNumProp,
     visit_id: nullableNumProp,
@@ -186,6 +195,11 @@ export const categoriesOutput = listSchema({ id: idProp, title: strProp }, [
   'title',
 ]);
 
+export const appointmentTagsOutput = listSchema(
+  { id: idProp, title: strProp, color: strProp },
+  ['id', 'title', 'color']
+);
+
 export const positionsOutput = listSchema(
   { id: idProp, title: strProp, description: nullableStrProp },
   ['id', 'title']
@@ -241,6 +255,11 @@ export const serviceEntityOutput = entitySchema(
     },
   },
   ['id', 'title']
+);
+
+export const appointmentTagEntityOutput = entitySchema(
+  { id: idProp, title: strProp, color: strProp },
+  ['id', 'title', 'color']
 );
 
 export const positionEntityOutput = entitySchema(

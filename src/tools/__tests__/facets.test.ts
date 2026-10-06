@@ -107,6 +107,8 @@ describe('static views', () => {
     expect([...index.members('ops')].sort()).toEqual(
       [
         'appointments_apply_attendance',
+        'appointments_create_tag',
+        'appointments_list_tags',
         'appointments_preview_attendance',
         'clients_add_comment',
         'clients_delete',

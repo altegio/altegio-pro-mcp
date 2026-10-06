@@ -14,9 +14,8 @@ version: 1
 
 operations:
   # --- tags ------------------------------------------------------------------
-  list_tags:
-    domain: tags
-    supersedes: [get_tag_list_by_entity]
+  # list_tags and create_tag back the curated appointment-tag tools; their
+  # entries live in existing-tools.yaml.
   update_tag:
     domain: tags
     supersedes: [update_tag_by_tag_id]
