@@ -13,7 +13,7 @@ import { previousPeriod, resolvePeriod, type PeriodInput } from './periods.js';
 import { resolveLocationTimezone } from './location-timezone.js';
 import { resolveLocationCurrency } from '../../api/v1/location-currency.js';
 import { sanitizeUntrusted, UNTRUSTED_NOTE } from '../../tools/tool-result.js';
-import type { VisitStatus } from './vocabulary.js';
+import { visitStatusOfAppointment, type VisitStatus } from './vocabulary.js';
 
 export interface DecisionAnalyticsResult {
   text: string;
@@ -35,26 +35,6 @@ function round(value: number, digits = 2): number {
 
 function safe(value: string | null | undefined, maxChars = 180): string | null {
   return sanitizeUntrusted(value, { maxChars });
-}
-
-function statusOf(
-  appointment: AltegioBooking
-): 'waiting' | 'confirmed' | 'arrived' | 'no_show' | 'cancelled' | 'unknown' {
-  if (appointment.deleted) return 'cancelled';
-  const code = appointment.attendance ?? appointment.visit_attendance;
-  if (code === 1) return 'arrived';
-  if (code === -1) return 'no_show';
-  if (code === 2 || (code === 0 && appointment.confirmed === 1))
-    return 'confirmed';
-  if (code === 0) return 'waiting';
-  const value = appointment.status?.trim().toLowerCase();
-  if (
-    value &&
-    ['waiting', 'confirmed', 'arrived', 'no_show', 'cancelled'].includes(value)
-  ) {
-    return value as ReturnType<typeof statusOf>;
-  }
-  return 'unknown';
 }
 
 type AppointmentService = AltegioBooking['services'][number];
@@ -434,7 +414,7 @@ function calculateCapacity(args: {
           timed.starts_appointment &&
           timed.interval.start >= start &&
           timed.interval.start < end;
-        const status = statusOf(appointment);
+        const status = visitStatusOfAppointment(appointment);
         if (startsHere) {
           if (status === 'arrived') completed += 1;
           else if (status === 'no_show') noShow += 1;
@@ -487,7 +467,7 @@ function calculateCapacity(args: {
   for (const key of appointmentsByMemberDate.keys()) {
     if (!scheduledMemberDates.has(key)) {
       for (const row of appointmentsByMemberDate.get(key) ?? []) {
-        if (statusOf(row.appointment) !== 'cancelled')
+        if (visitStatusOfAppointment(row.appointment) !== 'cancelled')
           unscheduledAppointments.add(row.appointment);
       }
     }
@@ -968,7 +948,7 @@ export async function getRevenueLeakage(
   const rows = appointments.rows.filter((appointment) => {
     const memberId = appointment.staff_id ?? appointment.staff?.id;
     if (members.size > 0 && (!memberId || !members.has(memberId))) return false;
-    const status = statusOf(appointment);
+    const status = visitStatusOfAppointment(appointment);
     if (statuses.size > 0 && (status === 'unknown' || !statuses.has(status)))
       return false;
     if (
@@ -1009,10 +989,14 @@ export async function getRevenueLeakage(
       quality,
     };
   };
-  const noShows = rows.filter((row) => statusOf(row) === 'no_show');
-  const cancelled = rows.filter((row) => statusOf(row) === 'cancelled');
+  const noShows = rows.filter(
+    (row) => visitStatusOfAppointment(row) === 'no_show'
+  );
+  const cancelled = rows.filter(
+    (row) => visitStatusOfAppointment(row) === 'cancelled'
+  );
   const completedUnpaid = rows.filter(
-    (row) => statusOf(row) === 'arrived' && row.paid_full === 0
+    (row) => visitStatusOfAppointment(row) === 'arrived' && row.paid_full === 0
   );
   const discounted = rows.filter((row) => (filteredDiscount(row) ?? 0) > 0);
   const currency =
