@@ -100,7 +100,11 @@ describe('AltegioClient - Bookings CRUD', () => {
       });
 
       const result = await client.updateBooking(456, 999, {
+        staff_id: 123,
+        services: [{ id: 789, amount: 1 }],
         datetime: '2025-11-02T10:00:00',
+        seance_length: 3600,
+        client: { id: 321 },
       });
 
       expect(result.datetime).toContain('2025-11-02');
@@ -124,6 +128,78 @@ describe('AltegioClient - Bookings CRUD', () => {
         expect.stringContaining('/../v2/locations/456/appointments/999'),
         expect.objectContaining({ method: 'DELETE' })
       );
+    });
+  });
+
+  describe('appointment tags', () => {
+    it('lists the live appointment tags of the location in #rrggbb', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: [
+            {
+              type: 'tag',
+              id: '67345',
+              attributes: { title: 'VIP', color: '#009800', is_deleted: false },
+            },
+            {
+              type: 'tag',
+              id: '67346',
+              attributes: { title: 'Old', color: '#ff0000', is_deleted: true },
+            },
+            {
+              type: 'tag',
+              id: '67347',
+              attributes: { title: 'Upper', color: 'F44336' },
+            },
+          ],
+        }),
+      });
+
+      const tags = await client.getAppointmentTags(456);
+
+      expect(tags).toEqual([
+        { id: 67345, title: 'VIP', color: '#009800' },
+        { id: 67347, title: 'Upper', color: '#f44336' },
+      ]);
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v2\/locations\/456\/tags\?entity=record$/),
+        expect.anything()
+      );
+    });
+
+    it('creates an appointment tag as the appointment kind', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => ({
+          data: {
+            type: 'tag',
+            id: '10105887',
+            attributes: { title: 'Nový klient', color: '#22c55e' },
+          },
+          meta: [],
+        }),
+      });
+
+      const tag = await client.createAppointmentTag(456, {
+        title: 'Nový klient',
+        color: '#22c55e',
+      });
+
+      expect(tag).toEqual({
+        id: 10105887,
+        title: 'Nový klient',
+        color: '#22c55e',
+      });
+      const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(url).toMatch(/\/v2\/locations\/456\/tags$/);
+      expect(JSON.parse(init.body)).toEqual({
+        title: 'Nový klient',
+        color: '#22c55e',
+        entity: 2,
+      });
     });
   });
 });

@@ -380,6 +380,27 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     },
   },
 
+  appointments_list_tags: {
+    what: 'appointment tag titles the team names',
+    canary: {
+      args: { location_id: 1 },
+      routes: [
+        {
+          match: /\/v2\/locations\/1\/tags/,
+          body: ok({
+            data: [
+              {
+                type: 'tag',
+                id: '13',
+                attributes: { title: CANARY, color: '#f44336' },
+              },
+            ],
+          }),
+        },
+      ],
+    },
+  },
+
   resources_list: {
     what: 'resource title (a cabinet, a chair, a machine)',
     canary: {
@@ -407,7 +428,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
   },
 
   appointments_list: {
-    what: 'client and team-member names, service titles, and the comment a client types at online booking',
+    what: 'client and team-member names, service titles, tag titles, and the comment a client types at online booking',
     canary: {
       args: { location_id: 1 },
       routes: [
@@ -422,6 +443,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
                 staff: { id: 10, name: CANARY },
                 services: [{ id: 11, title: CANARY, cost: 10 }],
                 comment: CANARY,
+                record_labels: [{ id: 12, title: CANARY, color: 'f44336' }],
               },
             ])
           ),
@@ -1010,6 +1032,7 @@ const NO_FREE_TEXT: Record<string, string> = {
   // --- writes that echo back only what this same call sent ---
   team_members_create: 'name and specialization as supplied by this call',
   positions_create: 'title as supplied by this call',
+  appointments_create_tag: 'title as supplied by this call',
   services_create: 'title as supplied by this call',
   booking_forms_create: 'title as supplied by this call',
   appointments_create: 'ids and the datetime; no name or comment is read back',

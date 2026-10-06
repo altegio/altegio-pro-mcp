@@ -67,6 +67,27 @@ operations:
       The V2 operation supersedes the V1 one with the same id; the curated tool
       calls it.
 
+  # --- tags ------------------------------------------------------------------
+  list_tags:
+    domain: tags
+    tier: pack
+    facets: [ops]
+    tool_name: appointments_list_tags
+    supersedes: [get_tag_list_by_entity]
+    write_allowed: false
+    notes: >
+      The curated tool lists appointment tags (entity record). Client, group
+      event and general tags stay executor reads of this operation.
+  create_tag:
+    domain: tags
+    tier: pack
+    facets: [ops]
+    tool_name: appointments_create_tag
+    write_allowed: false
+    notes: >
+      The curated tool creates appointment tags only (entity 2); the V1 twin
+      with the same id is retired by the build.
+
   # --- team members --------------------------------------------------------
   list_team_members:
     domain: team_members

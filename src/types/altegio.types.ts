@@ -141,6 +141,10 @@ export interface AltegioBooking {
   prepaid_amount?: number;
   finance_transactions?: unknown[];
   comment?: string;
+  /** Calendar color as six hex digits without `#`; empty when none is set. */
+  custom_color?: string;
+  /** The appointment tags put on this appointment. */
+  record_labels?: Array<{ id: number; title?: string; color?: string }>;
   [key: string]: unknown;
 }
 
@@ -421,21 +425,44 @@ export interface CreateBookingRequest {
    * and test/demo data.
    */
   save_if_busy?: boolean;
+  /** Appointment tag ids. */
+  record_labels?: number[];
+  /** Calendar color as six hex digits without `#`. */
+  custom_color?: string;
 }
 
+/**
+ * The V1 update is a full replacement: `staff_id`, `services`, `client`,
+ * `datetime` and `seance_length` are required on every call. Tags and the
+ * color are kept when omitted.
+ */
 export interface UpdateBookingRequest {
-  staff_id?: number;
-  services?: Array<{ id: number; amount?: number }>;
-  datetime?: string;
-  seance_length?: number;
-  client?: {
+  staff_id: number;
+  services: Array<{
+    id: number;
+    amount?: number;
+    first_cost?: number;
+    discount?: number;
+    cost?: number;
+  }>;
+  datetime: string;
+  seance_length: number;
+  /** An existing client by `id`, or the client details to store. */
+  client: {
+    id?: number;
     name?: string;
     phone?: string;
     email?: string;
   };
   comment?: string;
   attendance?: number;
+  /** A group-event booking must repeat its event id on update. */
+  activity_id?: number;
   save_if_busy?: boolean;
+  /** Appointment tag ids; replaces the current set. */
+  record_labels?: number[];
+  /** Six hex digits without `#`; an empty string removes the color. */
+  custom_color?: string;
 }
 
 // Clients
@@ -485,6 +512,20 @@ export interface UpdateLocationRequest {
 export interface CreatePositionRequest {
   title: string;
   description?: string;
+}
+
+/** An appointment tag of a location. */
+export interface AltegioAppointmentTag {
+  id: number;
+  title: string;
+  /** `#rrggbb`. */
+  color: string;
+}
+
+export interface CreateAppointmentTagRequest {
+  title: string;
+  /** `#rrggbb`. */
+  color: string;
 }
 
 // ========== Location Settings & Resources ==========

@@ -46,6 +46,7 @@ Decide by audience, not by mechanical replacement: an internal team record is a
 | **Service category** | Grouping of services | — |
 | **Package** | Bundled or four-hands services sold as one item | Complex |
 | **Resource** | Equipment or a room an appointment occupies | — |
+| **Tag** | Colored mark on an appointment, client or group event that groups and highlights them | Label, Category (for a tag) |
 | **Products** | Retail items and consumables the location sells or uses | Goods, Items |
 
 ## Loyalty and client money

@@ -7,7 +7,7 @@
       "spec": "docs/en/b2b-v1/openapi.yaml",
       "title": "Business Management",
       "version": "1.0.0",
-      "operations": 261
+      "operations": 277
     },
     {
       "source": "v2",
@@ -34,16 +34,16 @@
     "salon_id": "location_id",
     "staff_id": "team_member_id"
   },
-  "operationCount": 346,
-  "curatedCount": 71,
+  "operationCount": 362,
+  "curatedCount": 72,
   "domains": [
     {
       "domain": "analytics",
-      "operations": 10
+      "operations": 11
     },
     {
       "domain": "appointments",
-      "operations": 26
+      "operations": 35
     },
     {
       "domain": "auth",
@@ -55,7 +55,7 @@
     },
     {
       "domain": "chain",
-      "operations": 1
+      "operations": 3
     },
     {
       "domain": "client_accounts",
@@ -63,7 +63,7 @@
     },
     {
       "domain": "clients",
-      "operations": 22
+      "operations": 23
     },
     {
       "domain": "custom_fields",
@@ -103,7 +103,7 @@
     },
     {
       "domain": "payments",
-      "operations": 13
+      "operations": 14
     },
     {
       "domain": "payroll",
@@ -127,7 +127,7 @@
     },
     {
       "domain": "schedule",
-      "operations": 14
+      "operations": 16
     },
     {
       "domain": "services",
@@ -6408,6 +6408,192 @@
     },
     {
       "source": "v1",
+      "operationId": "list_chain_services",
+      "method": "GET",
+      "path": "/chains/{chain_id}/services",
+      "displayPath": "/chains/{chain_id}/services",
+      "summary": "List Chain Services",
+      "description": "Returns the Chain's Service catalog with chain-level prices. Filter by `category_id` to\nget the Services of one Service Category. The Business User needs access to the Chain's\nServices.",
+      "tags": [
+        "Chain Management"
+      ],
+      "domain": "chain",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Chain ID",
+          "name": "chain_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Service Category ID",
+          "name": "category_id",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "items": {
+            "properties": {
+              "category": {
+                "description": "Parent Service Category with its own parents",
+                "type": "object"
+              },
+              "category_id": {
+                "type": "integer"
+              },
+              "chain_price_max": {
+                "type": "number"
+              },
+              "chain_price_min": {
+                "type": "number"
+              },
+              "id": {
+                "type": "integer"
+              },
+              "is_category": {
+                "type": "boolean"
+              },
+              "is_chain": {
+                "type": "boolean"
+              },
+              "online_sale_title": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "get_chain_service",
+      "method": "GET",
+      "path": "/chains/{chain_id}/services/{service_id}",
+      "displayPath": "/chains/{chain_id}/services/{service_id}",
+      "summary": "Get Chain Service",
+      "description": "Returns a Chain Service with the Locations it is linked to (`salon_ids`) and whether price\nand comment are managed only at the Chain level. The Business User needs access to the\nChain's Services.",
+      "tags": [
+        "Chain Management"
+      ],
+      "domain": "chain",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Chain ID",
+          "name": "chain_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Service ID",
+          "name": "service_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "properties": {
+            "booking_title": {
+              "description": "Title shown in online booking",
+              "type": "string"
+            },
+            "category_id": {
+              "type": "integer"
+            },
+            "comment": {
+              "type": "string"
+            },
+            "id": {
+              "type": "integer"
+            },
+            "image_group": {
+              "description": "Service images, an empty array when there are none"
+            },
+            "in_main_location": {
+              "type": "boolean"
+            },
+            "is_chain": {
+              "type": "boolean"
+            },
+            "is_comment_managed_only_in_chain": {
+              "type": "boolean"
+            },
+            "is_composite": {
+              "type": "boolean"
+            },
+            "is_multi": {
+              "description": "Whether the Service is available for Events",
+              "type": "boolean"
+            },
+            "is_price_managed_only_in_chain": {
+              "type": "boolean"
+            },
+            "price_max": {
+              "type": "number"
+            },
+            "price_min": {
+              "type": "number"
+            },
+            "salon_id": {
+              "description": "Location that owns the Service; `0` for a Service created at the Chain level",
+              "type": "integer"
+            },
+            "salon_ids": {
+              "description": "IDs of the Locations the Service is linked to",
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      }
+    },
+    {
+      "source": "v1",
       "operationId": "get_client",
       "method": "GET",
       "path": "/client/{location_id}/{id}",
@@ -6502,6 +6688,10 @@
         "contentType": "*/*",
         "schema": {
           "properties": {
+            "additional_phone": {
+              "description": "Additional client phone. Must differ from `phone` and must not belong to another client of the Location. Send an empty string to clear it. It is not returned in the client card response, but `quick_s…",
+              "type": "string"
+            },
             "balance": {
               "description": "Client balance",
               "type": "number"
@@ -6513,6 +6703,20 @@
             "card": {
               "description": "Client card number",
               "type": "string"
+            },
+            "client_agreements": {
+              "description": "Consent flags. Applied only when client agreements are enabled for the Location.",
+              "properties": {
+                "is_newsletter_allowed": {
+                  "description": "Newsletter consent",
+                  "type": "boolean"
+                },
+                "is_personal_data_processing_allowed": {
+                  "description": "Personal data processing consent",
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
             },
             "comment": {
               "description": "A comment",
@@ -6531,10 +6735,6 @@
               "description": "Client Email",
               "type": "string"
             },
-            "gender_id": {
-              "description": "Gender of the client (1 - male, 2 - female, 0 - unknown)",
-              "type": "number"
-            },
             "importance_id": {
               "description": "Client priority level (0 - none, 1 - bronze, 2 - silver, 3 - gold)",
               "type": "number"
@@ -6542,10 +6742,6 @@
             "labels": {
               "description": "Array of customer tag IDs",
               "type": "object"
-            },
-            "middle_name": {
-              "description": "Client middle name",
-              "type": "string"
             },
             "name": {
               "description": "Client name",
@@ -6555,9 +6751,21 @@
               "description": "Client national ID: CPF for Brazil, IIN for Kazakhstan. For a location in Kazakhstan the value must be a valid individual IIN — 12 digits with a correct check digit — otherwise the request is rejecte…",
               "type": "string"
             },
+            "online_booking_ban": {
+              "description": "true - block online booking for this client, false - allow it",
+              "type": "boolean"
+            },
+            "patronymic": {
+              "description": "Client patronymic (middle name). Like `surname`, it is ignored unless the Business User may edit client surnames and patronymics.",
+              "type": "string"
+            },
             "phone": {
               "description": "Customer phone",
               "type": "string"
+            },
+            "sex_id": {
+              "description": "Gender of the client (1 - male, 2 - female, 0 - unknown)",
+              "type": "number"
             },
             "sms_check": {
               "description": "1 - Happy Birthday by SMS, 0 - do not congratulate",
@@ -6941,6 +7149,10 @@
         "contentType": "*/*",
         "schema": {
           "properties": {
+            "additional_phone": {
+              "description": "Additional client phone. Must differ from `phone` and must not belong to another client of the Location. Send an empty string to clear it. It is not returned in the client card response, but `quick_s…",
+              "type": "string"
+            },
             "balance": {
               "description": "Client balance",
               "type": "number"
@@ -6955,6 +7167,20 @@
             },
             "categories": {
               "description": "Array of customer tag IDs",
+              "type": "object"
+            },
+            "client_agreements": {
+              "description": "Consent flags. Applied only when client agreements are enabled for the Location.",
+              "properties": {
+                "is_newsletter_allowed": {
+                  "description": "Newsletter consent",
+                  "type": "boolean"
+                },
+                "is_personal_data_processing_allowed": {
+                  "description": "Personal data processing consent",
+                  "type": "boolean"
+                }
+              },
               "type": "object"
             },
             "comment": {
@@ -6974,17 +7200,9 @@
               "description": "Client Email",
               "type": "string"
             },
-            "gender_id": {
-              "description": "Gender of the client (1 - male, 2 - female, 0 - unknown)",
-              "type": "number"
-            },
             "importance_id": {
               "description": "Client priority level (0 - none, 1 - bronze, 2 - silver, 3 - gold)",
               "type": "number"
-            },
-            "middle_name": {
-              "description": "Client middle name",
-              "type": "string"
             },
             "name": {
               "description": "Client name",
@@ -6994,9 +7212,21 @@
               "description": "Client national ID: CPF for Brazil, IIN for Kazakhstan. For a location in Kazakhstan the value must be a valid individual IIN — 12 digits with a correct check digit — otherwise the request is rejecte…",
               "type": "string"
             },
+            "online_booking_ban": {
+              "description": "true - block online booking for this client, false - allow it",
+              "type": "boolean"
+            },
+            "patronymic": {
+              "description": "Client patronymic (middle name). Like `surname`, it is ignored unless the Business User may edit client surnames and patronymics.",
+              "type": "string"
+            },
             "phone": {
               "description": "Customer phone",
               "type": "string"
+            },
+            "sex_id": {
+              "description": "Gender of the client (1 - male, 2 - female, 0 - unknown)",
+              "type": "number"
             },
             "sms_check": {
               "description": "1 - Happy Birthday by SMS, 0 - do not congratulate",
@@ -7061,6 +7291,10 @@
         "contentType": "*/*",
         "schema": {
           "properties": {
+            "additional_phone": {
+              "description": "Additional client phone. Must differ from `phone` and must not belong to another client of the Location. Send an empty string to clear it. It is not returned in the client card response, but `quick_s…",
+              "type": "string"
+            },
             "balance": {
               "description": "Client balance",
               "type": "number"
@@ -7077,6 +7311,20 @@
               "description": "Array of customer tag IDs",
               "type": "object"
             },
+            "client_agreements": {
+              "description": "Consent flags. Applied only when client agreements are enabled for the Location.",
+              "properties": {
+                "is_newsletter_allowed": {
+                  "description": "Newsletter consent",
+                  "type": "boolean"
+                },
+                "is_personal_data_processing_allowed": {
+                  "description": "Personal data processing consent",
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
             "comment": {
               "description": "A comment",
               "type": "string"
@@ -7089,17 +7337,9 @@
               "description": "Client Email",
               "type": "string"
             },
-            "gender_id": {
-              "description": "Gender of the client (1 - male, 2 - female, 0 - unknown)",
-              "type": "number"
-            },
             "importance_id": {
               "description": "Client priority level (0 - none, 1 - bronze, 2 - silver, 3 - gold)",
               "type": "number"
-            },
-            "middle_name": {
-              "description": "Client middle name",
-              "type": "string"
             },
             "name": {
               "description": "Client name",
@@ -7109,9 +7349,21 @@
               "description": "Client national ID: CPF for Brazil, IIN for Kazakhstan. For a location in Kazakhstan the value must be a valid individual IIN — 12 digits with a correct check digit — otherwise the row is skipped and…",
               "type": "string"
             },
+            "online_booking_ban": {
+              "description": "true - block online booking for this client, false - allow it",
+              "type": "boolean"
+            },
+            "patronymic": {
+              "description": "Client patronymic (middle name). Like `surname`, it is ignored unless the Business User may edit client surnames and patronymics.",
+              "type": "string"
+            },
             "phone": {
               "description": "Customer phone",
               "type": "string"
+            },
+            "sex_id": {
+              "description": "Gender of the client (1 - male, 2 - female, 0 - unknown)",
+              "type": "number"
             },
             "sms_check": {
               "description": "1 - Happy Birthday by SMS, 0 - do not congratulate",
@@ -9379,7 +9631,7 @@
                 "type": "number"
               },
               "last_change_date": {
-                "description": "Last modified date",
+                "description": "Date and time of the last change. Use it as the cursor for the `changed_after` filter.",
                 "format": "date-time",
                 "type": "string"
               },
@@ -9404,12 +9656,21 @@
                 "type": "number"
               },
               "sold_item_id": {
-                "description": "Identifier of the sold product/service",
+                "description": "Identifier of the sold item (Service or Product transaction), `0` when not applicable",
                 "type": "number"
               },
               "sold_item_type": {
-                "description": "Sale entity type (product/service)",
-                "type": "number"
+                "description": "Type of the sold item: `service`, `goods_transaction` (Product sale), `deposit_topup`, or `null` for other transactions",
+                "enum": [
+                  "service",
+                  "goods_transaction",
+                  "deposit_topup",
+                  null
+                ],
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "supplier": {
                 "description": "counterparty",
@@ -9606,7 +9867,7 @@
                 "type": "number"
               },
               "last_change_date": {
-                "description": "Last modified date",
+                "description": "Date and time of the last change. Use it as the cursor for the `changed_after` filter.",
                 "format": "date-time",
                 "type": "string"
               },
@@ -9631,12 +9892,21 @@
                 "type": "number"
               },
               "sold_item_id": {
-                "description": "Identifier of the sold product/service",
+                "description": "Identifier of the sold item (Service or Product transaction), `0` when not applicable",
                 "type": "number"
               },
               "sold_item_type": {
-                "description": "Sale entity type (product/service)",
-                "type": "number"
+                "description": "Type of the sold item: `service`, `goods_transaction` (Product sale), `deposit_topup`, or `null` for other transactions",
+                "enum": [
+                  "service",
+                  "goods_transaction",
+                  "deposit_topup",
+                  null
+                ],
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "supplier": {
                 "description": "counterparty",
@@ -12929,7 +13199,7 @@
       "path": "/locations/{location_id}/appointments",
       "displayPath": "/locations/{location_id}/appointments",
       "summary": "Get list of appointments",
-      "description": "####  Filtering Appointments\n\n+ staff_id: team member ID. \n\nUse this to retrieve appointments for a specific team member\n\n+ client_id: Client ID \n\nUse this to retrieve appointments for a specific client\n\n+ created_user_id: User ID \n\nUser who created the appointment \n\nUse this to filter appointments created by a specific user\n\n+ start_date: Session start date (inclusive) \n\nReturns appointments with a session starting on or after this date\n\n+ end_date: Session end date (inclusive) \n\nReturns appointments with a session ending on or before this date\n\n+ c_start_date: Appointment creation date from \n\nReturns appointments created on or after this date\n\n+ c_end_date: Appointment creation date until \n\nReturns appointments created on or before this date\n\n+ changed_after: Modified or created after this datetime \n\nReturns appointments created or modified after the specified date and time\n\n+ changed_before: Modified or created before this datetime \n\nReturns appointments created or modified before the specified date and time",
+      "description": "####  Filtering Appointments\n\n+ staff_id: team member ID. \n\nUse this to retrieve appointments for a specific team member\n\n+ client_id: Client ID \n\nUse this to retrieve appointments for a specific client\n\n+ created_user_id: User ID \n\nUser who created the appointment \n\nUse this to filter appointments created by a specific user\n\n+ start_date: Session start date (inclusive) \n\nReturns appointments with a session starting on or after this date\n\n+ end_date: Session end date (inclusive) \n\nReturns appointments with a session ending on or before this date\n\n+ c_start_date: Appointment creation date from \n\nReturns appointments created on or after this date\n\n+ c_end_date: Appointment creation date until \n\nReturns appointments created on or before this date\n\n+ changed_after: Modified or created after this datetime \n\nReturns appointments created or modified after the specified date and time\n\n+ changed_before: Modified or created before this datetime \n\nReturns appointments created or modified before the specified date and time\n\n+ activity_id: Event ID \n\nReturns only the appointments booked to this Event",
       "tags": [
         "Appointments"
       ],
@@ -12947,6 +13217,15 @@
           "name": "location_id",
           "in": "path",
           "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Event ID. Returns only the Appointments booked to this Event.",
+          "name": "activity_id",
+          "in": "query",
+          "required": false,
           "schema": {
             "type": "number"
           }
@@ -13044,6 +13323,15 @@
         {
           "description": "Page number",
           "name": "page",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Flag to add `short_link_token` to each Appointment: the token of the Booking User's Appointment page (the last segment of `short_link`)",
+          "name": "short_link_token",
           "in": "query",
           "required": false,
           "schema": {
@@ -13339,6 +13627,11 @@
                 "type": "string",
                 "x-truncated": true
               },
+              "short_link_token": {
+                "description": "Token of the Booking User's Appointment page. Returned only when `short_link_token=1` is requested.",
+                "type": "string",
+                "x-truncated": true
+              },
               "sms_before": {
                 "description": "Whether to send an SMS reminder to the client (if the client is specified)",
                 "type": "number",
@@ -13495,6 +13788,10 @@
                   "description": "Client Email",
                   "type": "string"
                 },
+                "id": {
+                  "description": "Existing Client ID. When set, the phone, name and email are taken from the client card.",
+                  "type": "number"
+                },
                 "name": {
                   "description": "Client name",
                   "type": "string"
@@ -13505,6 +13802,26 @@
                 }
               },
               "type": "object"
+            },
+            "client_agreements": {
+              "description": "Consent flags to save on the client card. Applied only when client agreements are enabled for the Location.",
+              "properties": {
+                "is_newsletter_allowed": {
+                  "description": "Newsletter consent",
+                  "type": "boolean"
+                },
+                "is_personal_data_processing_allowed": {
+                  "description": "Personal data processing consent",
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "clients_count": {
+              "default": 1,
+              "description": "Group Event Appointment only: number of seats the Appointment takes. Must fit the Event's remaining capacity and the Location's per-appointment participant limit.",
+              "minimum": 1,
+              "type": "number"
             },
             "comment": {
               "description": "Appointment Comment",
@@ -13540,10 +13857,25 @@
               "description": "Specifies how many hours before the visit an email reminder should be sent to the client. Set to 0 if no reminder is needed.",
               "type": "number"
             },
+            "master_request": {
+              "description": "Whether the client explicitly requested this Team Member: 1 - requested, 0 - not requested",
+              "enum": [
+                0,
+                1
+              ],
+              "type": "number"
+            },
             "record_labels": {
               "description": "Array of post category IDs",
               "items": {
                 "type": "string"
+              },
+              "type": "array"
+            },
+            "resource_instance_ids": {
+              "description": "Resource Instance IDs (for example, a specific room or chair) the Appointment occupies. On update, the list replaces the current one. Unless `save_if_busy` is true, a busy instance returns an error.",
+              "items": {
+                "type": "number"
               },
               "type": "array"
             },
@@ -13874,6 +14206,11 @@
                 "type": "string",
                 "x-truncated": true
               },
+              "short_link_token": {
+                "description": "Token of the Booking User's Appointment page. Returned only when `short_link_token=1` is requested.",
+                "type": "string",
+                "x-truncated": true
+              },
               "sms_before": {
                 "description": "Whether to send an SMS reminder to the client (if the client is specified)",
                 "type": "number",
@@ -13989,6 +14326,24 @@
         },
         {
           "name": "include_finance_transactions",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Flag to add `loyalty_transactions`: active loyalty payments of the Appointment's Visit (loyalty card, Membership or gift card write-offs). An empty array when the Appointment has no Visit.",
+          "name": "include_loyalty_transactions",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Flag to add `short_link_token`: the token of the Booking User's Appointment page (the last segment of `short_link`)",
+          "name": "short_link_token",
           "in": "query",
           "required": false,
           "schema": {
@@ -14190,6 +14545,11 @@
               "type": "number",
               "x-truncated": true
             },
+            "loyalty_transactions": {
+              "description": "Active loyalty payments of the Visit. Returned only when `include_loyalty_transactions=1` is requested.",
+              "type": "array",
+              "x-truncated": true
+            },
             "master_request": {
               "description": "Indicates whether a specific team member was selected for the appointment. Set to false if the \"any team member\" option was chosen",
               "type": "number",
@@ -14260,6 +14620,11 @@
             },
             "short_link": {
               "description": "Short link to appointment",
+              "type": "string",
+              "x-truncated": true
+            },
+            "short_link_token": {
+              "description": "Token of the Booking User's Appointment page. Returned only when `short_link_token=1` is requested.",
               "type": "string",
               "x-truncated": true
             },
@@ -14430,6 +14795,10 @@
                   "description": "Client Email",
                   "type": "string"
                 },
+                "id": {
+                  "description": "Existing Client ID. When set, the phone, name and email are taken from the client card.",
+                  "type": "number"
+                },
                 "name": {
                   "description": "Client name",
                   "type": "string"
@@ -14440,6 +14809,26 @@
                 }
               },
               "type": "object"
+            },
+            "client_agreements": {
+              "description": "Consent flags to save on the client card. Applied only when client agreements are enabled for the Location.",
+              "properties": {
+                "is_newsletter_allowed": {
+                  "description": "Newsletter consent",
+                  "type": "boolean"
+                },
+                "is_personal_data_processing_allowed": {
+                  "description": "Personal data processing consent",
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "clients_count": {
+              "default": 1,
+              "description": "Group Event Appointment only: number of seats the Appointment takes. Must fit the Event's remaining capacity and the Location's per-appointment participant limit.",
+              "minimum": 1,
+              "type": "number"
             },
             "comment": {
               "description": "Appointment Comment",
@@ -14475,10 +14864,25 @@
               "description": "Specifies how many hours before the visit an email reminder should be sent to the client. Set to 0 if no reminder is needed.",
               "type": "number"
             },
+            "master_request": {
+              "description": "Whether the client explicitly requested this Team Member: 1 - requested, 0 - not requested",
+              "enum": [
+                0,
+                1
+              ],
+              "type": "number"
+            },
             "record_labels": {
               "description": "Array of post category IDs",
               "items": {
                 "type": "string"
+              },
+              "type": "array"
+            },
+            "resource_instance_ids": {
+              "description": "Resource Instance IDs (for example, a specific room or chair) the Appointment occupies. On update, the list replaces the current one. Unless `save_if_busy` is true, a busy instance returns an error.",
+              "items": {
+                "type": "number"
               },
               "type": "array"
             },
@@ -14865,6 +15269,867 @@
                   "type": "array"
                 }
               ]
+            }
+          },
+          "type": "object"
+        }
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "get_appointment_change_history",
+      "method": "GET",
+      "path": "/locations/{location_id}/appointments/{record_id}/changes",
+      "displayPath": "/locations/{location_id}/appointments/{appointment_id}/changes",
+      "summary": "Get Appointment change history",
+      "description": "Returns the audit trail of an Appointment: creation, edits, deletion and restoration,\nwith the Business User who made each change and the values before (`from`) and after (`to`) it.\n\nOnly the fields that changed are filled in `from` and `to`; unchanged fields are `null`\n(or an empty `services` array).\n\nClient phone numbers are partially masked when the Business User has no access to client\nphone numbers. The Business User needs access to the Appointment.",
+      "tags": [
+        "Appointments"
+      ],
+      "domain": "appointments",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Appointment ID",
+          "name": "record_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "items": {
+            "properties": {
+              "date": {
+                "description": "Date and time of the change (ISO 8601)",
+                "format": "date-time",
+                "type": "string"
+              },
+              "event_type_id": {
+                "description": "Change type: 1 - created, 2 - edited, 3 - deleted, 4 - restored",
+                "enum": [
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                "type": "integer"
+              },
+              "from": {
+                "description": "Appointment values on one side of a change. Fields that did not change are `null`.",
+                "properties": {
+                  "attendance_status": {
+                    "description": "Appointment status: -1 - no-show, 0 - pending, 1 - arrived, 2 - confirmed",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "client": {
+                    "description": "Client of the Appointment. The phone is partially masked without access to client phone numbers.",
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "date": {
+                    "description": "Appointment date and time (ISO 8601)",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "length": {
+                    "description": "Appointment duration in seconds",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "master": {
+                    "description": "Team Member. `master` is the literal legacy field name.",
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "services": {
+                    "description": "Services of the Appointment when they changed, otherwise an empty array",
+                    "type": "array",
+                    "x-truncated": true
+                  }
+                },
+                "type": "object"
+              },
+              "to": {
+                "description": "Appointment values on one side of a change. Fields that did not change are `null`.",
+                "properties": {
+                  "attendance_status": {
+                    "description": "Appointment status: -1 - no-show, 0 - pending, 1 - arrived, 2 - confirmed",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "client": {
+                    "description": "Client of the Appointment. The phone is partially masked without access to client phone numbers.",
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "date": {
+                    "description": "Appointment date and time (ISO 8601)",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "length": {
+                    "description": "Appointment duration in seconds",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "master": {
+                    "description": "Team Member. `master` is the literal legacy field name.",
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "services": {
+                    "description": "Services of the Appointment when they changed, otherwise an empty array",
+                    "type": "array",
+                    "x-truncated": true
+                  }
+                },
+                "type": "object"
+              },
+              "user": {
+                "description": "Business User who made the change",
+                "properties": {
+                  "avatar": {
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "email": {
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "id": {
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "is_approved": {
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "name": {
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "phone": {
+                    "type": "string",
+                    "x-truncated": true
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "repeat_appointment",
+      "method": "POST",
+      "path": "/locations/{location_id}/appointments/{record_id}/duplicate",
+      "displayPath": "/locations/{location_id}/appointments/{appointment_id}/duplicate",
+      "summary": "Repeat an Appointment",
+      "description": "Creates copies of an Appointment on the dates produced by a repeat rule, for example\n\"every Tuesday until the end of the month\" or \"10 times every other day\". Copies keep the\nTeam Member, Services, duration and Resource Instances of the original.\n\nThe dates are calculated and checked synchronously: the request fails if a date is busy\nfor the Team Member or its Resource Instances, unless `force` is `true`. The copies are then\ncreated asynchronously, so they appear in the Appointment list shortly after the response.\n`meta.count` is the number of copies scheduled. A second request for the same Appointment\nwhile copies are still being created returns `429`.\n\nEvent Appointments cannot be repeated. The Business User needs the permission to create\nAppointments.",
+      "tags": [
+        "Appointments"
+      ],
+      "domain": "appointments",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "ID of the Appointment to repeat",
+          "name": "record_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "properties": {
+            "count": {
+              "description": "Number of copies to create. Required unless `till` is set; ignored when `till` is set.",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "duplication_settings": {
+              "properties": {
+                "with_client": {
+                  "default": false,
+                  "description": "Copy the client to the new Appointments. By default the copies are created without a client.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "force": {
+              "default": false,
+              "description": "Create copies even when a date is busy for the Team Member or its Resource Instances.",
+              "type": "boolean"
+            },
+            "from": {
+              "description": "First date to consider for copies (YYYY-MM-DD). The original Appointment's own date and time are skipped.",
+              "format": "date",
+              "type": "string"
+            },
+            "hours": {
+              "description": "Start hour of the copies. Defaults to the original Appointment's hour.",
+              "maximum": 23,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "minutes": {
+              "description": "Start minute of the copies. Defaults to the original Appointment's minute.",
+              "maximum": 59,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "strategy": {
+              "description": "Repeat rule. Use the values of a saved repeat template or a one-off rule.",
+              "properties": {
+                "days": {
+                  "description": "Days of the week for `week` mode, required there: 1 - Monday ... 7 - Sunday",
+                  "items": {
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "type": "array"
+                },
+                "interval": {
+                  "description": "Number of periods skipped between repetitions for `day`, `week`, `month` and `year` (0 - every period, 1 - every other period)",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "repeat_mode": {
+                  "description": "Repeat mode: - `day` - every day - `working_days` - Monday to Friday - `mon_wed_fri` - Monday, Wednesday and Friday - `tue_thu` - Tuesday and Thursday - `week` - every week on the `days` listed - `mo…",
+                  "enum": [
+                    "day",
+                    "working_days",
+                    "mon_wed_fri",
+                    "tue_thu",
+                    "week",
+                    "month",
+                    "year"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "repeat_mode",
+                "interval",
+                "days"
+              ],
+              "type": "object"
+            },
+            "till": {
+              "description": "Last date to consider (YYYY-MM-DD), inclusive. Required unless `count` is set; must be after `from`.",
+              "format": "date",
+              "type": "string"
+            }
+          },
+          "required": [
+            "strategy",
+            "from"
+          ],
+          "type": "object"
+        }
+      },
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "201",
+        "envelope": "v1",
+        "schema": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "get_appointment_payment_link",
+      "method": "GET",
+      "path": "/locations/{location_id}/appointments/{record_id}/payment_link",
+      "displayPath": "/locations/{location_id}/appointments/{appointment_id}/payment_link",
+      "summary": "Get Appointment payment link",
+      "description": "Returns the online payment page URL for an Appointment, which you can send to the\nclient through your own channel. The client pays the Appointment's outstanding amount\non that page.\n\nThe Location must have link payments enabled; otherwise the request returns `400`.\nIt also returns an error when the Appointment's Visit contains items that cannot be paid\nonline. The Business User needs Finances access and access to Appointment finances.",
+      "tags": [
+        "Appointments"
+      ],
+      "domain": "appointments",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Appointment ID",
+          "name": "record_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "properties": {
+            "payment_link": {
+              "description": "Online payment page of the Appointment",
+              "format": "uri",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "send_appointment_payment_link",
+      "method": "POST",
+      "path": "/locations/{location_id}/appointments/{record_id}/payment_link/send",
+      "displayPath": "/locations/{location_id}/appointments/{appointment_id}/payment_link/send",
+      "summary": "Send Appointment payment link to the client",
+      "description": "Sends the Appointment's online payment link to the client through the Location's\nnotification channels (the channel cascade configured for the payment link notification)\nand by email when the client has one. Use [Get Appointment payment link](#tag/Appointments/operation/get_appointment_payment_link)\nto deliver the link yourself instead.\n\nThe payment link notification template must be active in the Location's notification\nsettings; otherwise the request fails. The Business User needs the permission to send\nmessages to clients.",
+      "tags": [
+        "Appointments"
+      ],
+      "domain": "appointments",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Appointment ID",
+          "name": "record_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "202",
+        "envelope": "v1",
+        "schema": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "list_appointment_repeat_templates",
+      "method": "GET",
+      "path": "/locations/{location_id}/appointments/duplication_strategies",
+      "displayPath": "/locations/{location_id}/appointments/duplication_strategies",
+      "summary": "List Appointment repeat templates",
+      "description": "Repeat templates store how an Appointment is repeated. Use them in the\n[Repeat an Appointment](#tag/Appointments/operation/repeat_appointment) request or keep\nthem for reuse. The Business User needs the permission to manage the Location.",
+      "tags": [
+        "Appointments"
+      ],
+      "domain": "appointments",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "items": {
+            "properties": {
+              "days": {
+                "description": "Days of the week for `week` mode, required there: 1 - Monday ... 7 - Sunday",
+                "items": {
+                  "type": "integer",
+                  "x-truncated": true
+                },
+                "type": "array"
+              },
+              "id": {
+                "description": "Template ID",
+                "type": "integer"
+              },
+              "interval": {
+                "description": "Number of periods skipped between repetitions for `day`, `week`, `month` and `year` (0 - every period, 1 - every other period)",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "repeat_mode": {
+                "description": "Repeat mode: - `day` - every day - `working_days` - Monday to Friday - `mon_wed_fri` - Monday, Wednesday and Friday - `tue_thu` - Tuesday and Thursday - `week` - every week on the `days` listed - `mo…",
+                "enum": [
+                  "day",
+                  "working_days",
+                  "mon_wed_fri",
+                  "tue_thu",
+                  "week",
+                  "month",
+                  "year"
+                ],
+                "type": "string"
+              },
+              "title": {
+                "description": "Template name",
+                "maxLength": 50,
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "create_appointment_repeat_template",
+      "method": "POST",
+      "path": "/locations/{location_id}/appointments/duplication_strategies",
+      "displayPath": "/locations/{location_id}/appointments/duplication_strategies",
+      "summary": "Create Appointment repeat template",
+      "description": "Repeat templates store how an Appointment is repeated. Use them in the\n[Repeat an Appointment](#tag/Appointments/operation/repeat_appointment) request or keep\nthem for reuse. The Business User needs the permission to manage the Location.",
+      "tags": [
+        "Appointments"
+      ],
+      "domain": "appointments",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "properties": {
+            "days": {
+              "description": "Days of the week for `week` mode, required there: 1 - Monday ... 7 - Sunday",
+              "items": {
+                "maximum": 7,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "interval": {
+              "description": "Number of periods skipped between repetitions for `day`, `week`, `month` and `year` (0 - every period, 1 - every other period)",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "repeat_mode": {
+              "description": "Repeat mode: - `day` - every day - `working_days` - Monday to Friday - `mon_wed_fri` - Monday, Wednesday and Friday - `tue_thu` - Tuesday and Thursday - `week` - every week on the `days` listed - `mo…",
+              "enum": [
+                "day",
+                "working_days",
+                "mon_wed_fri",
+                "tue_thu",
+                "week",
+                "month",
+                "year"
+              ],
+              "type": "string"
+            },
+            "title": {
+              "description": "Template name",
+              "maxLength": 50,
+              "type": "string"
+            }
+          },
+          "required": [
+            "title",
+            "repeat_mode"
+          ],
+          "type": "object"
+        }
+      },
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "201",
+        "envelope": "v1",
+        "schema": {
+          "properties": {
+            "days": {
+              "description": "Days of the week for `week` mode, required there: 1 - Monday ... 7 - Sunday",
+              "items": {
+                "maximum": 7,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "id": {
+              "description": "Template ID",
+              "type": "integer"
+            },
+            "interval": {
+              "description": "Number of periods skipped between repetitions for `day`, `week`, `month` and `year` (0 - every period, 1 - every other period)",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "repeat_mode": {
+              "description": "Repeat mode: - `day` - every day - `working_days` - Monday to Friday - `mon_wed_fri` - Monday, Wednesday and Friday - `tue_thu` - Tuesday and Thursday - `week` - every week on the `days` listed - `mo…",
+              "enum": [
+                "day",
+                "working_days",
+                "mon_wed_fri",
+                "tue_thu",
+                "week",
+                "month",
+                "year"
+              ],
+              "type": "string"
+            },
+            "title": {
+              "description": "Template name",
+              "maxLength": 50,
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "get_appointment_repeat_template",
+      "method": "GET",
+      "path": "/locations/{location_id}/appointments/duplication_strategies/{strategy_id}",
+      "displayPath": "/locations/{location_id}/appointments/duplication_strategies/{strategy_id}",
+      "summary": "Get Appointment repeat template",
+      "tags": [
+        "Appointments"
+      ],
+      "domain": "appointments",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Repeat template ID",
+          "name": "strategy_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "properties": {
+            "days": {
+              "description": "Days of the week for `week` mode, required there: 1 - Monday ... 7 - Sunday",
+              "items": {
+                "maximum": 7,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "id": {
+              "description": "Template ID",
+              "type": "integer"
+            },
+            "interval": {
+              "description": "Number of periods skipped between repetitions for `day`, `week`, `month` and `year` (0 - every period, 1 - every other period)",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "repeat_mode": {
+              "description": "Repeat mode: - `day` - every day - `working_days` - Monday to Friday - `mon_wed_fri` - Monday, Wednesday and Friday - `tue_thu` - Tuesday and Thursday - `week` - every week on the `days` listed - `mo…",
+              "enum": [
+                "day",
+                "working_days",
+                "mon_wed_fri",
+                "tue_thu",
+                "week",
+                "month",
+                "year"
+              ],
+              "type": "string"
+            },
+            "title": {
+              "description": "Template name",
+              "maxLength": 50,
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "update_appointment_repeat_template",
+      "method": "PUT",
+      "path": "/locations/{location_id}/appointments/duplication_strategies/{strategy_id}",
+      "displayPath": "/locations/{location_id}/appointments/duplication_strategies/{strategy_id}",
+      "summary": "Update Appointment repeat template",
+      "description": "Replaces the template settings. Send all fields; omitted `interval` and `days` are reset.",
+      "tags": [
+        "Appointments"
+      ],
+      "domain": "appointments",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Repeat template ID",
+          "name": "strategy_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "properties": {
+            "days": {
+              "description": "Days of the week for `week` mode, required there: 1 - Monday ... 7 - Sunday",
+              "items": {
+                "maximum": 7,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "interval": {
+              "description": "Number of periods skipped between repetitions for `day`, `week`, `month` and `year` (0 - every period, 1 - every other period)",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "repeat_mode": {
+              "description": "Repeat mode: - `day` - every day - `working_days` - Monday to Friday - `mon_wed_fri` - Monday, Wednesday and Friday - `tue_thu` - Tuesday and Thursday - `week` - every week on the `days` listed - `mo…",
+              "enum": [
+                "day",
+                "working_days",
+                "mon_wed_fri",
+                "tue_thu",
+                "week",
+                "month",
+                "year"
+              ],
+              "type": "string"
+            },
+            "title": {
+              "description": "Template name",
+              "maxLength": 50,
+              "type": "string"
+            }
+          },
+          "required": [
+            "title",
+            "repeat_mode"
+          ],
+          "type": "object"
+        }
+      },
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "properties": {
+            "days": {
+              "description": "Days of the week for `week` mode, required there: 1 - Monday ... 7 - Sunday",
+              "items": {
+                "maximum": 7,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "id": {
+              "description": "Template ID",
+              "type": "integer"
+            },
+            "interval": {
+              "description": "Number of periods skipped between repetitions for `day`, `week`, `month` and `year` (0 - every period, 1 - every other period)",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "repeat_mode": {
+              "description": "Repeat mode: - `day` - every day - `working_days` - Monday to Friday - `mon_wed_fri` - Monday, Wednesday and Friday - `tue_thu` - Tuesday and Thursday - `week` - every week on the `days` listed - `mo…",
+              "enum": [
+                "day",
+                "working_days",
+                "mon_wed_fri",
+                "tue_thu",
+                "week",
+                "month",
+                "year"
+              ],
+              "type": "string"
+            },
+            "title": {
+              "description": "Template name",
+              "maxLength": 50,
+              "type": "string"
             }
           },
           "type": "object"
@@ -16150,6 +17415,289 @@
     },
     {
       "source": "v1",
+      "operationId": "get_client_loyalty_summary",
+      "method": "GET",
+      "path": "/locations/{location_id}/client/{client_id}/loyalty",
+      "displayPath": "/locations/{location_id}/client/{client_id}/loyalty",
+      "summary": "Get client loyalty summary",
+      "description": "Returns everything the client can pay with or earn from at the Location in one call:\ngift cards, Memberships, loyalty cards and referral program settings. Gift cards and\nMemberships are matched by the client's phone number among those valid at this Location.\n\nUse the status filters to get, for example, only active Memberships before booking.\nThe Business User needs the permission to manage the Location and access to loyalty\n(or to client loyalty data).",
+      "tags": [
+        "Clients"
+      ],
+      "domain": "clients",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Client ID",
+          "name": "client_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Return only Memberships with these statuses",
+          "name": "abonement_status_slugs[]",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "items": {
+              "enum": [
+                "created",
+                "active",
+                "expired",
+                "wasted"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "description": "Return only gift cards with these statuses",
+          "name": "certificate_status_slugs[]",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "items": {
+              "enum": [
+                "created",
+                "active",
+                "expired",
+                "redeemed"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "properties": {
+            "abonements": {
+              "description": "Memberships",
+              "items": {
+                "properties": {
+                  "activated_date": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "balance_container": {
+                    "description": "Remaining visits per Service or Service Category (`links`)",
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "balance_string": {
+                    "description": "Remaining visits as display text",
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "created_date": {
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "expiration_date": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "freeze_period": {
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "goods_transaction_id": {
+                    "description": "ID of the sale (Product transaction) of the Membership",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "id": {
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "is_frozen": {
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "is_united_balance": {
+                    "description": "Whether one visit balance is shared by all Services",
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "number": {
+                    "description": "Membership code",
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "salon_group": {
+                    "description": "Chain the Membership belongs to (`id`, `title`)",
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "status": {
+                    "description": "Status with `id`, `slug` (`created`, `active`, `expired`, `wasted`), `title` and `extended_title`",
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "type": {
+                    "description": "Membership Type",
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "united_balance_services_count": {
+                    "description": "Remaining visits of a shared balance",
+                    "type": "integer",
+                    "x-truncated": true
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "certificates": {
+              "description": "Gift cards",
+              "items": {
+                "properties": {
+                  "balance": {
+                    "description": "Remaining balance",
+                    "type": "number",
+                    "x-truncated": true
+                  },
+                  "created_date": {
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "default_balance": {
+                    "description": "Initial balance",
+                    "type": "number",
+                    "x-truncated": true
+                  },
+                  "expiration_date": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "goods_transaction_id": {
+                    "description": "ID of the sale (Product transaction) of the gift card",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "id": {
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "number": {
+                    "description": "Gift card code",
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "salon_group": {
+                    "description": "Chain the gift card belongs to (`id`, `title`)",
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "status": {
+                    "description": "Status with `id`, `slug` (`created`, `active`, `expired`, `redeemed`) and `title`",
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "status_id": {
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "type": {
+                    "description": "Gift card type",
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "type_id": {
+                    "description": "Gift card type ID",
+                    "type": "integer",
+                    "x-truncated": true
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "loyalty_cards": {
+              "description": "Loyalty cards of the client with their type, Chain and programs",
+              "items": {
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "referral_settings": {
+              "description": "Referral program settings of the Location's Chains",
+              "items": {
+                "properties": {
+                  "cashback_loyalty_program": {
+                    "description": "Cashback program of the referral program",
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "discount_loyalty_program": {
+                    "description": "Loyalty program applied to the referrer",
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "id": {
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "is_enabled": {
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "salon_group": {
+                    "description": "Chain (`id`, `title`)",
+                    "type": "object",
+                    "x-truncated": true
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        }
+      }
+    },
+    {
+      "source": "v1",
       "operationId": "check_memberships_for_event",
       "method": "GET",
       "path": "/locations/{location_id}/client/{client_id}/loyalty/abonements/{membership_id}/check_for_activity",
@@ -17123,15 +18671,26 @@
               "type": "array"
             },
             "filters": {
-              "description": "Filters for searching by customers",
+              "description": "Filters for searching the client base of the Location. Each item is either a **condition** (`type` and `state`) or a **group** (`operation` and nested `filters`, without `type`). Groups can be nested…",
               "items": {
                 "properties": {
+                  "filters": {
+                    "description": "Filter groups only: nested conditions or groups with the same structure as the top-level `filters` items",
+                    "type": "array",
+                    "x-truncated": true
+                  },
+                  "operation": {
+                    "description": "Filter groups only: how the nested `filters` are combined",
+                    "type": "string",
+                    "x-truncated": true
+                  },
                   "state": {
-                    "description": "Filter type",
+                    "description": "Filter condition. Its shape depends on `type`; see the table above.",
                     "type": "object",
                     "x-truncated": true
                   },
                   "type": {
+                    "description": "Filter type. Omit it for a filter group.",
                     "type": "string",
                     "x-truncated": true
                   }
@@ -17141,7 +18700,7 @@
               "type": "array"
             },
             "operation": {
-              "description": "Type of transaction",
+              "description": "How the top-level `filters` are combined: `AND` (default, every filter must match) or `OR` (any filter matches)",
               "enum": [
                 "AND",
                 "OR"
@@ -18327,6 +19886,125 @@
             "type": "object"
           },
           "type": "array"
+        }
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "list_location_payment_methods",
+      "method": "GET",
+      "path": "/locations/{location_id}/payment_methods",
+      "displayPath": "/locations/{location_id}/payment_methods",
+      "summary": "List Location payment methods",
+      "description": "Returns the payment methods configured for the Location (cash, cards, Pix, custom methods)\nwith the default cash account, processing fee, card brands and installment rates. Built-in\nmethods have a `slug`; custom methods have `slug: null`.\n\nAvailable only for Locations with the payment methods and fees settings enabled;\notherwise the request returns `403`. The Business User needs access to the Location.",
+      "tags": [
+        "Payments"
+      ],
+      "domain": "payments",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "properties": {
+            "payment_methods": {
+              "items": {
+                "properties": {
+                  "card_brands": {
+                    "description": "Card brands with their own fee and installment rates",
+                    "type": "array",
+                    "x-truncated": true
+                  },
+                  "default_account_id": {
+                    "description": "Cash account that receives payments by default",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "fee_rate": {
+                    "description": "Processing fee, percent",
+                    "type": "number",
+                    "x-truncated": true
+                  },
+                  "funds_receipt_period": {
+                    "description": "Days until the funds are received",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "has_card_brands": {
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "has_funds_receipt_period": {
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "has_installments": {
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "id": {
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "installments": {
+                    "description": "Installment options with their fee rate, percent",
+                    "type": "array",
+                    "x-truncated": true
+                  },
+                  "is_default": {
+                    "description": "Whether this is a built-in method",
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "name": {
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "selection_mode": {
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "slug": {
+                    "description": "Built-in method slug, for example `debit_card` or `credit_card`; `null` for a custom method",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "use_card_brands": {
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "use_installments": {
+                    "type": "boolean",
+                    "x-truncated": true
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
         }
       }
     },
@@ -20739,6 +22417,18 @@
           "schema": {
             "type": "number"
           }
+        },
+        {
+          "description": "Optional list of extra blocks to include in the response. Repeat as `include[]=<value>`. Supported values include `state`, `state.items`, `state.loyalty_transactions`, `state.payment_transactions`, `state.deposit_holds`, `kkm_state`, and `payment_methods`. Request `state.deposit_holds` to receive the prepaid holds associated with the sale, including active and completed holds.",
+          "name": "include",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
         }
       ],
       "response": {
@@ -20794,8 +22484,18 @@
                     "type": "number",
                     "x-truncated": true
                   },
+                  "hold_id": {
+                    "description": "Prepaid hold ID, returned for the prepay_hold method",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
                   "is_applicable": {
                     "description": "Is it possible to use this method",
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "is_partial_allowed": {
+                    "description": "Whether the method may be used to pay only part of the remaining amount. Defaults to true; false means the method must cover the full applicable_amount in a single payment (e.g. prepay_hold).",
                     "type": "boolean",
                     "x-truncated": true
                   },
@@ -20811,6 +22511,14 @@
             },
             "state": {
               "properties": {
+                "deposit_holds": {
+                  "description": "Prepaid holds associated with the sale. Returned when state.deposit_holds is included; completed holds remain visible with their current status.",
+                  "items": {
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "type": "array"
+                },
                 "items": {
                   "items": {
                     "description": "Selling unit",
@@ -21119,6 +22827,39 @@
                 }
               },
               "type": "object"
+            },
+            {
+              "description": "Confirms and applies an active prepaid hold associated with the sale. Available only when payment_methods returns a prepay_hold entry with is_applicable=true. When every Service item of the Visit is…",
+              "properties": {
+                "payment": {
+                  "description": "Object containing the payment method",
+                  "properties": {
+                    "amount": {
+                      "description": "Full applicable_amount returned for this method. Partial payments are not allowed.",
+                      "format": "float",
+                      "type": "number"
+                    },
+                    "method": {
+                      "description": "Payment method",
+                      "properties": {
+                        "hold_id": {
+                          "description": "Identifier of the active prepaid hold (state.deposit_holds[].id) associated with this sale.",
+                          "type": "integer",
+                          "x-truncated": true
+                        },
+                        "slug": {
+                          "description": "Payment method type",
+                          "type": "string",
+                          "x-truncated": true
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "type": "object"
             }
           ]
         }
@@ -21176,8 +22917,18 @@
                     "type": "number",
                     "x-truncated": true
                   },
+                  "hold_id": {
+                    "description": "Prepaid hold ID, returned for the prepay_hold method",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
                   "is_applicable": {
                     "description": "Is it possible to use this method",
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "is_partial_allowed": {
+                    "description": "Whether the method may be used to pay only part of the remaining amount. Defaults to true; false means the method must cover the full applicable_amount in a single payment (e.g. prepay_hold).",
                     "type": "boolean",
                     "x-truncated": true
                   },
@@ -21193,6 +22944,14 @@
             },
             "state": {
               "properties": {
+                "deposit_holds": {
+                  "description": "Prepaid holds associated with the sale. Returned when state.deposit_holds is included; completed holds remain visible with their current status.",
+                  "items": {
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "type": "array"
+                },
                 "items": {
                   "items": {
                     "description": "Selling unit",
@@ -21232,7 +22991,7 @@
       "path": "/locations/{location_id}/sale/{document_id}/payment/loyalty_transaction/{payment_transaction_id}",
       "displayPath": "/locations/{location_id}/sale/{document_id}/payment/loyalty_transaction/{payment_transaction_id}",
       "summary": "Delete a Loyalty Payment Transaction",
-      "description": "As a response, information about the [Sale operation](#sale-operation) is returned",
+      "description": "As a response, information about the [Sale operation](#sale-operation) is returned.\n\nDeleting a loyalty payment that was made from a confirmed prepaid hold is forbidden and returns HTTP 400 with the localized message \"This payment was made from a prepaid hold and cannot be cancelled.\" in `meta.message`.",
       "tags": [
         "Sales"
       ],
@@ -21326,8 +23085,18 @@
                     "type": "number",
                     "x-truncated": true
                   },
+                  "hold_id": {
+                    "description": "Prepaid hold ID, returned for the prepay_hold method",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
                   "is_applicable": {
                     "description": "Is it possible to use this method",
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "is_partial_allowed": {
+                    "description": "Whether the method may be used to pay only part of the remaining amount. Defaults to true; false means the method must cover the full applicable_amount in a single payment (e.g. prepay_hold).",
                     "type": "boolean",
                     "x-truncated": true
                   },
@@ -21343,6 +23112,14 @@
             },
             "state": {
               "properties": {
+                "deposit_holds": {
+                  "description": "Prepaid holds associated with the sale. Returned when state.deposit_holds is included; completed holds remain visible with their current status.",
+                  "items": {
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "type": "array"
+                },
                 "items": {
                   "items": {
                     "description": "Selling unit",
@@ -21476,8 +23253,18 @@
                     "type": "number",
                     "x-truncated": true
                   },
+                  "hold_id": {
+                    "description": "Prepaid hold ID, returned for the prepay_hold method",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
                   "is_applicable": {
                     "description": "Is it possible to use this method",
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "is_partial_allowed": {
+                    "description": "Whether the method may be used to pay only part of the remaining amount. Defaults to true; false means the method must cover the full applicable_amount in a single payment (e.g. prepay_hold).",
                     "type": "boolean",
                     "x-truncated": true
                   },
@@ -21493,6 +23280,14 @@
             },
             "state": {
               "properties": {
+                "deposit_holds": {
+                  "description": "Prepaid holds associated with the sale. Returned when state.deposit_holds is included; completed holds remain visible with their current status.",
+                  "items": {
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "type": "array"
+                },
                 "items": {
                   "items": {
                     "description": "Selling unit",
@@ -25157,6 +26952,10 @@
               "description": "Display status in online appointment, 1 - hidden, 0 - not hidden",
               "type": "number"
             },
+            "image_group_id": {
+              "description": "ID of the image group returned by the [image upload](#tag/Utilities/operation/upload_image) endpoint (`entity` = `team_member`). Links the uploaded photo to the Team Member.",
+              "type": "number"
+            },
             "information": {
               "description": "team member information (HTML format)",
               "type": "string"
@@ -25171,6 +26970,19 @@
             },
             "name": {
               "description": "team member name",
+              "type": "string"
+            },
+            "position_id": {
+              "description": "Team Member Position ID. Applied on update only; on create, assign the Position with a subsequent update.",
+              "type": "number"
+            },
+            "prepaid": {
+              "description": "Online payment requirement for this Team Member's online bookings",
+              "enum": [
+                "forbidden",
+                "allowed",
+                "required"
+              ],
               "type": "string"
             },
             "specialization": {
@@ -25511,6 +27323,10 @@
               "description": "Display status in online appointment, 1 - hidden, 0 - not hidden",
               "type": "number"
             },
+            "image_group_id": {
+              "description": "ID of the image group returned by the [image upload](#tag/Utilities/operation/upload_image) endpoint (`entity` = `team_member`). Links the uploaded photo to the Team Member.",
+              "type": "number"
+            },
             "information": {
               "description": "team member information (HTML format)",
               "type": "string"
@@ -25525,6 +27341,19 @@
             },
             "name": {
               "description": "team member name",
+              "type": "string"
+            },
+            "position_id": {
+              "description": "Team Member Position ID. Applied on update only; on create, assign the Position with a subsequent update.",
+              "type": "number"
+            },
+            "prepaid": {
+              "description": "Online payment requirement for this Team Member's online bookings",
+              "enum": [
+                "forbidden",
+                "allowed",
+                "required"
+              ],
               "type": "string"
             },
             "specialization": {
@@ -25878,7 +27707,7 @@
       "path": "/locations/{location_id}/team_members/schedule",
       "displayPath": "/locations/{location_id}/team_members/schedule",
       "summary": "Get team member schedules",
-      "description": "Retrieves work schedules for team members as working intervals.\n\nOptionally includes:\n- Busy intervals (appointments and events)\n- Off-day type identifiers\n\n**Query Parameters:**\n- `start_date` / `end_date` - Date range for schedule search\n- `team_member_ids[]` - Filter by specific team members\n- `include[]` - Include additional data (busy_intervals, off_day_type)",
+      "description": "Retrieves work schedules for team members as working intervals.\n\nOptionally includes:\n- Busy intervals (appointments and events)\n- Off-day type identifiers\n\n**Query Parameters:**\n- `start_date` / `end_date` - Date range for schedule search\n- `team_member_ids[]` or `team_member_id` - Filter by specific team members\n- `include_fired` - Also return dismissed team members\n- `include[]` - Include additional data (busy_intervals, busy_times, off_day_type)",
       "tags": [
         "Schedule & Resources"
       ],
@@ -25919,11 +27748,25 @@
             "items": {
               "enum": [
                 "busy_intervals",
+                "busy_times",
                 "off_day_type"
               ],
               "type": "string"
             },
             "type": "array"
+          }
+        },
+        {
+          "description": "Set to `1` to also return schedules of dismissed Team Members. By default only active Team Members are returned.",
+          "name": "include_fired",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "enum": [
+              0,
+              1
+            ],
+            "type": "integer"
           }
         },
         {
@@ -25934,6 +27777,15 @@
           "schema": {
             "format": "date",
             "type": "string"
+          }
+        },
+        {
+          "description": "Single Team Member ID. Takes precedence over `team_member_ids[]`.",
+          "name": "team_member_id",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "integer"
           }
         },
         {
@@ -25960,6 +27812,14 @@
                 "description": "Time intervals occupied by appointments or events. Only included when `include[]=busy_intervals`.",
                 "items": {
                   "type": "object",
+                  "x-truncated": true
+                },
+                "type": "array"
+              },
+              "busy_times": {
+                "description": "Hours of the day (0-23) touched by appointments or events. Only included when `include[]=busy_times`.",
+                "items": {
+                  "type": "integer",
                   "x-truncated": true
                 },
                 "type": "array"
@@ -26120,6 +27980,185 @@
         "tool_name": "schedules_create",
         "write_allowed": false,
         "notes": "One PUT backs three tools: schedules_create and schedules_update send `schedules_to_set`, schedules_delete sends `schedules_to_delete`.\n"
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "get_team_member_working_days",
+      "method": "GET",
+      "path": "/locations/{location_id}/team_members/working_days",
+      "displayPath": "/locations/{location_id}/team_members/working_days",
+      "summary": "Get Team Member working days",
+      "description": "Returns the dates in the period on which at least one of the selected Team Members has\nworking hours in the schedule. Use it to disable non-working days in a date picker.\nThe Business User needs access to the appointment calendar.",
+      "tags": [
+        "Schedule & Resources"
+      ],
+      "domain": "schedule",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Period end date (YYYY-MM-DD), inclusive",
+          "name": "end_date",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        {
+          "description": "Period start date (YYYY-MM-DD)",
+          "name": "start_date",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        {
+          "description": "Single Team Member ID. Takes precedence over `team_member_ids[]`.",
+          "name": "team_member_id",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Team Member IDs. Without a Team Member filter, all active Team Members the Business User may see are used.",
+          "name": "team_member_ids[]",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "items": {
+            "format": "date",
+            "type": "string"
+          },
+          "type": "array"
+        }
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "get_team_member_workload",
+      "method": "GET",
+      "path": "/locations/{location_id}/team_members/workload",
+      "displayPath": "/locations/{location_id}/team_members/workload",
+      "summary": "Get Team Member workload by day",
+      "description": "Returns, for each day of the period, the share of the selected Team Members' working\ntime that is booked, from 0 (free) to 1 (fully booked). Use it to find quiet days for\npromotions or to show availability at a glance.\n\nOnly active Team Members that the Business User may see in the appointment calendar are\nincluded. The Business User needs access to the appointment calendar.",
+      "tags": [
+        "Schedule & Resources"
+      ],
+      "domain": "schedule",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Period end date (YYYY-MM-DD), inclusive",
+          "name": "end_date",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        {
+          "description": "Period start date (YYYY-MM-DD)",
+          "name": "start_date",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        {
+          "description": "Single Team Member ID. Takes precedence over `team_member_ids[]`.",
+          "name": "team_member_id",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Team Member IDs. Without a Team Member filter, all active Team Members the Business User may see are used.",
+          "name": "team_member_ids[]",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "items": {
+            "properties": {
+              "date": {
+                "format": "date",
+                "type": "string"
+              },
+              "workload": {
+                "description": "Booked share of working time",
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
       }
     },
     {
@@ -28570,6 +30609,94 @@
     },
     {
       "source": "v1",
+      "operationId": "get_day_report",
+      "method": "GET",
+      "path": "/reports/day_report/{location_id}/{date}",
+      "displayPath": "/reports/day_report/{location_id}/{date}",
+      "summary": "Get daily summary report",
+      "description": "Returns the key figures of one day at the Location: clients, booked and completed amounts,\nProduct sales, money received and average workload. Call `/reports/day_report/{location_id}`\nwithout a date for today.\n\nThe Business User needs the permission to manage the Location and access to basic\nreport metrics.",
+      "tags": [
+        "Analytics & Reports"
+      ],
+      "domain": "analytics",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Report date (YYYY-MM-DD). Omit the segment for today.",
+          "name": "date",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "properties": {
+            "average_income": {
+              "description": "Average check - income divided by the number of Visits and Product sale documents",
+              "type": "number"
+            },
+            "average_workload": {
+              "description": "Average Team Member workload",
+              "type": "number"
+            },
+            "clients_count": {
+              "description": "Number of distinct clients with Appointments on the day",
+              "type": "integer"
+            },
+            "date_iso": {
+              "description": "Start of the report day",
+              "format": "date-time",
+              "type": "string"
+            },
+            "discount": {
+              "description": "Total discounts on Services and Products",
+              "type": "number"
+            },
+            "record_sum": {
+              "description": "Total cost of Services in the day's Appointments",
+              "type": "number"
+            },
+            "sale_sum": {
+              "description": "Total of Product sales on the day",
+              "type": "number"
+            },
+            "transaction_sum": {
+              "description": "Money received on the day",
+              "type": "number"
+            },
+            "visit_sum": {
+              "description": "Total cost of Services in Appointments with the client arrived, plus Product sales",
+              "type": "number"
+            }
+          },
+          "type": "object"
+        }
+      }
+    },
+    {
+      "source": "v1",
       "operationId": "get_day_end_report_data",
       "method": "GET",
       "path": "/reports/z_report/{location_id}",
@@ -29527,6 +31654,19 @@
           }
         },
         {
+          "description": "Filter by the Event flag: 1 - only Services available for Events, 0 - only Services that are not. Omit it to return both.",
+          "name": "is_multi",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "enum": [
+              0,
+              1
+            ],
+            "type": "number"
+          }
+        },
+        {
           "description": "Team Member ID, if you want to filter by Team Member",
           "name": "team_member_id",
           "in": "query",
@@ -29698,6 +31838,19 @@
               "description": "Service duration, default is 3600 seconds",
               "format": "float",
               "type": "number"
+            },
+            "image_group_id": {
+              "description": "ID of the image group returned by the [image upload](#tag/Utilities/operation/upload_image) endpoint (`entity` = `service`). Links the uploaded image to the Service.",
+              "type": "number"
+            },
+            "prepaid": {
+              "description": "Online payment requirement for online bookings of this Service at the Location. `allowed` and `required` need a minimum price above zero; otherwise the request fails.",
+              "enum": [
+                "forbidden",
+                "allowed",
+                "required"
+              ],
+              "type": "string"
             },
             "price_max": {
               "description": "Maximum cost of the service",
@@ -30051,6 +32204,19 @@
               "description": "Service duration, default is 3600 seconds",
               "format": "float",
               "type": "number"
+            },
+            "image_group_id": {
+              "description": "ID of the image group returned by the [image upload](#tag/Utilities/operation/upload_image) endpoint (`entity` = `service`). Links the uploaded image to the Service.",
+              "type": "number"
+            },
+            "prepaid": {
+              "description": "Online payment requirement for online bookings of this Service at the Location. `allowed` and `required` need a minimum price above zero; otherwise the request fails.",
+              "enum": [
+                "forbidden",
+                "allowed",
+                "required"
+              ],
+              "type": "string"
             },
             "price_max": {
               "description": "Maximum cost of the service",
@@ -34538,7 +36704,7 @@
                 "type": "number"
               },
               "last_change_date": {
-                "description": "Last modified date",
+                "description": "Date and time of the last change. Use it as the cursor for the `changed_after` filter.",
                 "format": "date-time",
                 "type": "string"
               },
@@ -34563,12 +36729,21 @@
                 "type": "number"
               },
               "sold_item_id": {
-                "description": "Identifier of the sold product/service",
+                "description": "Identifier of the sold item (Service or Product transaction), `0` when not applicable",
                 "type": "number"
               },
               "sold_item_type": {
-                "description": "Sale entity type (product/service)",
-                "type": "number"
+                "description": "Type of the sold item: `service`, `goods_transaction` (Product sale), `deposit_topup`, or `null` for other transactions",
+                "enum": [
+                  "service",
+                  "goods_transaction",
+                  "deposit_topup",
+                  null
+                ],
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "supplier": {
                 "description": "counterparty",
@@ -34991,7 +37166,7 @@
       "path": "/transactions/{location_id}",
       "displayPath": "/transactions/{location_id}",
       "summary": "Get transactions",
-      "description": "#### Transaction filtering\n\n+ page: Page number\n\n+ count: Number of customers per page\n\n+ account_id: Checkout ID\n\n+ supplier_id: Supplier ID\n\n+ client_id: Client ID\n\n+ user_id: user ID\n\n+ master_id: team member ID\n\n+ type: transaction type\n\n+ real_money: Indicates whether this is a real-money (fiat) transaction\n\n+ deleted: whether the transaction was deleted\n\n+ start_date: start date of the period\n\n+ end_date: end date of the period\n\n+ balance_is: 0 - any balance, 1 - positive, 2 - negative\n\n+ document_id: document ID\n\nUse `document_id` from a linked membership goods transaction to inspect money transactions on the sale document. A document can contain multiple items and payments; this endpoint does not calculate a membership-specific paid total. Reading it requires Finances access. Results are limited by the caller's allowed accounts, expense types, and finance history window.",
+      "description": "#### Transaction filtering\n\n+ page: Page number\n\n+ count: Number of customers per page\n\n+ account_id: Checkout ID\n\n+ supplier_id: Supplier ID\n\n+ client_id: Client ID\n\n+ user_id: user ID\n\n+ master_id: team member ID\n\n+ type: transaction type\n\n+ real_money: Indicates whether this is a real-money (fiat) transaction\n\n+ deleted: whether the transaction was deleted\n\n+ start_date: start date of the period\n\n+ end_date: end date of the period\n\n+ balance_is: 0 - any balance, 1 - positive, 2 - negative\n\n+ document_id: document ID\n\n+ changed_after: created or modified at or after this ISO 8601 date and time\n\nUse `document_id` from a linked membership goods transaction to inspect money transactions on the sale document. A document can contain multiple items and payments; this endpoint does not calculate a membership-specific paid total. Reading it requires Finances access. Results are limited by the caller's allowed accounts, expense types, and finance history window.",
       "tags": [
         "Payments"
       ],
@@ -35029,6 +37204,16 @@
           "required": false,
           "schema": {
             "type": "number"
+          }
+        },
+        {
+          "description": "Return only transactions created or modified at or after this date and time (ISO 8601, for example `2026-09-01T00:00:00+03:00`). Use it with `last_change_date` from the response for incremental synchronization. There is no upper-bound filter: `changed_before` is accepted but ignored.",
+          "name": "changed_after",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "format": "date-time",
+            "type": "string"
           }
         },
         {
@@ -35224,7 +37409,7 @@
                 "type": "number"
               },
               "last_change_date": {
-                "description": "Last modified date",
+                "description": "Date and time of the last change. Use it as the cursor for the `changed_after` filter.",
                 "format": "date-time",
                 "type": "string"
               },
@@ -35249,12 +37434,21 @@
                 "type": "number"
               },
               "sold_item_id": {
-                "description": "Identifier of the sold product/service",
+                "description": "Identifier of the sold item (Service or Product transaction), `0` when not applicable",
                 "type": "number"
               },
               "sold_item_type": {
-                "description": "Sale entity type (product/service)",
-                "type": "number"
+                "description": "Type of the sold item: `service`, `goods_transaction` (Product sale), `deposit_topup`, or `null` for other transactions",
+                "enum": [
+                  "service",
+                  "goods_transaction",
+                  "deposit_topup",
+                  null
+                ],
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "supplier": {
                 "description": "counterparty",
@@ -36148,7 +38342,7 @@
               "x-truncated": true
             },
             "reports": {
-              "description": "Section Reports",
+              "description": "Section Reports. A report right is true only when reports_access is also true",
               "type": "object",
               "x-truncated": true
             },
@@ -37997,6 +40191,47 @@
     },
     {
       "source": "v1",
+      "operationId": "list_appointment_statuses",
+      "method": "GET",
+      "path": "/visit/statuses",
+      "displayPath": "/visit/statuses",
+      "summary": "List Appointment statuses",
+      "description": "Returns the Appointment attendance statuses with their titles in the request language.",
+      "tags": [
+        "Appointments"
+      ],
+      "domain": "appointments",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [],
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "items": {
+            "properties": {
+              "id": {
+                "description": "Status value used as `attendance`: -1 - no-show, 0 - pending, 1 - arrived, 2 - confirmed",
+                "type": "integer"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      }
+    },
+    {
+      "source": "v1",
       "operationId": "get_visit",
       "method": "GET",
       "path": "/visits/{visit_id}",
@@ -39080,9 +41315,16 @@
       },
       "curation": {
         "domain": "tags",
+        "tier": "pack",
+        "facets": [
+          "ops"
+        ],
+        "tool_name": "appointments_list_tags",
+        "write_allowed": false,
         "supersedes": [
           "get_tag_list_by_entity"
-        ]
+        ],
+        "notes": "The curated tool lists appointment tags (entity record). Client, group event and general tags stay executor reads of this operation.\n"
       }
     },
     {
@@ -39244,6 +41486,16 @@
           },
           "type": "object"
         }
+      },
+      "curation": {
+        "domain": "tags",
+        "tier": "pack",
+        "facets": [
+          "ops"
+        ],
+        "tool_name": "appointments_create_tag",
+        "write_allowed": false,
+        "notes": "The curated tool creates appointment tags only (entity 2); the V1 twin with the same id is retired by the build.\n"
       }
     },
     {

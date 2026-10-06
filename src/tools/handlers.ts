@@ -54,4 +54,8 @@ export class ToolHandlers {
     this.run(defs.updateAppointmentTool, args);
   deleteAppointment = (args: unknown) =>
     this.run(defs.deleteAppointmentTool, args);
+  listAppointmentTags = (args: unknown) =>
+    this.run(defs.listAppointmentTagsTool, args);
+  createAppointmentTag = (args: unknown) =>
+    this.run(defs.createAppointmentTagTool, args);
 }

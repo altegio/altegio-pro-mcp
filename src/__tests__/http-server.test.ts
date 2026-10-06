@@ -348,8 +348,10 @@ describe('HTTP server facet wiring, end to end', () => {
       expect([...ops].sort()).toEqual([
         'appointments_apply_attendance',
         'appointments_create',
+        'appointments_create_tag',
         'appointments_delete',
         'appointments_list',
+        'appointments_list_tags',
         'appointments_preview_attendance',
         'appointments_update',
         'clients_add_comment',
