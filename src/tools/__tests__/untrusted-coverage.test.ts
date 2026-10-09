@@ -1068,6 +1068,10 @@ const NO_FREE_TEXT: Record<string, string> = {
   analytics_get_loyalty_program_results: 'counts and money',
   analytics_get_forecast: 'money, counts and dates',
   analytics_get_team_member_occupancy: 'team-member ids and percentages',
+  analytics_get_team_workload:
+    'team-member ids, dates, fractions and fixed coverage fields',
+  analytics_get_daily_summary:
+    'dates, numeric metrics and fixed ledger definitions',
   analytics_get_client_visit_stats:
     'counts, money and a date; the client is identified by id',
   analytics_get_capacity_heatmap:

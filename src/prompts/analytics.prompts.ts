@@ -47,6 +47,37 @@ const periodArgument: PromptArgument = {
 
 export const ANALYTICS_PROMPTS: readonly PromptEntry[] = [
   {
+    name: 'analytics_daily_review',
+    title: 'Daily business review',
+    description:
+      'Review one day’s booked service value, completed sales and cash without double counting products or treating a cash difference as receivables.',
+    arguments: [
+      locationArgument,
+      {
+        name: 'date',
+        description:
+          'One report day, YYYY-MM-DD. Defaults to yesterday in the location timezone.',
+        required: false,
+      },
+    ],
+  },
+  {
+    name: 'analytics_quiet_working_days',
+    title: 'Quiet working days',
+    description:
+      'Find quiet working days for the visible active team, exclude closed days and use measured booked share to choose promotion candidates.',
+    arguments: [
+      locationArgument,
+      periodArgument,
+      {
+        name: 'team_member_ids',
+        description:
+          'Optional comma-separated IDs of the selected team; an aggregate, not individual rows.',
+        required: false,
+      },
+    ],
+  },
+  {
     name: 'analytics_location_health_check',
     title: 'Location health check',
     description:
@@ -134,6 +165,31 @@ export function getAnalyticsPrompt(
 
   let text: string;
   switch (name) {
+    case 'analytics_daily_review': {
+      const date = argument(args, 'date');
+      const scope = date
+        ? `date_from=${date}, date_to=${date}`
+        : 'period=yesterday';
+      text = [
+        `Review one day at location ${locationId}, ${scope}.`,
+        `1. analytics_get_daily_summary with location_id=${locationId}, ${scope}. Verify its returned local date. Keep booked_services_value, completed_sales_value and cash_received in separate columns; completed sales already includes product_sales_value.`,
+        `2. analytics_get_overview with the same location and day for currency and the standard headline. Do not silently reconcile different populations; clients in the daily summary are distinct clients with appointments, not attended clients.`,
+        '3. If payment-account reconciliation is requested, read analytics_get_day_end_report for that same day, respect its effective-period coverage and keep its ledger separate.',
+        'Calculate any cash-minus-completed-value difference in code; label it a difference with an undetermined cause. It does not prove unpaid appointments. Null stays unknown. The daily summary does not prove the unit of average workload; do not label that field a percentage.',
+      ].join('\n');
+      break;
+    }
+    case 'analytics_quiet_working_days': {
+      const ids = argument(args, 'team_member_ids');
+      text = [
+        `Find up to three quiet working days at location ${locationId} for period=${period}. Choose and disclose a booked-share threshold, such as 0.5.`,
+        `1. analytics_get_team_workload with location_id=${locationId}, period=${period}${ids ? `, team_member_ids=[${ids}]` : ''}. The result aggregates the selected visible active team; it is not a per-person table.`,
+        '2. In CodeMode intersect points with working_days, exclude null measurements, verify shares are between 0 and 1 and rank days below the threshold by booked_share then date. Convert a fraction to a displayed percentage by multiplying by 100 exactly once.',
+        '3. Check coverage.missing_working_days before claiming a complete ranking. Missing means unknown, and a closed day is not free capacity. Use analytics_get_team_member_capacity for scheduled/booked/idle hours and analytics_get_team_member_occupancy when an individual ranking is requested.',
+        'Return dates, the measured booked share, selection, threshold, denominators and missing coverage. Propose a promotion as a hypothesis, not a guaranteed effect or a claim that specific appointment slots are available.',
+      ].join('\n');
+      break;
+    }
     case 'analytics_location_health_check':
       text = [
         `Run a full health check on location ${locationId} for the period "${period}".`,
@@ -173,7 +229,7 @@ export function getAnalyticsPrompt(
         ids
           ? `3. analytics_get_team_member_occupancy for team_member_ids=[${ids}] — their day-by-day booked share.`
           : '3. Call analytics_get_team_member_occupancy for up to ten team members who stand out — their day-by-day booked share.',
-        '4. Before concluding about anyone with no occupancy at all, check their scheduled hours in the capacity table: no schedule means no occupancy, not poor performance.',
+        '4. For quiet days across the visible active team, analytics_get_team_workload reads the aggregate booked share and working dates in one tool call. Fractions 0…1 differ from individual occupancy percentages. Before concluding about anyone with no occupancy at all, check their scheduled hours in the capacity table: no schedule means no occupancy, not poor performance.',
         '',
         'Conclude with who is at capacity, who has room for more bookings, and whether the schedule or the price list is the constraint. Remember that a team member with no work schedule shows no occupancy at all — say that rather than reporting zero as poor performance.',
       ].join('\n');

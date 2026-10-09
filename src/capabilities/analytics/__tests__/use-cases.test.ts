@@ -376,7 +376,7 @@ describe('analytics_get_team_member_occupancy', () => {
         date_from: '2026-08-01',
         date_to: '2026-08-03',
       },
-      [[/staff\/workload/, 'staff-workload']]
+      [[/team_members\/workload/, 'staff-workload']]
     );
 
     const workloadCalls = calls.filter((c) => c.path.includes('workload'));
@@ -400,7 +400,7 @@ describe('analytics_get_team_member_occupancy', () => {
         team_member_ids: Array.from({ length: 11 }, (_, i) => i + 1),
         period: 'last_week',
       },
-      [[/staff\/workload/, 'staff-workload']]
+      [[/team_members\/workload/, 'staff-workload']]
     );
     expect(result.isError).toBe(true);
     expect(result.content[0]!.text).toMatch(/<=10 items/);

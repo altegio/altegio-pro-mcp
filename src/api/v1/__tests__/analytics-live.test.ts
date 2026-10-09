@@ -315,7 +315,7 @@ describeLive('analytics endpoints against the demo location', () => {
 
     await capture(
       'staff-workload',
-      `${base}/staff/workload?start_date=${PERIOD.date_from}&end_date=${PERIOD.date_to}`,
+      `/locations/${DEMO_LOCATION_ID}/team_members/workload?start_date=${PERIOD.date_from}&end_date=${PERIOD.date_to}`,
       'occupancy'
     );
 

@@ -150,7 +150,21 @@ export const apiMapping: Record<string, ApiMapping> = {
     method: 'get',
     operationId: 'get_appointment_list',
     pathParams: ['location_id'],
-    queryParams: ['page', 'count', 'start_date', 'end_date'],
+    queryParams: [
+      'page',
+      'count',
+      'start_date',
+      'end_date',
+      'team_member_id',
+      'client_id',
+      'created_user_id',
+      'activity_id',
+      'c_start_date',
+      'c_end_date',
+      'changed_after',
+      'changed_before',
+      'with_deleted',
+    ],
   },
   appointments_create: {
     path: '/locations/{location_id}/appointments',
@@ -699,12 +713,17 @@ export const apiMapping: Record<string, ApiMapping> = {
     source: 'extended',
   },
   analytics_get_team_member_occupancy: {
-    path: '/company/{location_id}/staff/workload',
+    path: '/locations/{location_id}/team_members/workload',
     method: 'get',
-    operationId: 'get_location_team_member_occupancy',
+    operationId: 'get_team_member_workload',
     pathParams: ['location_id'],
     queryParams: ['start_date', 'end_date', 'team_member_id'],
-    source: 'extended',
+  },
+  analytics_get_daily_summary: {
+    path: '/reports/day_report/{location_id}/{date}',
+    method: 'get',
+    operationId: 'get_day_report',
+    pathParams: ['location_id', 'date'],
   },
   analytics_get_client_visit_stats: {
     path: '/api/v2/locations/{location_id}/clients/{client_id}/attendances_statistic',
@@ -920,6 +939,32 @@ export const apiMapping: Record<string, ApiMapping> = {
  * or in `catalog/extended/*.yaml`, so the compliance test walks both maps.
  */
 export const multiApiMapping: Record<string, ApiMapping[]> = {
+  analytics_get_team_workload: [
+    {
+      path: '/locations/{location_id}/team_members/workload',
+      method: 'get',
+      operationId: 'get_team_member_workload',
+      pathParams: ['location_id'],
+      queryParams: [
+        'start_date',
+        'end_date',
+        'team_member_id',
+        'team_member_ids[]',
+      ],
+    },
+    {
+      path: '/locations/{location_id}/team_members/working_days',
+      method: 'get',
+      operationId: 'get_team_member_working_days',
+      pathParams: ['location_id'],
+      queryParams: [
+        'start_date',
+        'end_date',
+        'team_member_id',
+        'team_member_ids[]',
+      ],
+    },
+  ],
   // Group events: reads that join two operations, and the updates that read
   // the current state first because the API replaces what it is sent.
   events_get: [

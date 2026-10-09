@@ -1,0 +1,15 @@
+{
+  "success": true,
+  "data": {
+    "clients_count": 20,
+    "record_sum": 19005.5,
+    "visit_sum": 0,
+    "sale_sum": 0,
+    "transaction_sum": 0,
+    "discount": 94.5,
+    "date_iso": "2026-10-08T00:00:00+04:00",
+    "average_workload": 0,
+    "average_income": 0
+  },
+  "meta": []
+}

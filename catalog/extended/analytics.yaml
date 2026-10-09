@@ -373,52 +373,6 @@ paths:
                       income_by_period: { type: object }
                       visits_count_by_period: { type: object }
 
-  /company/{location_id}/staff/workload:
-    get:
-      operationId: get_location_team_member_occupancy
-      summary: Daily occupancy of one team member
-      x-altegio-permission: timetable_access
-      x-altegio-caveat: >-
-        The payload carries no team member id, so a call with several ids returns
-        rows that cannot be attributed — call it once per team member.
-        start_date and end_date are required (HTTP 400 otherwise).
-      parameters:
-        - {
-            name: location_id,
-            in: path,
-            required: true,
-            schema: { type: integer },
-          }
-        - {
-            name: start_date,
-            in: query,
-            required: true,
-            schema: { type: string, format: date },
-          }
-        - {
-            name: end_date,
-            in: query,
-            required: true,
-            schema: { type: string, format: date },
-          }
-        - { name: team_member_id, in: query, schema: { type: integer } }
-      responses:
-        '200':
-          description: One row per day with the occupancy percentage.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  data:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        date: { type: string, format: date }
-                        workload: { type: number }
-
   /api/v2/locations/{location_id}/clients/{client_id}/attendances_statistic:
     get:
       operationId: get_client_visit_statistics

@@ -46,6 +46,8 @@ export type AnalyticsEndpointKind =
   | 'forecast'
   | 'occupancy'
   | 'day_end_report'
+  | 'daily_summary'
+  | 'team_workload'
   | 'client_visits'
   | 'report_builder'
   | 'loyalty'
@@ -81,6 +83,10 @@ const BUILDER_OFF =
 
 function accessMessage(kind: AnalyticsEndpointKind): string {
   switch (kind) {
+    case 'daily_summary':
+      return 'The signed-in user cannot read the daily summary in this location. Ask a location owner to grant location management and access to basic report metrics.';
+    case 'team_workload':
+      return 'The signed-in user cannot read the selected team’s workload or working dates. Ask a location owner to grant Digital schedule access in this location.';
     case 'day_end_report':
       return NO_DAY_END_ACCESS;
     case 'occupancy':
@@ -138,9 +144,12 @@ export function mapAnalyticsHttpError(
   kind: AnalyticsEndpointKind,
   context: string
 ): AltegioApiError {
-  if (status === 401 && kind === 'appointments') {
-    // The appointment list answers a missing right with 403; 401 there is a
-    // missing or expired session, as on every other documented V1 route.
+  if (
+    status === 401 &&
+    ['appointments', 'daily_summary', 'team_workload'].includes(kind)
+  ) {
+    // These documented routes answer a missing right with 403; their 401 is
+    // a missing or expired session. Legacy charts still use 401 for access.
     return new AuthenticationError(
       'The Altegio session is missing or expired. Sign in again, then retry.'
     );

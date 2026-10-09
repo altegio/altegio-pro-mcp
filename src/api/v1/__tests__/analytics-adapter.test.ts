@@ -495,7 +495,9 @@ describe('V1AnalyticsAdapter — day-end report', () => {
 
 describe('V1AnalyticsAdapter — occupancy and client visits', () => {
   it('attributes occupancy rows to the requested team member', async () => {
-    const { api, calls } = adapter([[/staff\/workload/, 'staff-workload']]);
+    const { api, calls } = adapter([
+      [/team_members\/workload/, 'staff-workload'],
+    ]);
     const occupancy = await api.getTeamMemberOccupancy({
       ...period,
       team_member_id: 9001,
@@ -519,7 +521,9 @@ describe('V1AnalyticsAdapter — occupancy and client visits', () => {
       data: Array<{ date: string; workload: number }>;
     };
     body.data.push({ date: '2026-08-04', workload: 0 });
-    const { api } = adapter([[/staff\/workload/, { status: 200, body }]]);
+    const { api } = adapter([
+      [/team_members\/workload/, { status: 200, body }],
+    ]);
     const occupancy = await api.getTeamMemberOccupancy({
       ...period,
       team_member_id: 9001,

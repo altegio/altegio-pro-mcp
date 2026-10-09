@@ -1,0 +1,23 @@
+version: 1
+operations:
+  get_team_member_workload:
+    domain: analytics
+    tier: pack
+    facets: [analytics]
+    tool_name: analytics_get_team_workload
+    write_allowed: false
+    notes: Daily booked fraction for a selected visible active team. The curated tool also reads working dates; individual occupancy converts the fraction to percent.
+  get_team_member_working_days:
+    domain: analytics
+    tier: pack
+    facets: [analytics]
+    tool_name: analytics_get_team_workload
+    write_allowed: false
+    notes: Working dates for the same selection as the booked workload, not idle hours or available appointment slots.
+  get_day_report:
+    domain: analytics
+    tier: pack
+    facets: [analytics]
+    tool_name: analytics_get_daily_summary
+    write_allowed: false
+    notes: One verified local day. Completed sales includes products; booked value and cash are separate. Currency and the average-workload unit are not supplied.
