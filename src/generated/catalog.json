@@ -35,11 +35,11 @@
     "staff_id": "team_member_id"
   },
   "operationCount": 362,
-  "curatedCount": 72,
+  "curatedCount": 75,
   "domains": [
     {
       "domain": "analytics",
-      "operations": 11
+      "operations": 13
     },
     {
       "domain": "appointments",
@@ -127,7 +127,7 @@
     },
     {
       "domain": "schedule",
-      "operations": 16
+      "operations": 14
     },
     {
       "domain": "services",
@@ -27993,7 +27993,7 @@
       "tags": [
         "Schedule & Resources"
       ],
-      "domain": "schedule",
+      "domain": "analytics",
       "deprecated": false,
       "security": {
         "required": true,
@@ -28064,6 +28064,16 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "analytics",
+        "tier": "pack",
+        "facets": [
+          "analytics"
+        ],
+        "tool_name": "analytics_get_team_workload",
+        "write_allowed": false,
+        "notes": "Working dates for the same selection as the booked workload, not idle hours or available appointment slots."
       }
     },
     {
@@ -28077,7 +28087,7 @@
       "tags": [
         "Schedule & Resources"
       ],
-      "domain": "schedule",
+      "domain": "analytics",
       "deprecated": false,
       "security": {
         "required": true,
@@ -28159,6 +28169,16 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "analytics",
+        "tier": "pack",
+        "facets": [
+          "analytics"
+        ],
+        "tool_name": "analytics_get_team_workload",
+        "write_allowed": false,
+        "notes": "Daily booked fraction for a selected visible active team. The curated tool also reads working dates; individual occupancy converts the fraction to percent."
       }
     },
     {
@@ -30693,6 +30713,16 @@
           },
           "type": "object"
         }
+      },
+      "curation": {
+        "domain": "analytics",
+        "tier": "pack",
+        "facets": [
+          "analytics"
+        ],
+        "tool_name": "analytics_get_daily_summary",
+        "write_allowed": false,
+        "notes": "One verified local day. Completed sales includes products; booked value and cash are separate. Currency and the average-workload unit are not supplied."
       }
     },
     {
@@ -62312,7 +62342,7 @@
       "path": "/oauth/revoke",
       "displayPath": "/oauth/revoke",
       "summary": "Revoke a token",
-      "description": "OAuth 2.0 token revocation (RFC 7009). Revokes an access token or a refresh token;\nrevoking a refresh token revokes its whole token family. The endpoint returns `200`\neven when the token is already invalid, as required by the RFC.",
+      "description": "OAuth 2.0 token revocation (RFC 7009). Revokes an access token or a refresh token;\nrevoking a refresh token revokes its whole token family. The endpoint returns `200`\neven when the token is already invalid, as required by the RFC.\n\nConfidential clients authenticate with HTTP Basic (`client_secret_basic`); public\nclients send their `client_id` in the form body. A client revokes only its own tokens:\na token of another client is left untouched and still answers `200`.",
       "tags": [
         "Authorization"
       ],
@@ -62332,7 +62362,7 @@
           "description": "Token revocation request (RFC 7009, form-encoded).",
           "properties": {
             "client_id": {
-              "description": "OAuth client identifier (public clients).",
+              "description": "Required for public clients. Confidential clients send it in HTTP Basic and omit this field.",
               "type": "string"
             },
             "token": {
@@ -62340,6 +62370,7 @@
               "type": "string"
             },
             "token_type_hint": {
+              "description": "Optional RFC 7009 hint. Accepted and ignored: the token prefix (`ag_at_`, `ag_rt_`) defines the type.",
               "enum": [
                 "access_token",
                 "refresh_token"

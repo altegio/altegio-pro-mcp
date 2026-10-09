@@ -493,8 +493,10 @@ describe('prompts', () => {
     const { prompts } = await client.listPrompts();
     expect(prompts.map((prompt) => prompt.name)).toEqual([
       'analytics_compare_periods',
+      'analytics_daily_review',
       'analytics_location_health_check',
       'analytics_monthly_review',
+      'analytics_quiet_working_days',
       'analytics_team_member_review',
       ONBOARDING_WALKTHROUGH_PROMPT,
     ]);

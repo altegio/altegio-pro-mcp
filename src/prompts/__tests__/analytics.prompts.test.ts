@@ -10,6 +10,8 @@ import {
 describe('prompt listing', () => {
   it('offers the health check and the three review prompts', () => {
     expect(listAnalyticsPrompts().map((prompt) => prompt.name)).toEqual([
+      'analytics_daily_review',
+      'analytics_quiet_working_days',
       'analytics_location_health_check',
       'analytics_monthly_review',
       'analytics_team_member_review',

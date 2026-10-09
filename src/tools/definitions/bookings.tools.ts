@@ -170,7 +170,7 @@ export const getAppointmentsTool = defineTool({
   name: 'appointments_list',
   category: 'Appointments',
   description:
-    'List the appointments of a location, optionally within a date range. Each item carries the canonical status (waiting, confirmed, arrived, no_show, cancelled), team member, client, services, tags and color. Client phones are withheld unless include_contacts is true. Paged: 25 per page by default; follow pagination.next_page until it is null (a full last page may need one empty request). Find the location_id with locations_list first.',
+    'List the appointments of a location, optionally within a date range or narrowed by team member, client, creator, group event, creation dates or change timestamps. Deleted appointments are excluded unless include_deleted=true. Each item carries the canonical status (waiting, confirmed, arrived, no_show, cancelled), team member, client, services, tags and color. Client phones are withheld unless include_contacts is true. Paged: 25 per page by default; follow pagination.next_page until it is null (a full last page may need one empty request). Find the location_id with locations_list first.',
   annotations: {
     title: 'Get Appointments',
     readOnlyHint: true,
@@ -189,6 +189,33 @@ export const getAppointmentsTool = defineTool({
     date_to: isoDate
       .optional()
       .describe('Last appointment date to include, YYYY-MM-DD.'),
+    team_member_id: z.number().int().positive().optional(),
+    client_id: z.number().int().positive().optional(),
+    created_by_user_id: z.number().int().positive().optional(),
+    event_id: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Only appointments booked to this group event.'),
+    created_from: isoDate
+      .optional()
+      .describe(
+        'Appointment creation date from, independent of appointment date.'
+      ),
+    created_to: isoDate
+      .optional()
+      .describe(
+        'Appointment creation date through, independent of appointment date.'
+      ),
+    changed_after: z.string().datetime({ offset: true }).optional(),
+    changed_before: z.string().datetime({ offset: true }).optional(),
+    include_deleted: z
+      .boolean()
+      .optional()
+      .describe(
+        'Include deleted appointments for cancellation audits. Default false.'
+      ),
     include_contacts: includeContactsArg,
   }),
   outputSchema: bookingsOutput,
@@ -201,6 +228,19 @@ export const getAppointmentsTool = defineTool({
       count: input.page_size,
       ...(input.date_from ? { start_date: input.date_from } : {}),
       ...(input.date_to ? { end_date: input.date_to } : {}),
+      ...(input.team_member_id ? { team_member_id: input.team_member_id } : {}),
+      ...(input.client_id ? { client_id: input.client_id } : {}),
+      ...(input.created_by_user_id
+        ? { created_user_id: input.created_by_user_id }
+        : {}),
+      ...(input.event_id ? { activity_id: input.event_id } : {}),
+      ...(input.created_from ? { c_start_date: input.created_from } : {}),
+      ...(input.created_to ? { c_end_date: input.created_to } : {}),
+      ...(input.changed_after ? { changed_after: input.changed_after } : {}),
+      ...(input.changed_before ? { changed_before: input.changed_before } : {}),
+      ...(input.include_deleted !== undefined
+        ? { with_deleted: input.include_deleted ? 1 : 0 }
+        : {}),
     });
 
     const lines = [

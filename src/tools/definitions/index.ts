@@ -16,6 +16,7 @@ export * from './settings.tools.js';
 export * from './resources.tools.js';
 export * from './executor.tools.js';
 export * from './analytics.tools.js';
+export * from './daily-analytics.tools.js';
 export * from './cash-receipts.tools.js';
 export * from './payer-cohorts.tools.js';
 export * from './clients.tools.js';

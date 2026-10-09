@@ -67,6 +67,7 @@ import {
   toDottedDate,
 } from '../../capabilities/analytics/periods.js';
 import { AnalyticsInputError } from '../../capabilities/analytics/errors.js';
+import { bookedShare } from './daily-analytics-adapter.js';
 
 // ========== value parsing ==========
 
@@ -832,13 +833,13 @@ export class V1AnalyticsAdapter implements AnalyticsApi {
   ): Promise<TeamMemberOccupancy> {
     const rows = await callEnveloped<unknown[]>(
       this.http,
-      `/company/${query.location_id}/staff/workload${queryString({
+      `/locations/${query.location_id}/team_members/workload${queryString({
         start_date: query.date_from,
         end_date: query.date_to,
         team_member_id: query.team_member_id,
       })}`,
       {
-        kind: 'occupancy',
+        kind: 'team_workload',
         context: 'read the daily occupancy of this team member',
       }
     );
@@ -847,13 +848,15 @@ export class V1AnalyticsAdapter implements AnalyticsApi {
       points: list(rows).flatMap((row) => {
         const r = record(row);
         const day = String(r.date ?? '').slice(0, 10);
+        const share = bookedShare(r.workload);
         // The legacy workload endpoint can include the first day after end_date
         // with zero workload. It is outside this requested period and changes
         // both the reported day count and the mean occupancy.
         return /^\d{4}-\d{2}-\d{2}$/.test(day) &&
           day >= query.date_from &&
-          day <= query.date_to
-          ? [[day, toPercent(r.workload) ?? 0] as const]
+          day <= query.date_to &&
+          share !== null
+          ? [[day, Math.round(share * 1000) / 10] as const]
           : [];
       }),
     };

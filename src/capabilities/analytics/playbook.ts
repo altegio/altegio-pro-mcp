@@ -222,6 +222,16 @@ export const QUESTION_ROUTES: readonly QuestionRoute[] = [
     tool: 'analytics_get_team_member_occupancy',
   },
   {
+    question:
+      'Which working days are quiet for the selected visible active team / when to consider a promotion',
+    tool: 'analytics_get_team_workload',
+  },
+  {
+    question:
+      'What was booked, completed and received on one day / compact daily business summary',
+    tool: 'analytics_get_daily_summary',
+  },
+  {
     question: 'Is this client reliable / how much have they spent',
     tool: 'analytics_get_client_visit_stats',
   },
