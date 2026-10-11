@@ -9,18 +9,24 @@
  */
 import { isLocationMetadataRead } from '../../providers/location-read-policy.js';
 import {
-  acceptedNames,
-  canonicalName,
-  getOperation,
+  fallbacksFor,
   isLiveSource,
   isPreview,
-  replacementFor,
+  resolveOperation,
   type CatalogOperation,
   type CatalogParameter,
 } from './catalog.js';
 import { enforceBudget, NARROW_HINT } from './budget.js';
 import { searchOperations } from './search.js';
 import { readingNotesFor } from './reading-notes.js';
+import {
+  acceptedParamNames,
+  exposedParamName,
+  pagingParameters,
+  unwrapQueryName,
+} from './params.js';
+import { projectSchema } from './glossary.js';
+import { DEFAULT_PAGE_SIZE } from './paging.js';
 import {
   currentView,
   elsewhereClause,
@@ -53,26 +59,33 @@ function schemaType(schema: Record<string, unknown> | undefined): string {
   return 'unknown';
 }
 
-/** The canonical name for a parameter: overlay rename first, then the alias table. */
-export function exposedParamName(
-  op: CatalogOperation,
-  specName: string
-): string {
-  return op.curation?.param_renames?.[specName] ?? canonicalName(specName);
+export { exposedParamName } from './params.js';
+
+/** A date-only value is accepted where the spec wants a date-time. */
+function dateTimeNote(param: CatalogParameter): string | undefined {
+  const pattern = param.schema?.pattern;
+  return typeof pattern === 'string' && /\\d\{2\}:|\[0-9\]\{2\}:/.test(pattern)
+    ? ' A plain YYYY-MM-DD date is accepted (start of day for a lower bound, end of day for an upper one).'
+    : undefined;
 }
 
 function describeParameter(
   op: CatalogOperation,
   param: CatalogParameter
 ): DescribedParameter {
-  const exposed = exposedParamName(op, param.name);
-  const accepted = acceptedNames(param.name);
-  if (!accepted.includes(exposed)) accepted.push(exposed);
+  const exposed = exposedParamName(op, param.name, param.in);
+  const accepted = acceptedParamNames(op, param.name, param.in);
   const schema = param.schema;
   const managedLocationFilter =
     param.name === 'my' &&
     op.source === 'v1' &&
     isLocationMetadataRead(op.path.replace(/\{[^}]+\}/g, '1'), op.method);
+  const pageSize = exposed === 'page_size' && param.in === 'query';
+  const maximum = Number(schema?.maximum);
+  const description = [param.description, dateTimeNote(param)]
+    .filter(Boolean)
+    .join('')
+    .trim();
 
   return {
     name: exposed,
@@ -83,8 +96,16 @@ function describeParameter(
     type: schemaType(schema),
     ...(typeof schema?.format === 'string' ? { format: schema.format } : {}),
     ...(Array.isArray(schema?.enum) ? { enum: schema.enum } : {}),
-    ...(schema?.default !== undefined ? { default: schema.default } : {}),
-    ...(param.description ? { description: param.description } : {}),
+    ...(pageSize
+      ? {
+          default: Number.isFinite(maximum)
+            ? Math.min(DEFAULT_PAGE_SIZE, maximum)
+            : DEFAULT_PAGE_SIZE,
+        }
+      : schema?.default !== undefined
+        ? { default: schema.default }
+        : {}),
+    ...(description ? { description } : {}),
     ...(managedLocationFilter
       ? {
           enum: [1],
@@ -97,17 +118,46 @@ function describeParameter(
 }
 
 /**
- * Which legacy spellings this operation accepts under canonical names. The V1
- * API takes the canonical aliases on the wire, so this is a naming note for the
- * model, not a translation the executor has to perform.
+ * Filters a retired same-path twin documents and the canonical operation does
+ * not: the executor still accepts them and serves the call through the twin.
+ * Shown as ordinary optional parameters — the model sees one capability.
+ */
+function fallbackParameters(op: CatalogOperation): DescribedParameter[] {
+  const known = new Set(
+    op.parameters.flatMap((p) => acceptedParamNames(op, p.name, p.in))
+  );
+  const out: DescribedParameter[] = [];
+  for (const fallback of fallbacksFor(op)) {
+    for (const param of fallback.parameters) {
+      if (param.in !== 'query') continue;
+      const described = describeParameter(fallback, param);
+      if (known.has(described.name)) continue;
+      known.add(described.name);
+      out.push({ ...described, required: false });
+    }
+  }
+  return out;
+}
+
+/**
+ * Which spec spellings this operation accepts under canonical names. The
+ * executor sends the spec spelling on the wire, so this is a naming note for
+ * a model that read the raw spec.
  */
 export function terminologyNotes(op: CatalogOperation): string[] {
   const notes: string[] = [];
   const seen = new Set<string>();
 
   for (const param of op.parameters) {
-    const exposed = exposedParamName(op, param.name);
-    if (exposed === param.name || seen.has(param.name)) continue;
+    const exposed = exposedParamName(op, param.name, param.in);
+    // Dropping a `filter[…]` wrapper is not a different word; it needs no note.
+    if (
+      exposed === param.name ||
+      exposed === unwrapQueryName(param.name) ||
+      seen.has(param.name)
+    ) {
+      continue;
+    }
     seen.add(param.name);
     notes.push(`\`${param.name}\` is accepted as \`${exposed}\``);
   }
@@ -128,22 +178,6 @@ export interface DescribeOutput {
 
 /** Suggest neighbours when an operationId does not exist (D8: errors carry the next action). */
 function notFound(operationId: string): DescribeOutput {
-  const replacement = replacementFor(operationId);
-  if (replacement) {
-    return {
-      found: false,
-      text:
-        `\`${operationId}\` is not in the API catalog: \`${replacement}\` replaces it. ` +
-        `Describe \`${replacement}\` instead.`,
-      structuredContent: {
-        operation_id: operationId,
-        found: false,
-        replaced_by: replacement,
-        suggestions: [replacement],
-      },
-    };
-  }
-
   const { hits } = searchOperations(operationId.replace(/[_-]+/g, ' '), {
     limit: 5,
     includePreview: true,
@@ -175,24 +209,46 @@ const ENVELOPE_SHAPES: Readonly<Record<string, string>> = {
   jsonapi: '{data, meta}',
 };
 
+/**
+ * The response as the caller will receive it: unwrapped, and with its schema
+ * projected into the glossary the executor's result uses.
+ */
 function responseForModel(
   response: NonNullable<CatalogOperation['response']>
 ): Record<string, unknown> {
-  const { envelope, ...rest } = response;
+  const { envelope, schema, ...rest } = response;
   const shape = envelope ? ENVELOPE_SHAPES[envelope] : undefined;
-  return { ...rest, ...(shape ? { unwrapped_from: shape } : {}) };
+  return {
+    ...rest,
+    ...(shape ? { unwrapped_from: shape } : {}),
+    ...(schema ? { schema: projectSchema(schema) } : {}),
+  };
 }
 
-export function describeOperation(operationId: string): DescribeOutput {
-  const op = getOperation(operationId);
-  if (!op) return notFound(operationId);
+/** How results come back, said once per describe. */
+const GLOSSARY_NOTE =
+  'Results use the product glossary (location, team member, appointment, event, product, membership): ' +
+  'legacy keys are renamed, presentation and notification fields are dropped, an appointment carries ' +
+  'a canonical `status`, and client phone/email are withheld unless `include_contacts` is true.';
 
-  const parameters = op.parameters.map((p) => describeParameter(op, p));
+export function describeOperation(operationId: string): DescribeOutput {
+  const resolved = resolveOperation(operationId);
+  if (!resolved) return notFound(operationId);
+  const { op, retiredId } = resolved;
+
+  const parameters = [
+    ...op.parameters.map((p) => describeParameter(op, p)),
+    ...fallbackParameters(op),
+  ];
   const notes = terminologyNotes(op);
   const readingNotes = readingNotesFor(op);
   const curatedTool = op.curation?.tool_name;
+  const paged = pagingParameters(op).size !== undefined;
 
   const structured: Record<string, unknown> = {
+    ...(retiredId
+      ? { requested_id: retiredId, replaced_by: op.operationId }
+      : {}),
     operation_id: op.operationId,
     method: op.method,
     path: op.displayPath,
@@ -230,6 +286,9 @@ export function describeOperation(operationId: string): DescribeOutput {
     ...(op.curation?.projection ? { projection: op.curation.projection } : {}),
     ...(notes.length > 0 ? { terminology_notes: notes } : {}),
     ...(readingNotes.length > 0 ? { reading_notes: readingNotes } : {}),
+    ...(op.method === 'GET' && isLiveSource(op.source)
+      ? { result_notes: resultNotes(paged) }
+      : {}),
   };
 
   const budgeted = enforceBudget(structured);
@@ -241,19 +300,38 @@ export function describeOperation(operationId: string): DescribeOutput {
 
   return {
     found: true,
-    text: renderText(op, parameters, notes, readingNotes),
+    text: renderText(op, parameters, notes, readingNotes, retiredId, paged),
     structuredContent: value,
   };
+}
+
+function resultNotes(paged: boolean): string[] {
+  return [
+    GLOSSARY_NOTE,
+    ...(paged
+      ? [
+          'Paged with `page` and `page_size`. When a page does not fit the size budget, the result returns ' +
+            'the items that fit and `pagination.next_page` / `next_page_size` (also as `next_params`) for the exact next call.',
+        ]
+      : []),
+  ];
 }
 
 function renderText(
   op: CatalogOperation,
   parameters: DescribedParameter[],
   notes: string[],
-  readingNotes: string[]
+  readingNotes: string[],
+  retiredId: string | undefined,
+  paged: boolean
 ): string {
   const lines: string[] = [];
 
+  if (retiredId) {
+    lines.push(
+      `\`${retiredId}\` is an older id of \`${op.operationId}\`; it still works, but use \`${op.operationId}\`.`
+    );
+  }
   lines.push(`${op.operationId} — ${op.method} ${op.displayPath}`);
   if (op.summary) lines.push(op.summary);
   lines.push(
@@ -335,6 +413,21 @@ function renderText(
   if (readingNotes.length > 0) {
     lines.push('', 'Reading the data:');
     for (const note of readingNotes) lines.push(`  - ${note}`);
+  }
+  if (op.method === 'GET' && isLiveSource(op.source)) {
+    lines.push('', 'The result:');
+    for (const note of resultNotes(paged)) lines.push(`  - ${note}`);
+    const example = Object.fromEntries(
+      parameters
+        .filter((p) => p.required)
+        .map((p) => [
+          p.name,
+          p.type === 'integer' || p.type === 'number' ? 1 : '…',
+        ])
+    );
+    lines.push(
+      `  - Call it as {"operation_id": "${op.operationId}", "params": ${JSON.stringify(example)}} — every path and query parameter goes in one flat \`params\` object.`
+    );
   }
 
   return lines.join('\n');

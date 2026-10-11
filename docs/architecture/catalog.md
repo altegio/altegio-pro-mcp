@@ -49,7 +49,7 @@ schema refs, and writes one entry per operation:
 V1 and V2 are both live, and many operations exist in both. Clients see one
 operation per capability: V2 is canonical, and V1 stays only where V2 lacks the
 capability (product owner, 2026-09-29). The build therefore retires the V1 twin
-of every V2 operation in one of two ways:
+of every V2 operation in one of three ways:
 
 - **Same id.** A V2 id is catalogued without its `_v2` suffix
   (`get_event_date_range_v2` → `get_event_date_range`). When the V1 spec uses
@@ -58,10 +58,18 @@ of every V2 operation in one of two ways:
   entry names the V1 ids it replaces under `supersedes`
   (`list_events: {supersedes: [search_events]}`), and they are retired with
   reason `declared`.
+- **Same path.** A live V1 operation at the same method and path as a V2 one
+  (`get_appointment_list` and `list_appointments` are both
+  `GET /locations/{location_id}/appointments`) is retired automatically with
+  reason `same-path`. Its entry keeps the V1 `parameters`: when a call needs a
+  filter only V1 has (team member, creation or change dates, deleted
+  appointments), the executor serves it through the twin. The model sees one
+  operation whose parameter list is the union, in canonical names.
 
 A retired operation leaves `operations` and is listed under `superseded` with
-its method, path and `supersededBy`. The executor uses that list to answer a
-retired id with a pointer to its replacement, not with "unknown operation".
+its method, path and `supersededBy`. The executor resolves a retired id to its
+replacement — search, describe and call all answer for the canonical operation
+and say that the old id is an older name for it.
 The build fails when a `supersedes` entry names something other than a V1
 operation, when an operation is retired twice, when a spec that supersedes
 nothing claims a twin, or when the retired operation still carries curation.

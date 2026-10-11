@@ -11,6 +11,7 @@ import {
   allOperations,
   curatedToolFor,
   isLiveSource,
+  replacementFor,
   type CatalogOperation,
 } from './catalog.js';
 
@@ -125,6 +126,16 @@ const READ_BONUS = 1.5;
 const DEPRECATED_PENALTY = 2;
 
 export const MAX_SEARCH_RESULTS = 10;
+
+/**
+ * Relevant matches stop here. A broad query ("list appointments") used to
+ * report 150 matches, which reads as "keep paging"; past a few pages of
+ * ranked hits the tail is word overlap, not an answer.
+ */
+export const MAX_TOTAL_MATCHES = 30;
+
+/** A hit scoring under this share of the best hit is noise, not a candidate. */
+const RELEVANCE_FLOOR = 0.4;
 
 export interface SearchFilters {
   domain?: string;
@@ -246,7 +257,10 @@ function tieBreak(a: CatalogOperation, b: CatalogOperation): number {
 export interface SearchResult {
   terms: string[];
   hits: SearchHit[];
-  /** How many operations scored above zero, before the result limit. */
+  /**
+   * How many operations are relevant (within `RELEVANCE_FLOOR` of the best
+   * hit, at most `MAX_TOTAL_MATCHES`), before the page limit.
+   */
   totalMatches: number;
   /** How many operations the filters left searchable. */
   searched: number;
@@ -294,19 +308,29 @@ export function searchOperations(
     if (op.method === 'GET') score += READ_BONUS;
     if (op.deprecated) score -= DEPRECATED_PENALTY;
     // Someone who typed the exact identifier wants that operation, not a
-    // neighbour that happens to share more words.
-    if (op.operationId.toLowerCase() === normalizedQuery) score += 100;
+    // neighbour that happens to share more words — and an older id of it
+    // finds the operation that replaced it.
+    if (
+      op.operationId.toLowerCase() === normalizedQuery ||
+      replacementFor(normalizedQuery) === op.operationId
+    ) {
+      score += 100;
+    }
 
     scored.push({ op, score });
   }
 
   scored.sort((a, b) => b.score - a.score || tieBreak(a.op, b.op));
+  const floor = (scored[0]?.score ?? 0) * RELEVANCE_FLOOR;
+  const relevant = scored
+    .filter(({ score }) => score >= floor)
+    .slice(0, MAX_TOTAL_MATCHES);
 
   return {
     terms,
-    totalMatches: scored.length,
+    totalMatches: relevant.length,
     searched: candidates.length,
-    hits: scored.slice(offset, offset + limit).map(({ op, score }) => ({
+    hits: relevant.slice(offset, offset + limit).map(({ op, score }) => ({
       operationId: op.operationId,
       method: op.method,
       path: op.displayPath,

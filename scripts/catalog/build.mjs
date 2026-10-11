@@ -86,6 +86,10 @@ const METHOD_RANK = new Map(METHODS.map((m, i) => [m, i]));
  *   (`get_event`, `delete_appointment`) and is superseded automatically.
  * - **Declared.** Twins with different ids (`search_events` → `list_events`)
  *   are named by the overlay field `supersedes` on the surviving operation.
+ * - **Same path.** A V1 operation at the same method and path as a V2 one
+ *   (`get_appointment_list` → `list_appointments`) is superseded
+ *   automatically; it keeps its parameters as a fallback route for filters
+ *   only V1 has (see `retireSamePathTwins`).
  *
  * Superseded operations are listed under `superseded` in the catalog, not
  * under `operations`. Any other id clash still fails the build.
@@ -872,6 +876,44 @@ function applySupersedes(curation, byId, superseded, retire) {
   }
 }
 
+/** Method plus path with placeholder names erased: the address of a capability. */
+function routeKey(op) {
+  return `${op.method} ${op.displayPath.replace(/\{[^}]+\}/g, '{}')}`;
+}
+
+/**
+ * Retire every live V1 operation that a V2 operation serves at the same method
+ * and path (`get_appointment_list` and `list_appointments` are both
+ * `GET /locations/{location_id}/appointments`). Two ids for one address are one
+ * capability shown twice, whatever the spec authors called them.
+ *
+ * The retired twin keeps its parameters in the `superseded` entry: where V2
+ * lacks a filter V1 has, the executor routes a call that needs it to the twin
+ * (V1 only as a fallback, 2026-09-29). Curation keyed by the twin is refused,
+ * as for a declared twin, so it is moved to the survivor by hand.
+ */
+function retireSamePathTwins(operations, curation, retire) {
+  const survivors = new Map();
+  for (const spec of SPECS) {
+    if (!spec.supersedes) continue;
+    for (const op of operations) {
+      if (op.source === spec.source) {
+        survivors.set(routeKey(op), { op, retires: spec.supersedes });
+      }
+    }
+  }
+  for (const op of [...operations]) {
+    const survivor = survivors.get(routeKey(op));
+    if (!survivor || op.source !== survivor.retires) continue;
+    if (curation.has(op.operationId)) {
+      throw new Error(
+        `overlay entry "${op.operationId}" curates an operation that "${survivor.op.operationId}" supersedes by its path; move its curation to "${survivor.op.operationId}"`
+      );
+    }
+    retire(op, survivor.op, 'same-path', { parameters: op.parameters });
+  }
+}
+
 /** Build the catalog object from a spec repository plus the overlay directory. */
 export function buildCatalog({ docsRoot, overlayDir }) {
   const warnings = [];
@@ -880,7 +922,7 @@ export function buildCatalog({ docsRoot, overlayDir }) {
 
   const byId = new Map();
   const superseded = [];
-  const retire = (op, survivor, reason) => {
+  const retire = (op, survivor, reason, extra = {}) => {
     byId.delete(op.operationId);
     operations.splice(operations.indexOf(op), 1);
     superseded.push({
@@ -890,6 +932,7 @@ export function buildCatalog({ docsRoot, overlayDir }) {
       path: op.path,
       supersededBy: survivor.operationId,
       reason,
+      ...extra,
     });
   };
 
@@ -922,6 +965,7 @@ export function buildCatalog({ docsRoot, overlayDir }) {
 
   const curation = loadOverlay(overlayDir);
   applySupersedes(curation, byId, superseded, retire);
+  retireSamePathTwins(operations, curation, retire);
 
   let curatedCount = 0;
   for (const [operationId, entry] of curation) {

@@ -98,7 +98,7 @@ describe('mandatory managed-location reads', () => {
         my: 0,
       });
       expect(lastUrl().searchParams.getAll('my')).toEqual(['1']);
-      expect(result.structuredContent).toMatchObject({ query: { my: 1 } });
+      expect(result.structuredContent).toMatchObject({ params: { my: 1 } });
     }
   );
 

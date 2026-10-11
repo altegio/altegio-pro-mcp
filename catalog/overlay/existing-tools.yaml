@@ -32,13 +32,14 @@ operations:
     write_allowed: false
 
   # --- appointments --------------------------------------------------------
-  get_appointment_list:
+  # V2 serves the list at the same path, so the V1 `get_appointment_list`
+  # is superseded by its path and stays only as a fallback route for the
+  # filters V2 lacks (team member, creation and change dates, deleted).
+  list_appointments:
     domain: appointments
     tier: core
     facets: [ops]
     tool_name: appointments_list
-    param_renames:
-      staff_id: team_member_id
     write_allowed: false
   create_appointment:
     domain: appointments

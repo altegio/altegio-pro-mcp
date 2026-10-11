@@ -31,9 +31,9 @@ const ANALYTICS_POINTER = `For how these fields roll up into metrics (revenue, a
 const NOTES_BY_DOMAIN: Readonly<Record<string, readonly string[]>> = {
   appointments: [
     'This is an appointment (the spec calls it a `record`); one appointment is one team member in one slot.',
-    'Visit status is a coded field: `attendance`/`visit_attendance` = -1 no-show, 0 waiting, 1 arrived, 2 confirmed (V3 spells them no_show/waiting/arrived/confirmed/cancelled). Only an arrived appointment becomes a visit with revenue.',
-    'Marking is manual: about one past appointment in eight is never moved off waiting/confirmed, so attendance-based counts undercount — treat them as a floor.',
-    '`paid_full` = 1 means the appointment is fully paid. `is_mobile` = 0 (admin, app or web created by the team) · 1 (mobile-browser online widget) · 2 (desktop-browser online widget), so `is_mobile > 0` is an online booking. `visit_id` links the appointment to its billing visit.',
+    'The result carries the canonical `status`: waiting, confirmed, arrived, no_show or cancelled. It is derived from the coded `attendance` field of the spec (-1 no-show, 0 waiting, 1 arrived, 2 confirmed; a deleted appointment is cancelled); the spec’s separate `confirmed` flag is dropped because it does not mean the visit is confirmed. Only an arrived appointment becomes a visit with revenue.',
+    'Marking is manual: about one past appointment in eight is never moved off waiting/confirmed, so status-based counts undercount — treat them as a floor.',
+    '`paid_in_full` says whether the appointment is fully paid. `is_mobile` = 0 (admin, app or web created by the team) · 1 (mobile-browser online widget) · 2 (desktop-browser online widget), so `is_mobile > 0` is an online booking. `visit_id` links the appointment to its billing visit; `duration_seconds` is its length.',
   ],
   visits: [
     'A visit is the billing unit: it groups one or more appointments and carries the items actually sold and the payments that settled them. Revenue, average check and the paid/unpaid state come from the visit, not the appointment.',
@@ -60,7 +60,7 @@ const NOTES_BY_DOMAIN: Readonly<Record<string, readonly string[]>> = {
   ],
   events: [
     'An event is a group class or other session many clients book into (the specs call it an `activity`); `capacity` is its seat count and each booking is an appointment on the event.',
-    'The event reads `list_events`, `list_event_dates`, `get_event_date_range` and `list_event_filters` require `filter[from]` and `filter[to]` as `YYYY-MM-DD HH:MM:SS` in the location’s time zone, and refuse (422) a period that starts before the current time there. `list_events` and `list_event_dates` read the past with `filter[include_deleted]=1`, which also returns cancelled events (`deleted: true`). Prefer the curated `events_*` tools, which handle this.',
+    'The event reads `list_events`, `list_event_dates`, `get_event_date_range` and `list_event_filters` require `date_from` and `date_to` (the spec’s `filter[from]`/`filter[to]`) as `YYYY-MM-DD HH:MM:SS` in the location’s time zone — a plain date becomes the start or end of that day — and refuse (422) a period that starts before the current time there. `list_events` and `list_event_dates` read the past with `include_deleted=1`, which also returns cancelled events (`deleted: true`). Prefer the curated `events_*` tools, which handle this.',
   ],
   schedule: [
     'Occupancy is booked time over scheduled time. A team member with no schedule contributes no scheduled time, so their occupancy is blank, not zero.',
