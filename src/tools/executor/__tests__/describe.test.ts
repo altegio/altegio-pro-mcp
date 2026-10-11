@@ -175,13 +175,52 @@ describe('api_describe_operation', () => {
     ).toBe(false);
   });
 
-  it('points a superseded id at the operation that replaced it', () => {
+  it('resolves a superseded id to the operation that replaced it', () => {
     const result = describeOperation('get_team_member_list');
-    expect(result.found).toBe(false);
-    expect(result.text).toContain('`list_team_members` replaces it');
+    expect(result.found).toBe(true);
+    expect(result.text).toContain(
+      '`get_team_member_list` is an older id of `list_team_members`'
+    );
     expect(result.structuredContent).toMatchObject({
+      requested_id: 'get_team_member_list',
       replaced_by: 'list_team_members',
+      operation_id: 'list_team_members',
     });
+  });
+
+  it('describes one capability in canonical names, with the twin’s extra filters', () => {
+    const { text, structuredContent } = describeOperation('list_appointments');
+    const names = (
+      structuredContent.parameters as Array<{ name: string; required: boolean }>
+    ).map((p) => p.name);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'location_id',
+        'date_from',
+        'date_to',
+        'page',
+        'page_size',
+        'client_id',
+        'event_id',
+        // Served through the retired twin, shown as an ordinary filter.
+        'team_member_id',
+        'created_from',
+        'changed_after',
+        'include_deleted',
+      ])
+    );
+    expect(new Set(names).size).toBe(names.length);
+    expect(text).not.toMatch(/- (count|limit|start_date) \(|\bv1\b|\bv2\b/);
+    expect(text).toContain('- page_size (query');
+    expect(text).toContain('plain YYYY-MM-DD date is accepted');
+    expect(text).toContain('`pagination.next_page`');
+    // The response schema speaks the glossary too.
+    const schema = JSON.stringify(structuredContent.response);
+    expect(schema).toContain('team_member_id');
+    expect(schema).toContain('"status"');
+    expect(schema).not.toMatch(
+      /"(company_id|master_id|staff_id|attendance|confirmed)":/
+    );
   });
 
   it('suggests neighbours for an unknown operationId', () => {

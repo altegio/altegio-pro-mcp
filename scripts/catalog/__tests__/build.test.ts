@@ -184,6 +184,39 @@ describe('catalog build', () => {
       }
     });
 
+    it('retires a V1 operation a V2 one serves at the same method and path', () => {
+      const survivors = catalog.operations.filter(
+        (o) =>
+          o.method === 'GET' &&
+          o.displayPath === '/locations/{location_id}/appointments' &&
+          o.source !== 'v3'
+      );
+      expect(survivors.map((o) => o.operationId)).toEqual([
+        'list_appointments',
+      ]);
+      const twin = catalog.superseded.find(
+        (s) => s.operationId === 'get_appointment_list'
+      ) as
+        | {
+            supersededBy: string;
+            reason: string;
+            parameters?: Array<{ name: string }>;
+          }
+        | undefined;
+      expect(twin).toMatchObject({
+        supersededBy: 'list_appointments',
+        reason: 'same-path',
+      });
+      // The twin keeps its filters as the fallback route for what V2 lacks.
+      expect(twin?.parameters?.map((p) => p.name)).toContain('team_member_id');
+
+      // No live method + path is served twice.
+      const routes = catalog.operations
+        .filter((o) => o.source !== 'v3')
+        .map((o) => `${o.method} ${o.displayPath.replace(/\{[^}]+\}/g, '{}')}`);
+      expect(new Set(routes).size).toBe(routes.length);
+    });
+
     it('drops the spec’s _v2 suffix and keeps the spec id internally', () => {
       const strategies = catalog.operations.find(
         (o) => o.operationId === 'list_event_duplication_strategies'
@@ -251,7 +284,7 @@ describe('catalog build', () => {
         [
           'version: 1',
           'operations:',
-          '  get_team_member_list:',
+          '  get_resource_list:',
           '    domain: probe_domain',
           '    tier: pack',
           '    tool_name: probe_tool',
@@ -274,7 +307,7 @@ describe('catalog build', () => {
         }>;
       };
       const staff = built.operations.find(
-        (o) => o.operationId === 'get_team_member_list'
+        (o) => o.operationId === 'get_resource_list'
       );
       expect(staff?.curation?.tool_name).toBe('probe_tool');
       expect(staff?.curation?.tier).toBe('pack');
@@ -399,6 +432,11 @@ describe('catalog build', () => {
           '    tool_name: stale_tool',
         ],
         'move its curation to "list_events"',
+      ],
+      [
+        'curation left on a twin retired by its path',
+        ['  get_appointment_list:', '    tool_name: stale_tool'],
+        'supersedes by its path; move its curation to "list_appointments"',
       ],
       [
         'a malformed supersedes list',

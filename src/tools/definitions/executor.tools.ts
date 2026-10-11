@@ -12,7 +12,10 @@ import { defineTool } from '../factory.js';
 import { catalog, isLiveSource } from '../executor/catalog.js';
 import { MAX_SEARCH_RESULTS, searchOperations } from '../executor/search.js';
 import { describeOperation } from '../executor/describe.js';
-import { callOperation } from '../executor/call.js';
+import { callOperation, parameterNamesFor } from '../executor/call.js';
+import { foldCallArguments, takeFoldNotes } from '../executor/input.js';
+import { includeContactsArg } from '../contacts.js';
+import { ExecutorRefusalError } from '../../utils/errors.js';
 import { currentView, elsewhereClause } from '../serving-view.js';
 import {
   pageArg,
@@ -151,9 +154,23 @@ export const searchOperationsTool = defineTool({
       );
     });
 
+    // Curated tools first: they answer the question with the projection and
+    // paging the executor can only approximate.
+    const curated = [
+      ...new Set(
+        items
+          .filter((hit) => hit.tool && !('tool_served' in hit))
+          .map((hit) => `\`${hit.tool}\``)
+      ),
+    ];
+    const header = curated.length
+      ? `Curated tools cover some of these — prefer them: ${curated.join(', ')}.\n\n`
+      : '';
+
     return {
       text:
-        `${result.totalMatches} operation(s) match "${input.query}"; showing ${result.hits.length}:\n\n` +
+        header +
+        `${result.totalMatches} relevant operation(s) for "${input.query}"; showing ${result.hits.length}:\n\n` +
         `${lines.join('\n\n')}\n\n` +
         'Next: `api_describe_operation` for the full contract, then ' +
         '`api_call_operation` to run a GET.',
@@ -171,10 +188,11 @@ export const describeOperationTool = defineTool({
   category: 'API',
   description:
     'Read the full contract of one API operation before calling it: every parameter ' +
-    'with type, requiredness and description, the request body shape, the response shape, ' +
-    'whether a logged-in session is needed, whether it is deprecated or only a preview of a ' +
-    'future contract, and which legacy parameter names are accepted under canonical ones (for example ' +
-    '`staff_id` is accepted as `team_member_id`). Use it after `api_search_operations` ' +
+    'with its canonical name, type, requiredness and description, the request body shape, the ' +
+    'response shape in the product glossary, whether a logged-in session is needed, whether it ' +
+    'is deprecated or only a preview of a future contract, and which legacy names are accepted ' +
+    'under canonical ones (for example `staff_id` as `team_member_id`, `count` as `page_size`, ' +
+    '`start_date` as `date_from`). Use it after `api_search_operations` ' +
     'and before `api_call_operation`. Reads the built-in catalog only — no API call.',
   annotations: {
     title: 'Describe API Operation',
@@ -186,7 +204,7 @@ export const describeOperationTool = defineTool({
       .string()
       .min(1)
       .describe(
-        'The operationId from `api_search_operations`, e.g. `get_team_member_list`.'
+        'The operationId from `api_search_operations`, e.g. `list_team_members`.'
       ),
   }),
   handler: async ({ input }) => {
@@ -203,38 +221,74 @@ export const callOperationTool = defineTool({
   category: 'API',
   description:
     'Run a documented read against the Altegio API when no curated tool covers it. ' +
-    'Give the operationId from `api_search_operations` and its parameters under `params`; ' +
-    'canonical names are accepted (`location_id`, `team_member_id`, `appointment_id`, ' +
-    '`product_id`), required parameters are validated against the spec, and the result comes ' +
-    'back projected and inside the size budget. READS ONLY: a POST, PUT, PATCH or DELETE ' +
-    'operation is refused — writes go through the curated tools. Prefer a curated tool ' +
-    'whenever `api_search_operations` names one. AUTHENTICATION REQUIRED.',
+    'Give the operationId from `api_search_operations` and every path and query parameter in ' +
+    'one flat `params` object, in canonical names (`location_id`, `team_member_id`, ' +
+    '`appointment_id`, `date_from`, `date_to`, `page`, `page_size`). The result comes back in the ' +
+    'product glossary and inside the size budget; a list that does not fit returns the items that ' +
+    'do plus the exact next `page`/`page_size`. Client phone and email are withheld unless ' +
+    '`include_contacts` is true. READS ONLY: a POST, PUT, PATCH or DELETE operation is refused — ' +
+    'writes go through the curated tools. Prefer a curated tool whenever ' +
+    '`api_search_operations` names one. AUTHENTICATION REQUIRED.',
   annotations: {
     title: 'Call API Operation (read-only)',
     readOnlyHint: true,
     openWorldHint: true,
   },
-  input: z.object({
-    operation_id: z
-      .string()
-      .min(1)
-      .describe(
-        'The operationId to execute, e.g. `get_team_member_list`. Must be a GET operation.'
-      ),
-    params: z
-      .record(z.string(), z.unknown())
-      .optional()
-      .describe(
-        'Path and query parameters by name, e.g. {"location_id": 4564, "count": 30}. ' +
-          'Call `api_describe_operation` for the accepted names and types.'
-      ),
-  }),
+  // Misplaced shapes (`path_params`, `query`, `arguments`, `operationId`,
+  // top-level parameters) are folded into `params` before validation, so a
+  // wrong shape gets an answer that names `params`, not "Unrecognized key".
+  input: z.preprocess(
+    foldCallArguments,
+    z
+      .object({
+        operation_id: z
+          .string()
+          .describe(
+            'The operationId to execute, e.g. `list_team_members`. Must be a GET operation.'
+          ),
+        params: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe(
+            'Every path and query parameter, flat, by canonical name, e.g. ' +
+              '{"location_id": 4564, "date_from": "2026-10-01", "date_to": "2026-10-07", "page_size": 25}. ' +
+              'Call `api_describe_operation` for the accepted names and types.'
+          ),
+        include_contacts: includeContactsArg,
+      })
+      .strict()
+  ),
   handler: async ({ input, client }) => {
-    const result = await callOperation(
-      client,
-      input.operation_id,
-      input.params ?? {}
-    );
+    const { params, folded, invalid } = takeFoldNotes(input.params ?? {});
+    const shape =
+      '`api_call_operation` takes `operation_id` and one flat `params` object with every ' +
+      'path and query parameter, e.g. {"operation_id": "get_appointment", "params": ' +
+      '{"location_id": 4564, "appointment_id": 675876978}}.';
+    if (!input.operation_id) {
+      throw new ExecutorRefusalError(
+        `${shape} \`operation_id\` is missing — find it with \`api_search_operations\`.`,
+        { reason: 'missing_operation_id' }
+      );
+    }
+    if (invalid.length > 0) {
+      throw new ExecutorRefusalError(
+        `${shape} ${invalid.map((key) => `\`${key}\``).join(', ')} could not be read as ` +
+          'an object of parameter names to values. Parameters of ' +
+          `\`${input.operation_id}\`: ${parameterNamesFor(input.operation_id)}.`,
+        { reason: 'invalid_params', fields: invalid }
+      );
+    }
+    const notes =
+      folded.length > 0
+        ? [
+            `Read ${folded.map((key) => `\`${key}\``).join(', ')} as parameters; ` +
+              'next time put every path and query parameter in one flat `params` object.',
+          ]
+        : [];
+    const result = await callOperation(client, input.operation_id, params, {
+      includeContacts: input.include_contacts === true,
+      notes,
+    });
     return { text: result.text, structuredContent: result.structuredContent };
   },
 });

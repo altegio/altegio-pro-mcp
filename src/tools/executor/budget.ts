@@ -17,7 +17,7 @@ export const RESULT_BUDGET_CHARS = 14000;
 /** What to tell the model when a result had to be cut. */
 export const NARROW_HINT =
   'Result truncated to stay inside the size budget. Narrow the query — ' +
-  'add a date range, a smaller `count`/`page`, or a more specific id — ' +
+  'add a date range (`date_from`/`date_to`), a smaller `page_size`, or a more specific id — ' +
   'or use the curated tool for this domain, which projects the fields that matter.';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -162,6 +162,27 @@ function pruneObject(
     truncated: omitted.length > 0,
     ...(omitted.length > 0 ? { omittedFields: omitted } : {}),
   };
+}
+
+/**
+ * How many leading items of a list fit every size check at once — the
+ * structured payload and its text rendering are budgeted together, so both
+ * channels carry the same items. At least one item is always kept; callers
+ * prune that one with `enforceBudget` if it is still too big.
+ */
+export function fitCount(
+  items: readonly unknown[],
+  fits: (slice: readonly unknown[]) => boolean
+): number {
+  if (items.length === 0 || fits(items)) return items.length;
+  let low = 1;
+  let high = items.length - 1;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (fits(items.slice(0, mid))) low = mid;
+    else high = mid - 1;
+  }
+  return low;
 }
 
 /**

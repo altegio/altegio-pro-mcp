@@ -34,7 +34,7 @@
     "salon_id": "location_id",
     "staff_id": "team_member_id"
   },
-  "operationCount": 362,
+  "operationCount": 360,
   "curatedCount": 75,
   "domains": [
     {
@@ -43,7 +43,7 @@
     },
     {
       "domain": "appointments",
-      "operations": 35
+      "operations": 34
     },
     {
       "domain": "auth",
@@ -115,7 +115,7 @@
     },
     {
       "domain": "products",
-      "operations": 19
+      "operations": 18
     },
     {
       "domain": "resources",
@@ -158,7 +158,7 @@
       "operations": 2
     }
   ],
-  "supersededCount": 25,
+  "supersededCount": 27,
   "operations": [
     {
       "source": "v1",
@@ -13194,514 +13194,6 @@
     },
     {
       "source": "v1",
-      "operationId": "get_appointment_list",
-      "method": "GET",
-      "path": "/locations/{location_id}/appointments",
-      "displayPath": "/locations/{location_id}/appointments",
-      "summary": "Get list of appointments",
-      "description": "####  Filtering Appointments\n\n+ staff_id: team member ID. \n\nUse this to retrieve appointments for a specific team member\n\n+ client_id: Client ID \n\nUse this to retrieve appointments for a specific client\n\n+ created_user_id: User ID \n\nUser who created the appointment \n\nUse this to filter appointments created by a specific user\n\n+ start_date: Session start date (inclusive) \n\nReturns appointments with a session starting on or after this date\n\n+ end_date: Session end date (inclusive) \n\nReturns appointments with a session ending on or before this date\n\n+ c_start_date: Appointment creation date from \n\nReturns appointments created on or after this date\n\n+ c_end_date: Appointment creation date until \n\nReturns appointments created on or before this date\n\n+ changed_after: Modified or created after this datetime \n\nReturns appointments created or modified after the specified date and time\n\n+ changed_before: Modified or created before this datetime \n\nReturns appointments created or modified before the specified date and time\n\n+ activity_id: Event ID \n\nReturns only the appointments booked to this Event",
-      "tags": [
-        "Appointments"
-      ],
-      "domain": "appointments",
-      "deprecated": false,
-      "security": {
-        "required": true,
-        "schemes": [
-          "BearerPartnerUser"
-        ]
-      },
-      "parameters": [
-        {
-          "description": "location ID",
-          "name": "location_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "Event ID. Returns only the Appointments booked to this Event.",
-          "name": "activity_id",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "Appointment creation date by (filter by appointment creation date).",
-          "name": "c_end_date",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "description": "Appointment creation date starting from(filter by appointment creation date). If you need appointments created since a specific date",
-          "name": "c_start_date",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "description": "The date the appointment was modified/created. If you need appointments created/modified starting from a specific date and time",
-          "name": "changed_after",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "description": "The date the appointment was modified/created. If you need appointments created/modified before a specific date and time",
-          "name": "changed_before",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "description": "Client ID. If you need appointments for a specific client",
-          "name": "client_id",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "Number of appointments per page",
-          "name": "count",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "The ID of the user who created the appointment. If you need appointments created by a specific user",
-          "name": "created_user_id",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "Session date to. If you need appointments for a session before a specific date",
-          "name": "end_date",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "description": "Flag for including a list of consumables by appointments in the response",
-          "name": "include_consumables",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "Flag to include in the response financial transactions by appointments",
-          "name": "include_finance_transactions",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "Page number",
-          "name": "page",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "Flag to add `short_link_token` to each Appointment: the token of the Booking User's Appointment page (the last segment of `short_link`)",
-          "name": "short_link_token",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "Session date starting at (filter by session date). If you need appointments for a session starting from a specific date",
-          "name": "start_date",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "description": "team member ID, if you only need appointments for a specific team member",
-          "name": "team_member_id",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "Include deleted appointments in output (with_deleted=1 will return deleted appointments as well)",
-          "name": "with_deleted",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "boolean"
-          }
-        }
-      ],
-      "response": {
-        "contentType": "application/json",
-        "statusCode": "200",
-        "envelope": "v1",
-        "schema": {
-          "description": "Array of objects with data",
-          "items": {
-            "properties": {
-              "acceptance_free": {
-                "description": "Acceptance free flag",
-                "type": [
-                  "boolean",
-                  "null"
-                ],
-                "x-truncated": true
-              },
-              "activity_id": {
-                "description": "Group event ID",
-                "type": "integer",
-                "x-truncated": true
-              },
-              "api_id": {
-                "description": "External appointment ID",
-                "type": "string",
-                "x-truncated": true
-              },
-              "attendance": {
-                "description": "Appointment status, 2 - User confirmed the appointment, 1 - The user has arrived, services have been rendered, 0 - the user is waiting, -1 - the user has not come to visit",
-                "type": "number",
-                "x-truncated": true
-              },
-              "bookform_id": {
-                "description": "Online Appointment Form ID",
-                "type": "number",
-                "x-truncated": true
-              },
-              "client": {
-                "description": "Customer data (may be empty)",
-                "type": [
-                  "object",
-                  "null"
-                ],
-                "x-truncated": true
-              },
-              "clients_count": {
-                "description": "Number of clients in appointment",
-                "type": "number",
-                "x-truncated": true
-              },
-              "comer": {
-                "description": "Comer flag",
-                "type": [
-                  "boolean",
-                  "null"
-                ],
-                "x-truncated": true
-              },
-              "comment": {
-                "description": "Appointment Comment",
-                "type": "string",
-                "x-truncated": true
-              },
-              "company_id": {
-                "description": "location ID",
-                "type": "number",
-                "x-truncated": true
-              },
-              "confirmed": {
-                "description": "Appointment confirmation status, 0 - not confirmed, 1 - confirmed",
-                "type": "number",
-                "x-truncated": true
-              },
-              "consumables": {
-                "description": "Consumable Array",
-                "type": "array",
-                "x-truncated": true
-              },
-              "create_date": {
-                "description": "Session creation date",
-                "type": "string",
-                "x-truncated": true
-              },
-              "created_user_id": {
-                "description": "ID of the user who created the appointment",
-                "type": "number",
-                "x-truncated": true
-              },
-              "custom_color": {
-                "description": "Log appointment color",
-                "type": "string",
-                "x-truncated": true
-              },
-              "custom_fields": {
-                "description": "Custom fields (object or empty array)",
-                "type": [
-                  "object",
-                  "array"
-                ],
-                "x-truncated": true
-              },
-              "custom_font_color": {
-                "description": "(Only when reading) Write font color",
-                "type": "string",
-                "x-truncated": true
-              },
-              "date": {
-                "description": "Session date",
-                "type": "string",
-                "x-truncated": true
-              },
-              "datetime": {
-                "description": "Session date in ISO",
-                "type": "string",
-                "x-truncated": true
-              },
-              "deleted": {
-                "description": "(Read only) Whether the appointment was deleted (true if deleted)",
-                "type": "boolean",
-                "x-truncated": true
-              },
-              "documents": {
-                "description": "Array of documents",
-                "type": "array",
-                "x-truncated": true
-              },
-              "email_now": {
-                "description": "Has an email notification been sent?",
-                "type": "number",
-                "x-truncated": true
-              },
-              "email_remain_hours": {
-                "description": "How many hours before the start of the visit to send a reminder email",
-                "type": [
-                  "number",
-                  "null"
-                ],
-                "x-truncated": true
-              },
-              "finance_transactions": {
-                "description": "Array of financial transactions",
-                "type": "array",
-                "x-truncated": true
-              },
-              "from_url": {
-                "description": "From which page the transition was made to complete the appointment (website, VK application, etc.)",
-                "type": "string",
-                "x-truncated": true
-              },
-              "goods_transactions": {
-                "description": "Array of commodity transactions",
-                "type": "array",
-                "x-truncated": true
-              },
-              "id": {
-                "description": "Appointment ID",
-                "type": "number",
-                "x-truncated": true
-              },
-              "is_mobile": {
-                "description": "Type of device used to register (0 - appointment created by administrator, via web version or mobile app for administrators, 1 - Mobile browser, online appointment widget, 2 - Desktop browser, online…",
-                "type": "number",
-                "x-truncated": true
-              },
-              "is_remind_sms_sent": {
-                "description": "Has reminder SMS been sent",
-                "type": "boolean",
-                "x-truncated": true
-              },
-              "is_sale_bill_printed": {
-                "description": "Is the sales receipt printed?",
-                "type": "boolean",
-                "x-truncated": true
-              },
-              "is_update_blocked": {
-                "description": "Update blocked flag",
-                "type": "boolean",
-                "x-truncated": true
-              },
-              "last_change_date": {
-                "description": "The date and time when the appointment was last modified",
-                "type": "string",
-                "x-truncated": true
-              },
-              "length": {
-                "description": "Appointment duration in seconds. Alias of seance_length. Includes technical_break_duration.",
-                "type": "number",
-                "x-truncated": true
-              },
-              "master_request": {
-                "description": "Indicates whether a specific team member was selected for the appointment. Set to false if the \"any team member\" option was chosen",
-                "type": "number",
-                "x-truncated": true
-              },
-              "notified": {
-                "description": "Flag for confirmation of the appointment by the location administrator, if the client asked to confirm the appointment",
-                "type": "number",
-                "x-truncated": true
-              },
-              "online": {
-                "description": "(Read only) Whether the appointment is online or not (false if the appointment was made by an administrator)",
-                "type": "boolean",
-                "x-truncated": true
-              },
-              "paid_full": {
-                "description": "Flag, whether the appointment is paid in full (1 - if paid in full)",
-                "type": "number",
-                "x-truncated": true
-              },
-              "payment_status": {
-                "description": "Payment status",
-                "type": [
-                  "string",
-                  "number"
-                ],
-                "x-truncated": true
-              },
-              "prepaid": {
-                "description": "Is online payment available",
-                "type": "boolean",
-                "x-truncated": true
-              },
-              "prepaid_confirmed": {
-                "description": "Online payment status",
-                "type": "boolean",
-                "x-truncated": true
-              },
-              "record_from": {
-                "description": "Name of online registration form",
-                "type": "string",
-                "x-truncated": true
-              },
-              "record_labels": {
-                "description": "Post categories",
-                "type": "array",
-                "x-truncated": true
-              },
-              "resource_instance_ids": {
-                "description": "Resource instance IDs",
-                "type": "array",
-                "x-truncated": true
-              },
-              "review_requested": {
-                "description": "Flag for requesting visit feedback from the client",
-                "type": "number",
-                "x-truncated": true
-              },
-              "seance_length": {
-                "description": "Appointment duration in seconds. Includes technical_break_duration. Equal to the sum of services plus the technical break.",
-                "type": "number",
-                "x-truncated": true
-              },
-              "services": {
-                "description": "Array of objects with services in the appointment",
-                "type": "array",
-                "x-truncated": true
-              },
-              "short_link": {
-                "description": "Short link to appointment",
-                "type": "string",
-                "x-truncated": true
-              },
-              "short_link_token": {
-                "description": "Token of the Booking User's Appointment page. Returned only when `short_link_token=1` is requested.",
-                "type": "string",
-                "x-truncated": true
-              },
-              "sms_before": {
-                "description": "Whether to send an SMS reminder to the client (if the client is specified)",
-                "type": "number",
-                "x-truncated": true
-              },
-              "sms_now": {
-                "description": "Did you send SMS when adding an appointment",
-                "type": "number",
-                "x-truncated": true
-              },
-              "sms_now_text": {
-                "description": "SMS text",
-                "type": "string",
-                "x-truncated": true
-              },
-              "sms_remain_hours": {
-                "description": "How many hours before the start of the visit to send an SMS with a reminder",
-                "type": [
-                  "number",
-                  "null"
-                ],
-                "x-truncated": true
-              },
-              "staff": {
-                "description": "team member data object",
-                "type": "object",
-                "x-truncated": true
-              },
-              "staff_id": {
-                "description": "team member ID",
-                "type": "number",
-                "x-truncated": true
-              },
-              "technical_break_duration": {
-                "description": "Technical break duration in seconds",
-                "type": "number",
-                "x-truncated": true
-              },
-              "visit_attendance": {
-                "description": "Visit status, 2 - The user confirmed the appointment, 1 - The user came, the services were provided, 0 - the user is waiting, -1 - the user did not come to the visit",
-                "type": "number",
-                "x-truncated": true
-              },
-              "visit_id": {
-                "description": "Visit ID",
-                "type": "number",
-                "x-truncated": true
-              }
-            },
-            "type": "object"
-          },
-          "type": "array",
-          "x-depth-limited": 2
-        }
-      },
-      "curation": {
-        "domain": "appointments",
-        "tier": "core",
-        "facets": [
-          "ops"
-        ],
-        "tool_name": "appointments_list",
-        "param_renames": {
-          "staff_id": "team_member_id"
-        },
-        "write_allowed": false
-      }
-    },
-    {
-      "source": "v1",
       "operationId": "create_appointment",
       "method": "POST",
       "path": "/locations/{location_id}/appointments",
@@ -20090,78 +19582,6 @@
             }
           },
           "type": "object"
-        }
-      }
-    },
-    {
-      "source": "v1",
-      "operationId": "deprecated_get_product_category_list",
-      "method": "GET",
-      "path": "/locations/{location_id}/product_categories/{category_id}",
-      "displayPath": "/locations/{location_id}/product_categories/{category_id}",
-      "summary": "Get a list of product categories",
-      "tags": [
-        "Products"
-      ],
-      "domain": "products",
-      "deprecated": true,
-      "security": {
-        "required": true,
-        "schemes": [
-          "BearerPartnerUser"
-        ]
-      },
-      "parameters": [
-        {
-          "description": "ID of the parent product category. Default 0 - top-level categories are displayed (optional)",
-          "name": "category_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "location ID",
-          "name": "location_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "number"
-          }
-        }
-      ],
-      "response": {
-        "contentType": "application/json",
-        "statusCode": "200",
-        "envelope": "v1",
-        "schema": {
-          "description": "Array of objects with data",
-          "items": {
-            "properties": {
-              "id": {
-                "description": "Product category ID",
-                "type": "integer"
-              },
-              "is_chain": {
-                "description": "Whether the category belongs to the chain",
-                "type": "boolean"
-              },
-              "parent_category_id": {
-                "description": "Parent category ID (null for top-level categories)",
-                "type": [
-                  "integer",
-                  "null"
-                ]
-              },
-              "title": {
-                "description": "Product category name",
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "type": "array"
         }
       }
     },
@@ -42263,6 +41683,15 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "appointments",
+        "tier": "core",
+        "facets": [
+          "ops"
+        ],
+        "tool_name": "appointments_list",
+        "write_allowed": false
       }
     },
     {
@@ -62881,11 +62310,202 @@
     },
     {
       "source": "v1",
+      "operationId": "deprecated_get_product_category_list",
+      "method": "GET",
+      "path": "/locations/{location_id}/product_categories/{category_id}",
+      "parameters": [
+        {
+          "description": "ID of the parent product category. Default 0 - top-level categories are displayed (optional)",
+          "name": "category_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        }
+      ],
+      "supersededBy": "get_product_category",
+      "reason": "same-path"
+    },
+    {
+      "source": "v1",
       "operationId": "duplicate_event",
       "method": "POST",
       "path": "/locations/{location_id}/events/{event_id}/duplicate",
       "supersededBy": "duplicate_event",
       "reason": "same-id"
+    },
+    {
+      "source": "v1",
+      "operationId": "get_appointment_list",
+      "method": "GET",
+      "path": "/locations/{location_id}/appointments",
+      "parameters": [
+        {
+          "description": "location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Event ID. Returns only the Appointments booked to this Event.",
+          "name": "activity_id",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Appointment creation date by (filter by appointment creation date).",
+          "name": "c_end_date",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "Appointment creation date starting from(filter by appointment creation date). If you need appointments created since a specific date",
+          "name": "c_start_date",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "The date the appointment was modified/created. If you need appointments created/modified starting from a specific date and time",
+          "name": "changed_after",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "The date the appointment was modified/created. If you need appointments created/modified before a specific date and time",
+          "name": "changed_before",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "Client ID. If you need appointments for a specific client",
+          "name": "client_id",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Number of appointments per page",
+          "name": "count",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "The ID of the user who created the appointment. If you need appointments created by a specific user",
+          "name": "created_user_id",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Session date to. If you need appointments for a session before a specific date",
+          "name": "end_date",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "Flag for including a list of consumables by appointments in the response",
+          "name": "include_consumables",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Flag to include in the response financial transactions by appointments",
+          "name": "include_finance_transactions",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Page number",
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Flag to add `short_link_token` to each Appointment: the token of the Booking User's Appointment page (the last segment of `short_link`)",
+          "name": "short_link_token",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Session date starting at (filter by session date). If you need appointments for a session starting from a specific date",
+          "name": "start_date",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "team member ID, if you only need appointments for a specific team member",
+          "name": "team_member_id",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Include deleted appointments in output (with_deleted=1 will return deleted appointments as well)",
+          "name": "with_deleted",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "supersededBy": "list_appointments",
+      "reason": "same-path"
     },
     {
       "source": "v1",

@@ -1,4 +1,9 @@
-import { MAX_SEARCH_RESULTS, queryTerms, searchOperations } from '../search.js';
+import {
+  MAX_SEARCH_RESULTS,
+  MAX_TOTAL_MATCHES,
+  queryTerms,
+  searchOperations,
+} from '../search.js';
 
 /**
  * Relevance is asserted on a handful of fixed business questions. The ranking
@@ -14,7 +19,7 @@ describe('api_search_operations ranking', () => {
       query: 'cash register transactions',
       expect: 'get_fiscal_transaction_list',
     },
-    { query: 'appointments for a day', expect: 'get_appointment_list' },
+    { query: 'appointments for a day', expect: 'list_appointments' },
   ];
 
   for (const { query, expect: expected } of cases) {
@@ -102,6 +107,25 @@ describe('api_search_operations ranking', () => {
     expect(ids).not.toContain('search_events');
     expect(ids.filter((id) => id === 'get_event')).toHaveLength(1);
     expect(ids.some((id) => id.endsWith('_v2'))).toBe(false);
+  });
+
+  it('serves each live method and path once: the V1 twin of a V2 route is gone', () => {
+    const ids = searchOperations('list appointments', { limit: 10 }).hits.map(
+      (h) => h.operationId
+    );
+    expect(ids[0]).toBe('list_appointments');
+    expect(ids).not.toContain('get_appointment_list');
+    expect(ids).not.toContain('listAppointments');
+  });
+
+  it('finds the canonical operation by an older id', () => {
+    const { hits } = searchOperations('get_appointment_list');
+    expect(hits[0]?.operationId).toBe('list_appointments');
+  });
+
+  it('caps a broad query at the relevant matches', () => {
+    const { totalMatches } = searchOperations('list appointments');
+    expect(totalMatches).toBeLessThanOrEqual(MAX_TOTAL_MATCHES);
   });
 
   it('filters by domain and by method', () => {

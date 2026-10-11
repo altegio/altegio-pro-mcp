@@ -82,21 +82,94 @@ describe('api_call_operation', () => {
       expect(result.text).toContain('1 item');
     });
 
-    it('sends documented query parameters', async () => {
-      mockOk({ success: true, data: [] });
+    it('sends canonical parameters under the spec spelling', async () => {
+      mockOk({ data: [], meta: [] });
 
-      await callOperation(client, 'get_appointment_list', {
+      const result = await callOperation(client, 'list_appointments', {
+        location_id: 4564,
+        date_from: '2026-09-01',
+        date_to: '2026-09-07',
+        page_size: 30,
+      });
+
+      const url = new URL(fetchedUrl());
+      expect(url.pathname).toBe('/api/v2/locations/4564/appointments');
+      // A plain date becomes the start or end of that day where the spec wants a date-time.
+      expect(url.searchParams.get('filter[date_intersect_from]')).toBe(
+        '2026-09-01T00:00:00'
+      );
+      expect(url.searchParams.get('filter[date_intersect_to]')).toBe(
+        '2026-09-07T23:59:59'
+      );
+      expect(url.searchParams.get('limit')).toBe('30');
+      // The result echoes the call in canonical names only.
+      expect(result.structuredContent.params).toEqual({
+        location_id: 4564,
+        date_from: '2026-09-01T00:00:00',
+        date_to: '2026-09-07T23:59:59',
+        page_size: 30,
+      });
+      expect(result.text).not.toMatch(/filter\[|limit|count/);
+    });
+
+    it('serves an old id as the canonical operation and says so', async () => {
+      mockOk({ data: [], meta: [] });
+
+      const result = await callOperation(client, 'get_appointment_list', {
         location_id: 4564,
         start_date: '2026-09-01',
-        end_date: '2026-09-07',
         count: 30,
       });
 
-      const url = fetchedUrl();
-      expect(url).toContain('/locations/4564/appointments?');
-      expect(url).toContain('start_date=2026-09-01');
-      expect(url).toContain('end_date=2026-09-07');
-      expect(url).toContain('count=30');
+      const url = new URL(fetchedUrl());
+      expect(url.pathname).toBe('/api/v2/locations/4564/appointments');
+      expect(url.searchParams.get('limit')).toBe('30');
+      expect(result.structuredContent.operation_id).toBe('list_appointments');
+      expect(result.structuredContent.notices).toEqual([
+        expect.stringContaining(
+          '`get_appointment_list` is an older id of `list_appointments`'
+        ),
+      ]);
+    });
+
+    it('routes a filter only the retired twin has through that twin', async () => {
+      mockOk({ success: true, data: [], meta: { page: 1, total_count: 0 } });
+
+      const result = await callOperation(client, 'list_appointments', {
+        location_id: 4564,
+        team_member_id: 7,
+        date_from: '2026-09-01',
+        page_size: 30,
+      });
+
+      const url = new URL(fetchedUrl());
+      expect(url.pathname).toBe('/api/v1/locations/4564/appointments');
+      expect(url.searchParams.get('team_member_id')).toBe('7');
+      expect(url.searchParams.get('start_date')).toBe('2026-09-01');
+      expect(url.searchParams.get('count')).toBe('30');
+      // One capability: the caller still sees the canonical operation.
+      expect(result.structuredContent.operation_id).toBe('list_appointments');
+      expect(result.structuredContent.path).toBe(
+        '/locations/4564/appointments'
+      );
+    });
+
+    it('asks for a bounded page when the caller names no page size', async () => {
+      mockOk({ data: [], meta: [] });
+      await callOperation(client, 'list_appointments', { location_id: 4564 });
+      expect(new URL(fetchedUrl()).searchParams.get('limit')).toBe('50');
+    });
+
+    it('sends a V2 list parameter in the repeated `[]` form', async () => {
+      mockOk({ data: [], meta: [] });
+      await callOperation(client, 'list_appointments', {
+        location_id: 4564,
+        include: ['client', 'staff'],
+      });
+      expect(new URL(fetchedUrl()).searchParams.getAll('include[]')).toEqual([
+        'client',
+        'staff',
+      ]);
     });
 
     it('passes a payload through untouched when the overlay has no projection', async () => {
@@ -199,15 +272,10 @@ describe('api_call_operation', () => {
       };
       expect(init.headers.Accept).toBe('application/vnd.api.v2+json');
 
+      // A JSON:API resource reads as a plain object.
       expect(result.structuredContent).toMatchObject({
         operation_id: 'list_event_dates',
-        data: [
-          {
-            type: 'activity_date',
-            id: '2026-07-18',
-            attributes: { date: '2026-07-18' },
-          },
-        ],
+        data: [{ id: '2026-07-18', date: '2026-07-18' }],
       });
       // V2 sends an empty meta as `[]`; it carries nothing.
       expect(result.structuredContent.meta).toBeUndefined();
@@ -217,18 +285,38 @@ describe('api_call_operation', () => {
       expect(result.text).not.toMatch(/\/api\/v\d|\bv2\b/);
     });
 
-    it('keeps a JSON:API document with side-loads whole', async () => {
-      const body = {
-        data: { type: 'activity', id: '5', attributes: {} },
-        included: [{ type: 'service', id: '7', attributes: {} }],
-      };
-      mockOk(body);
+    it('inlines side-loads where the data links to them', async () => {
+      mockOk({
+        data: {
+          type: 'activity',
+          id: '5',
+          attributes: { capacity: 10, staff_id: 3 },
+          relationships: {
+            services: { data: [{ type: 'service', id: '7' }] },
+            staff: { data: { type: 'staff', id: '3' } },
+          },
+        },
+        included: [
+          { type: 'service', id: '7', attributes: { title: 'Yoga' } },
+          {
+            type: 'staff',
+            id: '3',
+            attributes: { name: 'Ann', avatar: 'https://example.test/a.png' },
+          },
+        ],
+      });
 
       const result = await callOperation(client, 'get_event', {
         location_id: 4564,
         event_id: 5,
       });
-      expect(result.structuredContent.data).toEqual(body);
+      expect(result.structuredContent.data).toEqual({
+        id: 5,
+        capacity: 10,
+        team_member_id: 3,
+        services: [{ id: 7, title: 'Yoga' }],
+        team_member: { id: 3, name: 'Ann' },
+      });
     });
 
     it('still refuses a V2 write', async () => {
@@ -241,11 +329,21 @@ describe('api_call_operation', () => {
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it('points a superseded id at the operation that replaced it', async () => {
-      await expect(
-        callOperation(client, 'search_events', { location_id: 4564 })
-      ).rejects.toThrow(/`list_events` replaces it/);
-      expect(global.fetch).not.toHaveBeenCalled();
+    it('resolves a superseded id to the operation that replaced it', async () => {
+      mockOk({ data: [], meta: [] });
+      const result = await callOperation(client, 'search_events', {
+        location_id: 4564,
+        date_from: '2026-07-16',
+        date_to: '2026-07-31',
+      });
+      const url = new URL(fetchedUrl());
+      expect(url.pathname).toBe('/api/v2/locations/4564/events');
+      expect(url.searchParams.get('filter[from]')).toBe('2026-07-16 00:00:00');
+      expect(url.searchParams.get('filter[to]')).toBe('2026-07-31 23:59:59');
+      expect(result.structuredContent.operation_id).toBe('list_events');
+      expect(result.text).toContain(
+        '`search_events` is an older id of `list_events`'
+      );
     });
 
     it('serves a same-id twin from the canonical spec only', async () => {
@@ -279,7 +377,7 @@ describe('api_call_operation', () => {
       expect(built.path).toBe('/locations/4564/appointments/987');
     });
 
-    it('forwards a canonical query name unchanged — V1 accepts the alias', () => {
+    it('sends the spec spelling of a query parameter', () => {
       const op = getOperation('get_service_list');
       const built = buildRequest(op!, {
         location_id: 4564,
@@ -290,7 +388,7 @@ describe('api_call_operation', () => {
       expect(built.warnings).toEqual([]);
     });
 
-    it('forwards a legacy query spelling where the spec says `location_id`', () => {
+    it('accepts a legacy spelling and sends the spec’s `location_id`', () => {
       const op = getOperation('get_client_memberships');
       expect(op?.parameters.some((p) => p.name === 'location_id')).toBe(true);
 
@@ -299,10 +397,18 @@ describe('api_call_operation', () => {
         phone: '79000000000',
       });
       expect(built.query).toEqual({
-        company_id: 4564,
+        location_id: 4564,
         phone: '79000000000',
       });
+      expect(built.params).toEqual({ location_id: 4564, phone: '79000000000' });
       expect(built.warnings).toEqual([]);
+    });
+
+    it('accepts the legacy paging spelling under `page_size`', () => {
+      const op = getOperation('list_appointments');
+      const built = buildRequest(op!, { location_id: 4564, count: 20 });
+      expect(built.query).toEqual({ limit: 20 });
+      expect(built.params).toEqual({ location_id: 4564, page_size: 20 });
     });
   });
 
@@ -447,7 +553,129 @@ describe('api_call_operation', () => {
           salon_id: 4564,
         })
       );
-      expect(fetchedUrl()).toContain('salon_id=4564');
+      expect(fetchedUrl()).toContain('location_id=4564');
+    });
+  });
+
+  describe('product glossary (ADR-001 D5)', () => {
+    const rawAppointment = {
+      id: 675876978,
+      company_id: 4564,
+      staff_id: 3100101,
+      staff: {
+        id: 3100101,
+        api_id: null,
+        name: 'Petra',
+        avatar: 'https://example.test/a.png',
+        avatar_big: 'https://example.test/b.png',
+        rating: 0,
+        votes_count: 0,
+      },
+      client: {
+        id: 186529560,
+        name: 'Barbora',
+        surname: '',
+        phone: '+420000000000',
+        email: 'client@example.test',
+        phone_country_id: 13,
+      },
+      services: [
+        {
+          id: 1,
+          title: 'Cut',
+          cost: 790,
+          staff_service_link: { length: 3600 },
+        },
+      ],
+      goods_transactions: [],
+      comer: null,
+      datetime: '2026-10-31T17:25:00+02:00',
+      date: '2026-10-31 17:25:00',
+      visit_attendance: 0,
+      attendance: 0,
+      confirmed: 1,
+      seance_length: 4800,
+      length: 4800,
+      sms_before: 0,
+      sms_now: 0,
+      email_now: 1,
+      api_id: '0',
+      from_url: '',
+      paid_full: 0,
+      deleted: false,
+      record_labels: [],
+    };
+
+    it('projects an appointment into glossary keys with a canonical status', async () => {
+      mockOk({ success: true, data: rawAppointment, meta: [] });
+      const result = await callOperation(client, 'get_appointment', {
+        location_id: 4564,
+        appointment_id: 675876978,
+      });
+      expect(result.structuredContent.data).toEqual({
+        id: 675876978,
+        location_id: 4564,
+        team_member_id: 3100101,
+        team_member: { id: 3100101, name: 'Petra' },
+        client: { id: 186529560, name: 'Barbora' },
+        services: [
+          {
+            id: 1,
+            title: 'Cut',
+            cost: 790,
+            team_member_service_link: { length: 3600 },
+          },
+        ],
+        datetime: '2026-10-31T17:25:00+02:00',
+        date: '2026-10-31 17:25:00',
+        status: 'waiting',
+        duration_seconds: 4800,
+        paid_in_full: false,
+        deleted: false,
+        tags: [],
+      });
+      // Wire names stay inside the adapter, in both channels.
+      expect(result.text).not.toMatch(
+        /company_id|staff_id|seance_length|attendance|confirmed|avatar/
+      );
+    });
+
+    it('withholds client contacts unless include_contacts is true', async () => {
+      mockOk({ success: true, data: rawAppointment, meta: [] });
+      const withheld = await callOperation(client, 'get_appointment', {
+        location_id: 4564,
+        appointment_id: 675876978,
+      });
+      expect(JSON.stringify(withheld.structuredContent)).not.toMatch(
+        /\+420000000000|client@example\.test/
+      );
+      expect(withheld.text).not.toMatch(/\+420000000000|client@example\.test/);
+      expect(withheld.text).toContain('Contacts withheld by default');
+
+      mockOk({ success: true, data: rawAppointment, meta: [] });
+      const included = await callOperation(
+        client,
+        'get_appointment',
+        { location_id: 4564, appointment_id: 675876978 },
+        { includeContacts: true }
+      );
+      expect(included.structuredContent.data).toMatchObject({
+        client: { phone: '+420000000000', email: 'client@example.test' },
+      });
+      expect(included.text).not.toContain('Contacts withheld');
+    });
+
+    it('keeps a location’s own phone on a location read', async () => {
+      mockOk({
+        success: true,
+        data: { id: 4564, title: 'Studio', phone: '+420111111111' },
+      });
+      const result = await callOperation(client, 'get_location', {
+        location_id: 4564,
+      });
+      expect(result.structuredContent.data).toMatchObject({
+        phone: '+420111111111',
+      });
     });
   });
 
@@ -469,14 +697,109 @@ describe('api_call_operation', () => {
         location_id: 4564,
       });
 
+      // This operation documents no paging, so only narrowing helps.
       expect(result.structuredContent.truncated).toBe(true);
-      expect(result.structuredContent.total).toBe(3000);
+      expect(result.structuredContent.received).toBe(3000);
       expect(result.structuredContent.returned).toBeLessThan(3000);
       expect(result.structuredContent.hint).toContain('Narrow the query');
+      expect(result.structuredContent.hint).toContain('page_size');
       expect(
         JSON.stringify(result.structuredContent.data).length
       ).toBeLessThanOrEqual(PAYLOAD_BUDGET_CHARS);
       expect(result.text).toContain('Narrow the query');
+    });
+
+    const appointments = (count: number, from = 0) =>
+      Array.from({ length: count }, (_, i) => ({
+        type: 'record',
+        id: String(1000 + from + i),
+        attributes: {
+          company_id: 4564,
+          staff_id: 7,
+          master_id: 7,
+          client_id: 9,
+          attendance: 1,
+          attendance_status_slug: 'attended',
+          date: '2026-10-01T10:00:00',
+          length: 3600,
+          duration: 3600,
+          comment: `Appointment ${from + i} with a comment long enough to weigh something real`,
+        },
+      }));
+
+    it('returns what fits plus the exact next page in canonical names', async () => {
+      mockOk({ data: appointments(50), meta: { pagination: { page: 1 } } });
+      const result = await callOperation(client, 'list_appointments', {
+        location_id: 4564,
+        page_size: 50,
+      });
+
+      const data = result.structuredContent.data as Array<{ id: number }>;
+      const pagination = result.structuredContent.pagination as {
+        returned: number;
+        has_more: boolean;
+        next_page: number;
+        next_page_size: number;
+      };
+      expect(data.length).toBeGreaterThan(1);
+      expect(data.length).toBeLessThan(50);
+      expect(pagination).toMatchObject({
+        page: 1,
+        page_size: 50,
+        returned: data.length,
+        has_more: true,
+        next_page: 2,
+        next_page_size: data.length,
+      });
+      expect(result.structuredContent.next_params).toEqual({
+        location_id: 4564,
+        page: 2,
+        page_size: data.length,
+      });
+      // A continuation replaces the narrow-the-query hint.
+      expect(result.structuredContent.hint).toBeUndefined();
+      expect(result.text).toContain(
+        `call \`list_appointments\` again with params {"location_id":4564,"page":2,"page_size":${data.length}}`
+      );
+      // Both channels carry the same items: every id is in the text too.
+      for (const item of data) expect(result.text).toContain(String(item.id));
+      expect(result.text.length).toBeLessThan(
+        JSON.stringify(result.structuredContent.data).length + 1500
+      );
+    });
+
+    it('aligns the continuation of a later page so no item is skipped', async () => {
+      mockOk({ data: appointments(50, 50), meta: [] });
+      const result = await callOperation(client, 'list_appointments', {
+        location_id: 4564,
+        page: 2,
+        page_size: 50,
+      });
+      const pagination = result.structuredContent.pagination as {
+        returned: number;
+        next_page: number;
+        next_page_size: number;
+      };
+      // The next page starts exactly after the last returned item.
+      const shownUpTo = 50 + pagination.returned;
+      expect((pagination.next_page - 1) * pagination.next_page_size).toBe(
+        shownUpTo
+      );
+      expect(50 % pagination.next_page_size).toBe(0);
+    });
+
+    it('says when the last page is reached', async () => {
+      mockOk({ data: appointments(3), meta: [] });
+      const result = await callOperation(client, 'list_appointments', {
+        location_id: 4564,
+        page_size: 10,
+      });
+      expect(result.structuredContent.pagination).toMatchObject({
+        returned: 3,
+        has_more: false,
+        next_page: null,
+      });
+      expect(result.text).toContain('Last page.');
     });
 
     it('keeps the whole result when it fits', async () => {
