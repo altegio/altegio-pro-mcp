@@ -1,4 +1,5 @@
-import { createLogger } from '../utils/logger.js';
+import { z, ZodError, type ZodType } from 'zod';
+import { createLogger, logSafeToken, sessionLogId } from '../utils/logger.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   CallToolRequestSchema,
@@ -23,6 +24,7 @@ import {
 } from './facets.js';
 import type { ToolResult } from './tool-result.js';
 import {
+  CONFIRMATION_TOKEN_ARG,
   requireConfirmation,
   type ConfirmationAnswer,
   type ConfirmationRuntime,
@@ -44,6 +46,20 @@ import {
   type ToolScope,
 } from './scopes.js';
 import { listedOnView, runOnView, type ServingView } from './serving-view.js';
+import { legacyAliasTargets } from './legacy-aliases.js';
+import { getOperation } from './executor/catalog.js';
+import {
+  AltegioApiError,
+  AuthenticationError,
+  ExecutorRefusalError,
+  InvalidParamsError,
+} from '../utils/errors.js';
+import {
+  createToolCallObservation,
+  isTimeout,
+  runObservingToolCall,
+  type ToolCallObservation,
+} from '../utils/tool-call-observation.js';
 
 type CallHandler = (args: unknown) => Promise<ToolResult>;
 
@@ -158,6 +174,161 @@ function confirmationRuntime(
   };
 }
 
+/** Why a tool call did not succeed, as the `tool_call` log reports it. */
+export type ToolErrorClass =
+  | 'validation'
+  | 'upstream_4xx'
+  | 'upstream_5xx'
+  | 'auth'
+  | 'scope_denied'
+  | 'out_of_view'
+  | 'confirmation_required'
+  | 'unknown_tool'
+  | 'timeout'
+  | 'internal';
+
+/** A name a reply or a log line may repeat: nothing else a caller sent is. */
+const SAFE_TOOL_NAME = /^[A-Za-z0-9_.-]{1,64}$/;
+
+/**
+ * The strict input schema of a factory tool, as its handler parses it, built
+ * once per definition rather than once per server instance.
+ */
+const strictInputs = new WeakMap<ZodType, ZodType>();
+function strictInput(input: ZodType): ZodType {
+  let schema = strictInputs.get(input);
+  if (!schema) {
+    schema = input instanceof z.ZodObject ? input.strict() : input;
+    strictInputs.set(input, schema);
+  }
+  return schema;
+}
+
+/** Whether `args` would pass the tool's own input validation. */
+function argumentsValidate(input: ZodType | undefined, args: unknown): boolean {
+  if (!input) return false;
+  let candidate: unknown = args ?? {};
+  if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+    const copy = { ...(candidate as Record<string, unknown>) };
+    delete copy[CONFIRMATION_TOKEN_ARG];
+    candidate = copy;
+  }
+  return strictInput(input).safeParse(candidate).success;
+}
+
+/** The answer to a tool name this server does not define. */
+function unknownToolResult(
+  requested: string,
+  targets: readonly string[] | undefined,
+  servingView: ServingView
+): ToolResult {
+  let text: string;
+  if (targets) {
+    const named = targets.map((target) => {
+      if (servingView.serves(target)) return `\`${target}\``;
+      const where = servingView.addressesServing(target);
+      return where.length > 0
+        ? `\`${target}\` (served on ${where.join(' or ')})`
+        : `\`${target}\``;
+    });
+    text =
+      `\`${requested}\` is a former tool name. Call ${named.join(' or ')} ` +
+      'instead, with the arguments its current input schema defines ' +
+      '(refresh the tool list with tools/list).';
+  } else {
+    const name = SAFE_TOOL_NAME.test(requested) ? ` "${requested}"` : '';
+    text =
+      `This server has no tool${name}. Refresh the tool list with ` +
+      'tools/list and call one of the tools it returns.';
+  }
+  return { content: [{ type: 'text', text }], isError: true };
+}
+
+/** UTF-8 bytes of what a result carries: text blocks plus structured content. */
+function resultBytes(result: ToolResult): number {
+  let bytes = 0;
+  try {
+    for (const block of result.content ?? []) {
+      bytes += Buffer.byteLength(
+        block.type === 'text' ? block.text : JSON.stringify(block)
+      );
+    }
+    if (result.structuredContent !== undefined) {
+      bytes += Buffer.byteLength(
+        JSON.stringify(result.structuredContent) ?? ''
+      );
+    }
+  } catch {
+    // A result that cannot be serialized fails in the SDK, not in the log.
+  }
+  return bytes;
+}
+
+/**
+ * Classify a failed call from what it did: the upstream statuses and the
+ * typed errors noted while it ran (`../utils/tool-call-observation.ts`), the
+ * thrown error if there was one, and — only when nothing upstream explains
+ * it — whether the arguments validate and whether the caller is signed in.
+ */
+function classifyFailure(
+  observation: ToolCallObservation,
+  thrown: unknown,
+  argsInvalid: () => boolean,
+  unauthenticated: () => boolean
+): { error_class: ToolErrorClass; upstream_status?: number } {
+  const cause = thrown ?? observation.lastError;
+  const status = observation.upstreamErrorStatus;
+  if (observation.upstreamFailure === 'timeout' || isTimeout(cause)) {
+    return { error_class: 'timeout' };
+  }
+  if (status !== undefined) {
+    return {
+      error_class:
+        status === 401
+          ? 'auth'
+          : status >= 500
+            ? 'upstream_5xx'
+            : 'upstream_4xx',
+      upstream_status: status,
+    };
+  }
+  if (cause instanceof AuthenticationError) return { error_class: 'auth' };
+  // The API was unreachable: no status, but the failure is upstream's.
+  if (observation.upstreamFailure === 'network') {
+    return { error_class: 'upstream_5xx' };
+  }
+  if (
+    cause instanceof ZodError ||
+    cause instanceof ExecutorRefusalError ||
+    cause instanceof InvalidParamsError ||
+    (cause instanceof McpError && cause.code === ErrorCode.InvalidParams) ||
+    argsInvalid()
+  ) {
+    return { error_class: 'validation' };
+  }
+  // Raised locally, before any request: the declared company scope (403), or
+  // a precondition the arguments did not meet.
+  if (cause instanceof AltegioApiError && cause.statusCode !== undefined) {
+    if (cause.statusCode === 403) return { error_class: 'scope_denied' };
+    if (cause.statusCode >= 400 && cause.statusCode < 500) {
+      return { error_class: 'validation' };
+    }
+  }
+  if (unauthenticated()) return { error_class: 'auth' };
+  return { error_class: 'internal' };
+}
+
+/** `name/version` from the first product of a User-Agent header. */
+function userAgentProduct(value: unknown): {
+  name?: string;
+  version?: string;
+} {
+  if (typeof value !== 'string') return {};
+  const [product = ''] = value.trim().split(/\s+/, 1);
+  const [name, version] = product.split('/', 2);
+  return { name: logSafeToken(name), version: logSafeToken(version) };
+}
+
 export function registerTools(
   server: Server,
   client: AltegioClient,
@@ -169,6 +340,11 @@ export function registerTools(
   const factoryTools = servedDefinedTools();
   const handlers = new Map<string, CallHandler>(
     factoryTools.map((tool) => [tool.meta.name, tool.createHandler(client)])
+  );
+  // Input schemas, for resolving a legacy alias and for telling a validation
+  // failure from other failures in the tool_call log.
+  const inputSchemas = new Map<string, ZodType>(
+    factoryTools.map((tool) => [tool.meta.name, tool.meta.input])
   );
 
   // Destructive tools that require a human confirmation before they run. The
@@ -246,16 +422,51 @@ export function registerTools(
     tools: visibleToolDefs,
   }));
 
+  // Own keys only: a name such as `constructor` is not a tool.
+  const handlerFor = (name: string): CallHandler | undefined =>
+    handlers.get(name) ??
+    (Object.hasOwn(onboardingDispatch, name)
+      ? onboardingDispatch[name]
+      : undefined);
+
   // call handler
   server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-    const execute = async (): Promise<ToolResult> => {
-      const { name, arguments: args } = request.params;
+    const { name: requested, arguments: args } = request.params;
+    // What the tool_call log reports about this call, filled in as it runs.
+    const call: {
+      tool: string;
+      alias?: string;
+      errorClass?: ToolErrorClass;
+      confirmation?: boolean;
+    } = { tool: 'unknown' };
 
-      const handler = handlers.get(name) ?? onboardingDispatch[name];
+    const execute = async (): Promise<ToolResult> => {
+      let name = requested;
+      let handler = handlerFor(name);
       if (!handler) {
-        throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
+        // A former name (`./legacy-aliases.ts`) runs as its replacement when
+        // the arguments fit it; anything else is answered in band, so the
+        // model reads which tool to call instead of a protocol error.
+        const targets = legacyAliasTargets(requested);
+        const [target] = targets ?? [];
+        if (targets) call.alias = requested;
+        if (
+          targets?.length === 1 &&
+          target !== undefined &&
+          handlerFor(target) &&
+          argumentsValidate(inputSchemas.get(target), args)
+        ) {
+          name = target;
+          handler = handlerFor(target);
+        } else {
+          call.errorClass = 'unknown_tool';
+          return unknownToolResult(requested, targets, servingView);
+        }
       }
+      call.tool = name;
+      if (!handler) throw new McpError(ErrorCode.InternalError, 'No handler');
       if (!visible.has(name)) {
+        call.errorClass = 'out_of_view';
         throw outOfFacetError(name, facet, facetIndex, publicBaseUrl);
       }
 
@@ -269,11 +480,15 @@ export function registerTools(
         required: requiredScopes.get(name) ?? [],
         granted: getRequestScopes(),
       });
-      if (denial) return denial;
+      if (denial) {
+        call.errorClass = 'scope_denied';
+        return denial;
+      }
 
       // Destructive operations stop here until a human says yes. `undefined`
       // means "already confirmed, or nothing to confirm"; anything else is the
-      // result the caller gets instead of the operation being performed.
+      // result the caller gets instead of the operation being performed —
+      // logged as `confirmation_required` whatever shape that result takes.
       const prepared = confirmations.get(name)?.(args);
       if (prepared) {
         const gate = await requireConfirmation({
@@ -283,7 +498,10 @@ export function registerTools(
           client,
           runtime: confirmationRuntime(server, extra.requestId),
         });
-        if (gate) return gate;
+        if (gate) {
+          call.confirmation = true;
+          return gate;
+        }
       }
 
       return handler(args);
@@ -298,25 +516,87 @@ export function registerTools(
     const headers = extra.requestInfo?.headers;
     const onView = async () => {
       const started = performance.now();
-      const fields = {
-        event: 'tool_call',
-        request_id: headers?.['x-request-id'],
-        route: `/mcp${facet === DEFAULT_FACET ? '' : '/' + facet}`,
-        rpc_method: 'tools/call',
-        tool:
-          handlers.has(request.params.name) ||
-          Object.hasOwn(onboardingDispatch, request.params.name)
-            ? request.params.name
-            : 'unknown',
+      const observation = createToolCallObservation();
+      // Counts, classes and validated names only: never arguments or text.
+      const fields = () => {
+        // `clientInfo` from initialize; a stateless request has none.
+        const clientInfo =
+          typeof server.getClientVersion === 'function'
+            ? server.getClientVersion()
+            : undefined;
+        const agent = clientInfo
+          ? {}
+          : userAgentProduct(headers?.['user-agent']);
+        const operationId =
+          call.tool === 'api_call_operation' &&
+          args &&
+          typeof args.operation_id === 'string' &&
+          getOperation(args.operation_id)
+            ? args.operation_id
+            : undefined;
+        return {
+          event: 'tool_call',
+          request_id: headers?.['x-request-id'],
+          route: `/mcp${facet === DEFAULT_FACET ? '' : '/' + facet}`,
+          rpc_method: 'tools/call',
+          tool: call.tool,
+          ...(call.alias ? { alias: call.alias } : {}),
+          ...(call.tool === 'unknown' &&
+          !call.alias &&
+          SAFE_TOOL_NAME.test(requested)
+            ? { requested_tool: requested }
+            : {}),
+          ...(operationId ? { operation_id: operationId } : {}),
+          transport: headers
+            ? extra.sessionId
+              ? 'session'
+              : 'stateless'
+            : 'stdio',
+          ...(extra.sessionId
+            ? { session: sessionLogId(extra.sessionId) }
+            : {}),
+          client_name: logSafeToken(clientInfo?.name) ?? agent.name,
+          client_version: logSafeToken(clientInfo?.version) ?? agent.version,
+        };
       };
+      const failure = (thrown?: unknown) =>
+        call.errorClass
+          ? { error_class: call.errorClass }
+          : classifyFailure(
+              observation,
+              thrown,
+              () =>
+                inputSchemas.has(call.tool) &&
+                !argumentsValidate(inputSchemas.get(call.tool), args),
+              () => {
+                try {
+                  return client.isAuthenticated?.() === false;
+                } catch {
+                  return false;
+                }
+              }
+            );
       const log = createLogger('tool-calls');
       try {
-        const result = await runOnView(servingView, execute);
+        const result = await runObservingToolCall(observation, () =>
+          runOnView(servingView, execute)
+        );
+        const outcome = call.confirmation
+          ? 'confirmation_required'
+          : result.isError
+            ? 'error'
+            : 'success';
         log.info(
           {
-            ...fields,
-            outcome: result.isError ? 'error' : 'success',
-            ...(result.isError ? { error_type: 'tool_result' } : {}),
+            ...fields(),
+            outcome,
+            ...(outcome === 'confirmation_required'
+              ? { error_class: 'confirmation_required' }
+              : {}),
+            ...(outcome === 'error'
+              ? { error_type: 'tool_result', ...failure() }
+              : {}),
+            response_bytes: resultBytes(result),
             latency_ms: Math.round(performance.now() - started),
           },
           'Tool completed'
@@ -325,9 +605,10 @@ export function registerTools(
       } catch (error) {
         log.error(
           {
-            ...fields,
+            ...fields(),
             outcome: 'error',
             error_type: error instanceof Error ? error.name : 'unknown',
+            ...failure(error),
             latency_ms: Math.round(performance.now() - started),
           },
           'Tool failed'

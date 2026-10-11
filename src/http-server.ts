@@ -4,7 +4,10 @@ import { parseProxyKeys, verifyProxyRequest } from './utils/proxy-auth.js';
 import { randomUUID } from 'node:crypto';
 import express from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import {
+  ClientRequestSchema,
+  isInitializeRequest,
+} from '@modelcontextprotocol/sdk/types.js';
 import { createServer } from './server.js';
 import { loadConfig } from './config/schema.js';
 import {
@@ -13,10 +16,16 @@ import {
   READONLY_VIEW,
   type FacetKey,
 } from './tools/facets.js';
-import { createLogger, flushLogs } from './utils/logger.js';
+import {
+  createLogger,
+  flushLogs,
+  logSafeToken,
+  sessionLogId,
+} from './utils/logger.js';
 import {
   requestContextFromHeaders,
   runWithContext,
+  type RequestContext,
 } from './request-context.js';
 import { COMMIT_SHA, PACKAGE_VERSION } from './package-metadata.js';
 import {
@@ -27,6 +36,33 @@ import {
 const logger = createLogger('http-server');
 
 type TransportRegistry = Record<string, StreamableHTTPServerTransport>;
+
+/** Every request method the protocol defines for a client to send. */
+const MCP_CLIENT_METHODS: ReadonlySet<string> = new Set(
+  ClientRequestSchema.options.map((schema) => schema.shape.method.value)
+);
+
+/**
+ * Methods that mean a session is in real use. A session that only initialized
+ * and listed tools keeps the short idle expiry (`./utils/http-sessions.ts`).
+ */
+const WORK_METHODS: ReadonlySet<string> = new Set([
+  'tools/call',
+  'resources/read',
+  'prompts/get',
+]);
+
+/** A JSON-RPC method name as the request log may record it. */
+const LOGGABLE_METHOD = /^[A-Za-z0-9_/.-]{1,64}$/;
+
+/** The JSON-RPC messages of a POST body, single or batched. */
+function rpcMessages(body: unknown): Array<Record<string, unknown>> {
+  const messages = Array.isArray(body) ? body : [body];
+  return messages.filter(
+    (message): message is Record<string, unknown> =>
+      !!message && typeof message === 'object' && !Array.isArray(message)
+  );
+}
 
 /**
  * Every path this app serves MCP on, and the view each one exposes.
@@ -60,12 +96,56 @@ function sessionTransport(
 }
 
 /**
+ * Answer a sessionless JSON-RPC request for a method the protocol does not
+ * define (`server/discover`, say) without building a server for it: -32601,
+ * as JSON-RPC specifies, instead of a transport-level 400. Returns false when
+ * the body is something the MCP server itself has to handle.
+ */
+function answerUnknownMethod(res: express.Response, body: unknown): boolean {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return false;
+  const { method, id } = body as Record<string, unknown>;
+  if (typeof method !== 'string' || MCP_CLIENT_METHODS.has(method)) {
+    return false;
+  }
+  if (method.startsWith('notifications/')) return false;
+  if (typeof id !== 'string' && typeof id !== 'number') {
+    // A notification for a method nobody serves: nothing to answer.
+    res.status(202).end();
+    return true;
+  }
+  res.status(200).json({
+    jsonrpc: '2.0',
+    error: { code: -32601, message: 'Method not found' },
+    id,
+  });
+  return true;
+}
+
+/** The 503 every view returns when every slot is serving a request. */
+function refuseAtCapacity(
+  res: express.Response,
+  requestId: string | number | null
+): void {
+  res.locals.limitedBy = 'pro_session_capacity';
+  res.setHeader('Retry-After', '60');
+  res.status(503).json({
+    jsonrpc: '2.0',
+    error: {
+      code: -32000,
+      message: 'MCP session capacity reached; retry later',
+    },
+    id: requestId,
+  });
+}
+
+/**
  * Refuse a request this view has no session for, as the Streamable HTTP
  * transport specifies. A session ID the view does not hold — lost when the
  * process restarted, terminated by DELETE, or issued by another view — is 404,
  * which tells the client to start a new session with `initialize`. A missing
- * session ID on anything but `initialize` is 400. Answering 400 for an unknown
- * session left clients retrying a dead session until their own timeout.
+ * session ID on GET or DELETE is 400 (a sessionless POST is served statelessly
+ * instead). Answering 400 for an unknown session left clients retrying a dead
+ * session until their own timeout.
  */
 function rejectSessionlessRequest(
   res: express.Response,
@@ -103,7 +183,11 @@ function rejectSessionlessRequest(
  * so a future transport change can move it in one place.
  */
 export function createApp(
-  options: { maxSessions?: number; idleTimeoutMs?: number } = {}
+  options: {
+    maxSessions?: number;
+    idleTimeoutMs?: number;
+    unusedIdleTimeoutMs?: number;
+  } = {}
 ): {
   app: express.Express;
   /** The default `/mcp` session registry. */
@@ -111,9 +195,28 @@ export function createApp(
   transportsByFacet: Record<FacetKey, TransportRegistry>;
 } {
   const app = express();
+  const env = loadConfig().env;
   const budget = new HttpSessionBudget(
-    options.maxSessions ?? loadConfig().env.MCP_HTTP_MAX_SESSIONS,
-    options.idleTimeoutMs
+    options.maxSessions ?? env.MCP_HTTP_MAX_SESSIONS,
+    {
+      idleTimeoutMs:
+        options.idleTimeoutMs ?? env.MCP_HTTP_SESSION_IDLE_SECONDS * 1000,
+      unusedIdleTimeoutMs:
+        options.unusedIdleTimeoutMs ??
+        env.MCP_HTTP_UNUSED_SESSION_IDLE_SECONDS * 1000,
+      onEvict: ({ used, idleSeconds, sessions }) => {
+        logger.info(
+          {
+            event: 'session_evicted',
+            reason: 'capacity',
+            session_used: used,
+            idle_s: idleSeconds,
+            sessions,
+          },
+          'Evicted an idle MCP session to admit a new one'
+        );
+      },
+    }
   );
   const leases = new WeakMap<StreamableHTTPServerTransport, HttpSessionLease>();
   const trackPost = (
@@ -124,6 +227,54 @@ export function createApp(
     if (finish) {
       res.once('finish', finish);
       res.once('close', finish);
+    }
+  };
+
+  /**
+   * Serve one POST that carries no session and is not `initialize` — a host
+   * that sends `tools/call` straight from a cached tool list — on a server and
+   * transport built for this request alone. Same proxy-verified context,
+   * scopes and view as a session; nothing outlives the response. Its lease
+   * counts against the shared budget while the request runs. Without an
+   * `initialize` the server knows no client capabilities, so a destructive
+   * call takes the confirmation-token path rather than elicitation.
+   */
+  const serveStateless = async (
+    facet: FacetKey,
+    req: express.Request,
+    res: express.Response,
+    requestContext: RequestContext
+  ): Promise<void> => {
+    if (answerUnknownMethod(res, req.body)) return;
+    res.locals.stateless = true;
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+    });
+    const lease = budget.acquire(() => transport.close());
+    if (!lease) {
+      refuseAtCapacity(res, req.body?.id ?? null);
+      return;
+    }
+    const finish = lease.beginPost();
+    const server = createServer({ facet });
+    let done = false;
+    const cleanup = () => {
+      if (done) return;
+      done = true;
+      finish();
+      lease.release();
+      void server.close().catch(() => undefined);
+    };
+    res.once('finish', cleanup);
+    res.once('close', cleanup);
+    try {
+      await server.connect(transport);
+      await runWithContext(requestContext, () =>
+        transport.handleRequest(req, res, req.body)
+      );
+    } catch (error) {
+      cleanup();
+      throw error;
     }
   };
 
@@ -200,15 +351,38 @@ export function createApp(
     const record = () => {
       if (logged) return;
       logged = true;
+      const method: unknown = req.body?.method;
+      const clientInfo: unknown = req.body?.params?.clientInfo;
+      const session =
+        req.headers['mcp-session-id'] ?? res.getHeader('mcp-session-id');
       logger.info(
         {
           event: 'request',
           request_id: requestId,
           route: req.path,
           rpc_method:
-            typeof req.body?.method === 'string'
-              ? req.body.method.slice(0, 64)
+            typeof method === 'string'
+              ? LOGGABLE_METHOD.test(method)
+                ? method
+                : 'invalid'
               : undefined,
+          ...(typeof session === 'string'
+            ? { session: sessionLogId(session) }
+            : {}),
+          ...(res.locals.stateless ? { transport: 'stateless' } : {}),
+          // Who opens sessions: the product token a client names itself by.
+          ...(method === 'initialize' &&
+          clientInfo &&
+          typeof clientInfo === 'object'
+            ? {
+                client_name: logSafeToken(
+                  (clientInfo as Record<string, unknown>).name
+                ),
+                client_version: logSafeToken(
+                  (clientInfo as Record<string, unknown>).version
+                ),
+              }
+            : {}),
           http_status: res.statusCode,
           ...(res.locals.limitedBy
             ? { limited_by: res.locals.limitedBy, error_type: 'admission' }
@@ -260,31 +434,42 @@ export function createApp(
         if (existing) {
           // Reuse existing transport
           transport = existing;
+          const lease = leases.get(transport);
+          if (
+            lease &&
+            rpcMessages(req.body).some(
+              (message) =>
+                typeof message.method === 'string' &&
+                WORK_METHODS.has(message.method)
+            )
+          ) {
+            lease.markUsed();
+          }
           trackPost(transport, res);
         } else if (!sessionId && isInitializeRequest(req.body)) {
           // New initialization request — create transport + server
           transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
             onsessioninitialized: (id) => {
-              logger.info(`Session initialized on ${path}`);
               transports[id] = transport;
+              logger.info(
+                {
+                  event: 'session_opened',
+                  route: path,
+                  session: sessionLogId(id),
+                  sessions: budget.size,
+                },
+                `Session initialized on ${path}`
+              );
             },
           });
 
           // Reserve before the first await: concurrent initializes and views
           // share one process-wide capacity rather than each growing forever.
+          // A full budget evicts its least recently used idle session first.
           const lease = budget.acquire(() => transport.close());
           if (!lease) {
-            res.locals.limitedBy = 'pro_session_capacity';
-            res.setHeader('Retry-After', '60');
-            res.status(503).json({
-              jsonrpc: '2.0',
-              error: {
-                code: -32000,
-                message: 'MCP session capacity reached; retry later',
-              },
-              id: requestId,
-            });
+            refuseAtCapacity(res, requestId);
             return;
           }
           leases.set(transport, lease);
@@ -294,8 +479,17 @@ export function createApp(
             lease.release();
             const sid = transport.sessionId;
             if (sid && transports[sid]) {
-              logger.info(`Transport closed`);
               delete transports[sid];
+              logger.info(
+                {
+                  event: 'session_closed',
+                  route: path,
+                  session: sessionLogId(sid),
+                  session_used: lease.used,
+                  sessions: budget.size,
+                },
+                'Transport closed'
+              );
             }
           };
 
@@ -316,8 +510,13 @@ export function createApp(
             throw error;
           }
           return;
-        } else {
+        } else if (sessionId) {
+          // An ID this view does not hold (restart, expiry, eviction): 404
+          // tells the client to initialize again.
           rejectSessionlessRequest(res, sessionId);
+          return;
+        } else {
+          await serveStateless(facet, req, res, requestContext);
           return;
         }
 

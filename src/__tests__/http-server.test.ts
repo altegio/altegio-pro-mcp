@@ -621,15 +621,10 @@ describe('HTTP server session status codes', () => {
     });
   });
 
-  it('answers 400 only when the session ID is missing', async () => {
+  it('answers 400 only when GET or DELETE carries no session ID', async () => {
     await withApp(async (port) => {
-      for (const method of ['POST', 'GET', 'DELETE'] as const) {
-        const res = await send(
-          port,
-          method,
-          null,
-          method === 'POST' ? TOOLS_LIST : undefined
-        );
+      for (const method of ['GET', 'DELETE'] as const) {
+        const res = await send(port, method, null);
         expect(res.status).toBe(400);
         expect(await res.json()).toEqual({
           jsonrpc: '2.0',
@@ -637,6 +632,88 @@ describe('HTTP server session status codes', () => {
           id: null,
         });
       }
+    });
+  });
+
+  /** The JSON-RPC message of an SSE or JSON response body. */
+  const rpcBody = async (res: Response) => {
+    const text = await res.text();
+    const data = text
+      .split('\n')
+      .find((line) => line.startsWith('data: '))
+      ?.slice('data: '.length);
+    return JSON.parse(data ?? text);
+  };
+
+  it('serves a sessionless POST statelessly and keeps nothing', async () => {
+    await withApp(async (port, { transportsByFacet }) => {
+      const list = await send(port, 'POST', null, TOOLS_LIST);
+      expect(list.status).toBe(200);
+      expect(list.headers.get('mcp-session-id')).toBeNull();
+      const listed = await rpcBody(list);
+      expect(listed.result.tools.length).toBeGreaterThan(0);
+
+      const call = await send(port, 'POST', null, {
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'tools/call',
+        params: {
+          name: 'api_search_operations',
+          arguments: { query: 'appointments' },
+        },
+      });
+      expect(call.status).toBe(200);
+      const called = await rpcBody(call);
+      expect(called.id).toBe(3);
+      expect(called.result.isError).toBeFalsy();
+
+      // A former tool name resolves without a session, too.
+      const alias = await rpcBody(
+        await send(port, 'POST', null, {
+          jsonrpc: '2.0',
+          id: 4,
+          method: 'tools/call',
+          params: {
+            name: 'altegio_search_operations',
+            arguments: { query: 'appointments' },
+          },
+        })
+      );
+      expect(alias.result.isError).toBeFalsy();
+      expect(alias.result.structuredContent).toEqual(
+        called.result.structuredContent
+      );
+
+      for (const transports of Object.values(transportsByFacet)) {
+        expect(Object.keys(transports)).toHaveLength(0);
+      }
+    });
+  });
+
+  it('answers an unknown method without a session as JSON-RPC -32601', async () => {
+    await withApp(async (port) => {
+      const res = await fetch(`http://127.0.0.1:${port}/mcp`, {
+        method: 'POST',
+        headers: { ...MCP_HEADERS, 'mcp-protocol-version': '2026-07-28' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'd1',
+          method: 'server/discover',
+          params: {},
+        }),
+      });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        jsonrpc: '2.0',
+        error: { code: -32601, message: 'Method not found' },
+        id: 'd1',
+      });
+
+      const note = await send(port, 'POST', null, {
+        jsonrpc: '2.0',
+        method: 'server/announce',
+      });
+      expect(note.status).toBe(202);
     });
   });
 
@@ -668,7 +745,7 @@ describe('HTTP server session status codes', () => {
 });
 
 describe('HTTP session capacity across views', () => {
-  it('rejects excess initializes and reclaims a DELETEd session across views', async () => {
+  it('admits a new session by evicting the idle one, across views', async () => {
     const config = loadConfig();
     const previousLimit = config.env.MCP_HTTP_MAX_SESSIONS;
     config.env.MCP_HTTP_MAX_SESSIONS = 1;
@@ -699,21 +776,20 @@ describe('HTTP session capacity across views', () => {
       const first = await initialize('/mcp');
       await first.text();
       const sid = first.headers.get('mcp-session-id')!;
-      const blocked = await initialize('/mcp/readonly');
-      expect(blocked.status).toBe(503);
-      expect(blocked.headers.get('retry-after')).toBe('60');
-      await blocked.text();
-      expect(Object.keys(transportsByFacet[READONLY_VIEW])).toHaveLength(0);
-      const deleted = await fetch(`http://127.0.0.1:${port}/mcp`, {
-        method: 'DELETE',
-        headers: { ...headers, 'mcp-session-id': sid },
-      });
-      await deleted.text();
-      expect(deleted.status).toBe(200);
       const replacement = await initialize('/mcp/readonly');
       await replacement.text();
       expect(replacement.status).toBe(200);
       expect(Object.keys(transportsByFacet[READONLY_VIEW])).toHaveLength(1);
+      expect(Object.keys(transportsByFacet[DEFAULT_FACET])).toHaveLength(0);
+
+      // The evicted client is told to start over, as after a restart.
+      const stale = await fetch(`http://127.0.0.1:${port}/mcp`, {
+        method: 'POST',
+        headers: { ...headers, 'mcp-session-id': sid },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'ping' }),
+      });
+      await stale.text();
+      expect(stale.status).toBe(404);
     } finally {
       for (const transports of Object.values(transportsByFacet)) {
         for (const transport of Object.values(transports))

@@ -24,6 +24,10 @@ import { isLocationMetadataRead } from './location-read-policy.js';
 import { CredentialManager } from './credential-manager.js';
 import { prepareClientFile } from './client-file-upload.js';
 import { AuthenticationError, AltegioApiError } from '../utils/errors.js';
+import {
+  noteUpstreamFailure,
+  noteUpstreamResponse,
+} from '../utils/tool-call-observation.js';
 import { upstreamDetail } from '../tools/tool-result.js';
 import { v2Path } from '../api/altegio-http.js';
 import { hexColor } from '../utils/color.js';
@@ -312,10 +316,18 @@ export class AltegioClient {
       endpoint = `${path}?${params.toString()}`;
     }
 
-    return fetch(`${this.apiUrl}${endpoint}`, {
-      ...options,
-      headers,
-    });
+    // The status (never the body) feeds the tool_call log's error class.
+    try {
+      const response = await fetch(`${this.apiUrl}${endpoint}`, {
+        ...options,
+        headers,
+      });
+      noteUpstreamResponse(response.status);
+      return response;
+    } catch (error) {
+      noteUpstreamFailure(error);
+      throw error;
+    }
   }
 
   /**

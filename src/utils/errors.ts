@@ -4,6 +4,7 @@
 
 import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import type { AltegioError } from '../types/altegio.types.js';
+import { noteError } from './tool-call-observation.js';
 
 /**
  * Base error class for MCP server errors
@@ -22,6 +23,8 @@ export class MCPError extends Error {
     this.code = code;
     this.data = data;
     Error.captureStackTrace(this, this.constructor);
+    // Keeps the cause of a tool's `isError` result for the tool_call log.
+    noteError(this);
   }
 
   toJSON() {
@@ -117,6 +120,8 @@ export class AltegioApiError extends Error implements AltegioError {
     this.code = statusCode;
     this.response = response;
     Error.captureStackTrace(this, this.constructor);
+    // Keeps the cause of a tool's `isError` result for the tool_call log.
+    noteError(this);
   }
 }
 
