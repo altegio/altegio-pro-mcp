@@ -6,7 +6,13 @@ import {
   it,
   jest,
 } from '@jest/globals';
-import { HttpSessionBudget } from '../utils/http-sessions.js';
+import {
+  HttpSessionBudget,
+  type HttpSessionEviction,
+} from '../utils/http-sessions.js';
+
+const closer = () =>
+  jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
 
 describe('HTTP session memory budget', () => {
   beforeEach(() => {
@@ -16,19 +22,19 @@ describe('HTTP session memory budget', () => {
     jest.useRealTimers();
   });
 
-  it('caps concurrent reservations and frees a slot after idle expiry', async () => {
+  it('frees a slot after idle expiry', async () => {
     const budget = new HttpSessionBudget(1, 100);
-    const close = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const close = closer();
     expect(budget.acquire(close)).toBeDefined();
-    expect(budget.acquire(close)).toBeUndefined();
+    expect(budget.size).toBe(1);
     await jest.advanceTimersByTimeAsync(100);
     expect(close).toHaveBeenCalledTimes(1);
-    expect(budget.acquire(close)).toBeDefined();
+    expect(budget.size).toBe(0);
   });
 
   it('refreshes idle time on activity, including SSE reconnects', async () => {
     const budget = new HttpSessionBudget(1, 100);
-    const close = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const close = closer();
     const lease = budget.acquire(close)!;
     await jest.advanceTimersByTimeAsync(90);
     lease.touch();
@@ -38,9 +44,40 @@ describe('HTTP session memory budget', () => {
     expect(close).toHaveBeenCalledTimes(1);
   });
 
+  it('expires a session that never did real work sooner than one that did', async () => {
+    const budget = new HttpSessionBudget(2, {
+      idleTimeoutMs: 1000,
+      unusedIdleTimeoutMs: 100,
+    });
+    const probeClose = closer();
+    const workClose = closer();
+    budget.acquire(probeClose);
+    const working = budget.acquire(workClose)!;
+    const finish = working.beginPost();
+    working.markUsed();
+    finish();
+
+    await jest.advanceTimersByTimeAsync(100);
+    expect(probeClose).toHaveBeenCalledTimes(1);
+    expect(workClose).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(900);
+    expect(workClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('never lets the short expiry exceed the configured one', async () => {
+    const budget = new HttpSessionBudget(1, {
+      idleTimeoutMs: 50,
+      unusedIdleTimeoutMs: 1000,
+    });
+    const close = closer();
+    budget.acquire(close);
+    await jest.advanceTimersByTimeAsync(50);
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
   it('does not expire long-running or overlapping POST responses', async () => {
     const budget = new HttpSessionBudget(1, 100);
-    const close = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const close = closer();
     const lease = budget.acquire(close)!;
     const first = lease.beginPost();
     const second = lease.beginPost();
@@ -57,7 +94,7 @@ describe('HTTP session memory budget', () => {
 
   it('releases terminated or failed initializations without closing twice', async () => {
     const budget = new HttpSessionBudget(1, 100);
-    const close = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const close = closer();
     const lease = budget.acquire(close)!;
     const finish = lease.beginPost();
     lease.release();
@@ -67,5 +104,76 @@ describe('HTTP session memory budget', () => {
     expect(budget.acquire(close)).toBeDefined();
     await jest.advanceTimersByTimeAsync(100);
     expect(close).toHaveBeenCalledTimes(1); // only the replacement expired
+  });
+});
+
+describe('HTTP session budget at capacity', () => {
+  let clock = 0;
+  const now = () => clock;
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    clock = 0;
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('evicts the least recently used idle session instead of refusing', () => {
+    const evictions: HttpSessionEviction[] = [];
+    const budget = new HttpSessionBudget(2, {
+      now,
+      onEvict: (eviction) => evictions.push(eviction),
+    });
+    const closes = [closer(), closer(), closer()];
+    const older = budget.acquire(closes[0]!)!;
+    clock = 1000;
+    budget.acquire(closes[1]!);
+    clock = 2000;
+    older.touch(); // the first session is now the most recently used
+    clock = 5000;
+
+    expect(budget.acquire(closes[2]!)).toBeDefined();
+    expect(closes[1]).toHaveBeenCalledTimes(1);
+    expect(closes[0]).not.toHaveBeenCalled();
+    expect(budget.size).toBe(2);
+    expect(evictions).toEqual([{ used: false, idleSeconds: 4, sessions: 1 }]);
+  });
+
+  it('evicts a session that never did real work before one that did', () => {
+    const budget = new HttpSessionBudget(2, { now });
+    const usedClose = closer();
+    const probeClose = closer();
+    const used = budget.acquire(usedClose)!;
+    used.markUsed();
+    clock = 1000;
+    budget.acquire(probeClose);
+
+    expect(budget.acquire(closer())).toBeDefined();
+    expect(probeClose).toHaveBeenCalledTimes(1);
+    expect(usedClose).not.toHaveBeenCalled();
+  });
+
+  it('refuses only when every session is serving a request', () => {
+    const budget = new HttpSessionBudget(2, { now });
+    const busy = [closer(), closer()];
+    const finishes = busy.map((close) => budget.acquire(close)!.beginPost());
+
+    expect(budget.acquire(closer())).toBeUndefined();
+    for (const close of busy) expect(close).not.toHaveBeenCalled();
+
+    finishes[1]!();
+    expect(budget.acquire(closer())).toBeDefined();
+    expect(busy[1]).toHaveBeenCalledTimes(1);
+    expect(busy[0]).not.toHaveBeenCalled();
+  });
+
+  it('never holds more leases than its capacity', () => {
+    const budget = new HttpSessionBudget(3, { now });
+    for (let i = 0; i < 50; i++) {
+      clock += 10;
+      expect(budget.acquire(closer())).toBeDefined();
+      expect(budget.size).toBeLessThanOrEqual(3);
+    }
   });
 });

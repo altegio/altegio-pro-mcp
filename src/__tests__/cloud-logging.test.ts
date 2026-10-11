@@ -75,12 +75,141 @@ describe('Cloud Logging destination', () => {
     await destination.flush();
     destination.write(line);
     await destination.flush();
-    expect(fallback.mock.calls).toEqual([[line], [line]]);
+    const lines = fallback.mock.calls.map(([written]) => written);
+    expect(lines.filter((written) => written === line)).toHaveLength(2);
     expect(
       fetcher.mock.calls.filter(([url]) =>
         String(url).includes('entries:write')
       )
     ).toHaveLength(1);
+  });
+
+  it('says once a minute why writes fail, with status and API reason only', async () => {
+    let clock = 1_000_000;
+    const fetcher = jest.fn(async (url: string | URL | Request) => {
+      const path = String(url);
+      if (path.includes('entries:write')) {
+        return Response.json(
+          {
+            error: {
+              status: 'PERMISSION_DENIED',
+              message: 'free text that must not be echoed',
+            },
+          },
+          { status: 403 }
+        );
+      }
+      return mockFetch()(url);
+    });
+    const fallback = jest.fn();
+    const destination = new CloudLoggingDestination(
+      fetcher as typeof fetch,
+      fallback,
+      256,
+      () => clock
+    );
+    const diagnostics = () =>
+      fallback.mock.calls
+        .map(([written]) => String(written))
+        .filter((written) => written.includes('cloud_logging_write_failed'))
+        .map((written) => JSON.parse(written));
+
+    destination.write(line);
+    await destination.flush();
+    expect(diagnostics()).toEqual([
+      expect.objectContaining({
+        severity: 'WARNING',
+        stage: 'write',
+        http_status: 403,
+        reason: 'PERMISSION_DENIED',
+        failures: 1,
+        entries_to_fallback: 1,
+      }),
+    ]);
+    expect(JSON.stringify(diagnostics())).not.toContain('free text');
+
+    clock += 31_000; // past the cooldown, inside the diagnostic interval
+    destination.write(line);
+    await destination.flush();
+    expect(diagnostics()).toHaveLength(1);
+
+    clock += 31_000; // past both
+    destination.write(line);
+    await destination.flush();
+    expect(diagnostics()).toHaveLength(2);
+    expect(diagnostics()[1]).toMatchObject({ failures: 2 });
+  });
+
+  it('recovers from a write that never settles instead of stalling for good', async () => {
+    jest.useFakeTimers();
+    try {
+      let hang = true;
+      const fetcher = jest.fn(async (url: string | URL | Request) => {
+        if (String(url).includes('entries:write') && hang) {
+          return new Promise<Response>(() => undefined);
+        }
+        return mockFetch()(url);
+      });
+      const fallback = jest.fn();
+      const destination = new CloudLoggingDestination(
+        fetcher as typeof fetch,
+        fallback
+      );
+      destination.write(line);
+      await jest.advanceTimersByTimeAsync(200 + 5000);
+      // The stuck batch went to the fallback; the destination says why.
+      expect(fallback).toHaveBeenCalledWith(line);
+      expect(
+        fallback.mock.calls.some(([written]) =>
+          String(written).includes('"reason":"TimeoutError"')
+        )
+      ).toBe(true);
+
+      hang = false;
+      fallback.mockClear();
+      await jest.advanceTimersByTimeAsync(30_000);
+      destination.write(line);
+      await jest.advanceTimersByTimeAsync(200);
+      expect(fallback).not.toHaveBeenCalled();
+      expect(
+        fetcher.mock.calls.filter(([url]) =>
+          String(url).includes('entries:write')
+        )
+      ).toHaveLength(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps draining after the queue overflows', async () => {
+    jest.useFakeTimers();
+    try {
+      const fetcher = mockFetch();
+      const fallback = jest.fn();
+      const destination = new CloudLoggingDestination(
+        fetcher as typeof fetch,
+        fallback,
+        2
+      );
+      for (let i = 0; i < 3; i++) destination.write(line);
+      expect(fallback).toHaveBeenCalledTimes(1);
+      await jest.advanceTimersByTimeAsync(200);
+      destination.write(line);
+      await jest.advanceTimersByTimeAsync(200);
+      expect(fallback).toHaveBeenCalledTimes(1);
+      const calls = fetcher.mock.calls as unknown as [string, RequestInit][];
+      expect(
+        calls
+          .filter(([url]) => url.includes('entries:write'))
+          .reduce(
+            (sum, [, init]) =>
+              sum + JSON.parse(String(init.body)).entries.length,
+            0
+          )
+      ).toBe(3);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('bounds queued entries and batches at twenty', async () => {

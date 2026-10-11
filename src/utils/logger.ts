@@ -2,6 +2,7 @@
  * Logger utility using Pino for structured logging
  */
 
+import { createHash } from 'node:crypto';
 import pino from 'pino';
 import { COMMIT_SHA, PACKAGE_VERSION } from '../package-metadata.js';
 import type { Logger as PinoLogger } from 'pino';
@@ -139,6 +140,31 @@ export const createLogger = (
 
 export const getLogger = (name: string): PinoLogger => {
   return LoggerFactory.getInstance().getLogger(name);
+};
+
+/**
+ * A short, non-reversible handle for an MCP session in logs. Lines of one
+ * session correlate with each other; the session ID itself is never written.
+ */
+export const sessionLogId = (
+  sessionId: string | undefined
+): string | undefined =>
+  sessionId
+    ? createHash('sha256').update(sessionId).digest('hex').slice(0, 12)
+    : undefined;
+
+/**
+ * A client-supplied product token (a `clientInfo` name or version, a
+ * User-Agent product) reduced to `[A-Za-z0-9._-]`, at most 64 characters.
+ * Anything else a client sends is free text and is never logged.
+ */
+export const logSafeToken = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const token = value
+    .replace(/[^A-Za-z0-9._-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 64);
+  return token || undefined;
 };
 
 // Default logger instance

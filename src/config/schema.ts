@@ -127,6 +127,14 @@ export const EnvSchema = z.object({
 
   // Retained HTTP servers; deployments tune this against their JS heap budget.
   MCP_HTTP_MAX_SESSIONS: z.coerce.number().int().min(1).default(512),
+  // Idle expiry of an HTTP session after it made a tool call, and before it
+  // did (a host that opens a session per thread and never calls a tool).
+  MCP_HTTP_SESSION_IDLE_SECONDS: z.coerce.number().int().min(10).default(1800),
+  MCP_HTTP_UNUSED_SESSION_IDLE_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(10)
+    .default(300),
 
   // Credentials storage
   CREDENTIALS_DIR: z.string().optional(),
@@ -280,6 +288,9 @@ export class ConfigLoader {
         NODE_ENV: env.NODE_ENV,
         LOG_LEVEL: env.LOG_LEVEL,
         MCP_HTTP_MAX_SESSIONS: env.MCP_HTTP_MAX_SESSIONS,
+        MCP_HTTP_SESSION_IDLE_SECONDS: env.MCP_HTTP_SESSION_IDLE_SECONDS,
+        MCP_HTTP_UNUSED_SESSION_IDLE_SECONDS:
+          env.MCP_HTTP_UNUSED_SESSION_IDLE_SECONDS,
         CREDENTIALS_DIR: env.CREDENTIALS_DIR,
         MCP_SERVER_INSTRUCTIONS: env.MCP_SERVER_INSTRUCTIONS,
         MCP_PUBLIC_BASE_URL: env.MCP_PUBLIC_BASE_URL,

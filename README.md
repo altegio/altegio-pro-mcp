@@ -60,9 +60,15 @@ The local MCP route is `/mcp`, with `/mcp/<facet>` and `/mcp/readonly` variants.
 HTTP uses the SDK's Streamable HTTP transport and session handling. All views
 share `MCP_HTTP_MAX_SESSIONS` (default 512), including pending initializes. Tune
 it against the container's JS heap budget; the internal 256 MiB old-space
-deployment uses 256 sessions. Sessions expire after 30 idle minutes, with active
-POST responses protected. At capacity, initialization returns 503 with
-`Retry-After: 60`; expired IDs return 404 and require reinitialization.
+deployment uses 256 sessions. Sessions expire after 30 idle minutes
+(`MCP_HTTP_SESSION_IDLE_SECONDS`) once they have called a tool, and after 5
+(`MCP_HTTP_UNUSED_SESSION_IDLE_SECONDS`) before that; active POST responses are
+protected. A full budget evicts its least recently used idle session, preferring
+one that never called a tool; only when every session is serving a request does
+initialization return 503 with `Retry-After: 60`. Expired or evicted IDs return
+404 and require reinitialization. A POST without a session ID that is not
+`initialize` is served statelessly, on a server built for that request alone;
+an unknown JSON-RPC method gets error -32601.
 
 ## Self-hosting and authentication
 
