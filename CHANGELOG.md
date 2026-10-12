@@ -6,6 +6,16 @@ is declared stable.
 
 ## [Unreleased]
 
+### Fixed — a page keeps the requested page size
+
+- `appointments_list`, `services_list` and `memberships_list_types` cut a page
+  over 40 KB to a smaller page size and counted `next_page` in that size. A
+  caller that kept its own `page_size` while following `next_page` skipped
+  items without an error: on location 720441 a loop at 100 was served pages 1,
+  3, 7 and 15 of 50 and read 200 of 797 September appointments. A page that
+  continues now holds exactly `page_size` items (at most 100); the text names
+  the next request as `page=…, page_size=…`.
+
 ### Added — appointment tags and colors
 
 - `appointments_create` and `appointments_update` take `tag_ids` and a `color`

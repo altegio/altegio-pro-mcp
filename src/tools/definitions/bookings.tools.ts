@@ -1,7 +1,7 @@
 import {
-  fitPageToBudget,
   paginationInput,
   paginateCollection,
+  renderPage,
 } from '../pagination.js';
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
@@ -170,7 +170,7 @@ export const getAppointmentsTool = defineTool({
   name: 'appointments_list',
   category: 'Appointments',
   description:
-    'Appointments of a location by date range, team member, client, creator, group event, creation or change time; deleted only with include_deleted. Each has status, team member, client, services, tags and color; phones need include_contacts. Paged and size-bounded: follow pagination.next_page.',
+    'Appointments of a location by date range, team member, client, creator, group event, creation or change time; deleted only with include_deleted. Each has status, team member, client, services, tags and color; phones need include_contacts. Paged: follow pagination.next_page with the same page_size.',
   annotations: {
     title: 'Get Appointments',
     readOnlyHint: true,
@@ -243,10 +243,10 @@ export const getAppointmentsTool = defineTool({
         : {}),
     });
 
-    return fitPageToBudget({
+    return renderPage({
       input,
       items: appointments,
-      render: ({ items, pagination, notice }) => {
+      render: ({ items, pagination }) => {
         const projected = items.map((booking) =>
           projectAppointment(booking, { includeContacts })
         );
@@ -254,9 +254,8 @@ export const getAppointmentsTool = defineTool({
           `${projected.length} ${projected.length === 1 ? 'appointment' : 'appointments'} at location ${location_id}, page ${pagination.page}` +
             (pagination.next_page === null
               ? ' (last page).'
-              : `; next: page=${pagination.next_page}.`),
+              : `; next: page=${pagination.next_page}, page_size=${pagination.page_size}.`),
         ];
-        if (notice) lines.push(notice);
         if (!includeContacts && projected.length > 0) {
           lines.push(CONTACTS_WITHHELD_NOTICE);
         }

@@ -7,9 +7,11 @@
  * that page by a date window instead of an offset use `windowPagination`, which
  * keeps the same object name and the `returned` / `has_more` pair.
  *
- * Every page also has a size budget (`RESPONSE_BYTE_BUDGET`, ADR-001 D8): a
- * page that renders larger is cut to a smaller page size that still continues
- * exactly (`fitPageToBudget`), and the result says so.
+ * A page holds exactly the `page_size` the caller asked for — fewer only on the
+ * last page — so `page = next_page` with the same page size reads on without a
+ * gap (`renderPage`). `MAX_PAGE_SIZE` bounds a page. Sources read whole by a date
+ * window fit `RESPONSE_BYTE_BUDGET` instead (`fitPrefixToBudget`, ADR-001 D8):
+ * they continue by date, which no page size can shift.
  */
 import { z } from 'zod';
 
@@ -17,9 +19,10 @@ export const DEFAULT_PAGE_SIZE = 25;
 export const MAX_PAGE_SIZE = 100;
 
 /**
- * Bytes one collection result may take — its text plus its serialized
+ * Bytes a date-window result may take — its text plus its serialized
  * `structuredContent`. Production pages of 300 appointments reached 400 KB,
- * which a host either truncates or pays for in context on every turn.
+ * which a host either truncates or pays for in context on every turn; offset
+ * pages are bounded by `MAX_PAGE_SIZE` instead (see `renderPage`).
  */
 export const RESPONSE_BYTE_BUDGET = 40_000;
 
@@ -227,6 +230,36 @@ export function standardizeCollection<
   return { ...result, structuredContent: out };
 }
 
+/** What `renderPage` hands a renderer: one page and how it continues. */
+export interface PageView<T> {
+  items: T[];
+  pagination: Pagination;
+}
+
+/**
+ * Render one offset page with its continuation, never cut.
+ *
+ * A page that continues holds exactly `input.page_size` items, so a caller that
+ * keeps its page size while following `next_page` reads every item once. Cutting
+ * an oversized page to a smaller size (#116) moved `next_page` into that size:
+ * on 2026-10-12 a loop that kept page_size 100 was served pages 1, 3, 7 and 15
+ * of 50 and read 200 of 797 appointments without an error. No size budget can
+ * shrink a page and keep `page`/`page_size` stable for such a caller, so the page
+ * size the caller chose, at most `MAX_PAGE_SIZE`, is what bounds the result.
+ */
+export function renderPage<T, R>(options: {
+  input: PageInput;
+  items: readonly T[];
+  total?: number;
+  render: (page: PageView<T>) => R;
+}): R {
+  const { input, items, total, render } = options;
+  return render({
+    items: [...items],
+    pagination: pageMetadata(input, items.length, total),
+  });
+}
+
 // ========== size budget ==========
 
 /** Text plus serialized `structuredContent`: what a result costs a host. */
@@ -240,79 +273,6 @@ export function resultBytes(output: {
       ? 0
       : Buffer.byteLength(JSON.stringify(output.structuredContent)))
   );
-}
-
-/** Divisors of `n`, largest first. */
-function divisorsDescending(n: number): number[] {
-  const divisors: number[] = [];
-  for (let d = 1; d * d <= n; d += 1) {
-    if (n % d !== 0) continue;
-    divisors.push(d);
-    if (d * d !== n) divisors.push(n / d);
-  }
-  return divisors.sort((a, b) => b - a);
-}
-
-/** What `fitPageToBudget` hands a renderer: one page and how it continues. */
-export interface BudgetedPage<T> {
-  items: T[];
-  pagination: Pagination;
-  /**
-   * One sentence for the text when the page was cut to fit the budget,
-   * naming how to continue; undefined when it was not.
-   */
-  notice?: string;
-}
-
-/**
- * Render one offset page within the response budget.
- *
- * `items` is the page as fetched for `input`. When it renders larger than
- * `budget`, it is cut to the largest page size that divides the requested
- * one and fits — a divisor, so `page` / `page_size` still address the very
- * next item: page p of size s cut to size k is page (p-1)·s/k + 1 of size k,
- * and every later page of size k continues without a gap or an overlap. The
- * cut is reported in `pagination` (the page and page size actually served) and
- * in a notice the renderer puts in its text.
- */
-export function fitPageToBudget<
-  T,
-  R extends { text: string; structuredContent?: unknown },
->(options: {
-  input: PageInput;
-  items: readonly T[];
-  total?: number;
-  render: (page: BudgetedPage<T>) => R;
-  budget?: number;
-}): R {
-  const { input, items, total, render } = options;
-  const budget = options.budget ?? RESPONSE_BYTE_BUDGET;
-  const full = render({
-    items: [...items],
-    pagination: pageMetadata(input, items.length, total),
-  });
-  const fullBytes = resultBytes(full);
-  if (fullBytes <= budget || items.length <= 1) return full;
-
-  // Start from the size the measured bytes suggest, then step down.
-  const estimate = Math.max(1, Math.floor((items.length * budget) / fullBytes));
-  let last = full;
-  for (const size of divisorsDescending(input.page_size)) {
-    if (size >= items.length || size > estimate) continue;
-    const page = (input.page - 1) * (input.page_size / size) + 1;
-    const pagination = pageMetadata({ page, page_size: size }, size, total);
-    last = render({
-      items: items.slice(0, size),
-      pagination,
-      notice:
-        `Cut to ${size} of ${items.length} items to stay within the ${Math.round(budget / 1000)} KB response budget` +
-        (pagination.next_page === null
-          ? '.'
-          : `; continue with page=${pagination.next_page}, page_size=${size}.`),
-    });
-    if (resultBytes(last) <= budget) return last;
-  }
-  return last;
 }
 
 /**

@@ -28,9 +28,9 @@ import type {
 import { MembershipsInputError } from './errors.js';
 import {
   completeCollection,
-  fitPageToBudget,
   pageMetadata,
   paginateCollection,
+  renderPage,
   type PageInput,
 } from '../../tools/pagination.js';
 import {
@@ -320,19 +320,20 @@ export async function listTypes(
     page: input.page,
     page_size: input.page_size,
   });
-  return fitPageToBudget({
+  return renderPage({
     input,
     items: page.items,
     total: page.total ?? undefined,
-    render: ({ items, pagination, notice }) => {
+    render: ({ items, pagination }) => {
       const lines = [
         `${page.total ?? items.length} ${input.archived ? 'archived' : 'active'} membership type(s) in chain ${input.chain_id}; page ${pagination.page} shows ${items.length}:`,
-        ...(notice ? [notice] : []),
         ...items.map((t) => typeLine(t, { inChain: true })),
       ];
       if (items.length === 0) lines.push('No membership types match.');
       if (pagination.has_more)
-        lines.push(`More follow: request page ${pagination.next_page}.`);
+        lines.push(
+          `More follow: request page ${pagination.next_page} with page_size ${pagination.page_size}.`
+        );
       return {
         text: withUntrustedBlock(lines.join('\n'), typesUntrusted(items), {
           maxChars: FIELD_MAX_CHARS,
