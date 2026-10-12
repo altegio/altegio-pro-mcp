@@ -1,4 +1,4 @@
-import { z, ZodError, type ZodType } from 'zod';
+import { ZodError } from 'zod';
 import { createLogger, logSafeToken, sessionLogId } from '../utils/logger.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
@@ -24,7 +24,6 @@ import {
 } from './facets.js';
 import type { ToolResult } from './tool-result.js';
 import {
-  CONFIRMATION_TOKEN_ARG,
   requireConfirmation,
   type ConfirmationAnswer,
   type ConfirmationRuntime,
@@ -46,7 +45,10 @@ import {
   type ToolScope,
 } from './scopes.js';
 import { listedOnView, runOnView, type ServingView } from './serving-view.js';
-import { legacyAliasTargets } from './legacy-aliases.js';
+import {
+  legacyAliasTargets,
+  translateLegacyArguments,
+} from './legacy-aliases.js';
 import { getOperation } from './executor/catalog.js';
 import {
   AltegioApiError,
@@ -58,7 +60,9 @@ import {
   createToolCallObservation,
   isTimeout,
   runObservingToolCall,
+  summarizeIssues,
   type ToolCallObservation,
+  type ValidationIssue,
 } from '../utils/tool-call-observation.js';
 
 type CallHandler = (args: unknown) => Promise<ToolResult>;
@@ -190,32 +194,6 @@ export type ToolErrorClass =
 /** A name a reply or a log line may repeat: nothing else a caller sent is. */
 const SAFE_TOOL_NAME = /^[A-Za-z0-9_.-]{1,64}$/;
 
-/**
- * The strict input schema of a factory tool, as its handler parses it, built
- * once per definition rather than once per server instance.
- */
-const strictInputs = new WeakMap<ZodType, ZodType>();
-function strictInput(input: ZodType): ZodType {
-  let schema = strictInputs.get(input);
-  if (!schema) {
-    schema = input instanceof z.ZodObject ? input.strict() : input;
-    strictInputs.set(input, schema);
-  }
-  return schema;
-}
-
-/** Whether `args` would pass the tool's own input validation. */
-function argumentsValidate(input: ZodType | undefined, args: unknown): boolean {
-  if (!input) return false;
-  let candidate: unknown = args ?? {};
-  if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
-    const copy = { ...(candidate as Record<string, unknown>) };
-    delete copy[CONFIRMATION_TOKEN_ARG];
-    candidate = copy;
-  }
-  return strictInput(input).safeParse(candidate).success;
-}
-
 /** The answer to a tool name this server does not define. */
 function unknownToolResult(
   requested: string,
@@ -241,6 +219,53 @@ function unknownToolResult(
       `This server has no tool${name}. Refresh the tool list with ` +
       'tools/list and call one of the tools it returns.';
   }
+  return { content: [{ type: 'text', text }], isError: true };
+}
+
+/**
+ * The answer to a former tool name whose arguments, translated to its
+ * replacement's names, still do not fit: what to change, in the replacement's
+ * argument names only. An argument the replacement does not take is counted,
+ * never named — it is caller text, not one of our fixed strings.
+ */
+function legacyArgumentsResult(
+  requested: string,
+  target: string,
+  issues: ZodError['issues']
+): ToolResult {
+  const problems: string[] = [];
+  let unknown = 0;
+  for (const issue of issues) {
+    if (issue.code === 'unrecognized_keys') {
+      unknown += issue.keys.length;
+    } else if (
+      issue.code === 'too_big' &&
+      issue.path.length === 1 &&
+      issue.path[0] === 'page_size' &&
+      typeof issue.maximum === 'number'
+    ) {
+      problems.push(
+        `page_size is at most ${issue.maximum}; follow pagination.next_page with pagination.page_size to read the rest`
+      );
+    } else {
+      const [key] = issue.path;
+      problems.push(
+        typeof key === 'string' && SAFE_TOOL_NAME.test(key)
+          ? `\`${key}\`: ${issue.message}`
+          : issue.message
+      );
+    }
+  }
+  if (unknown > 0) {
+    problems.push(
+      `${unknown} argument${unknown === 1 ? '' : 's'} it does not take`
+    );
+  }
+  const text =
+    `\`${requested}\` is a former tool name for \`${target}\`, and its ` +
+    `arguments do not fit \`${target}\`: ${problems.slice(0, 5).join('; ')}. ` +
+    `Call \`${target}\` with the arguments its current input schema defines ` +
+    '(refresh the tool list with tools/list).';
   return { content: [{ type: 'text', text }], isError: true };
 }
 
@@ -318,6 +343,35 @@ function classifyFailure(
   return { error_class: 'internal' };
 }
 
+/**
+ * Which arguments failed validation, for the `tool_call` log: the issues the
+ * handler noted, the thrown schema error's, an executor refusal's reason and
+ * parameter names, or — when nothing was noted — the tool's own validation
+ * re-run. Codes, paths and argument names only, never values.
+ */
+function validationIssuesOf(
+  observation: ToolCallObservation,
+  thrown: unknown,
+  inputIssues: () => ZodError['issues'] | undefined
+): ValidationIssue[] | undefined {
+  if (observation.validationIssues) return observation.validationIssues;
+  if (thrown instanceof ZodError) return summarizeIssues(thrown.issues);
+  const cause = thrown ?? observation.lastError;
+  if (cause instanceof ExecutorRefusalError) {
+    const data = (cause.data ?? {}) as Record<string, unknown>;
+    const keys = [data.fields, data.missing].find(Array.isArray);
+    return summarizeIssues([
+      {
+        code: typeof data.reason === 'string' ? data.reason : 'refused',
+        path: [],
+        ...(keys ? { keys } : {}),
+      },
+    ]);
+  }
+  const issues = inputIssues();
+  return issues ? summarizeIssues(issues) : undefined;
+}
+
 /** `name/version` from the first product of a User-Agent header. */
 function userAgentProduct(value: unknown): {
   name?: string;
@@ -341,10 +395,10 @@ export function registerTools(
   const handlers = new Map<string, CallHandler>(
     factoryTools.map((tool) => [tool.meta.name, tool.createHandler(client)])
   );
-  // Input schemas, for resolving a legacy alias and for telling a validation
-  // failure from other failures in the tool_call log.
-  const inputSchemas = new Map<string, ZodType>(
-    factoryTools.map((tool) => [tool.meta.name, tool.meta.input])
+  // Input validation as each handler runs it, for resolving a legacy alias and
+  // for telling a validation failure from other failures in the tool_call log.
+  const inputIssuesOf = new Map(
+    factoryTools.map((tool) => [tool.meta.name, tool.inputIssues])
   );
 
   // Destructive tools that require a human confirmation before they run. The
@@ -437,37 +491,42 @@ export function registerTools(
       tool: string;
       alias?: string;
       errorClass?: ToolErrorClass;
+      validation?: ValidationIssue[];
       confirmation?: boolean;
     } = { tool: 'unknown' };
+    // The arguments the tool runs with: a former name's, translated.
+    let callArgs = args;
 
     const execute = async (): Promise<ToolResult> => {
       let name = requested;
       let handler = handlerFor(name);
+      let aliasIssues: ZodError['issues'] | undefined;
       if (!handler) {
-        // A former name (`./legacy-aliases.ts`) runs as its replacement when
-        // the arguments fit it; anything else is answered in band, so the
-        // model reads which tool to call instead of a protocol error.
+        // A former name (`./legacy-aliases.ts`) runs as its one replacement,
+        // with its former argument names translated; anything else is
+        // answered in band, so the model reads which tool to call instead of
+        // a protocol error.
         const targets = legacyAliasTargets(requested);
-        const [target] = targets ?? [];
         if (targets) call.alias = requested;
-        if (
-          targets?.length === 1 &&
-          target !== undefined &&
-          handlerFor(target) &&
-          argumentsValidate(inputSchemas.get(target), args)
-        ) {
-          name = target;
-          handler = handlerFor(target);
-        } else {
+        const target = targets?.length === 1 ? targets[0] : undefined;
+        handler = target === undefined ? undefined : handlerFor(target);
+        if (target === undefined || !handler) {
           call.errorClass = 'unknown_tool';
           return unknownToolResult(requested, targets, servingView);
         }
+        name = target;
+        callArgs = translateLegacyArguments(requested, args) as typeof args;
+        aliasIssues = inputIssuesOf.get(target)?.(callArgs);
       }
       call.tool = name;
-      if (!handler) throw new McpError(ErrorCode.InternalError, 'No handler');
       if (!visible.has(name)) {
         call.errorClass = 'out_of_view';
         throw outOfFacetError(name, facet, facetIndex, publicBaseUrl);
+      }
+      if (aliasIssues) {
+        call.errorClass = 'validation';
+        call.validation = summarizeIssues(aliasIssues);
+        return legacyArgumentsResult(requested, name, aliasIssues);
       }
 
       // Scope check before anything else the call does. It precedes the
@@ -489,11 +548,11 @@ export function registerTools(
       // means "already confirmed, or nothing to confirm"; anything else is the
       // result the caller gets instead of the operation being performed —
       // logged as `confirmation_required` whatever shape that result takes.
-      const prepared = confirmations.get(name)?.(args);
+      const prepared = confirmations.get(name)?.(callArgs);
       if (prepared) {
         const gate = await requireConfirmation({
           toolName: name,
-          args,
+          args: callArgs,
           prepared,
           client,
           runtime: confirmationRuntime(server, extra.requestId),
@@ -504,7 +563,7 @@ export function registerTools(
         }
       }
 
-      return handler(args);
+      return handler(callArgs);
     };
 
     // The SDK deliberately schedules protocol handlers on a later promise turn.
@@ -529,10 +588,10 @@ export function registerTools(
           : userAgentProduct(headers?.['user-agent']);
         const operationId =
           call.tool === 'api_call_operation' &&
-          args &&
-          typeof args.operation_id === 'string' &&
-          getOperation(args.operation_id)
-            ? args.operation_id
+          callArgs &&
+          typeof callArgs.operation_id === 'string' &&
+          getOperation(callArgs.operation_id)
+            ? callArgs.operation_id
             : undefined;
         return {
           event: 'tool_call',
@@ -559,15 +618,14 @@ export function registerTools(
           client_version: logSafeToken(clientInfo?.version) ?? agent.version,
         };
       };
-      const failure = (thrown?: unknown) =>
-        call.errorClass
+      const inputIssues = () => inputIssuesOf.get(call.tool)?.(callArgs);
+      const failure = (thrown?: unknown) => {
+        const classified = call.errorClass
           ? { error_class: call.errorClass }
           : classifyFailure(
               observation,
               thrown,
-              () =>
-                inputSchemas.has(call.tool) &&
-                !argumentsValidate(inputSchemas.get(call.tool), args),
+              () => inputIssues() !== undefined,
               () => {
                 try {
                   return client.isAuthenticated?.() === false;
@@ -576,6 +634,14 @@ export function registerTools(
                 }
               }
             );
+        if (classified.error_class !== 'validation') return classified;
+        const issues =
+          call.validation ??
+          validationIssuesOf(observation, thrown, inputIssues);
+        return issues && issues.length > 0
+          ? { ...classified, validation_issues: issues }
+          : classified;
+      };
       const log = createLogger('tool-calls');
       try {
         const result = await runObservingToolCall(observation, () =>

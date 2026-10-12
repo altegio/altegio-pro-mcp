@@ -193,4 +193,129 @@ describe('sessionless tool calls, end to end', () => {
       );
     }
   });
+
+  /** One sessionless `tools/call` against a fresh app; returns result and log. */
+  async function callOnce(
+    path: string,
+    name: string,
+    args: Record<string, unknown>
+  ) {
+    const toolLog = jest.spyOn(createLogger('tool-calls'), 'info');
+    const { app } = createApp();
+    const server = app.listen(0);
+    try {
+      const { port } = server.address() as AddressInfo;
+      const result = await rpcResult(
+        await nativeFetch(`http://127.0.0.1:${port}${path}`, {
+          method: 'POST',
+          headers: {
+            accept: 'application/json, text/event-stream',
+            'content-type': 'application/json',
+            'x-altegio-user-token': 'direct-user-token',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'tools/call',
+            params: { name, arguments: args },
+          }),
+        })
+      );
+      const [fields] = toolLog.mock.calls.at(-1)!;
+      return { result, fields: fields as unknown as Record<string, unknown> };
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  }
+
+  it('runs a former tool name with the arguments its cached schema had', async () => {
+    const requested: URL[] = [];
+    jest.spyOn(global, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (!url.startsWith('https://api.alteg.io/')) {
+        return nativeFetch(input, init);
+      }
+      requested.push(new URL(url));
+      return Response.json({
+        success: true,
+        data: [],
+        meta: { page: 1, total_count: 0 },
+      });
+    });
+    const { result, fields } = await callOnce('/mcp', 'get_appointments', {
+      location_id: LOCATION,
+      page: 1,
+      count: 20,
+      start_date: '2026-10-01',
+      end_date: '2026-10-07',
+    });
+    expect(result.isError).toBeFalsy();
+    expect(fields).toMatchObject({
+      tool: 'appointments_list',
+      alias: 'get_appointments',
+      outcome: 'success',
+    });
+    expect(requested).toHaveLength(1);
+    expect(requested[0]!.pathname).toContain(
+      `/locations/${LOCATION}/appointments`
+    );
+    expect(requested[0]!.search).toContain('2026-10-01');
+  });
+
+  it('says how to page when a former page size is over the limit, and logs which argument failed', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    const { result, fields } = await callOnce('/mcp', 'get_appointments', {
+      location_id: LOCATION,
+      count: 300,
+      surprise_key: 'secret value',
+    });
+    expect(result.isError).toBe(true);
+    const text = result.content[0]?.text ?? '';
+    expect(text).toContain('former tool name for `appointments_list`');
+    expect(text).toContain(
+      'page_size is at most 100; follow pagination.next_page with pagination.page_size'
+    );
+    expect(text).toContain('1 argument it does not take');
+    expect(text).not.toContain('surprise_key');
+    expect(fields).toMatchObject({
+      tool: 'appointments_list',
+      alias: 'get_appointments',
+      outcome: 'error',
+      error_class: 'validation',
+      validation_issues: expect.arrayContaining([
+        { code: 'too_big', path: 'page_size' },
+        { code: 'unrecognized_keys', path: '', keys: ['surprise_key'] },
+      ]),
+    });
+    expect(JSON.stringify(fields)).not.toMatch(/300|secret value/);
+    expect(
+      fetchSpy.mock.calls.filter(([input]) =>
+        String(input).startsWith('https://api.alteg.io/')
+      )
+    ).toHaveLength(0);
+  });
+
+  it('refuses an oversized page on the read-only view with what to do, never clamping it', async () => {
+    const { result, fields } = await callOnce(
+      '/mcp/readonly',
+      'services_list',
+      {
+        location_id: LOCATION,
+        page_size: 300,
+      }
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain(
+      'page_size: at most 100. Pass page_size 100 or less, then follow pagination.next_page with pagination.page_size'
+    );
+    expect(fields).toMatchObject({
+      tool: 'services_list',
+      route: '/mcp/readonly',
+      error_class: 'validation',
+      validation_issues: [{ code: 'too_big', path: 'page_size' }],
+    });
+    expect(JSON.stringify(fields)).not.toContain('300');
+  });
 });

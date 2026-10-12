@@ -17,6 +17,19 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 /** Why an upstream request produced no HTTP response at all. */
 export type UpstreamFailure = 'timeout' | 'network';
 
+/**
+ * Which argument failed validation and how, for the `tool_call` log: a schema
+ * issue code and the argument path, plus the names of arguments the tool does
+ * not take. Never a value.
+ */
+export interface ValidationIssue {
+  code: string;
+  /** Dotted argument path; empty for the arguments object itself. */
+  path: string;
+  /** Unrecognized argument names (sanitized), for `unrecognized_keys`. */
+  keys?: string[];
+}
+
 export interface ToolCallObservation {
   /** Upstream requests that returned a response, whatever its status. */
   upstreamResponses: number;
@@ -26,6 +39,32 @@ export interface ToolCallObservation {
   upstreamFailure?: UpstreamFailure;
   /** The most recent typed error constructed during the call. */
   lastError?: Error;
+  /** The issues of the most recent argument validation that failed. */
+  validationIssues?: ValidationIssue[];
+}
+
+/** Bounds on what one call may add to its log line. */
+const MAX_ISSUES = 5;
+const MAX_KEYS = 5;
+const MAX_DEPTH = 6;
+/** A code or a name a log line may carry; anything else is masked. */
+const LOG_TOKEN = /^[A-Za-z0-9_]{1,64}$/;
+
+function logToken(value: unknown): string {
+  return typeof value === 'string' && LOG_TOKEN.test(value) ? value : '?';
+}
+
+/** `a.0.b`: names as tokens, indexes as numbers, anything else masked. */
+function logPath(path: readonly unknown[]): string {
+  const segments = path
+    .slice(0, MAX_DEPTH)
+    .map((segment) =>
+      typeof segment === 'number' && Number.isInteger(segment)
+        ? String(segment)
+        : logToken(segment)
+    );
+  if (path.length > MAX_DEPTH) segments.push('…');
+  return segments.join('.');
 }
 
 const storage = new AsyncLocalStorage<ToolCallObservation>();
@@ -59,6 +98,39 @@ export function noteUpstreamFailure(error: unknown): void {
   const observation = storage.getStore();
   if (!observation) return;
   observation.upstreamFailure = isTimeout(error) ? 'timeout' : 'network';
+}
+
+/**
+ * Note why arguments failed validation, reduced to codes, paths and argument
+ * names (`ValidationIssue`). Takes the structural shape of a schema issue, so
+ * this module stays free of the schema library. A no-op outside a tool call.
+ */
+export function noteValidationIssues(issues: readonly SchemaIssue[]): void {
+  const observation = storage.getStore();
+  if (observation) observation.validationIssues = summarizeIssues(issues);
+}
+
+/** The structural shape of a schema issue that the log reduces. */
+export interface SchemaIssue {
+  code?: unknown;
+  path?: readonly unknown[];
+  keys?: readonly unknown[];
+}
+
+/** Schema issues as the log may carry them: bounded, value-free. */
+export function summarizeIssues(
+  issues: readonly SchemaIssue[]
+): ValidationIssue[] {
+  return issues.slice(0, MAX_ISSUES).map((issue) => {
+    const keys = Array.isArray(issue.keys)
+      ? issue.keys.slice(0, MAX_KEYS).map(logToken)
+      : undefined;
+    return {
+      code: logToken(issue.code),
+      path: logPath(issue.path ?? []),
+      ...(keys && keys.length > 0 ? { keys } : {}),
+    };
+  });
 }
 
 /** Note a typed error at construction. A no-op outside a tool call. */
