@@ -6,11 +6,22 @@
  * not report it), `has_more` and `next_page` (null on the last page). Sources
  * that page by a date window instead of an offset use `windowPagination`, which
  * keeps the same object name and the `returned` / `has_more` pair.
+ *
+ * Every page also has a size budget (`RESPONSE_BYTE_BUDGET`, ADR-001 D8): a
+ * page that renders larger is cut to a smaller page size that still continues
+ * exactly (`fitPageToBudget`), and the result says so.
  */
 import { z } from 'zod';
 
 export const DEFAULT_PAGE_SIZE = 25;
-export const MAX_PAGE_SIZE = 300;
+export const MAX_PAGE_SIZE = 100;
+
+/**
+ * Bytes one collection result may take — its text plus its serialized
+ * `structuredContent`. Production pages of 300 appointments reached 400 KB,
+ * which a host either truncates or pays for in context on every turn.
+ */
+export const RESPONSE_BYTE_BUDGET = 40_000;
 
 export const pageArg = z
   .number()
@@ -18,7 +29,7 @@ export const pageArg = z
   .positive()
   .max(Number.MAX_SAFE_INTEGER)
   .default(1)
-  .describe('1-based page number. Default 1.');
+  .describe('1-based page.');
 
 /** `page_size` with a tool-specific ceiling. */
 export function pageSizeArg(max = MAX_PAGE_SIZE, fallback = DEFAULT_PAGE_SIZE) {
@@ -28,7 +39,7 @@ export function pageSizeArg(max = MAX_PAGE_SIZE, fallback = DEFAULT_PAGE_SIZE) {
     .positive()
     .max(max)
     .default(fallback)
-    .describe(`Items per page. Default ${fallback}; maximum ${max}.`);
+    .describe('Items per page.');
 }
 
 /** Shared one-based pagination arguments for collection tools. */
@@ -214,4 +225,120 @@ export function standardizeCollection<
     out.page = page;
   }
   return { ...result, structuredContent: out };
+}
+
+// ========== size budget ==========
+
+/** Text plus serialized `structuredContent`: what a result costs a host. */
+export function resultBytes(output: {
+  text: string;
+  structuredContent?: unknown;
+}): number {
+  return (
+    Buffer.byteLength(output.text) +
+    (output.structuredContent === undefined
+      ? 0
+      : Buffer.byteLength(JSON.stringify(output.structuredContent)))
+  );
+}
+
+/** Divisors of `n`, largest first. */
+function divisorsDescending(n: number): number[] {
+  const divisors: number[] = [];
+  for (let d = 1; d * d <= n; d += 1) {
+    if (n % d !== 0) continue;
+    divisors.push(d);
+    if (d * d !== n) divisors.push(n / d);
+  }
+  return divisors.sort((a, b) => b - a);
+}
+
+/** What `fitPageToBudget` hands a renderer: one page and how it continues. */
+export interface BudgetedPage<T> {
+  items: T[];
+  pagination: Pagination;
+  /**
+   * One sentence for the text when the page was cut to fit the budget,
+   * naming how to continue; undefined when it was not.
+   */
+  notice?: string;
+}
+
+/**
+ * Render one offset page within the response budget.
+ *
+ * `items` is the page as fetched for `input`. When it renders larger than
+ * `budget`, it is cut to the largest page size that divides the requested
+ * one and fits — a divisor, so `page` / `page_size` still address the very
+ * next item: page p of size s cut to size k is page (p-1)·s/k + 1 of size k,
+ * and every later page of size k continues without a gap or an overlap. The
+ * cut is reported in `pagination` (the page and page size actually served) and
+ * in a notice the renderer puts in its text.
+ */
+export function fitPageToBudget<
+  T,
+  R extends { text: string; structuredContent?: unknown },
+>(options: {
+  input: PageInput;
+  items: readonly T[];
+  total?: number;
+  render: (page: BudgetedPage<T>) => R;
+  budget?: number;
+}): R {
+  const { input, items, total, render } = options;
+  const budget = options.budget ?? RESPONSE_BYTE_BUDGET;
+  const full = render({
+    items: [...items],
+    pagination: pageMetadata(input, items.length, total),
+  });
+  const fullBytes = resultBytes(full);
+  if (fullBytes <= budget || items.length <= 1) return full;
+
+  // Start from the size the measured bytes suggest, then step down.
+  const estimate = Math.max(1, Math.floor((items.length * budget) / fullBytes));
+  let last = full;
+  for (const size of divisorsDescending(input.page_size)) {
+    if (size >= items.length || size > estimate) continue;
+    const page = (input.page - 1) * (input.page_size / size) + 1;
+    const pagination = pageMetadata({ page, page_size: size }, size, total);
+    last = render({
+      items: items.slice(0, size),
+      pagination,
+      notice:
+        `Cut to ${size} of ${items.length} items to stay within the ${Math.round(budget / 1000)} KB response budget` +
+        (pagination.next_page === null
+          ? '.'
+          : `; continue with page=${pagination.next_page}, page_size=${size}.`),
+    });
+    if (resultBytes(last) <= budget) return last;
+  }
+  return last;
+}
+
+/**
+ * A complete collection under the response budget: the longest prefix that
+ * fits, for sources without offset paging (a date range read whole). The
+ * renderer is told where the cut fell so it can say how to continue.
+ */
+export function fitPrefixToBudget<
+  T,
+  R extends { text: string; structuredContent?: unknown },
+>(options: {
+  items: readonly T[];
+  render: (items: T[], cutAt: number | undefined) => R;
+  budget?: number;
+}): R {
+  const { items, render } = options;
+  const budget = options.budget ?? RESPONSE_BYTE_BUDGET;
+  const full = render([...items], undefined);
+  const fullBytes = resultBytes(full);
+  if (fullBytes <= budget || items.length <= 1) return full;
+
+  let size = Math.max(1, Math.floor((items.length * budget) / fullBytes));
+  let last = render(items.slice(0, size), size);
+  while (resultBytes(last) > budget && size > 1) {
+    size = Math.max(1, Math.floor(size * 0.8));
+    last = render(items.slice(0, size), size);
+  }
+  return last;
 }

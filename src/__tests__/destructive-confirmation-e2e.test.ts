@@ -280,9 +280,14 @@ describe('destructive confirmation — host WITHOUT form elicitation', () => {
 
         expect(h.deleteStaff).not.toHaveBeenCalled();
         expect(h.elicitations).toHaveLength(0);
-        expect(result.isError).toBe(true);
+        // Waiting for a person, not a failure; the status says so.
+        expect(result.isError).toBeFalsy();
+        expect(result.structuredContent).toMatchObject({
+          status: 'confirmation_required',
+          changed: false,
+        });
         const text = firstText(result);
-        expect(text).toContain('nothing was changed yet');
+        expect(text).toContain('nothing was changed');
         expect(text).toContain('Ivan Petrov');
         expect(text).toContain('can no longer be booked');
         expect(text).toContain(`${CONFIRMATION_TOKEN_ARG}="`);
@@ -307,6 +312,27 @@ describe('destructive confirmation — host WITHOUT form elicitation', () => {
       expect(h.deleteStaff).toHaveBeenCalledTimes(1);
       expect(h.deleteStaff).toHaveBeenCalledWith(LOCATION, TEAM_MEMBER);
       expect(firstText(second)).toContain('Deleted team member');
+    } finally {
+      await h.close();
+    }
+  });
+
+  it('accepts the repeat when it spells the ids as strings', async () => {
+    const h = await connect({ elicitation: false });
+    try {
+      const first = await callDeleteStaff(h.client);
+      const token = new RegExp(`${CONFIRMATION_TOKEN_ARG}="([^"]+)"`).exec(
+        firstText(first)
+      )![1]!;
+
+      const second = await callDeleteStaff(h.client, {
+        location_id: String(LOCATION),
+        team_member_id: String(TEAM_MEMBER),
+        [CONFIRMATION_TOKEN_ARG]: token,
+      });
+
+      expect(second.isError).toBeFalsy();
+      expect(h.deleteStaff).toHaveBeenCalledWith(LOCATION, TEAM_MEMBER);
     } finally {
       await h.close();
     }

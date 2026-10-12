@@ -939,6 +939,22 @@ export const apiMapping: Record<string, ApiMapping> = {
  * or in `catalog/extended/*.yaml`, so the compliance test walks both maps.
  */
 export const multiApiMapping: Record<string, ApiMapping[]> = {
+  // The services' team-member links give who qualifies and their session
+  // length; the calendar's session grid gives when each of them is free.
+  appointments_find_free_slots: [
+    {
+      path: '/services/{location_id}',
+      method: 'get',
+      operationId: 'get_service_list',
+      pathParams: ['location_id'],
+    },
+    {
+      path: '/timetable/seances/{location_id}/{team_member_id}/{date}',
+      method: 'get',
+      operationId: 'get_appointment_calendar_sessions',
+      pathParams: ['location_id', 'team_member_id', 'date'],
+    },
+  ],
   analytics_get_team_workload: [
     {
       path: '/locations/{location_id}/team_members/workload',

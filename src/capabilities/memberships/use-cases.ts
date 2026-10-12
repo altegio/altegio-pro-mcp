@@ -28,6 +28,7 @@ import type {
 import { MembershipsInputError } from './errors.js';
 import {
   completeCollection,
+  fitPageToBudget,
   pageMetadata,
   paginateCollection,
   type PageInput,
@@ -82,9 +83,15 @@ function balanceText(
   return `per-service balance: ${covered}`;
 }
 
-function typeLine(t: MembershipType): string {
+function typeLine(
+  t: MembershipType,
+  options: { inChain?: boolean } = {}
+): string {
+  const head = options.inChain
+    ? `- ${t.id}`
+    : `- Membership type ${t.id} (chain ${t.chain_id ?? '?'})`;
   return (
-    `- Membership type ${t.id} (chain ${t.chain_id ?? '?'}): price ${t.price ?? 'not reported'}` +
+    `${head}: price ${t.price ?? 'not reported'}` +
     ` · ${balanceText(t.balance_type, t.shared_visits, t.shared_unlimited, t.services, 'visits')}` +
     ` · valid ${durationText(t.validity, 'with no expiration')}` +
     (t.activation
@@ -98,20 +105,44 @@ function typeLine(t: MembershipType): string {
   );
 }
 
+/** A covered service or category, named by the id the type's balance uses. */
+function coveredLabel(a: MembershipType['services'][number]): string {
+  return a.service_id !== null
+    ? `service ${a.service_id}`
+    : `service category ${a.service_category_id}`;
+}
+
 function typeUntrusted(t: MembershipType): UntrustedField[] {
   const key = `membership type ${t.id}`;
   return [
     { label: `${key} title`, value: t.title },
-    { label: `${key} online sale title`, value: t.online_sale_title },
+    // The online-sale title is usually the title again; say it once.
+    ...(t.online_sale_title !== t.title
+      ? [{ label: `${key} online sale title`, value: t.online_sale_title }]
+      : []),
     {
       label: `${key} online sale description`,
       value: t.online_sale_description,
     },
     ...t.services.map((a) => ({
-      label: `${key} ${a.service_id !== null ? `service ${a.service_id}` : `service category ${a.service_category_id}`}`,
+      label: `${key} ${coveredLabel(a)}`,
       value: a.title,
     })),
   ];
+}
+
+/**
+ * Free text of a page of types: each type's own titles, then every covered
+ * service or category once — types of one chain cover the same few services.
+ */
+function typesUntrusted(types: readonly MembershipType[]): UntrustedField[] {
+  const covered = new Map<string, string | null>();
+  const own: UntrustedField[] = [];
+  for (const t of types) {
+    own.push(...typeUntrusted({ ...t, services: [] }));
+    for (const a of t.services) covered.set(coveredLabel(a), a.title);
+  }
+  return [...own, ...[...covered].map(([label, value]) => ({ label, value }))];
 }
 
 function membershipLine(m: Membership): string {
@@ -289,31 +320,32 @@ export async function listTypes(
     page: input.page,
     page_size: input.page_size,
   });
-  const pagination = pageMetadata(
+  return fitPageToBudget({
     input,
-    page.items.length,
-    page.total ?? undefined
-  );
-  const lines = [
-    `${page.total ?? page.items.length} ${input.archived ? 'archived' : 'active'} membership type(s) in chain ${input.chain_id}; page ${input.page} shows ${page.items.length}:`,
-    ...page.items.map(typeLine),
-  ];
-  if (page.items.length === 0) lines.push('No membership types match.');
-  if (pagination.has_more)
-    lines.push(`More follow: request page ${pagination.next_page}.`);
-  return {
-    text: withUntrustedBlock(
-      lines.join('\n'),
-      page.items.flatMap(typeUntrusted),
-      { maxChars: FIELD_MAX_CHARS }
-    ),
-    structuredContent: {
-      chain_id: input.chain_id,
-      archived: input.archived === true,
-      items: page.items,
-      pagination,
+    items: page.items,
+    total: page.total ?? undefined,
+    render: ({ items, pagination, notice }) => {
+      const lines = [
+        `${page.total ?? items.length} ${input.archived ? 'archived' : 'active'} membership type(s) in chain ${input.chain_id}; page ${pagination.page} shows ${items.length}:`,
+        ...(notice ? [notice] : []),
+        ...items.map((t) => typeLine(t, { inChain: true })),
+      ];
+      if (items.length === 0) lines.push('No membership types match.');
+      if (pagination.has_more)
+        lines.push(`More follow: request page ${pagination.next_page}.`);
+      return {
+        text: withUntrustedBlock(lines.join('\n'), typesUntrusted(items), {
+          maxChars: FIELD_MAX_CHARS,
+        }),
+        structuredContent: {
+          chain_id: input.chain_id,
+          archived: input.archived === true,
+          items,
+          pagination,
+        },
+      };
     },
-  };
+  });
 }
 
 function savedType(

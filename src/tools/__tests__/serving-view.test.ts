@@ -48,9 +48,37 @@ describe('serving view', () => {
       description: 'Find the id with y_get.',
       inputSchema: {},
     };
-    expect(listedOnView(spec, viewServing('y_get'), ['x_list', 'y_get'])).toBe(
-      spec
-    );
+    expect(
+      listedOnView(spec, viewServing('y_get'), ['x_list', 'y_get'])
+    ).toEqual(spec);
+  });
+
+  it('lists no output schema, no default hints and no top-level additionalProperties', () => {
+    const spec = {
+      name: 'x_list',
+      description: 'Lists x.',
+      inputSchema: {
+        type: 'object',
+        properties: { nested: { type: 'object', additionalProperties: false } },
+        additionalProperties: false,
+      },
+      outputSchema: { type: 'object' },
+      annotations: {
+        title: 'X',
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    };
+    const listed = listedOnView(spec, viewServing(), ['x_list']);
+    expect(listed).not.toHaveProperty('outputSchema');
+    expect(listed.annotations).toEqual({ title: 'X', readOnlyHint: true });
+    expect(listed.inputSchema).toEqual({
+      type: 'object',
+      properties: { nested: { type: 'object', additionalProperties: false } },
+    });
+    expect(spec.outputSchema).toEqual({ type: 'object' });
   });
 
   it('appends where each withheld tool is served, grouped by address', () => {

@@ -35,20 +35,14 @@ import { clientFiltersSchema } from './client-filters.schema.js';
 
 // ========== shared input pieces ==========
 
-const locationId = z
-  .number()
-  .int()
-  .positive()
-  .describe(
-    'Location to report on. Call locations_list when the id is unknown.'
-  );
+const locationId = z.number().int().positive().describe('From locations_list.');
 
 const periodFields = {
   period: z
     .enum(PERIOD_PRESETS)
     .optional()
     .describe(
-      'Period preset, resolved in the location’s own timezone. Use this for "yesterday", "last month", "this quarter" style questions instead of computing dates.'
+      'Period preset in the location’s timezone — use it for "yesterday", "last month" instead of computing dates.'
     ),
   date_from: z
     .string()
@@ -208,7 +202,7 @@ export const analyticsGetOverviewTool = defineTool({
   name: 'analytics_get_overview',
   category: 'Analytics',
   description:
-    'Key metrics of one location for a period, each next to the same metric in the previous period of equal length: total revenue and its services and products split, average check (average ticket), occupancy, appointments by outcome, and new, returning, active and lost clients. Start here for "how did we do last month", "is revenue up", "how many new clients", "what is our average check", "how busy were we". Optional filters narrow it to one team member, one position or one receptionist. For day-by-day numbers use analytics_get_daily_series; to split the same headline across the team call it again with position_id or team_member_id; for today’s till totals use analytics_get_day_end_report. Needs the Analytics access right in this location.',
+    'Key metrics of one location for a period, each beside the previous period of equal length: revenue (services and products), average check, occupancy, appointments by outcome, new, returning, active and lost clients. Start here for "how did we do last month". Filter to one team member, position or receptionist. Day by day: analytics_get_daily_series. Needs the Analytics right.',
   annotations: { title: 'Analytics: key metrics', ...READ_ONLY },
   input: z.object({
     location_id: locationId,

@@ -24,3 +24,4 @@ export * from './users.tools.js';
 export * from './location-access.tools.js';
 export * from './client-card.tools.js';
 export * from './attendance.tools.js';
+export * from './availability.tools.js';

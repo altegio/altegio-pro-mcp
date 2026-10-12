@@ -27,6 +27,11 @@ import {
   type ToolResult,
 } from './tool-result.js';
 import { requiredScopesFor, type ToolScope } from './scopes.js';
+import {
+  acceptedKeysAt,
+  coerceIdStrings,
+  compactJsonSchema,
+} from './input-normalization.js';
 
 export interface ToolAnnotations {
   title?: string;
@@ -101,7 +106,9 @@ export interface DefinedTool<T extends ZodType = ZodType> {
    * Present only when the definition declares `confirm`. Binds the declared
    * spec to one set of raw arguments with the input generic erased, so the
    * registry can hold the gates for every tool in one map. Returns `undefined`
-   * for arguments the tool would reject anyway.
+   * for arguments the tool would reject anyway. The confirmation token binds
+   * the parsed, canonical input (`./input-normalization.ts`), not the raw
+   * arguments, so a cosmetic difference on the repeat does not void it.
    */
   prepareConfirmation?: (args: unknown) => PreparedConfirmation | undefined;
   meta: ToolDefinition<T>;
@@ -109,7 +116,7 @@ export interface DefinedTool<T extends ZodType = ZodType> {
 
 /**
  * Generate a plain JSON Schema for the MCP `inputSchema` (drops the `$schema`
- * key).
+ * key and the generator noise `compactJsonSchema` lists).
  *
  * `withConfirmationToken` adds the optional `confirmation_token` argument. It
  * is added unconditionally, never from the connected client's capabilities:
@@ -120,10 +127,9 @@ function inputJsonSchema(
   schema: ZodType,
   withConfirmationToken: boolean
 ): Record<string, unknown> {
-  const json = z.toJSONSchema(schema, { io: 'input' }) as Record<
-    string,
-    unknown
-  >;
+  const json = compactJsonSchema(
+    z.toJSONSchema(schema, { io: 'input' })
+  ) as Record<string, unknown>;
   delete json.$schema;
   if (!withConfirmationToken) return json;
 
@@ -144,17 +150,30 @@ export function defineTool<T extends ZodType>(
   // dropping them before a mutation. Nested adapter payloads keep their schemas.
   const schema =
     def.input instanceof z.ZodObject ? def.input.strict() : def.input;
-  const withoutConfirmation = (args: unknown): unknown => {
+  /**
+   * The arguments as the schema should judge them: the confirmation token
+   * removed (the handler never sees it) and id digit strings turned into ids.
+   */
+  const normalized = (args: unknown): unknown => {
+    let input: unknown = args ?? {};
     if (
-      !def.confirm ||
-      !args ||
-      typeof args !== 'object' ||
-      Array.isArray(args)
-    )
-      return args ?? {};
-    const input = { ...(args as Record<string, unknown>) };
-    delete input[CONFIRMATION_TOKEN_ARG];
-    return input;
+      def.confirm &&
+      input &&
+      typeof input === 'object' &&
+      !Array.isArray(input)
+    ) {
+      const rest = { ...(input as Record<string, unknown>) };
+      delete rest[CONFIRMATION_TOKEN_ARG];
+      input = rest;
+    }
+    return coerceIdStrings(schema, input);
+  };
+  // An unknown top-level key is answered with the keys the tool does take.
+  const acceptedKeys = (path: readonly PropertyKey[]) => {
+    const keys = acceptedKeysAt(schema, path);
+    return keys && path.length === 0 && def.confirm
+      ? [...keys, CONFIRMATION_TOKEN_ARG]
+      : keys;
   };
   return {
     toMcpTool: () => ({
@@ -168,29 +187,33 @@ export function defineTool<T extends ZodType>(
     ...(def.confirm
       ? {
           prepareConfirmation: prepareConfirmation(def.confirm, (args) => {
-            const parsed = schema.safeParse(withoutConfirmation(args));
+            const parsed = schema.safeParse(normalized(args));
             return parsed.success ? (parsed.data as z.infer<T>) : undefined;
           }),
         }
       : {}),
 
     createHandler: (client: AltegioClient) => (args: unknown) =>
-      withErrorHandling(def.name, async () => {
-        const input = schema.parse(withoutConfirmation(args)) as z.infer<T>;
-        const { text, structuredContent, extraContent, isError } =
-          await def.handler({
-            input,
-            client,
-          });
-        const result: ToolResult = {
-          content: [{ type: 'text' as const, text }, ...(extraContent ?? [])],
-        };
-        if (structuredContent !== undefined) {
-          result.structuredContent = structuredContent;
-        }
-        if (isError === true) result.isError = true;
-        return result;
-      }),
+      withErrorHandling(
+        def.name,
+        async () => {
+          const input = schema.parse(normalized(args)) as z.infer<T>;
+          const { text, structuredContent, extraContent, isError } =
+            await def.handler({
+              input,
+              client,
+            });
+          const result: ToolResult = {
+            content: [{ type: 'text' as const, text }, ...(extraContent ?? [])],
+          };
+          if (structuredContent !== undefined) {
+            result.structuredContent = structuredContent;
+          }
+          if (isError === true) result.isError = true;
+          return result;
+        },
+        { acceptedKeysAt: acceptedKeys }
+      ),
 
     meta: { ...def, requiredScopes: requiredScopesFor(def.name) },
   };

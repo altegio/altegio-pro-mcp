@@ -45,12 +45,50 @@ export interface ToolResult {
 }
 
 /**
+ * The keys an object accepts at a path inside a tool's arguments (`[]` is the
+ * arguments object itself), or `undefined` when the path is not an object.
+ */
+export type AcceptedKeysAt = (
+  path: readonly PropertyKey[]
+) => readonly string[] | undefined;
+
+/**
+ * One line per Zod issue, phrased for the model that has to fix its call: the
+ * argument path (`(arguments)` for the object itself, never an empty string),
+ * and for an unknown key the keys that object does accept, so the next call
+ * can be right instead of another guess.
+ */
+export function formatZodIssues(
+  error: ZodError,
+  acceptedKeysAt?: AcceptedKeysAt
+): string {
+  return error.issues
+    .map((issue) => {
+      const where =
+        issue.path.length > 0
+          ? issue.path.map(String).join('.')
+          : '(arguments)';
+      if (issue.code === 'unrecognized_keys') {
+        const keys = issue.keys.map((key) => `"${key}"`).join(', ');
+        const accepted = acceptedKeysAt?.(issue.path);
+        const noun = issue.keys.length === 1 ? 'key' : 'keys';
+        return accepted && accepted.length > 0
+          ? `${where}: unrecognized ${noun} ${keys}; accepted keys: ${accepted.join(', ')}`
+          : `${where}: unrecognized ${noun} ${keys}`;
+      }
+      return `${where}: ${issue.message}`;
+    })
+    .join('; ');
+}
+
+/**
  * Run a tool body and map any thrown error to a friendly `isError` result.
  * Preserves the typed-error messages relied on by the tool tests and clients.
  */
 export async function withErrorHandling(
   toolName: string,
-  fn: () => Promise<ToolResult>
+  fn: () => Promise<ToolResult>,
+  options: { acceptedKeysAt?: AcceptedKeysAt } = {}
 ): Promise<ToolResult> {
   try {
     return await fn();
@@ -58,10 +96,7 @@ export async function withErrorHandling(
     let message: string;
 
     if (error instanceof ZodError) {
-      const issues = error.issues
-        .map((i) => `${i.path.join('.')}: ${i.message}`)
-        .join('; ');
-      message = `Invalid parameters for ${toolName}: ${issues}`;
+      message = `Invalid parameters for ${toolName}: ${formatZodIssues(error, options.acceptedKeysAt)}`;
     } else if (error instanceof AuthenticationError) {
       message = signInInstruction(toolName);
     } else if (error instanceof ExecutorRefusalError) {

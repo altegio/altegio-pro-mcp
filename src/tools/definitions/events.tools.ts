@@ -21,19 +21,9 @@ import { EventsAdapter } from '../../api/v2/events-adapter.js';
 
 // ========== shared input pieces ==========
 
-const locationId = z
-  .number()
-  .int()
-  .positive()
-  .describe(
-    'Location whose events to work with. Call locations_list when the id is unknown.'
-  );
+const locationId = z.number().int().positive().describe('From locations_list.');
 
-const eventId = z
-  .number()
-  .int()
-  .positive()
-  .describe('Event id, from events_list.');
+const eventId = z.number().int().positive().describe('From events_list.');
 
 const ids = (what: string) =>
   z.array(z.number().int().positive()).min(1).optional().describe(what);
@@ -66,9 +56,7 @@ const periodFilters = {
 const localStart = z
   .string()
   .min(16)
-  .describe(
-    'Start in the location’s local time, YYYY-MM-DDTHH:MM, without a time-zone offset.'
-  );
+  .describe('Location time, YYYY-MM-DDTHH:MM, no offset.');
 
 const color = z
   .string()
@@ -81,9 +69,7 @@ const optionalText = (max: number, what: string) =>
 const force = z
   .boolean()
   .optional()
-  .describe(
-    'Keep the event even when the team member or a resource is already busy at that time. Default false: an overlap is refused.'
-  );
+  .describe('Allow an overlap with other bookings. Default false.');
 
 const eventFieldInputs = {
   resource_ids: z
@@ -102,7 +88,7 @@ const eventFieldInputs = {
     .nullable()
     .optional()
     .describe(
-      'Break kept free after the session, in minutes (steps of 5, at most 60, 0 for none), counted inside duration_minutes. Omitted (or null) on create, the location adds its default break after duration_minutes, so the event runs longer; omitted on update, the current break is kept.'
+      'Break after the session in minutes (steps of 5, max 60, 0 none), inside duration_minutes; omitted on create: the location default is added.'
     ),
   comment: optionalText(255, 'Internal comment on the event.').optional(),
   color: color.optional(),
@@ -151,9 +137,7 @@ const strategyInterval = z
 const copyBookings = z
   .boolean()
   .optional()
-  .describe(
-    'Copy the clients booked into the event as well. Default false: only the event is copied.'
-  );
+  .describe('Also copy the booked clients. Default false.');
 
 // ========== output schema pieces ==========
 
@@ -251,7 +235,7 @@ export const eventsListTool = defineTool({
   name: 'events_list',
   category: 'Events',
   description:
-    'List the group events of a location in a period — classes, workshops, group trainings and other sessions many clients book into — with start, duration, team member, service, resources, capacity, booked and free seats. Past and future periods both work. Filter by team member, service, resource, weekday and minimum free seats ("which yoga classes still have 3 seats next week"). Cancelled events are left out unless include_deleted is true. Paged: 25 per page by default; follow pagination.next_page until it is null. For who is booked into one event use events_get; for which days have events use events_list_dates.',
+    'Group events (classes, workshops) of a location in a period, past or future: start, duration, team member, service, resources, capacity, booked and free seats. Filter by team member, service, resource, weekday, minimum free seats; cancelled only with include_deleted. Paged: follow pagination.next_page. Bookings of one event: events_get; event days: events_list_dates.',
   annotations: { title: 'Events: list events in a period', ...READ_ONLY },
   input: z.object({
     ...periodFilters,
@@ -289,7 +273,7 @@ export const eventsGetTool = defineTool({
   name: 'events_get',
   category: 'Events',
   description:
-    'One group event with everything about it: start, duration and break, team member, service, resources, tags, capacity, booked and free seats, comment and client instructions — plus every client booked into it with appointment id, seats, status (waiting, confirmed, arrived, no_show), total and paid flag. Use it for "who is coming to Saturday’s class" and before changing or moving a booking. Client phones and emails are withheld unless include_contacts is true. A cancelled event stays readable here.',
+    'One group event in full — start, duration, break, team member, service, resources, tags, seats, comment, instructions — and every booking: appointment id, seats, status, total, paid flag. Contacts need include_contacts. Cancelled events stay readable.',
   annotations: { title: 'Events: get an event and its bookings', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -320,7 +304,7 @@ export const eventsListDatesTool = defineTool({
   name: 'events_list_dates',
   category: 'Events',
   description:
-    'The event calendar of a location for an upcoming period: which dates have group events, the first and last of them, and which team members, services, service categories and resources those events use — with ids and names to pass as filters to events_list. Use it to answer "when is the next workshop" or to fill a date picker. The calendar reads from the current time in the location’s time zone onward: a period that starts earlier ("from today") is read from now on, and the result says so. It covers at most 366 days; for past events use events_list.',
+    'Upcoming event calendar: which dates have group events, and the team members, services, categories and resources they use (ids and names to filter events_list). Reads from now on in location time, at most 366 days; past events: events_list.',
   annotations: { title: 'Events: dates with events', ...READ_ONLY },
   input: z.object(periodFilters),
   outputSchema: {
@@ -421,7 +405,7 @@ export const eventsCreateTool = defineTool({
   name: 'events_create',
   category: 'Events',
   description:
-    'Create a group event — a class, workshop or group training clients can book into. Required: team member, service, start (location time), duration in minutes (steps of 5, at most 24 hours, break included) and capacity (seats). Optional: resources, tags, break, comment, color, client instructions and a stream link. Find the service, the team members who can run it and its resources with events_list_services. An overlap with the team member’s or a resource’s other bookings is refused unless force is true. Then book clients with events_book_clients or copy the event to more dates with events_duplicate.',
+    'Create a group event: team member, service, start (location time), duration in minutes (steps of 5, break included) and capacity; optional resources, tags, break, comment, color, client instructions, stream link. events_list_services gives the service, its team members and resources. An overlap is refused unless force=true. Then events_book_clients or events_duplicate.',
   annotations: {
     title: 'Events: create an event',
     destructiveHint: false,
@@ -447,7 +431,7 @@ export const eventsCreateTool = defineTool({
       .min(5)
       .max(1440)
       .describe(
-        'Length in minutes, steps of 5, including technical_break_minutes when it is given; without it the location’s default break is added after this length.'
+        'Minutes, steps of 5, including technical_break_minutes (without it the default break is added).'
       ),
     capacity: z
       .number()
@@ -464,7 +448,7 @@ export const eventsUpdateTool = defineTool({
   name: 'events_update',
   category: 'Events',
   description:
-    'Change a group event: move it to another start, change the team member, service, duration, capacity, resources, tags, break, comment, color, client instructions or stream link. Pass only what changes; everything else is kept. The clients already booked stay booked. An overlap with the team member’s or a resource’s other bookings is refused unless force is true. To move one client to another event use events_reschedule_appointment.',
+    'Change a group event: start, team member, service, duration, capacity, resources, tags, break, comment, color, instructions or stream link. Pass only changes; bookings stay. An overlap is refused unless force=true. To move one client use events_reschedule_appointment.',
   annotations: {
     title: 'Events: update an event',
     destructiveHint: false,
@@ -542,7 +526,7 @@ export const eventsDuplicateTool = defineTool({
   name: 'events_duplicate',
   category: 'Events',
   description:
-    'Copy a group event to other start times — "repeat this class every Monday in March". Give up to 100 start times in the location’s local time; one invalid time refuses the whole request. To repeat by a saved pattern, read it with events_list_duplication_strategies and work out the start times. Each copy keeps the team member, service, duration, capacity, resources and tags; copy_bookings also copies the booked clients. An overlap with the team member’s or a resource’s other bookings is refused unless force is true. Returns the new events.',
+    'Copy a group event to up to 100 start times (location time; one invalid time refuses all). Copies keep team member, service, duration, capacity, resources and tags; copy_bookings also copies the clients. Saved patterns: events_list_duplication_strategies. An overlap is refused unless force=true.',
   annotations: {
     title: 'Events: duplicate an event to dates',
     destructiveHint: false,
@@ -675,7 +659,7 @@ export const eventsBookClientsTool = defineTool({
   name: 'events_book_clients',
   category: 'Events',
   description:
-    'Book one client or up to 50 clients into a group event in one call. Give an existing client by client_id (find it with clients_lookup), or a new one by name and phone (and email). seats reserves several places for one client (default 1). Each client is booked independently: when some fail — no free seats, already booked, a bad id — the rest are still booked and the result lists which positions failed and why. Set send_sms to send the booking confirmation SMS.',
+    'Book up to 50 clients into a group event: existing by client_id (clients_lookup) or new by name and phone. seats reserves several places (default 1). Each is booked independently; failures are listed with the reason. send_sms sends the confirmation.',
   annotations: {
     title: 'Events: book clients into an event',
     destructiveHint: false,
@@ -771,7 +755,7 @@ export const eventsUpdateAppointmentTool = defineTool({
   name: 'events_update_appointment',
   category: 'Events',
   description:
-    'Change one client’s booking in a group event: the seats it takes, the comment, tags, color, or the price — price per seat before discount, discount_percent, or the total. Pass only what changes; the rest is kept. When seats, price or discount change without a total, the total is recalculated as price × seats × (1 − discount). A booking with product sales attached is refused, because this change would drop them. Find the appointment id with events_get; to move the client to another event use events_reschedule_appointment.',
+    'Change one booking in a group event: seats, comment, tags, color, or price (per seat, discount_percent or total; total is recalculated otherwise). Pass only changes. Refused when product sales are attached. Appointment id from events_get; to move it use events_reschedule_appointment.',
   annotations: {
     title: 'Events: update a booking',
     destructiveHint: false,

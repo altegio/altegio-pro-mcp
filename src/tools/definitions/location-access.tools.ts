@@ -28,35 +28,27 @@ export const diagnoseLocationAccessTool = defineTool({
   name: 'locations_diagnose_access',
   category: 'Location',
   description:
-    'Diagnose an HTTP 403 for the current Altegio credential pair at a location. Reads location access and the user’s effective permission groups with the same request credential. Optionally reads an application’s declared permissions, which do not prove installation or effective system-user rights. Partner-token grants cannot be inspected by this API, so a 403 alone cannot isolate the failing grant. No permissions are changed.',
+    'Diagnose an HTTP 403 at a location: location access and the user’s effective permission groups, optionally an application’s declared permissions (not proof of installation). Partner-token grants cannot be inspected. Changes nothing.',
   annotations: {
     title: 'Diagnose location access',
     readOnlyHint: true,
     openWorldHint: true,
   },
   input: z.object({
-    location_id: z
-      .number()
-      .int()
-      .positive()
-      .describe(
-        'Location where the failing operation was refused. Call locations_list when the id is unknown.'
-      ),
+    location_id: z.number().int().positive().describe('From locations_list.'),
     permission_keys: z
       .array(z.string().regex(/^[a-z_]+\.[a-z_]+$/))
       .max(20)
       .optional()
       .describe(
-        'Specific effective rights to inspect as group.key, for example clients.client_files_list_access.'
+        'Rights to check, as group.key (e.g. clients.client_files_list_access).'
       ),
     application_id: z
       .number()
       .int()
       .positive()
       .optional()
-      .describe(
-        'Optional Marketplace application ID; requires Manage user rights.'
-      ),
+      .describe('Marketplace application id (needs Manage user rights).'),
   }),
   outputSchema: objectSchema({
     location_id: { type: 'integer' },

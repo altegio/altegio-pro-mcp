@@ -1,6 +1,6 @@
 import {
+  fitPageToBudget,
   paginationInput,
-  pageMetadata,
   paginateCollection,
 } from '../pagination.js';
 import { z } from 'zod';
@@ -14,6 +14,7 @@ import {
 import {
   withUntrustedBlock,
   sanitizeUntrusted,
+  upstreamDetail,
   type UntrustedField,
 } from '../tool-result.js';
 import { includeContactsArg, CONTACTS_WITHHELD_NOTICE } from '../contacts.js';
@@ -22,7 +23,7 @@ import {
   visitStatusToLegacyCode,
 } from '../../capabilities/analytics/vocabulary.js';
 import { hexColor } from '../../utils/color.js';
-import { ExecutorRefusalError } from '../../utils/errors.js';
+import { AltegioApiError, ExecutorRefusalError } from '../../utils/errors.js';
 import type {
   AltegioBooking,
   UpdateBookingRequest,
@@ -38,13 +39,20 @@ const appointmentStatusArg = z
     'Visit status to record: waiting (default for a new appointment), confirmed, arrived or no_show.'
   );
 
+/**
+ * When the appointment starts. V1 sends both `datetime` (ISO 8601 with the
+ * location's offset) and `date` (the same instant without it); one is enough.
+ */
+function appointmentStart(appointment: AltegioBooking): string | null {
+  return appointment.datetime || appointment.date || null;
+}
+
 /** The identifying fields a write returns; the full row is `appointments_list`. */
 function projectAppointmentReference(appointment: AltegioBooking) {
   return {
     id: appointment.id,
     team_member_id: appointment.staff_id ?? appointment.staff?.id ?? null,
-    datetime: appointment.datetime ?? null,
-    date: appointment.date ?? null,
+    datetime: appointmentStart(appointment),
   };
 }
 
@@ -82,13 +90,7 @@ const appointmentColorArg = z
       ...(keyof typeof APPOINTMENT_COLORS)[],
     ]
   )
-  .describe(
-    'Color of the appointment in the digital schedule, from its palette: ' +
-      Object.entries(APPOINTMENT_COLORS)
-        .map(([hex, name]) => `${hex} ${name}`)
-        .join(', ') +
-      '.'
-  );
+  .describe('Appointment color, from the digital schedule palette.');
 
 const tagIdsArg = z
   .array(z.number().int().positive())
@@ -124,9 +126,7 @@ function projectAppointment(
 ) {
   return {
     id: appointment.id,
-    location_id: appointment.company_id,
-    datetime: appointment.datetime ?? null,
-    date: appointment.date ?? null,
+    datetime: appointmentStart(appointment),
     status: visitStatusOfAppointment(appointment),
     team_member_id: appointment.staff_id ?? appointment.staff?.id ?? null,
     team_member_name: appointment.staff?.name ?? null,
@@ -170,7 +170,7 @@ export const getAppointmentsTool = defineTool({
   name: 'appointments_list',
   category: 'Appointments',
   description:
-    'List the appointments of a location, optionally within a date range or narrowed by team member, client, creator, group event, creation dates or change timestamps. Deleted appointments are excluded unless include_deleted=true. Each item carries the canonical status (waiting, confirmed, arrived, no_show, cancelled), team member, client, services, tags and color. Client phones are withheld unless include_contacts is true. Paged: 25 per page by default; follow pagination.next_page until it is null (a full last page may need one empty request). Find the location_id with locations_list first.',
+    'Appointments of a location by date range, team member, client, creator, group event, creation or change time; deleted only with include_deleted. Each has status, team member, client, services, tags and color; phones need include_contacts. Paged and size-bounded: follow pagination.next_page.',
   annotations: {
     title: 'Get Appointments',
     readOnlyHint: true,
@@ -243,76 +243,134 @@ export const getAppointmentsTool = defineTool({
         : {}),
     });
 
-    const lines = [
-      `Found ${appointments.length} ${appointments.length === 1 ? 'appointment' : 'appointments'} for location ${location_id}:`,
-    ];
-    if (!includeContacts && appointments.length > 0) {
-      lines.push(CONTACTS_WITHHELD_NOTICE);
-    }
-    // Free text — client and team-member names, service titles, the comment the
-    // client typed at online booking — never goes inside our own rows; it is
-    // keyed back to them by appointment id in the untrusted block below.
-    const untrusted: UntrustedField[] = [];
-    for (const booking of appointments) {
-      const projected = projectAppointment(booking, { includeContacts });
-      lines.push(
-        `- Appointment ${booking.id}: ${projected.datetime ?? projected.date ?? 'date not reported'}` +
-          ` · ${projected.status}` +
-          ` · client id ${projected.client_id ?? 'not reported'}` +
-          ` · team member id ${projected.team_member_id ?? 'not reported'}` +
-          ` · ${projected.services.length} service(s)` +
-          ` · total ${projected.total_cost ?? 'not reported'}` +
-          (projected.tags.length
-            ? ` · tag ids ${projected.tags.map((tag) => tag.id).join(', ')}`
-            : '') +
-          (projected.color ? ` · color ${projected.color}` : '')
-      );
-      const key = `appointment ${booking.id}`;
-      untrusted.push({ label: `${key} client`, value: projected.client_name });
-      untrusted.push({
-        label: `${key} team member`,
-        value: projected.team_member_name,
-      });
-      untrusted.push({
-        label: `${key} services`,
-        value: projected.services.map((s) => s.title).join(', '),
-      });
-      untrusted.push({ label: `${key} comment`, value: projected.comment });
-      if (projected.tags.length) {
-        untrusted.push({
-          label: `${key} tags`,
-          value: projected.tags.map((tag) => tag.title).join(', '),
-        });
-      }
-      if (includeContacts) {
-        untrusted.push({
-          label: `${key} client phone`,
-          value: booking.client?.phone ?? null,
-        });
-      }
-    }
-
-    return {
-      text: withUntrustedBlock(lines.join('\n'), untrusted, { maxChars: 200 }),
-      structuredContent: {
-        items: appointments.map((booking) =>
+    return fitPageToBudget({
+      input,
+      items: appointments,
+      render: ({ items, pagination, notice }) => {
+        const projected = items.map((booking) =>
           projectAppointment(booking, { includeContacts })
-        ),
-        pagination: pageMetadata(input, appointments.length),
-        contacts_included: includeContacts,
+        );
+        const lines = [
+          `${projected.length} ${projected.length === 1 ? 'appointment' : 'appointments'} at location ${location_id}, page ${pagination.page}` +
+            (pagination.next_page === null
+              ? ' (last page).'
+              : `; next: page=${pagination.next_page}.`),
+        ];
+        if (notice) lines.push(notice);
+        if (!includeContacts && projected.length > 0) {
+          lines.push(CONTACTS_WITHHELD_NOTICE);
+        }
+        lines.push(...projected.map(appointmentLine));
+        return {
+          text: withUntrustedBlock(
+            lines.join('\n'),
+            appointmentNames(projected),
+            { maxChars: 200 }
+          ),
+          structuredContent: {
+            location_id,
+            items: projected,
+            pagination,
+            contacts_included: includeContacts,
+          },
+        };
       },
-    };
+    });
   },
 });
+
+type ProjectedAppointment = ReturnType<typeof projectAppointment>;
+
+/**
+ * One appointment as one line of our own text: ids, time, status, money. Every
+ * name is in the untrusted block, keyed by these ids.
+ */
+function appointmentLine(appointment: ProjectedAppointment): string {
+  const parts = [
+    `- ${appointment.id}`,
+    appointment.datetime ?? 'start not reported',
+    appointment.status,
+    appointment.client_id === null
+      ? 'no client'
+      : `client ${appointment.client_id}`,
+    appointment.team_member_id === null
+      ? 'no team member'
+      : `team member ${appointment.team_member_id}`,
+    `services ${appointment.services.map((service) => service.id).join(', ') || 'none'}`,
+    `total ${appointment.total_cost ?? 'not reported'}`,
+  ];
+  if (appointment.tags.length > 0) {
+    parts.push(`tags ${appointment.tags.map((tag) => tag.id).join(', ')}`);
+  }
+  if (appointment.color) parts.push(`color ${appointment.color}`);
+  if (appointment.deleted) parts.push('deleted');
+  return parts.join(' · ');
+}
+
+/**
+ * Free text of a page, each name once: team members, services, tags and
+ * clients by id, then each appointment's comment. A schedule repeats the same
+ * few team members and services on every row, so naming them per appointment
+ * cost more than the rows themselves.
+ */
+function appointmentNames(
+  appointments: readonly ProjectedAppointment[]
+): UntrustedField[] {
+  const teamMembers = new Map<number, string | null>();
+  const services = new Map<number, string>();
+  const tags = new Map<number, string>();
+  const clients = new Map<number, UntrustedField[]>();
+  const comments: UntrustedField[] = [];
+  for (const appointment of appointments) {
+    if (appointment.team_member_id !== null) {
+      teamMembers.set(appointment.team_member_id, appointment.team_member_name);
+    }
+    for (const service of appointment.services) {
+      services.set(service.id, service.title);
+    }
+    for (const tag of appointment.tags) tags.set(tag.id, tag.title);
+    if (appointment.client_id !== null && !clients.has(appointment.client_id)) {
+      const fields: UntrustedField[] = [
+        {
+          label: `client ${appointment.client_id}`,
+          value: appointment.client_name,
+        },
+      ];
+      if ('client_phone' in appointment) {
+        fields.push({
+          label: `client ${appointment.client_id} phone`,
+          value: appointment.client_phone,
+        });
+      }
+      clients.set(appointment.client_id, fields);
+    }
+    comments.push({
+      label: `comment on ${appointment.id}`,
+      value: appointment.comment,
+    });
+  }
+  return [
+    ...[...teamMembers].map(([id, name]) => ({
+      label: `team member ${id}`,
+      value: name,
+    })),
+    ...[...services].map(([id, title]) => ({
+      label: `service ${id}`,
+      value: title,
+    })),
+    ...[...tags].map(([id, title]) => ({ label: `tag ${id}`, value: title })),
+    ...[...clients.values()].flat(),
+    ...comments,
+  ];
+}
 
 export const createAppointmentTool = defineTool({
   name: 'appointments_create',
   category: 'Appointments',
   description:
     'Create an appointment for a client. Required: team_member_id, services, datetime, session_length and the client name and phone. ' +
-    'Prerequisites: the team member must be linked to every service (services_link_team_member; otherwise the API answers 400) and be scheduled at that time (schedules_create; otherwise 409). ' +
-    'Pass save_if_busy=true to back-date a completed visit or force a slot that is busy or unscheduled, and status=arrived to record a past visit as attended. ' +
-    'Optionally mark it with tags (ids from appointments_list_tags) and a color from the digital schedule palette.',
+    'Pick the time with appointments_find_free_slots first: a busy or unscheduled time is refused (409), and so is a team member not linked to every service (400). ' +
+    'save_if_busy=true forces a busy or unscheduled slot (back-dated visits); status=arrived records a past visit as attended. Optional: tags (appointments_list_tags), color.',
   annotations: {
     title: 'Create Appointment',
     destructiveHint: false,
@@ -352,7 +410,7 @@ export const createAppointmentTool = defineTool({
       .boolean()
       .optional()
       .describe(
-        'Keep the appointment even if the slot is busy or the team member is not scheduled (avoids HTTP 409). Useful for back-dated visits and test/demo data.'
+        'Save even if the slot is busy or unscheduled (avoids 409): back-dated visits, demo data.'
       ),
     tag_ids: tagIdsArg.optional(),
     color: appointmentColorArg.optional(),
@@ -369,23 +427,57 @@ export const createAppointmentTool = defineTool({
       color,
       ...appointmentData
     } = input;
-    const appointment = await client.createBooking(location_id, {
-      staff_id: team_member_id,
-      seance_length: session_length,
-      ...(send_sms !== undefined ? { send_sms: send_sms ? 1 : 0 } : {}),
-      ...(status !== undefined
-        ? { attendance: visitStatusToLegacyCode(status) ?? undefined }
-        : {}),
-      ...(tag_ids !== undefined ? { record_labels: tag_ids } : {}),
-      ...(color !== undefined ? { custom_color: wireColor(color) } : {}),
-      ...appointmentData,
-    });
+    let appointment: AltegioBooking;
+    try {
+      appointment = await client.createBooking(location_id, {
+        staff_id: team_member_id,
+        seance_length: session_length,
+        ...(send_sms !== undefined ? { send_sms: send_sms ? 1 : 0 } : {}),
+        ...(status !== undefined
+          ? { attendance: visitStatusToLegacyCode(status) ?? undefined }
+          : {}),
+        ...(tag_ids !== undefined ? { record_labels: tag_ids } : {}),
+        ...(color !== undefined ? { custom_color: wireColor(color) } : {}),
+        ...appointmentData,
+      });
+    } catch (error) {
+      const refusal = createRefusal(error, input);
+      if (refusal) return { text: refusal, isError: true };
+      throw error;
+    }
     return {
       text: `Created appointment ${appointment.id} with team member ${appointment.staff_id} on ${appointment.datetime || appointment.date}.`,
       structuredContent: projectAppointmentReference(appointment),
     };
   },
 });
+
+/**
+ * What to do next when the API refuses a new appointment for the two reasons
+ * models keep guessing their way around: the time (409) and the links (400).
+ * Our sentence first, the upstream wording quoted after it.
+ */
+function createRefusal(
+  error: unknown,
+  input: {
+    location_id: number;
+    team_member_id: number;
+    datetime: string;
+    services: Array<{ id: number }>;
+  }
+): string | undefined {
+  if (!(error instanceof AltegioApiError)) return undefined;
+  if (error.statusCode !== 409 && error.statusCode !== 400) return undefined;
+  const meta = (error.response as { meta?: { message?: unknown } } | undefined)
+    ?.meta;
+  const detail = upstreamDetail(meta?.message);
+  const search = `appointments_find_free_slots with location_id ${input.location_id}, service_ids [${input.services.map((s) => s.id).join(', ')}]`;
+  const next =
+    error.statusCode === 409
+      ? `Not created: team member ${input.team_member_id} is busy or not working at ${input.datetime} (HTTP 409). Do not guess another time: call ${search}, team_member_id ${input.team_member_id} and a date range, then retry with a listed start. Use save_if_busy=true only to record a past visit or to double-book on purpose.`
+      : `Not created (HTTP 400). The usual cause is a team member not linked to every service: call ${search} (without team_member_id) to see who can take them, or link team member ${input.team_member_id} with services_link_team_member.`;
+  return detail ? `${next} ${detail}` : next;
+}
 
 /** The services as booked, priced as booked, for a full update that keeps them. */
 function currentServices(

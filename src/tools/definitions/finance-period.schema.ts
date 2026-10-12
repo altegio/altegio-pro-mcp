@@ -2,13 +2,7 @@
 import { z } from 'zod';
 
 export const completeMonthsInput = {
-  location_id: z
-    .number()
-    .int()
-    .positive()
-    .describe(
-      'Location to report on. Call locations_list when the id is unknown.'
-    ),
+  location_id: z.number().int().positive().describe('From locations_list.'),
   date_from: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import { scheduleOutput, scheduleWriteOutput } from '../output-schemas.js';
-import { completeCollection } from '../pagination.js';
+import { fitPrefixToBudget, windowPagination } from '../pagination.js';
 import type { AltegioScheduleEntry } from '../../types/altegio.types.js';
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -22,18 +22,18 @@ const slotSchema = z.object({
   from: z
     .string()
     .regex(/^\d{2}:\d{2}$/)
-    .describe('Start time (HH:MM format, e.g., "09:00")'),
+    .describe('Start, HH:MM.'),
   to: z
     .string()
     .regex(/^\d{2}:\d{2}$/)
-    .describe('End time (HH:MM format, e.g., "18:00")'),
+    .describe('End, HH:MM.'),
 });
 
 export const getScheduleTool = defineTool({
   name: 'schedules_get',
   category: 'Schedule',
   description:
-    "Read a team member's work schedule for a date range: one entry per day with its working intervals and whether it is a working day. The range is returned whole; keep it to a few weeks.",
+    "A team member's working intervals per day for a date range. A long range is cut to fit the response budget; continue from pagination.next_date_from.",
   annotations: {
     title: 'Get Schedule',
     readOnlyHint: true,
@@ -59,20 +59,36 @@ export const getScheduleTool = defineTool({
       entry.slots.length > 0
         ? entry.slots.map((slot) => `${slot.from}-${slot.to}`).join(', ')
         : 'day off';
-    const summary = `${entries.length} schedule ${entries.length === 1 ? 'entry' : 'entries'} for team member ${input.team_member_id}, ${input.date_from} to ${input.date_to}:\n\n`;
-    const scheduleList = entries
-      .map((entry, idx) => `${idx + 1}. ${entry.date} ${describe(entry)}`)
-      .join('\n');
 
-    return {
-      text: summary + scheduleList,
-      structuredContent: {
-        team_member_id: input.team_member_id,
-        date_from: input.date_from,
-        date_to: input.date_to,
-        ...completeCollection(entries),
+    return fitPrefixToBudget({
+      items: entries,
+      render: (served, cutAt) => {
+        const next = cutAt === undefined ? undefined : entries[cutAt];
+        const pagination = windowPagination({
+          returned: served.length,
+          has_more: next !== undefined,
+          next_date_from: next?.date ?? null,
+          next_date_to: input.date_to,
+        });
+        const lines = [
+          `${served.length} schedule ${served.length === 1 ? 'day' : 'days'} for team member ${input.team_member_id}, ${input.date_from} to ${input.date_to}` +
+            (next
+              ? `; cut to fit the response budget — continue with date_from=${next.date}.`
+              : '.'),
+          ...served.map((entry) => `${entry.date}: ${describe(entry)}`),
+        ];
+        return {
+          text: lines.join('\n'),
+          structuredContent: {
+            team_member_id: input.team_member_id,
+            date_from: input.date_from,
+            date_to: input.date_to,
+            items: served,
+            pagination,
+          },
+        };
       },
-    };
+    });
   },
 });
 
@@ -90,12 +106,7 @@ export const createScheduleTool = defineTool({
   input: z.object({
     location_id: z.number().int().positive().describe('Location ID'),
     team_member_id: z.number().int().positive().describe('Team member ID'),
-    dates: z
-      .array(dateSchema)
-      .min(1)
-      .describe(
-        'Dates for the schedule (YYYY-MM-DD format). Can set multiple dates at once.'
-      ),
+    dates: z.array(dateSchema).min(1).describe('Dates (YYYY-MM-DD) to set.'),
     slots: z
       .array(slotSchema)
       .min(1)
@@ -140,10 +151,7 @@ export const updateScheduleTool = defineTool({
   input: z.object({
     location_id: z.number().int().positive().describe('Location ID'),
     team_member_id: z.number().int().positive().describe('Team member ID'),
-    dates: z
-      .array(dateSchema)
-      .min(1)
-      .describe('Dates to update schedule for (YYYY-MM-DD format)'),
+    dates: z.array(dateSchema).min(1).describe('Dates (YYYY-MM-DD) to change.'),
     slots: z
       .array(slotSchema)
       .min(1)
@@ -187,10 +195,7 @@ export const deleteScheduleTool = defineTool({
   input: z.object({
     location_id: z.number().int().positive().describe('Location ID'),
     team_member_id: z.number().int().positive().describe('Team member ID'),
-    dates: z
-      .array(dateSchema)
-      .min(1)
-      .describe('Dates to delete schedule for (YYYY-MM-DD format)'),
+    dates: z.array(dateSchema).min(1).describe('Dates (YYYY-MM-DD) to clear.'),
   }),
   confirm: {
     action: 'Delete work schedule',

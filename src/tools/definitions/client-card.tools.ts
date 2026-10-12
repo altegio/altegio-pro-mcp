@@ -58,18 +58,12 @@ function pageOf<T>(entries: readonly T[], input: PageInput) {
 /** V1 inventory transaction type of a sale. */
 const SALE_TRANSACTION_TYPE = 1;
 
-const locationId = z
-  .number()
-  .int()
-  .positive()
-  .describe(
-    'Location whose client card to work with. Call locations_list when the id is unknown.'
-  );
+const locationId = z.number().int().positive().describe('From locations_list.');
 const clientId = z
   .number()
   .int()
   .positive()
-  .describe('Client id, from clients_search or clients_lookup.');
+  .describe('From clients_search or clients_lookup.');
 
 const READ_ONLY = { readOnlyHint: true, openWorldHint: true } as const;
 
@@ -204,7 +198,7 @@ async function saleEvidence(
 export const clientsGetMembershipPurchasesTool = defineTool({
   name: 'clients_get_membership_purchases',
   category: 'Clients',
-  description: `Inspect up to ${MEMBERSHIP_LIMIT} memberships of one client. Memberships are found by the client’s current phone, and each is verified against the client-specific membership history before it is reported. Where permitted, follows the linked sale transaction and sale document. A membership creation date is not a sale date, the current membership type price is not a purchase price, and the recorded unit price is not a proven paid amount; paid_amount stays null because a sale document does not attribute payment to one item. Returns explicit evidence status per membership and may miss memberships sold under an earlier phone.`,
+  description: `How up to ${MEMBERSHIP_LIMIT} memberships of one client were sold: found by the client’s current phone (earlier phones are missed), each verified against the client’s membership history, with the linked sale document where permitted and an evidence status. Creation date is not a sale date and the type price is not a paid amount; paid_amount stays null.`,
   annotations: { title: 'Client membership purchases', ...READ_ONLY },
   input: z.object({ location_id: locationId, client_id: clientId }),
   outputSchema: objectSchema({

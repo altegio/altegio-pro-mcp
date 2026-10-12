@@ -24,22 +24,20 @@ const chainId = z
   .number()
   .int()
   .positive()
-  .describe(
-    'Chain the membership types and memberships belong to. Call memberships_list_chains when the id is unknown; a membership read also reports its chain_id.'
-  );
+  .describe('Chain id (memberships_list_chains; membership reads report it).');
 
 const typeId = z
   .number()
   .int()
   .positive()
-  .describe('Membership type id, from memberships_list_types.');
+  .describe('Membership type id (memberships_list_types).');
 
 const membershipId = z
   .number()
   .int()
   .positive()
   .describe(
-    'Membership id (not its number), from memberships_list_for_client or memberships_list.'
+    'Membership id, not its number (memberships_list_for_client, memberships_list).'
   );
 
 const unit = z
@@ -81,14 +79,12 @@ const allowance = z
       .min(1)
       .max(10000)
       .optional()
-      .describe(
-        'Visits included for this service under a per_service balance. Leave out under a shared balance.'
-      ),
+      .describe('Visits for this service (per_service balance).'),
     unlimited: z
       .boolean()
       .optional()
       .describe(
-        'Unlimited visits for this service under a per_service balance (needs a validity). Not every chain has unlimited memberships enabled.'
+        'Unlimited visits for this service (per_service; needs validity; chain must allow unlimited).'
       ),
   })
   .strict();
@@ -104,12 +100,12 @@ const typeFieldInputs = {
     .min(1)
     .max(200)
     .describe(
-      'Services and service categories the membership covers, each with service_id or service_category_id. Ids are the chain’s: see services_list and service_categories_list.'
+      'Covered services or categories, each by service_id or service_category_id (chain ids: services_list, service_categories_list).'
     ),
   balance_type: z
     .enum(['per_service', 'shared'])
     .describe(
-      'per_service: a separate number of visits for each covered service (set visits on each). shared: one pool of visits for any covered service (set shared_visits). Default per_service.'
+      'per_service (default): visits per covered service; shared: one pool (shared_visits).'
     ),
   shared_visits: z
     .number()
@@ -120,44 +116,40 @@ const typeFieldInputs = {
   shared_unlimited: z
     .boolean()
     .describe(
-      'Unlimited visits in the shared pool, instead of shared_visits (needs a validity). Not every chain has unlimited memberships enabled.'
+      'Unlimited shared pool instead of shared_visits (needs validity; chain must allow unlimited).'
     ),
   validity: duration(
-    'How long a membership stays valid once activated, e.g. { length: 3, unit: "month" }. Omitted: it never expires.'
+    'Validity once activated, e.g. { length: 3, unit: "month" }; omitted: never expires.'
   ).nullable(),
   activation: z
     .enum(['first_visit', 'sale'])
     .describe('When validity starts: first_visit (default) or sale.'),
   auto_activation_after: duration(
-    'With activation first_visit: an unused membership activates by itself this long after the sale. Omitted: never by itself.'
+    'With first_visit activation: auto-activate this long after the sale; omitted: never.'
   ).nullable(),
   personal: z
     .boolean()
     .describe(
-      'true: only the client who bought it (or the one it was given to) uses it, without entering its number. false (default): paying with it needs its number, and whoever has the number can use it.'
+      'true: only its client uses it, without its number. false (default): whoever has the number can use it.'
     ),
   freeze_allowed: z
     .boolean()
-    .describe(
-      'Whether a membership can be frozen (needs a validity). Default false.'
-    ),
+    .describe('Can be frozen (needs validity). Default false.'),
   freeze_limit: duration(
     'Longest total freeze per membership. Omitted: no limit.'
   ).nullable(),
   online_booking_while_frozen: z
     .boolean()
-    .describe(
-      'Whether clients can still book online with a frozen membership. Default false.'
-    ),
+    .describe('Online booking allowed while frozen. Default false.'),
   recalculate_service_price: z
     .boolean()
     .describe(
-      'Recalculate the service price when a visit is paid with the membership. Default false; not allowed for unlimited memberships.'
+      'Recalculate the service price when paid with it. Default false; not for unlimited.'
     ),
   balance_edit: z
     .enum(['not_allowed', 'sale_location', 'any_location'])
     .describe(
-      'Where team members may correct the balance of a sold membership by hand: not_allowed (default), sale_location or any_location of the chain.'
+      'Where staff may correct a sold balance by hand. Default not_allowed.'
     ),
   online_sale_enabled: z
     .boolean()
@@ -177,7 +169,7 @@ const typeFieldInputs = {
     .positive()
     .nullable()
     .describe(
-      'The chain’s grouping of membership types (not a service category); null removes it.'
+      'The chain’s membership type group (not a service category); null removes it.'
     ),
 };
 
@@ -296,7 +288,7 @@ export const membershipsListChainsTool = defineTool({
   name: 'memberships_list_chains',
   category: 'Memberships',
   description:
-    'The chains the signed-in user belongs to — each with its locations and the user’s membership rights there: loyalty, managing membership types, changing sold memberships (freeze, validity, balance) and editing balances. Membership types and sold memberships belong to a chain, so start here for the chain_id the other memberships_* tools take, and when one of them is refused for lack of rights. A location can belong to several chains; the user’s rights are per chain.',
+    'The user’s chains with their locations and the user’s membership rights per chain (loyalty, managing types, changing sold memberships, editing balances). Start here for the chain_id the memberships_* tools take, and when one is refused for rights.',
   annotations: { title: 'Memberships: chains and rights', ...READ_ONLY },
   input: z.object({}),
   outputSchema: {
@@ -341,7 +333,7 @@ export const membershipsListTypesTool = defineTool({
   name: 'memberships_list_types',
   category: 'Memberships',
   description:
-    'List the membership types of a chain — the templates memberships are sold from — with price, the services and service categories each covers, balance (a shared pool of visits or visits per service), validity and activation, freezing rules and how many were sold. Active types by default; archived: true lists the archived ones instead. Filter by part of the title. Paged: follow pagination.next_page until it is null. Locations that sell a type are in memberships_get_type.',
+    'Membership types of a chain (the templates memberships are sold from): price, covered services, balance, validity and activation, freezing, sold count. Active by default, archived=true for archived; filter by title. Paged: follow pagination.next_page. Selling locations: memberships_get_type.',
   annotations: { title: 'Memberships: list membership types', ...READ_ONLY },
   input: z.object({
     chain_id: chainId,
@@ -388,7 +380,7 @@ export const membershipsCreateTypeTool = defineTool({
   name: 'memberships_create_type',
   category: 'Memberships',
   description:
-    'Create a membership type in a chain — "10 haircuts for 3 months", "a month of unlimited yoga". Required: title, price, the locations that sell it and the covered services or service categories. Balance per_service (visits per service, the default) or shared (one pool of visits, shared_visits); validity and when it starts (first visit or sale); optional freezing, auto-activation, personal use, price recalculation, balance corrections and online sale. Once the first membership is sold, the price, validity, activation, personal flag, balance and covered services are fixed. Needs the right to manage membership types in the chain (memberships_list_chains).',
+    'Create a membership type in a chain ("10 haircuts for 3 months"): title, price, selling locations, covered services or categories; balance per_service (default) or shared; validity and activation; optional freezing, auto-activation, personal use, price recalculation, balance corrections, online sale. Price, validity, activation, personal flag, balance and services are fixed once one is sold.',
   annotations: {
     title: 'Memberships: create a membership type',
     destructiveHint: false,
@@ -429,7 +421,7 @@ export const membershipsUpdateTypeTool = defineTool({
   name: 'memberships_update_type',
   category: 'Memberships',
   description:
-    'Change a membership type: read its current settings with memberships_get_type, then pass only what changes; everything else is kept. services replaces the whole list of covered services. After the first membership of the type is sold, only the title, locations, freezing, price recalculation, balance corrections, online sale and type category can change (a shared balance can still gain services); a request for the fixed fields saves the rest and reports what was kept. For new terms create a new type and archive this one. An archived type must be unarchived first. Memberships already sold keep their own balance and validity.',
+    'Change a membership type (read it with memberships_get_type; pass only changes; services replaces the list). Once one is sold only title, locations, freezing, price recalculation, balance corrections, online sale and category change; fixed fields are reported as kept. Unarchive an archived type first. Sold memberships keep their terms.',
   annotations: {
     title: 'Memberships: update a membership type',
     destructiveHint: false,
@@ -519,7 +511,7 @@ export const membershipsListTool = defineTool({
   name: 'memberships_list',
   category: 'Memberships',
   description:
-    'Sold memberships of a chain, by id or by the period they were created in (created_from and created_to, YYYY-MM-DD) — with number, type, status (issued, active, expired, used_up), frozen flag, visits left per service or in the shared pool, activation and expiration dates. The creation date is not a sale date and the list does not name clients: for one client’s memberships use memberships_list_for_client. Paged: follow pagination.next_page until it is null.',
+    'Sold memberships of a chain by id or creation period (created_from/created_to): number, type, status, frozen flag, visits left, activation and expiry. Creation is not sale, and clients are not named: per client use memberships_list_for_client. Paged: follow pagination.next_page.',
   annotations: { title: 'Memberships: list sold memberships', ...READ_ONLY },
   input: z.object({
     chain_id: chainId,
@@ -555,19 +547,13 @@ export const membershipsListForClientTool = defineTool({
   name: 'memberships_list_for_client',
   category: 'Memberships',
   description:
-    'A client’s current memberships — issued, active or frozen — with number, type, visits left per service or in the shared pool, activation and expiration dates, and the chain_id each belongs to (the id the freeze, balance and validity tools take). Found by the phone on the client card in the given location; expired and used-up memberships are not listed, and one sold under an earlier phone is missed. For how and when each was paid use clients_get_membership_purchases.',
+    'A client’s current memberships (issued, active, frozen): number, type, visits left, activation and expiry, and chain_id for the freeze, balance and validity tools. Found by the client card phone; expired, used-up or sold under an earlier phone are missed. Payments: clients_get_membership_purchases.',
   annotations: {
     title: 'Memberships: a client’s current memberships',
     ...READ_ONLY,
   },
   input: z.object({
-    location_id: z
-      .number()
-      .int()
-      .positive()
-      .describe(
-        'Location whose client card to use. Call locations_list when the id is unknown.'
-      ),
+    location_id: z.number().int().positive().describe('From locations_list.'),
     client_id: z
       .number()
       .int()

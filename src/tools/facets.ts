@@ -174,6 +174,7 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
   ops: {
     tools: [
       'appointments_list',
+      'appointments_find_free_slots',
       'appointments_create',
       'appointments_update',
       'appointments_delete',

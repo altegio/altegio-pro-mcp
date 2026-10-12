@@ -44,7 +44,7 @@ describe('ToolHandlers - Appointments CRUD', () => {
 
       const text = result.content[0]?.text ?? '';
       // Present, but still inside the fence: a phone is free input too.
-      expect(text).toContain('appointment 999 client phone: 555');
+      expect(text).toContain('client 321 phone: 555');
       expect(text.split('\n\n')[0]).not.toContain('555');
       expect(result.structuredContent).toMatchObject({
         contacts_included: true,
@@ -84,16 +84,23 @@ describe('ToolHandlers - Appointments CRUD', () => {
       expect(text).not.toContain('undefined');
       // Names and service titles are free input: fenced, not in our own row.
       const [ours, theirs] = text.split('\n\n');
-      expect(ours).toContain('Appointment 999');
+      expect(ours).toContain('- 999 · 2026-09-10T10:00:00+02:00 · waiting');
+      expect(ours).toContain('services 789');
       expect(ours).not.toContain('Jane');
       expect(ours).not.toContain('Haircut');
-      expect(theirs).toContain('appointment 999 client: Jane');
-      expect(theirs).toContain('appointment 999 services: Haircut');
+      // Each name once, keyed by the id our row carries.
+      expect(theirs).toContain('client 321: Jane');
+      expect(theirs).toContain('team member 123: Alex');
+      expect(theirs).toContain('service 789: Haircut');
       // A phone is a contact: withheld unless the call asked for it.
       expect(text).not.toContain('555');
       expect(result.structuredContent).toMatchObject({
+        location_id: 456,
         contacts_included: false,
       });
+      expect(
+        (result.structuredContent as { items: object[] }).items[0]
+      ).not.toHaveProperty('date');
       expect(
         (result.structuredContent as { items: object[] }).items[0]
       ).not.toHaveProperty('client_phone');
@@ -101,7 +108,7 @@ describe('ToolHandlers - Appointments CRUD', () => {
         items: [
           {
             id: 999,
-            location_id: 456,
+            datetime: '2026-09-10T10:00:00+02:00',
             // attendance=0 is waiting; confirmed=1 is the admin-default
             // verification flag, not the status.
             status: 'waiting',
@@ -396,9 +403,9 @@ describe('ToolHandlers - Appointments CRUD', () => {
       const result = await handlers.getAppointments({ location_id: 456 });
       const text = result.content[0]?.text ?? '';
       const [ours, theirs] = text.split('\n\n');
-      expect(ours).toContain('tag ids 7 · color #f44336');
+      expect(ours).toContain('tags 7 · color #f44336');
       expect(ours).not.toContain('VIP');
-      expect(theirs).toContain('appointment 999 tags: VIP');
+      expect(theirs).toContain('tag 7: VIP');
       expect(result.structuredContent).toMatchObject({
         items: [
           {

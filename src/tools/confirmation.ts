@@ -21,17 +21,24 @@
  * - **Host does not** — the first call performs nothing and returns the
  *   consequence text plus a one-time `confirmation_token`; the caller must
  *   repeat the call with that token to proceed. Without this fallback the call
- *   would simply hang on an older host.
+ *   would simply hang on an older host. That answer is a successful result
+ *   with `structuredContent.status = "confirmation_required"`, not an error:
+ *   nothing failed, the call is waiting for a person, and hosts that treat an
+ *   error as "retry differently" looped on it.
  *
- * The token is an HMAC over the tool name and the exact arguments, keyed by a
+ * The token is an HMAC over the tool name and the parsed arguments, keyed by a
  * secret minted per process, so it cannot be guessed, cannot be replayed
  * against a different target (confirming the deletion of client 5 never
- * authorises deleting client 7), and expires. Nothing is stored server-side:
- * `tools/list` stays static and no state is scoped to a session (ADR-001 D7).
+ * authorises deleting client 7), and expires. It binds the input after Zod has
+ * read it, with absent and `null` optionals removed (`canonicalInput`), so the
+ * repeat may differ cosmetically — `"4564"` for `4564`, `null` for an omitted
+ * field — and still match. Nothing is stored server-side: `tools/list` stays
+ * static and no state is scoped to a session (ADR-001 D7).
  */
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { AltegioClient } from '../providers/altegio-client.js';
 import { sanitizeUntrusted, type ToolResult } from './tool-result.js';
+import { canonicalInput } from './input-normalization.js';
 
 /** The argument every confirmable tool accepts, on every host (ADR-001 D7). */
 export const CONFIRMATION_TOKEN_ARG = 'confirmation_token';
@@ -40,7 +47,7 @@ export const CONFIRMATION_TOKEN_ARG = 'confirmation_token';
 export const CONFIRMATION_TOKEN_SCHEMA = {
   type: 'string',
   description:
-    'Confirmation token for this destructive operation. Omit it on the first call. If the host cannot show a confirmation prompt, the first call performs nothing and returns a token together with the consequences; repeat the identical call with that token to proceed. The token is bound to these exact arguments and expires in 10 minutes.',
+    'Omit at first; then from this tool’s confirmation_required answer, once the user agreed.',
 } as const;
 
 const TOKEN_TTL_MS = 10 * 60 * 1000;
@@ -81,6 +88,11 @@ export interface PreparedConfirmation {
   readonly target: string;
   readonly consequence: string;
   readonly resolve?: (client: AltegioClient) => Promise<string | undefined>;
+  /**
+   * What the token binds: the parsed input in canonical form. Absent only for
+   * a hand-built preparation, which then binds the raw arguments.
+   */
+  readonly binding?: unknown;
 }
 
 /**
@@ -98,6 +110,7 @@ export function prepareConfirmation<TInput>(
     const input = parse(args);
     if (input === undefined) return undefined;
     return {
+      binding: canonicalInput(input),
       action: spec.action,
       target: spec.target(input),
       consequence:
@@ -188,12 +201,10 @@ export interface ConfirmationRuntime {
 }
 
 /**
- * Every outcome of the gate is an `isError` result, because in every one of
- * them the tool did not do what it was asked to do. It is the same channel the
- * executor uses to refuse a write (`ExecutorRefusalError`), it leaves a model
- * no room to read "cancelled" as "deleted", and it keeps the result legal for
- * a tool that declares an `outputSchema`: a client rejects a non-error result
- * that carries no `structuredContent`.
+ * A refusal — declined, dismissed, undeliverable prompt, invalid token — is an
+ * `isError` result: the tool did not do what it was asked to do and there is
+ * no token to continue with, so a model has no room to read "cancelled" as
+ * "deleted". A confirmation request is not a refusal (see `requireConfirmation`).
  */
 function refusal(message: string): ToolResult {
   return {
@@ -227,14 +238,18 @@ export async function requireConfirmation(options: {
       ? (args as Record<string, unknown>)[CONFIRMATION_TOKEN_ARG]
       : undefined;
 
-  // Already confirmed, for these exact arguments, within the last 10 minutes.
-  if (verifyConfirmationToken(supplied, toolName, args)) return undefined;
+  // What the token binds: the canonical parsed input, or the raw arguments
+  // for a preparation that did not supply one.
+  const bound = 'binding' in prepared ? prepared.binding : args;
+
+  // Already confirmed, for these arguments, within the last 10 minutes.
+  if (verifyConfirmationToken(supplied, toolName, bound)) return undefined;
 
   // A token that does not verify is never silently ignored: it is a stale,
   // altered or reused one, and proceeding would defeat the argument binding.
   if (supplied !== undefined) {
     return refusal(
-      `Nothing was changed: the ${CONFIRMATION_TOKEN_ARG} for ${toolName} is not valid for these arguments. A token is bound to the exact call it was issued for and expires after 10 minutes. Repeat the call without a token.`
+      `Nothing was changed: the ${CONFIRMATION_TOKEN_ARG} for ${toolName} is not valid for these arguments. A token is bound to the call it was issued for (same target and options) and expires after 10 minutes. Repeat the call without a token to get a new one.`
     );
   }
 
@@ -264,18 +279,35 @@ export async function requireConfirmation(options: {
   }
 
   // No elicitation on this host: hand back the consequences and a token, and
-  // perform nothing until the caller repeats the call with it.
-  const token = mintConfirmationToken(toolName, args);
-  return refusal(
-    [
-      `Confirmation required — nothing was changed yet.`,
-      ``,
-      headline,
-      prepared.consequence,
-      ``,
-      `This host cannot show a confirmation prompt, so confirmation is explicit: show the line above to the person you are acting for, and only if they agree, call ${toolName} again with the identical arguments plus ${CONFIRMATION_TOKEN_ARG}="${token}". The token authorises only this exact call and expires in 10 minutes.`,
-    ].join('\n')
-  );
+  // perform nothing until the caller repeats the call with it. This is a
+  // successful answer, not a failure: the call is waiting for a person.
+  const now = Date.now();
+  const token = mintConfirmationToken(toolName, bound, now);
+  const expiresAt = new Date(now + TOKEN_TTL_MS).toISOString();
+  return {
+    content: [
+      {
+        type: 'text' as const,
+        text: [
+          `Confirmation required — nothing was changed.`,
+          ``,
+          headline,
+          prepared.consequence,
+          ``,
+          `Show this to the person you act for. Only if they agree, call ${toolName} again with the same arguments plus ${CONFIRMATION_TOKEN_ARG}="${token}" (valid until ${expiresAt}, for this call only). Do not retry without asking.`,
+        ].join('\n'),
+      },
+    ],
+    structuredContent: {
+      status: 'confirmation_required',
+      changed: false,
+      tool: toolName,
+      summary: `${headline} ${prepared.consequence}`,
+      [CONFIRMATION_TOKEN_ARG]: token,
+      expires_at: expiresAt,
+      next_step: `Ask the user. Only if they agree, call ${toolName} again with the same arguments plus ${CONFIRMATION_TOKEN_ARG}.`,
+    },
+  };
 }
 
 async function resolveTarget(

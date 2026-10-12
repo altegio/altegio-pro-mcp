@@ -350,6 +350,7 @@ describe('HTTP server facet wiring, end to end', () => {
         'appointments_create',
         'appointments_create_tag',
         'appointments_delete',
+        'appointments_find_free_slots',
         'appointments_list',
         'appointments_list_tags',
         'appointments_preview_attendance',

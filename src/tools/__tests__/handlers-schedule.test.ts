@@ -23,7 +23,7 @@ describe('schedules_get handler', () => {
 
     expect(result.structuredContent).toMatchObject({
       items: [{ is_working: true }, { is_working: false }],
-      pagination: { returned: 2, total: 2, has_more: false },
+      pagination: { returned: 2, has_more: false, next_date_from: null },
     });
     expect(result.content[0]?.text).toContain('day off');
   });

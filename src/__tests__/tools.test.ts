@@ -129,7 +129,7 @@ describe('Tool Registration', () => {
     }
 
     // Total: 84 served factory-defined + 12 onboarding = 96 tools
-    expect(toolNames.length).toBe(128);
+    expect(toolNames.length).toBe(129);
   });
 
   it('should create server with tools', () => {
@@ -212,9 +212,9 @@ describe('schedules_get', () => {
     });
 
     expect(result.content[0]?.text).toContain(
-      '2 schedule entries for team member 456'
+      '2 schedule days for team member 456'
     );
-    expect(result.content[0]?.text).toContain('2025-10-27 09:00-13:00');
+    expect(result.content[0]?.text).toContain('2025-10-27: 09:00-13:00');
   });
 });
 
