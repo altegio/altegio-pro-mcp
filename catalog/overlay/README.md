@@ -68,9 +68,14 @@ that is the drift signal when the spec repository renames or drops an operation.
   setting it today only records intent.
 - **V2 is canonical; V1 fills the gaps.** When V1 and V2 both offer a
   capability, curate the V2 operation. If the V1 twin has a different
-  `operationId`, name it under `supersedes`; a twin with the same id is retired
-  without being listed. Curation left on a retired V1 operation fails the build.
-  Keep a V1 operation only when V2 lacks what it does, and say why in `notes`.
+  `operationId` or path, name it under `supersedes`; a twin with the same id or
+  the same method and path is retired without being listed. A retired read
+  stays a hidden fallback route for filters only it documents. Curation left on
+  a retired V1 operation fails the build. Keep a V1 operation listed only when
+  V2 has nothing for its capability, and say why in `notes`.
+- **`projection` names glossary fields.** The executor projects after it has
+  renamed keys and flattened JSON:API resources, so one allowlist fits V2 and
+  its V1 fallback (`company_links.price_min` next to `price_min`).
 - **`projection` keeps results inside the size budget** (ADR-001 D8). Prefer a
   short allowlist of fields with ids over a whole API object.
 

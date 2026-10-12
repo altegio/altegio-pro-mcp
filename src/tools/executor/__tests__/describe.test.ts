@@ -72,7 +72,7 @@ describe('api_describe_operation', () => {
   });
 
   it('still accepts the legacy spelling where the spec is already canonical', () => {
-    const { structuredContent } = describeOperation('get_service_list');
+    const { structuredContent } = describeOperation('search_event_services');
     const params = structuredContent.parameters as Array<{
       name: string;
       spec_name?: string;
@@ -153,7 +153,7 @@ describe('api_describe_operation', () => {
 
   it('reports deprecation', () => {
     const { text, structuredContent } = describeOperation(
-      'deprecated_get_service_category_list'
+      'deprecated_get_client_list'
     );
     expect(structuredContent.deprecated).toBe(true);
     expect(text).toContain('DEPRECATED');

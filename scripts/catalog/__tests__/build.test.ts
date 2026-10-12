@@ -253,10 +253,12 @@ describe('catalog build', () => {
 
     it('merges the overlay into curation for the hand-written tools', () => {
       const services = catalog.operations.find(
-        (o) => o.operationId === 'get_service_list'
+        (o) => o.operationId === 'list_services'
       );
       expect(services?.curation?.tool_name).toBe('services_list');
-      expect(services?.curation?.projection).toContain('price_min');
+      expect(services?.curation?.projection).toContain(
+        'company_links.price_min'
+      );
       // A curated tool moves to the V2 survivor with its twin.
       const staff = catalog.operations.find(
         (o) => o.operationId === 'list_team_members'
@@ -397,10 +399,40 @@ describe('catalog build', () => {
       expect(built.curatedCount).toBe(0);
     });
 
+    it('keeps a retired read at another path as a fallback route, and a retired write without one', () => {
+      if (!specAvailable) return;
+      const result = buildWith('supersedes-fallback', [
+        '  list_services:',
+        '    supersedes: [get_service_list]',
+        '  update_tag:',
+        '    supersedes: [update_tag_by_tag_id]',
+      ]);
+      expect(result.status).toBe(0);
+      const built = JSON.parse(fs.readFileSync(result.out, 'utf8')) as {
+        superseded: Array<{
+          operationId: string;
+          path: string;
+          parameters?: Array<{ name: string }>;
+        }>;
+      };
+      const read = built.superseded.find(
+        (s) => s.operationId === 'get_service_list'
+      );
+      expect(read?.path).toBe('/services/{location_id}');
+      expect(read?.parameters?.map((p) => p.name)).toEqual(
+        expect.arrayContaining(['category_id', 'team_member_id'])
+      );
+      const write = built.superseded.find(
+        (s) => s.operationId === 'update_tag_by_tag_id'
+      );
+      expect(write).toBeDefined();
+      expect(write?.parameters).toBeUndefined();
+    });
+
     it.each([
       [
         'a survivor from a spec that supersedes nothing',
-        ['  get_service_list:', '    supersedes: [get_resource_list]'],
+        ['  get_location_list:', '    supersedes: [get_resource_list]'],
         'not an operation of a spec that supersedes another',
       ],
       [
