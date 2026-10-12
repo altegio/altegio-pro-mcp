@@ -215,11 +215,14 @@ describe('api_call_operation', () => {
       const result = await callOperation(client, 'list_services', {
         location_id: 4564,
         category_id: 3,
+        page_size: 20,
       });
 
       const url = new URL(fetchedUrl());
       expect(url.pathname).toBe('/api/v1/services/4564');
       expect(url.searchParams.get('category_id')).toBe('3');
+      // A page size never keeps the call on a route without the filter.
+      expect(url.searchParams.get('count')).toBe('20');
       expect(result.structuredContent).toMatchObject({
         operation_id: 'list_services',
         path: '/locations/4564/services',
