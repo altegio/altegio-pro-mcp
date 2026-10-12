@@ -1,7 +1,7 @@
 import {
-  fitPageToBudget,
   paginationInput,
   paginateCollection,
+  renderPage,
 } from '../pagination.js';
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
@@ -163,18 +163,17 @@ export const getServicesTool = defineTool({
     const all = await client.getServices(location_id);
     const { items: page } = paginateCollection(all, input);
 
-    return fitPageToBudget({
+    return renderPage({
       input,
       items: page,
       total: all.length,
-      render: ({ items: services, pagination, notice }) => {
+      render: ({ items: services, pagination }) => {
         const lines = [
           `${services.length} of ${all.length} ${all.length === 1 ? 'service' : 'services'} at location ${location_id}, page ${pagination.page}` +
             (pagination.next_page === null
               ? ' (last page).'
-              : `; next: page=${pagination.next_page}.`),
+              : `; next: page=${pagination.next_page}, page_size=${pagination.page_size}.`),
         ];
-        if (notice) lines.push(notice);
         lines.push(...services.map(serviceLine));
         // A service title and its comment are typed by the location's staff,
         // so they stay out of our rows and go in the untrusted block, by id.
