@@ -12,6 +12,7 @@ import {
   ExecutorRefusalError,
 } from '../utils/errors.js';
 import { signInInstruction } from './serving-view.js';
+import { noteValidationIssues } from '../utils/tool-call-observation.js';
 
 /** The ordinary text block every tool returns. */
 export interface TextContent {
@@ -68,6 +69,20 @@ export function formatZodIssues(
         issue.path.length > 0
           ? issue.path.map(String).join('.')
           : '(arguments)';
+      if (
+        issue.code === 'too_big' &&
+        issue.path.length === 1 &&
+        issue.path[0] === 'page_size' &&
+        typeof issue.maximum === 'number'
+      ) {
+        // Never clamped: a caller that keeps its own size while following
+        // next_page would skip items. Say how to read the rest instead.
+        return (
+          `page_size: at most ${issue.maximum}. Pass page_size ${issue.maximum} ` +
+          'or less, then follow pagination.next_page with pagination.page_size ' +
+          'from the result to read the rest'
+        );
+      }
       if (issue.code === 'unrecognized_keys') {
         const keys = issue.keys.map((key) => `"${key}"`).join(', ');
         const accepted = acceptedKeysAt?.(issue.path);
@@ -96,6 +111,7 @@ export async function withErrorHandling(
     let message: string;
 
     if (error instanceof ZodError) {
+      noteValidationIssues(error.issues);
       message = `Invalid parameters for ${toolName}: ${formatZodIssues(error, options.acceptedKeysAt)}`;
     } else if (error instanceof AuthenticationError) {
       message = signInInstruction(toolName);

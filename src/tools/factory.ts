@@ -12,7 +12,7 @@
  * JSON Schema is generated from the Zod schema via zod 4's native
  * `z.toJSONSchema`, so the definition is the single source of truth.
  */
-import { z, type ZodType } from 'zod';
+import { z, type ZodError, type ZodType } from 'zod';
 import type { AltegioClient } from '../providers/altegio-client.js';
 import {
   prepareConfirmation,
@@ -111,6 +111,12 @@ export interface DefinedTool<T extends ZodType = ZodType> {
    * arguments, so a cosmetic difference on the repeat does not void it.
    */
   prepareConfirmation?: (args: unknown) => PreparedConfirmation | undefined;
+  /**
+   * What the handler's own input validation finds wrong with `args` — the
+   * same normalization and strictness — or `undefined` when they pass. The
+   * registry uses it to resolve a former tool name and to classify failures.
+   */
+  inputIssues: (args: unknown) => ZodError['issues'] | undefined;
   meta: ToolDefinition<T>;
 }
 
@@ -192,6 +198,11 @@ export function defineTool<T extends ZodType>(
           }),
         }
       : {}),
+
+    inputIssues: (args) => {
+      const parsed = schema.safeParse(normalized(args));
+      return parsed.success ? undefined : parsed.error.issues;
+    },
 
     createHandler: (client: AltegioClient) => (args: unknown) =>
       withErrorHandling(
