@@ -1,4 +1,10 @@
-import { CloudLoggingDestination } from '../utils/cloud-logging.js';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import {
+  CloudLoggingDestination,
+  keepAliveFetch,
+  writeTimeoutMs,
+} from '../utils/cloud-logging.js';
 
 const line = `${JSON.stringify({
   severity: 'WARNING',
@@ -25,6 +31,13 @@ function mockFetch(writeStatus = 200, expiresIn = 3600) {
       return new Response('projects/1/zones/test-zone');
     return new Response('{}', { status: writeStatus });
   });
+}
+
+/** The `entries:write` requests a mock fetch received. */
+function writes(fetcher: jest.Mock) {
+  return (fetcher.mock.calls as unknown as [string, RequestInit][]).filter(
+    ([url]) => String(url).includes('entries:write')
+  );
 }
 
 describe('Cloud Logging destination', () => {
@@ -153,10 +166,14 @@ describe('Cloud Logging destination', () => {
       const fallback = jest.fn();
       const destination = new CloudLoggingDestination(
         fetcher as typeof fetch,
-        fallback
+        fallback,
+        256,
+        Date.now,
+        { retryDelayMs: () => 100 }
       );
       destination.write(line);
-      await jest.advanceTimersByTimeAsync(200 + 5000);
+      // Two attempts, each under its deadline, with the retry delay between.
+      await jest.advanceTimersByTimeAsync(200 + writeTimeoutMs(1000) * 2 + 100);
       // The stuck batch went to the fallback; the destination says why.
       expect(fallback).toHaveBeenCalledWith(line);
       expect(
@@ -164,23 +181,122 @@ describe('Cloud Logging destination', () => {
           String(written).includes('"reason":"TimeoutError"')
         )
       ).toBe(true);
+      expect(writes(fetcher)).toHaveLength(2);
 
       hang = false;
       fallback.mockClear();
-      await jest.advanceTimersByTimeAsync(30_000);
+      await jest.advanceTimersByTimeAsync(5_000);
       destination.write(line);
       await jest.advanceTimersByTimeAsync(200);
       expect(fallback).not.toHaveBeenCalled();
-      expect(
-        fetcher.mock.calls.filter(([url]) =>
-          String(url).includes('entries:write')
-        )
-      ).toHaveLength(2);
+      expect(writes(fetcher)).toHaveLength(3);
     } finally {
       jest.useRealTimers();
     }
   });
 
+  it('retries a timed-out write once and keeps the entries on the direct log', async () => {
+    jest.useFakeTimers();
+    try {
+      let calls = 0;
+      const fetcher = jest.fn(async (url: string | URL | Request) => {
+        if (String(url).includes('entries:write') && calls++ === 0) {
+          return new Promise<Response>(() => undefined);
+        }
+        return mockFetch()(url);
+      });
+      const fallback = jest.fn();
+      const destination = new CloudLoggingDestination(
+        fetcher as typeof fetch,
+        fallback,
+        256,
+        Date.now,
+        { retryDelayMs: () => 100 }
+      );
+      destination.write(line);
+      await jest.advanceTimersByTimeAsync(200 + writeTimeoutMs(1000) + 100);
+      const retried = writes(fetcher);
+      expect(retried).toHaveLength(2);
+      // The same entry, under the same insertId, so the API deduplicates it.
+      expect(JSON.parse(String(retried[1]![1].body)).entries).toEqual(
+        JSON.parse(String(retried[0]![1].body)).entries
+      );
+      const lines = fallback.mock.calls.map(([written]) => String(written));
+      expect(lines).not.toContain(line);
+      expect(lines.map((written) => JSON.parse(written))).toEqual([
+        expect.objectContaining({
+          event: 'cloud_logging_write_recovered',
+          recovered: 1,
+        }),
+      ]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('retries a transient status once, and a refusal not at all', async () => {
+    let status = 503;
+    const fetcher = jest.fn(async (url: string | URL | Request) => {
+      if (String(url).includes('entries:write')) {
+        const answer = new Response('{}', { status });
+        status = 200;
+        return answer;
+      }
+      return mockFetch()(url);
+    });
+    const fallback = jest.fn();
+    const destination = new CloudLoggingDestination(
+      fetcher as typeof fetch,
+      fallback,
+      256,
+      Date.now,
+      { retryDelayMs: () => 0 }
+    );
+    destination.write(line);
+    await destination.flush();
+    expect(writes(fetcher)).toHaveLength(2);
+    expect(fallback.mock.calls.map(([written]) => written)).not.toContain(line);
+  });
+
+  it('names the step that failed and lengthens the cooldown while failures repeat', async () => {
+    let clock = 1_000_000;
+    const fetcher = jest.fn(async (url: string | URL | Request) => {
+      if (String(url).endsWith('/token')) {
+        const error = new Error('stalled');
+        error.name = 'TimeoutError';
+        throw error;
+      }
+      return mockFetch()(url);
+    });
+    const fallback = jest.fn();
+    const destination = new CloudLoggingDestination(
+      fetcher as typeof fetch,
+      fallback,
+      256,
+      () => clock,
+      { retryDelayMs: () => 0 }
+    );
+    const diagnostics = () =>
+      fallback.mock.calls
+        .map(([written]) => String(written))
+        .filter((written) => written.includes('cloud_logging_write_failed'))
+        .map((written) => JSON.parse(written));
+
+    destination.write(line);
+    await destination.flush();
+    expect(diagnostics()).toEqual([
+      expect.objectContaining({
+        stage: 'token',
+        reason: 'TimeoutError',
+        cooldown_ms: 5_000,
+      }),
+    ]);
+
+    clock += 61_000;
+    destination.write(line);
+    await destination.flush();
+    expect(diagnostics()[1]).toMatchObject({ cooldown_ms: 10_000 });
+  });
   it('keeps draining after the queue overflows', async () => {
     jest.useFakeTimers();
     try {
@@ -212,7 +328,7 @@ describe('Cloud Logging destination', () => {
     }
   });
 
-  it('bounds queued entries and batches at twenty', async () => {
+  it('bounds queued entries and batches at ten entries', async () => {
     const fetcher = mockFetch();
     const fallback = jest.fn();
     const destination = new CloudLoggingDestination(
@@ -223,12 +339,67 @@ describe('Cloud Logging destination', () => {
     for (let i = 0; i < 22; i++) destination.write(line);
     expect(fallback).toHaveBeenCalledTimes(1);
     await destination.flush();
-    const calls = fetcher.mock.calls as unknown as [string, RequestInit][];
     expect(
-      calls
-        .filter(([url]) => url.includes('entries:write'))
-        .map(([, init]) => JSON.parse(String(init.body)).entries.length)
-    ).toEqual([20, 1]);
+      writes(fetcher).map(
+        ([, init]) => JSON.parse(String(init.body)).entries.length
+      )
+    ).toEqual([10, 10, 1]);
+  });
+
+  it('bounds a batch at 64 KiB, and still sends one larger entry alone', async () => {
+    const big = (size: number) =>
+      `${JSON.stringify({ severity: 'INFO', time: 1, pad: 'x'.repeat(size) })}\n`;
+    const fetcher = mockFetch();
+    const destination = new CloudLoggingDestination(
+      fetcher as typeof fetch,
+      jest.fn()
+    );
+    for (let i = 0; i < 4; i++) destination.write(big(20_000));
+    destination.write(big(60_000));
+    await destination.flush();
+    expect(
+      writes(fetcher).map(
+        ([, init]) => JSON.parse(String(init.body)).entries.length
+      )
+    ).toEqual([3, 1, 1]);
+  });
+
+  it('gives a larger write a longer deadline, within a cap', () => {
+    expect(writeTimeoutMs(1_000)).toBe(6_000);
+    expect(writeTimeoutMs(64 * 1024)).toBe(9_000);
+    expect(writeTimeoutMs(10_000_000)).toBe(15_000);
+  });
+
+  it('reuses one keep-alive connection for consecutive writes', async () => {
+    const ports = new Set<number>();
+    const bodies: string[] = [];
+    const server = createServer((request, response) => {
+      ports.add(request.socket.remotePort ?? 0);
+      let body = '';
+      request.on('data', (chunk: Buffer) => (body += chunk.toString()));
+      request.on('end', () => {
+        bodies.push(body);
+        response.end('{}');
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    try {
+      const { port } = server.address() as AddressInfo;
+      for (const body of ['{"a":1}', '{"b":2}']) {
+        const response = await keepAliveFetch(`http://127.0.0.1:${port}/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body,
+        });
+        expect(response.ok).toBe(true);
+        expect(await response.text()).toBe('{}');
+      }
+      expect(bodies).toEqual(['{"a":1}', '{"b":2}']);
+      expect(ports.size).toBe(1);
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 
   it('refreshes an expiring token through the native metadata endpoint', async () => {
