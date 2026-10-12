@@ -78,14 +78,17 @@ const METHOD_RANK = new Map(METHODS.map((m, i) => [m, i]));
  * V2 supersedes V1 (the product owner's decision of 2026-09-29): where both
  * specs describe the same operation, the V2 one is canonical and the V1 twin
  * leaves the catalog, so the model sees each capability exactly once and never
- * a version. Two rules decide what "the same operation" is:
+ * a version. Three rules decide what "the same operation" is:
  *
  * - **Same id.** A V2 operation's catalog id is its spec id without the `_v2`
  *   suffix the V2 spec uses on some of its ids (`canonicalSuffix`). A V1
  *   operation with that same id is its twin by the spec authors' own naming
  *   (`get_event`, `delete_appointment`) and is superseded automatically.
- * - **Declared.** Twins with different ids (`search_events` → `list_events`)
- *   are named by the overlay field `supersedes` on the surviving operation.
+ * - **Declared.** Twins with different ids or paths (`search_events` →
+ *   `list_events`, `get_service_list` → `list_services`) are named by the
+ *   overlay field `supersedes` on the surviving operation. A retired read keeps
+ *   its parameters as a fallback route for filters only V1 has
+ *   (see `fallbackRoute`).
  * - **Same path.** A V1 operation at the same method and path as a V2 one
  *   (`get_appointment_list` → `list_appointments`) is superseded
  *   automatically; it keeps its parameters as a fallback route for filters
@@ -864,7 +867,7 @@ function applySupersedes(curation, byId, superseded, retire) {
         );
       }
       claimed.set(twinId, operationId);
-      retire(twin, survivor, 'declared');
+      retire(twin, survivor, 'declared', fallbackRoute(twin, survivor));
     }
   }
   for (const operationId of curation.keys()) {
@@ -874,6 +877,18 @@ function applySupersedes(curation, byId, superseded, retire) {
       );
     }
   }
+}
+
+/**
+ * What a retired read keeps so it can still serve its survivor's capability:
+ * its own parameters, when it is a GET like the survivor. The executor routes
+ * a call that needs a filter only the twin documents to the twin (V1 only as a
+ * fallback, 2026-09-29); the model keeps seeing the survivor alone.
+ */
+function fallbackRoute(twin, survivor) {
+  return twin.method === 'GET' && survivor.method === 'GET'
+    ? { parameters: twin.parameters }
+    : {};
 }
 
 /** Method plus path with placeholder names erased: the address of a capability. */

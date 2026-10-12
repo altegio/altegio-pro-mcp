@@ -432,8 +432,9 @@ function queryString(query: BuiltRequest['query']): string {
 
 /**
  * Pick the route that serves a call. The canonical operation serves it unless
- * the caller needs a filter only a retired same-path twin documents — then the
- * twin does (V2 first, V1 only as a fallback; the model never sees which).
+ * the caller needs a filter only a retired twin documents — then the twin does
+ * (V2 first, V1 only as a fallback; the model never sees which). A twin at
+ * another path qualifies only when the call fills its path.
  */
 function chooseRoute(
   op: CatalogOperation,
@@ -446,9 +447,16 @@ function chooseRoute(
     const bindable = bindableKeys(route, params);
     return supplied.filter((key) => !bindable.has(key)).length;
   };
+  const fillsPath = (route: CatalogOperation): boolean =>
+    [...route.path.matchAll(/\{([^}]+)\}/g)].every(([, placeholder]) =>
+      acceptedParamNames(route, placeholder ?? '', 'path').some((name) =>
+        has(params, name)
+      )
+    );
   let best = op;
   let bestUnknown = unknownTo(op);
   for (const fallback of fallbacks) {
+    if (!fillsPath(fallback)) continue;
     const unknown = unknownTo(fallback);
     if (unknown < bestUnknown) {
       best = fallback;
@@ -456,6 +464,30 @@ function chooseRoute(
     }
   }
   return best;
+}
+
+/**
+ * The address a result reports when a retired twin at another path served the
+ * call: the canonical operation's, filled from the same canonical parameters,
+ * so the model sees one capability at one address. `undefined` when the
+ * canonical route served it, or its path cannot be filled.
+ */
+function reportedPath(
+  op: CatalogOperation,
+  route: CatalogOperation,
+  params: Record<string, unknown>
+): string | undefined {
+  if (route === op) return undefined;
+  let filled = true;
+  const path = op.displayPath.replace(/\{([^}]+)\}/g, (match, name: string) => {
+    const value = params[name];
+    if (typeof value !== 'string' && typeof value !== 'number') {
+      filled = false;
+      return match;
+    }
+    return encodeURIComponent(String(value));
+  });
+  return filled ? path : undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -713,24 +745,27 @@ export async function callOperation(
     included?: unknown;
   } = route.source === 'v2' ? unwrapJsonApi(response.data) : response;
 
-  const projection = route === op ? op.curation?.projection : undefined;
-  const projected =
-    projection && projection.length > 0
-      ? applyProjection(data, projection)
-      : data;
-
-  const glossary = projectToGlossary(projected, {
+  const glossary = projectToGlossary(data, {
     includeContacts,
     keepRootContacts: op.domain === 'locations',
     included: indexIncluded(included),
   });
+
+  // The overlay names projected fields as the glossary spells them, after
+  // JSON:API resources are flattened, so one allowlist fits whichever route —
+  // the canonical operation or its retired twin — served the call.
+  const projection = op.curation?.projection;
+  const projected =
+    projection && projection.length > 0
+      ? applyProjection(glossary.value, projection)
+      : glossary.value;
 
   // One tool reaches every documented GET, so the response schema is not known
   // until it arrives and there is no field list to guard by name. The whole
   // payload is other people's text — client comments, names, service titles,
   // whatever an endpoint nobody curated happens to carry — so it is cleaned as
   // a whole and, below, echoed only inside the fence.
-  const cleaned = sanitizeUntrustedDeep(glossary.value, {
+  const cleaned = sanitizeUntrustedDeep(projected, {
     maxChars: PAYLOAD_BUDGET_CHARS,
   });
 
@@ -813,10 +848,11 @@ export async function callOperation(
     : undefined;
   const hint = truncated && !nextParams ? NARROW_HINT : undefined;
 
+  const path = reportedPath(op, route, built.params) ?? built.path;
   const structuredContent: Record<string, unknown> = {
     operation_id: op.operationId,
     method: op.method,
-    path: built.path,
+    path,
     params: built.params,
     data: value,
     data_note: UNTRUSTED_NOTE,
@@ -839,7 +875,7 @@ export async function callOperation(
   };
 
   const lines = [
-    `${op.method} ${built.path} · ${op.operationId} ${JSON.stringify(built.params)}`,
+    `${op.method} ${path} · ${op.operationId} ${JSON.stringify(built.params)}`,
     `→ ${summarize(value)}` +
       (pagination
         ? ` (page ${pagination.page}` +

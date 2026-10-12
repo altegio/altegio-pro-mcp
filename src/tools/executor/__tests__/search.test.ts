@@ -14,7 +14,7 @@ describe('api_search_operations ranking', () => {
   const cases: Array<{ query: string; expect: string }> = [
     { query: 'team member schedule', expect: 'get_team_member_schedule' },
     { query: 'staff list', expect: 'list_team_members' },
-    { query: 'list of services', expect: 'get_service_list' },
+    { query: 'list of services', expect: 'list_services' },
     {
       query: 'cash register transactions',
       expect: 'get_fiscal_transaction_list',

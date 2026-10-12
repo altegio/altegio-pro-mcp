@@ -54,10 +54,14 @@ of every V2 operation in one of three ways:
 - **Same id.** A V2 id is catalogued without its `_v2` suffix
   (`get_event_date_range_v2` → `get_event_date_range`). When the V1 spec uses
   that id too, the V1 operation is retired with reason `same-id`.
-- **Declared.** When the twins have different ids, the V2 operation's overlay
-  entry names the V1 ids it replaces under `supersedes`
-  (`list_events: {supersedes: [search_events]}`), and they are retired with
-  reason `declared`.
+- **Declared.** When the twins have different ids or paths, the V2 operation's
+  overlay entry names the V1 ids it replaces under `supersedes`
+  (`list_events: {supersedes: [search_events]}`,
+  `list_services: {supersedes: [get_service_list]}`), and they are retired with
+  reason `declared`. A retired GET keeps its `parameters`, like a same-path
+  twin: a call that needs a filter only V1 has (the service list by category
+  or team member) is served through the twin at its own path, and the result
+  still reports the canonical operation and path.
 - **Same path.** A live V1 operation at the same method and path as a V2 one
   (`get_appointment_list` and `list_appointments` are both
   `GET /locations/{location_id}/appointments`) is retired automatically with

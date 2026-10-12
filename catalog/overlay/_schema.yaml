@@ -79,7 +79,11 @@ operation_entry:
       items: { type: string }
       description: >
         Allowlist of result fields kept in `structuredContent` (ADR-001 D8 —
-        never the raw payload). Dot paths address nested fields; a leading
+        never the raw payload). Fields are named as the executor returns them:
+        in glossary names, with JSON:API resources flattened and their
+        side-loads embedded, so one list fits the canonical operation and any
+        retired twin that serves it as a fallback; a path absent from a
+        response is skipped. Dot paths address nested fields; a leading
         `data[].` addresses each item of a list response. Absent means the
         result passes through under the size budget only.
       examples:

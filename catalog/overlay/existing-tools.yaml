@@ -145,12 +145,25 @@ operations:
       Supersedes the deprecated V1 quick create; the curated tool calls it.
 
   # --- services ------------------------------------------------------------
-  get_service_list:
+  # V2 lists services at its own path. The V1 list stays only as a fallback
+  # route for the filters V2 lacks (category, team member). The projection
+  # names fields after the glossary flattens either response: V2 carries the
+  # prices on the location link (`include=company_links`), V1 on the service.
+  list_services:
     domain: services
     tier: core
     facets: [ops, catalog]
     tool_name: services_list
-    projection: [id, title, category_id, price_min, price_max, duration]
+    supersedes: [get_service_list]
+    projection:
+      - id
+      - title
+      - category_id
+      - price_min
+      - price_max
+      - duration
+      - company_links.price_min
+      - company_links.price_max
     write_allowed: false
   create_service:
     domain: services
@@ -192,16 +205,18 @@ operations:
     tool_name: locations_remove_user
     write_allowed: false
     notes: Exact user ID is required twice as a destructive safeguard.
-  deprecated_get_service_category_list:
+  # V2 lists service categories; both V1 listings (which also read one
+  # category by id) stay only as fallback routes. One category by id is the
+  # live V1 `get_service_category`, which V2 lacks.
+  list_service_categories:
     domain: services
     tier: core
     facets: [catalog, onboarding]
     tool_name: service_categories_list
+    supersedes:
+      [deprecated_get_service_category_list, get_service_category_list]
     projection: [id, title, weight]
     write_allowed: false
-    notes: >
-      Deprecated in the spec but the only service-category listing available to
-      this product; keep until a replacement is documented.
 
   # --- schedule ------------------------------------------------------------
   get_team_member_schedule:

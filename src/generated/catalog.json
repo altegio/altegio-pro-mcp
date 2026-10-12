@@ -34,8 +34,8 @@
     "salon_id": "location_id",
     "staff_id": "team_member_id"
   },
-  "operationCount": 360,
-  "curatedCount": 75,
+  "operationCount": 354,
+  "curatedCount": 77,
   "domains": [
     {
       "domain": "analytics",
@@ -115,7 +115,7 @@
     },
     {
       "domain": "products",
-      "operations": 18
+      "operations": 16
     },
     {
       "domain": "resources",
@@ -131,7 +131,7 @@
     },
     {
       "domain": "services",
-      "operations": 32
+      "operations": 28
     },
     {
       "domain": "settings",
@@ -158,7 +158,7 @@
       "operations": 2
     }
   ],
-  "supersededCount": 27,
+  "supersededCount": 33,
   "operations": [
     {
       "source": "v1",
@@ -19724,78 +19724,6 @@
     },
     {
       "source": "v1",
-      "operationId": "get_product_category_list_by_ids",
-      "method": "GET",
-      "path": "/locations/{location_id}/product_categories/multiple",
-      "displayPath": "/locations/{location_id}/product_categories/multiple",
-      "summary": "Get a list of product categories by ID",
-      "tags": [
-        "Products"
-      ],
-      "domain": "products",
-      "deprecated": false,
-      "security": {
-        "required": true,
-        "schemes": [
-          "BearerPartnerUser"
-        ]
-      },
-      "parameters": [
-        {
-          "description": "location ID",
-          "name": "location_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "Product category ID (you can specify several additional parameters &ids[]={id}",
-          "name": "location_id",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "number"
-          }
-        }
-      ],
-      "response": {
-        "contentType": "application/json",
-        "statusCode": "200",
-        "envelope": "v1",
-        "schema": {
-          "description": "Array of objects with data",
-          "items": {
-            "properties": {
-              "id": {
-                "description": "Product category ID",
-                "type": "integer"
-              },
-              "is_chain": {
-                "description": "Whether the category belongs to the chain",
-                "type": "boolean"
-              },
-              "parent_category_id": {
-                "description": "Parent category ID (null for top-level categories)",
-                "type": [
-                  "integer",
-                  "null"
-                ]
-              },
-              "title": {
-                "description": "Product category name",
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "type": "array"
-        }
-      }
-    },
-    {
-      "source": "v1",
       "operationId": "create_product",
       "method": "POST",
       "path": "/locations/{location_id}/products",
@@ -20487,97 +20415,6 @@
             }
           },
           "type": "object"
-        }
-      }
-    },
-    {
-      "source": "v1",
-      "operationId": "search_product",
-      "method": "GET",
-      "path": "/locations/{location_id}/products/search",
-      "displayPath": "/locations/{location_id}/products/search",
-      "summary": "Search products and categories",
-      "description": "### List of products and product categories\r\n\r\nYou can retrieve a list of products and product categories by providing the location ID. Use the `search_term` parameter to filter: \n+ Product categories by name or article \n+ Products by name, article, or barcode \n\nLimit the number of results using the `max_count` parameter.\r\n\r\nIf `search_term` is not provided, the response will return a list of root categories for the specified location. In this case, the `max_count` parameter is ignored. If `search_term` is provided, the system will first search among categories. If fewer than `max_count` results are found, the search will continue among products to fill the remaining count.\r\n\r\nThe result is returned as an array of [products tree elements](#product-category-tree-node).\r\n\r\n<a name=\"product-category-tree-node\"></a>\r\n**Product tree element** has the following structure:\r\n\r\n| Field | Type | Description |\r\n| -------------| ------- | -------------------------------------------------- ----------------------------------------- |\r\n| parent_id | number | Parent element ID (0 for root elements) |\r\n| item_id | number | Item ID (0 if item is a category) |\r\n| category_id | number | Product category ID (0 if the item is a product) |\r\n| title | string | Product name or product category |\r\n| is_chain | boolean | Is the element chain-bound? true - the element is connected to the chain, false - not connected |\r\n| is_category | boolean | Is the element a category? true - category, false - product |\r\n| is_item | boolean | Is the item a product? true - product, false - category |",
-      "tags": [
-        "Products"
-      ],
-      "domain": "products",
-      "deprecated": false,
-      "security": {
-        "required": true,
-        "schemes": [
-          "BearerPartnerUser"
-        ]
-      },
-      "parameters": [
-        {
-          "description": "location ID",
-          "name": "location_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "The number of output lines per page. Maximum 100",
-          "name": "count",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "Search query by name, article number or barcode",
-          "name": "term",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "string"
-          }
-        }
-      ],
-      "response": {
-        "contentType": "application/json",
-        "statusCode": "200",
-        "envelope": "v1",
-        "schema": {
-          "description": "Array with data objects",
-          "items": {
-            "properties": {
-              "category_id": {
-                "description": "Product category ID (0 if the item is a product)",
-                "type": "number"
-              },
-              "is_category": {
-                "description": "Is the element a category? true - category, false - product",
-                "type": "boolean"
-              },
-              "is_chain": {
-                "description": "Is the element chain-bound? true - the element is connected to the chain, false - not connected",
-                "type": "boolean"
-              },
-              "is_item": {
-                "description": "Is the item a product? true - product, false - category",
-                "type": "boolean"
-              },
-              "item_id": {
-                "description": "Item ID (0 if item is a category)",
-                "type": "number"
-              },
-              "parent_id": {
-                "description": "Parent element ID (0 for root elements)",
-                "type": "number"
-              },
-              "title": {
-                "description": "The name of the product or product category",
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "type": "array"
         }
       }
     },
@@ -24925,103 +24762,6 @@
             }
           },
           "type": "object"
-        }
-      }
-    },
-    {
-      "source": "v1",
-      "operationId": "get_service_category_list",
-      "method": "GET",
-      "path": "/locations/{location_id}/service_categories/{id}",
-      "displayPath": "/locations/{location_id}/service_categories/{id}",
-      "summary": "Get a list of service categories",
-      "description": "+ Options\r\n    + company_id (required, number) - location ID\r\n    + id (optional, number) - service category ID (to work with a specific category)\r\n    + staff_id (optional, number) - team member ID (to get categories associated with a team member)",
-      "tags": [
-        "Services"
-      ],
-      "domain": "services",
-      "deprecated": false,
-      "security": {
-        "required": true,
-        "schemes": [
-          "BearerPartnerUser"
-        ]
-      },
-      "parameters": [
-        {
-          "description": "Service Category ID",
-          "name": "id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "location ID",
-          "name": "location_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "Team Member ID (to get categories associated with a Team Member)",
-          "name": "team_member_id",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "number"
-          }
-        }
-      ],
-      "response": {
-        "contentType": "application/json",
-        "statusCode": "200",
-        "envelope": "v1",
-        "schema": {
-          "description": "Array of objects",
-          "items": {
-            "additionalProperties": true,
-            "properties": {
-              "api_id": {
-                "description": "External Category ID",
-                "type": "string"
-              },
-              "id": {
-                "description": "Category ID",
-                "type": "number"
-              },
-              "is_chain": {
-                "description": "Whether category belongs to chain",
-                "type": "boolean"
-              },
-              "salon_service_id": {
-                "description": "Category ID for the location on the chain",
-                "type": "number"
-              },
-              "staff": {
-                "description": "List of team member IDs providing the service",
-                "items": {
-                  "description": "team member ID",
-                  "type": "number",
-                  "x-truncated": true
-                },
-                "type": "array"
-              },
-              "title": {
-                "description": "name of category",
-                "type": "string"
-              },
-              "weight": {
-                "description": "Category weight (used to sort categories when displayed)",
-                "type": "number"
-              }
-            },
-            "type": "object"
-          },
-          "type": "array"
         }
       }
     },
@@ -30707,110 +30447,6 @@
     },
     {
       "source": "v1",
-      "operationId": "deprecated_get_service_category_list",
-      "method": "GET",
-      "path": "/service_categories/{location_id}/{id}",
-      "displayPath": "/service_categories/{location_id}/{id}",
-      "summary": "Deprecated. Get a list of service categories",
-      "description": "Get a list of service categories",
-      "tags": [
-        "Services"
-      ],
-      "domain": "services",
-      "deprecated": true,
-      "security": {
-        "required": true,
-        "schemes": [
-          "BearerPartnerUser"
-        ]
-      },
-      "parameters": [
-        {
-          "description": "Service category identifier",
-          "name": "id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "location ID",
-          "name": "location_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "number"
-          }
-        }
-      ],
-      "response": {
-        "contentType": "application/json",
-        "statusCode": "200",
-        "envelope": "v1",
-        "schema": {
-          "description": "Array of objects",
-          "items": {
-            "additionalProperties": true,
-            "properties": {
-              "api_id": {
-                "description": "External Category ID",
-                "type": "string"
-              },
-              "id": {
-                "description": "Category ID",
-                "type": "number"
-              },
-              "is_chain": {
-                "description": "Whether category belongs to chain",
-                "type": "boolean"
-              },
-              "salon_service_id": {
-                "description": "Category ID for the location on the chain",
-                "type": "number"
-              },
-              "staff": {
-                "description": "List of team member IDs providing the service",
-                "items": {
-                  "description": "team member ID",
-                  "type": "number",
-                  "x-truncated": true
-                },
-                "type": "array"
-              },
-              "title": {
-                "description": "name of category",
-                "type": "string"
-              },
-              "weight": {
-                "description": "Category weight (used to sort categories when displayed)",
-                "type": "number"
-              }
-            },
-            "type": "object"
-          },
-          "type": "array"
-        }
-      },
-      "curation": {
-        "domain": "services",
-        "tier": "core",
-        "facets": [
-          "catalog",
-          "onboarding"
-        ],
-        "tool_name": "service_categories_list",
-        "projection": [
-          "id",
-          "title",
-          "weight"
-        ],
-        "write_allowed": false,
-        "notes": "Deprecated in the spec but the only service-category listing available to this product; keep until a replacement is documented.\n"
-      }
-    },
-    {
-      "source": "v1",
       "operationId": "get_service_category",
       "method": "GET",
       "path": "/service_category/{location_id}/{id}",
@@ -31067,168 +30703,6 @@
     },
     {
       "source": "v1",
-      "operationId": "get_service_list",
-      "method": "GET",
-      "path": "/services/{location_id}",
-      "displayPath": "/services/{location_id}",
-      "summary": "Get a list of services",
-      "description": "Returns a list of all services for the specified location",
-      "tags": [
-        "Services"
-      ],
-      "domain": "services",
-      "deprecated": false,
-      "security": {
-        "required": true,
-        "schemes": [
-          "BearerPartnerUser"
-        ]
-      },
-      "parameters": [
-        {
-          "description": "location ID",
-          "name": "location_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "Category ID, if you want to filter by category",
-          "name": "category_id",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "Filter by the Event flag: 1 - only Services available for Events, 0 - only Services that are not. Omit it to return both.",
-          "name": "is_multi",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "enum": [
-              0,
-              1
-            ],
-            "type": "number"
-          }
-        },
-        {
-          "description": "Team Member ID, if you want to filter by Team Member",
-          "name": "team_member_id",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "number"
-          }
-        }
-      ],
-      "response": {
-        "contentType": "application/json",
-        "statusCode": "200",
-        "envelope": "v1",
-        "schema": {
-          "description": "Array of services",
-          "items": {
-            "additionalProperties": true,
-            "properties": {
-              "active": {
-                "description": "1 - available for online booking, 0 - not available",
-                "type": "number"
-              },
-              "api_id": {
-                "description": "External Service ID",
-                "type": "string"
-              },
-              "booking_title": {
-                "description": "Service name for booking",
-                "type": "string"
-              },
-              "category_id": {
-                "description": "Identifier of the category in which the service consists",
-                "type": "number"
-              },
-              "comment": {
-                "description": "Comment on the service",
-                "type": "string"
-              },
-              "discount": {
-                "description": "Discount percentage",
-                "format": "float",
-                "type": "number"
-              },
-              "duration": {
-                "description": "Service duration in seconds, default is 3600",
-                "format": "float",
-                "type": "number"
-              },
-              "id": {
-                "description": "Service ID",
-                "type": "number"
-              },
-              "price_max": {
-                "description": "Maximum price for the service",
-                "format": "float",
-                "type": "number"
-              },
-              "price_min": {
-                "description": "Minimum price for the service",
-                "format": "float",
-                "type": "number"
-              },
-              "salon_service_id": {
-                "description": "Service ID for a location on the chain",
-                "type": "number"
-              },
-              "technical_break_duration": {
-                "description": "Technical break duration in seconds. - null = use location default - Value in multiples of 300 (5-minute intervals)",
-                "oneOf": [
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "title": {
-                "description": "Service name",
-                "type": "string"
-              },
-              "weight": {
-                "description": "Service weight (used to sort categories when displayed)",
-                "type": "number"
-              }
-            },
-            "type": "object"
-          },
-          "type": "array"
-        }
-      },
-      "curation": {
-        "domain": "services",
-        "tier": "core",
-        "facets": [
-          "ops",
-          "catalog"
-        ],
-        "tool_name": "services_list",
-        "projection": [
-          "id",
-          "title",
-          "category_id",
-          "price_min",
-          "price_max",
-          "duration"
-        ],
-        "write_allowed": false
-      }
-    },
-    {
-      "source": "v1",
       "operationId": "create_service",
       "method": "POST",
       "path": "/services/{location_id}",
@@ -31459,129 +30933,6 @@
         ],
         "tool_name": "services_create",
         "write_allowed": false
-      }
-    },
-    {
-      "source": "v1",
-      "operationId": "deprecated_get_service_list_by_id",
-      "method": "GET",
-      "path": "/services/{location_id}/{service_id}",
-      "displayPath": "/services/{location_id}/{service_id}",
-      "summary": "Deprecated. Get a list of services / specific service",
-      "tags": [
-        "Services"
-      ],
-      "domain": "services",
-      "deprecated": true,
-      "security": {
-        "required": true,
-        "schemes": [
-          "BearerPartnerUser"
-        ]
-      },
-      "parameters": [
-        {
-          "description": "location ID",
-          "name": "location_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "Service ID, if you need to work with a specific service.",
-          "name": "service_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "Category ID, if you want to filter by category",
-          "name": "category_id",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "number"
-          }
-        },
-        {
-          "description": "Team Member ID, if you want to filter by Team Member",
-          "name": "team_member_id",
-          "in": "query",
-          "required": false,
-          "schema": {
-            "type": "number"
-          }
-        }
-      ],
-      "response": {
-        "contentType": "application/json",
-        "statusCode": "200",
-        "envelope": "v1",
-        "schema": {
-          "additionalProperties": true,
-          "description": "Service data object",
-          "properties": {
-            "active": {
-              "description": "1 - available for online booking, 0 - not available",
-              "type": "number"
-            },
-            "api_id": {
-              "description": "External Service ID",
-              "type": "string"
-            },
-            "category_id": {
-              "description": "Identifier of the category in which the service consists",
-              "type": "number"
-            },
-            "comment": {
-              "description": "Comment on the service",
-              "type": "string"
-            },
-            "discount": {
-              "description": "Discount",
-              "format": "float",
-              "type": "number"
-            },
-            "id": {
-              "description": "Service ID",
-              "type": "number"
-            },
-            "price_max": {
-              "description": "Maximum price for the service",
-              "format": "float",
-              "type": "number"
-            },
-            "price_min": {
-              "description": "Minimum price for the service",
-              "format": "float",
-              "type": "number"
-            },
-            "salon_service_id": {
-              "description": "Service ID for a location on the chain",
-              "type": "number"
-            },
-            "staff": {
-              "description": "List of team members providing the service and session duration",
-              "items": {
-                "type": "object"
-              },
-              "type": "array"
-            },
-            "title": {
-              "description": "Service name",
-              "type": "string"
-            },
-            "weight": {
-              "description": "Service weight (used to sort categories when displayed)",
-              "type": "number"
-            }
-          },
-          "type": "object"
-        }
       }
     },
     {
@@ -48430,7 +47781,8 @@
       "curation": {
         "domain": "products",
         "supersedes": [
-          "get_product_category_list"
+          "get_product_category_list",
+          "get_product_category_list_by_ids"
         ]
       }
     },
@@ -49355,6 +48707,12 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "products",
+        "supersedes": [
+          "search_product"
+        ]
       }
     },
     {
@@ -49596,6 +48954,25 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "services",
+        "tier": "core",
+        "facets": [
+          "catalog",
+          "onboarding"
+        ],
+        "tool_name": "service_categories_list",
+        "projection": [
+          "id",
+          "title",
+          "weight"
+        ],
+        "write_allowed": false,
+        "supersedes": [
+          "deprecated_get_service_category_list",
+          "get_service_category_list"
+        ]
       }
     },
     {
@@ -49848,6 +49225,29 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "services",
+        "tier": "core",
+        "facets": [
+          "ops",
+          "catalog"
+        ],
+        "tool_name": "services_list",
+        "projection": [
+          "id",
+          "title",
+          "category_id",
+          "price_min",
+          "price_max",
+          "duration",
+          "company_links.price_min",
+          "company_links.price_max"
+        ],
+        "write_allowed": false,
+        "supersedes": [
+          "get_service_list"
+        ]
       }
     },
     {
@@ -50123,6 +49523,12 @@
           ],
           "type": "object"
         }
+      },
+      "curation": {
+        "domain": "services",
+        "supersedes": [
+          "deprecated_get_service_list_by_id"
+        ]
       }
     },
     {
@@ -62338,6 +61744,80 @@
     },
     {
       "source": "v1",
+      "operationId": "deprecated_get_service_category_list",
+      "method": "GET",
+      "path": "/service_categories/{location_id}/{id}",
+      "parameters": [
+        {
+          "description": "Service category identifier",
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        }
+      ],
+      "supersededBy": "list_service_categories",
+      "reason": "declared"
+    },
+    {
+      "source": "v1",
+      "operationId": "deprecated_get_service_list_by_id",
+      "method": "GET",
+      "path": "/services/{location_id}/{service_id}",
+      "parameters": [
+        {
+          "description": "location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Service ID, if you need to work with a specific service.",
+          "name": "service_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Category ID, if you want to filter by category",
+          "name": "category_id",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Team Member ID, if you want to filter by Team Member",
+          "name": "team_member_id",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        }
+      ],
+      "supersededBy": "get_service",
+      "reason": "declared"
+    },
+    {
+      "source": "v1",
       "operationId": "duplicate_event",
       "method": "POST",
       "path": "/locations/{location_id}/events/{event_id}/duplicate",
@@ -62512,6 +61992,26 @@
       "operationId": "get_custom_field_list",
       "method": "GET",
       "path": "/custom_fields/{field_category}/{location_id}",
+      "parameters": [
+        {
+          "description": "Field category.<br>",
+          "name": "field_category",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
       "supersededBy": "list_custom_fields",
       "reason": "declared"
     },
@@ -62536,6 +62036,53 @@
       "operationId": "get_event_search_filters",
       "method": "GET",
       "path": "/locations/{location_id}/events/filters",
+      "parameters": [
+        {
+          "description": "ID of a location.",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Filter by resources IDs; repeat `resource_ids[]` once per ID.",
+          "name": "resource_ids[]",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "description": "Filter by services IDs; repeat `service_ids[]` once per ID.",
+          "name": "service_ids[]",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "description": "Filter by Team Member IDs; repeat `team_member_ids[]` once per ID.",
+          "name": "team_member_ids[]",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        }
+      ],
       "supersededBy": "list_event_filters",
       "reason": "declared"
     },
@@ -62544,6 +62091,17 @@
       "operationId": "get_position_list",
       "method": "GET",
       "path": "/locations/{location_id}/team_members/positions",
+      "parameters": [
+        {
+          "description": "location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        }
+      ],
       "supersededBy": "list_positions",
       "reason": "declared"
     },
@@ -62560,6 +62118,54 @@
       "operationId": "get_product_category_list",
       "method": "GET",
       "path": "/company/{location_id}/goods_categories/{parent_category_id}",
+      "parameters": [
+        {
+          "description": "location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "ID of the parent product category",
+          "name": "parent_category_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        }
+      ],
+      "supersededBy": "list_product_categories",
+      "reason": "declared"
+    },
+    {
+      "source": "v1",
+      "operationId": "get_product_category_list_by_ids",
+      "method": "GET",
+      "path": "/locations/{location_id}/product_categories/multiple",
+      "parameters": [
+        {
+          "description": "location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Product category ID (you can specify several additional parameters &ids[]={id}",
+          "name": "location_id",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        }
+      ],
       "supersededBy": "list_product_categories",
       "reason": "declared"
     },
@@ -62568,6 +62174,17 @@
       "operationId": "get_products_list",
       "method": "GET",
       "path": "/locations/{location_id}/products",
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        }
+      ],
       "supersededBy": "list_products",
       "reason": "declared"
     },
@@ -62581,9 +62198,122 @@
     },
     {
       "source": "v1",
+      "operationId": "get_service_category_list",
+      "method": "GET",
+      "path": "/locations/{location_id}/service_categories/{id}",
+      "parameters": [
+        {
+          "description": "Service Category ID",
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Team Member ID (to get categories associated with a Team Member)",
+          "name": "team_member_id",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        }
+      ],
+      "supersededBy": "list_service_categories",
+      "reason": "declared"
+    },
+    {
+      "source": "v1",
+      "operationId": "get_service_list",
+      "method": "GET",
+      "path": "/services/{location_id}",
+      "parameters": [
+        {
+          "description": "location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Category ID, if you want to filter by category",
+          "name": "category_id",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Filter by the Event flag: 1 - only Services available for Events, 0 - only Services that are not. Omit it to return both.",
+          "name": "is_multi",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "enum": [
+              0,
+              1
+            ],
+            "type": "number"
+          }
+        },
+        {
+          "description": "Team Member ID, if you want to filter by Team Member",
+          "name": "team_member_id",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        }
+      ],
+      "supersededBy": "list_services",
+      "reason": "declared"
+    },
+    {
+      "source": "v1",
       "operationId": "get_tag_list_by_entity",
       "method": "GET",
       "path": "/labels/{location_id}/{entity}",
+      "parameters": [
+        {
+          "description": "Tag type alias",
+          "name": "entity",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "enum": [
+              "common",
+              "client",
+              "record",
+              "activity"
+            ],
+            "type": "string"
+          }
+        },
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
       "supersededBy": "list_tags",
       "reason": "declared"
     },
@@ -62592,6 +62322,17 @@
       "operationId": "get_team_member_list",
       "method": "GET",
       "path": "/locations/{location_id}/team_members",
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
       "supersededBy": "list_team_members",
       "reason": "declared"
     },
@@ -62608,6 +62349,71 @@
       "operationId": "search_event_dates",
       "method": "GET",
       "path": "/locations/{location_id}/events/search_dates",
+      "parameters": [
+        {
+          "description": "ID of a location.",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Search start date (YYYY-MM-DD format).",
+          "name": "from",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "Filter by resources IDs; repeat `resource_ids[]` once per ID.",
+          "name": "resource_ids[]",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "description": "Filter by services IDs; repeat `service_ids[]` once per ID.",
+          "name": "service_ids[]",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "description": "Filter by Team Member IDs; repeat `team_member_ids[]` once per ID.",
+          "name": "team_member_ids[]",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "description": "Search end date (YYYY-MM-DD format).",
+          "name": "till",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
       "supersededBy": "list_event_dates",
       "reason": "declared"
     },
@@ -62616,7 +62422,127 @@
       "operationId": "search_events",
       "method": "GET",
       "path": "/locations/{location_id}/events/search",
+      "parameters": [
+        {
+          "description": "ID of a location.",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Page size (default 25).",
+          "name": "count",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Search start date (YYYY-MM-DD format).",
+          "name": "from",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "Page number (default 1).",
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Filter by resources IDs; repeat `resource_ids[]` once per ID.",
+          "name": "resource_ids[]",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "description": "Filter by services IDs; repeat `service_ids[]` once per ID.",
+          "name": "service_ids[]",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "description": "Filter by Team Member IDs; repeat `team_member_ids[]` once per ID.",
+          "name": "team_member_ids[]",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "description": "Search end date (YYYY-MM-DD format).",
+          "name": "till",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
       "supersededBy": "list_events",
+      "reason": "declared"
+    },
+    {
+      "source": "v1",
+      "operationId": "search_product",
+      "method": "GET",
+      "path": "/locations/{location_id}/products/search",
+      "parameters": [
+        {
+          "description": "location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "The number of output lines per page. Maximum 100",
+          "name": "count",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "description": "Search query by name, article number or barcode",
+          "name": "term",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "supersededBy": "autocomplete_products",
       "reason": "declared"
     },
     {

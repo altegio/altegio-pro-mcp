@@ -42,11 +42,8 @@ describe('api_call_operation', () => {
         data: [
           {
             id: 11,
-            title: 'Haircut',
-            category_id: 3,
-            price_min: 10,
-            price_max: 20,
-            duration: 3600,
+            title: 'Chair 1',
+            capacity: 2,
             image: 'https://example.test/a.png',
             comment: '<p>notes</p>',
           },
@@ -54,31 +51,24 @@ describe('api_call_operation', () => {
         meta: { total_count: 1 },
       });
 
-      const result = await callOperation(client, 'get_service_list', {
+      const result = await callOperation(client, 'get_resource_list', {
         location_id: 4564,
       });
 
-      expect(fetchedUrl()).toBe('https://api.alteg.io/api/v1/services/4564');
+      expect(fetchedUrl()).toBe('https://api.alteg.io/api/v1/resources/4564');
       expect(result.structuredContent).toMatchObject({
-        operation_id: 'get_service_list',
+        operation_id: 'get_resource_list',
         method: 'GET',
-        path: '/services/4564',
+        path: '/resources/4564',
         meta: { total_count: 1 },
       });
 
-      // The overlay projection for this operation drops image/comment.
+      // The overlay projection for this operation keeps id and title only.
       expect(result.structuredContent.data).toEqual([
-        {
-          id: 11,
-          title: 'Haircut',
-          category_id: 3,
-          price_min: 10,
-          price_max: 20,
-          duration: 3600,
-        },
+        { id: 11, title: 'Chair 1' },
       ]);
       expect(result.structuredContent.projection_applied).toBeDefined();
-      expect(result.text).toContain('GET /services/4564');
+      expect(result.text).toContain('GET /resources/4564');
       expect(result.text).toContain('1 item');
     });
 
@@ -152,6 +142,113 @@ describe('api_call_operation', () => {
       expect(result.structuredContent.path).toBe(
         '/locations/4564/appointments'
       );
+    });
+
+    it('serves the V1 service list id as the V2 list, projected to the glossary fields', async () => {
+      mockOk({
+        data: [
+          {
+            type: 'service',
+            id: '11',
+            attributes: { title: 'Haircut', category_id: 3 },
+            relationships: {
+              company_links: { data: [{ type: 'company_link', id: '5' }] },
+            },
+          },
+        ],
+        included: [
+          {
+            type: 'company_link',
+            id: '5',
+            attributes: {
+              company_id: 4564,
+              service_id: 11,
+              composite_service_id: null,
+              price_min: 10,
+              price_max: 20,
+            },
+          },
+        ],
+      });
+
+      const result = await callOperation(client, 'get_service_list', {
+        location_id: 4564,
+        include: ['company_links'],
+      });
+
+      expect(new URL(fetchedUrl()).pathname).toBe(
+        '/api/v2/locations/4564/services'
+      );
+      expect(result.structuredContent.operation_id).toBe('list_services');
+      expect(result.structuredContent.notices).toEqual([
+        expect.stringContaining(
+          '`get_service_list` is an older id of `list_services`'
+        ),
+      ]);
+      // The same allowlist fits the flattened V2 resource and its location link.
+      expect(result.structuredContent.data).toEqual([
+        {
+          id: 11,
+          title: 'Haircut',
+          category_id: 3,
+          company_links: [{ price_min: 10, price_max: 20 }],
+        },
+      ]);
+    });
+
+    it('routes a filter only V1 has to the twin at its own path, reporting the canonical one', async () => {
+      mockOk({
+        success: true,
+        data: [
+          {
+            id: 11,
+            title: 'Haircut',
+            category_id: 3,
+            price_min: 10,
+            price_max: 20,
+            duration: 3600,
+            comment: '<p>notes</p>',
+          },
+        ],
+      });
+
+      const result = await callOperation(client, 'list_services', {
+        location_id: 4564,
+        category_id: 3,
+      });
+
+      const url = new URL(fetchedUrl());
+      expect(url.pathname).toBe('/api/v1/services/4564');
+      expect(url.searchParams.get('category_id')).toBe('3');
+      expect(result.structuredContent).toMatchObject({
+        operation_id: 'list_services',
+        path: '/locations/4564/services',
+      });
+      expect(result.text).toContain('GET /locations/4564/services');
+      expect(result.text).not.toContain('/services/4564');
+      expect(result.structuredContent.data).toEqual([
+        {
+          id: 11,
+          title: 'Haircut',
+          category_id: 3,
+          price_min: 10,
+          price_max: 20,
+          duration: 3600,
+        },
+      ]);
+    });
+
+    it('keeps the canonical route when a twin needs a path value the call lacks', async () => {
+      mockOk({ data: [] });
+
+      await callOperation(client, 'list_service_categories', {
+        location_id: 4564,
+        team_member_id: 7,
+      });
+
+      const url = new URL(fetchedUrl());
+      expect(url.pathname).toBe('/api/v2/locations/4564/service_categories');
+      expect(url.searchParams.get('filter[staff_id]')).toBe('7');
     });
 
     it('asks for a bounded page when the caller names no page size', async () => {
@@ -378,12 +475,12 @@ describe('api_call_operation', () => {
     });
 
     it('sends the spec spelling of a query parameter', () => {
-      const op = getOperation('get_service_list');
+      const op = getOperation('search_event_services');
       const built = buildRequest(op!, {
         location_id: 4564,
         team_member_id: 11,
       });
-      expect(built.path).toBe('/services/4564');
+      expect(built.path).toBe('/locations/4564/events/services');
       expect(built.query).toEqual({ team_member_id: 11 });
       expect(built.warnings).toEqual([]);
     });
@@ -415,10 +512,10 @@ describe('api_call_operation', () => {
   describe('parameter validation', () => {
     it('refuses a call missing a required parameter', async () => {
       await expect(
-        callOperation(client, 'get_service_list', {})
+        callOperation(client, 'get_resource_list', {})
       ).rejects.toThrow(ExecutorRefusalError);
       await expect(
-        callOperation(client, 'get_service_list', {})
+        callOperation(client, 'get_resource_list', {})
       ).rejects.toThrow(/missing required: location_id/);
       expect(global.fetch).not.toHaveBeenCalled();
     });
@@ -431,7 +528,7 @@ describe('api_call_operation', () => {
 
     it('refuses a value of the wrong type', async () => {
       await expect(
-        callOperation(client, 'get_service_list', {
+        callOperation(client, 'get_resource_list', {
           location_id: 'not-a-number',
         })
       ).rejects.toThrow(/`location_id` must be number/);
@@ -440,24 +537,24 @@ describe('api_call_operation', () => {
 
     it('accepts a numeric string for an integer parameter', async () => {
       mockOk({ success: true, data: [] });
-      await callOperation(client, 'get_service_list', {
+      await callOperation(client, 'get_resource_list', {
         location_id: '4564',
       });
-      expect(fetchedUrl()).toBe('https://api.alteg.io/api/v1/services/4564');
+      expect(fetchedUrl()).toBe('https://api.alteg.io/api/v1/resources/4564');
     });
 
     it('points at describe_operation when arguments do not fit', async () => {
       await expect(
-        callOperation(client, 'get_service_list', {})
+        callOperation(client, 'get_resource_list', {})
       ).rejects.toThrow(/api_describe_operation/);
     });
 
     it('forwards an undocumented parameter and says so', async () => {
       mockOk({ success: true, data: [] });
 
-      // The V1 spec does not document page/count on /services/{location_id},
-      // although the API honours them — refusing would block paging.
-      const result = await callOperation(client, 'get_service_list', {
+      // The V1 spec does not document page/count on /resources/{location_id};
+      // refusing an argument the API may honour would block paging.
+      const result = await callOperation(client, 'get_resource_list', {
         location_id: 4564,
         count: 30,
       });
@@ -685,15 +782,11 @@ describe('api_call_operation', () => {
         success: true,
         data: Array.from({ length: 3000 }, (_, i) => ({
           id: i,
-          title: `Service ${i} with a long enough title`,
-          category_id: 1,
-          price_min: 10,
-          price_max: 20,
-          duration: 3600,
+          title: `Resource ${i} with a long enough title to fill the budget`,
         })),
       });
 
-      const result = await callOperation(client, 'get_service_list', {
+      const result = await callOperation(client, 'get_resource_list', {
         location_id: 4564,
       });
 
@@ -804,7 +897,7 @@ describe('api_call_operation', () => {
 
     it('keeps the whole result when it fits', async () => {
       mockOk({ success: true, data: [{ id: 1, name: 'Ann' }] });
-      const result = await callOperation(client, 'get_service_list', {
+      const result = await callOperation(client, 'get_resource_list', {
         location_id: 4564,
       });
       expect(result.structuredContent.truncated).toBeUndefined();
@@ -821,7 +914,7 @@ describe('api_call_operation', () => {
       });
 
       await expect(
-        callOperation(client, 'get_service_list', { location_id: 1 })
+        callOperation(client, 'get_resource_list', { location_id: 1 })
       ).rejects.toThrow(/Verify the ID is correct/);
     });
 
@@ -831,7 +924,7 @@ describe('api_call_operation', () => {
         '/tmp/altegio-executor-test-anon'
       );
       await expect(
-        callOperation(anonymous, 'get_service_list', { location_id: 4564 })
+        callOperation(anonymous, 'get_resource_list', { location_id: 4564 })
       ).rejects.toThrow(/Not authenticated/);
     });
   });

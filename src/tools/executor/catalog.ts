@@ -121,8 +121,9 @@ export interface SupersededOperation {
    */
   reason: string;
   /**
-   * A `same-path` twin's own parameters: the executor routes a call that needs
-   * a filter only the twin documents to the twin (V1 as a fallback).
+   * A retired read's own parameters (`same-path` twins and declared GET
+   * twins): the executor routes a call that needs a filter only the twin
+   * documents to the twin (V1 as a fallback).
    */
   parameters?: CatalogParameter[];
 }
@@ -231,7 +232,7 @@ export function resolveOperation(
 const fallbacksBySurvivor = (() => {
   const out = new Map<string, CatalogOperation[]>();
   for (const entry of catalog.superseded ?? []) {
-    if (entry.reason !== 'same-path' || !entry.parameters) continue;
+    if (!entry.parameters) continue;
     const survivor = getOperation(entry.supersededBy);
     if (!survivor || !isLiveSource(entry.source)) continue;
     const fallback: CatalogOperation = {
@@ -255,9 +256,10 @@ const fallbacksBySurvivor = (() => {
 })();
 
 /**
- * The retired same-path twins that still serve a canonical operation's
- * capability where it lacks a filter (V1 behind V2, product decision of
- * 2026-09-29). Internal: the model only ever sees the canonical operation.
+ * The retired twins that still serve a canonical operation's capability where
+ * it lacks a filter (V1 behind V2, product decision of 2026-09-29), whether
+ * they share its path or not. Internal: the model only ever sees the
+ * canonical operation.
  */
 export function fallbacksFor(
   op: CatalogOperation
