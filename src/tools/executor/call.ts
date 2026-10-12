@@ -35,6 +35,7 @@ import {
 } from '../tool-result.js';
 import { CONTACTS_WITHHELD_NOTICE } from '../contacts.js';
 import {
+  QUERY_ALIASES,
   acceptedParamNames,
   exposedParamName,
   isArrayWireName,
@@ -442,7 +443,15 @@ function chooseRoute(
 ): CatalogOperation {
   const fallbacks = fallbacksFor(op);
   if (fallbacks.length === 0) return op;
-  const supplied = Object.keys(params).filter((key) => has(params, key));
+  // Paging goes to every route — an undocumented page size is forwarded in
+  // the route's own spelling (`buildRequest`) — so it never decides one.
+  const supplied = Object.keys(params).filter(
+    (key) =>
+      has(params, key) &&
+      key !== 'page' &&
+      key !== 'page_size' &&
+      QUERY_ALIASES[key] !== 'page_size'
+  );
   const unknownTo = (route: CatalogOperation): number => {
     const bindable = bindableKeys(route, params);
     return supplied.filter((key) => !bindable.has(key)).length;
