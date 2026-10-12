@@ -25,13 +25,7 @@ import {
 
 // ========== shared input pieces ==========
 
-const locationId = z
-  .number()
-  .int()
-  .positive()
-  .describe(
-    'Location whose client base to work with. Call locations_list when the id is unknown.'
-  );
+const locationId = z.number().int().positive().describe('From locations_list.');
 
 // ========== output schema pieces ==========
 
@@ -55,7 +49,7 @@ export const clientsSearchTool = defineTool({
   name: 'clients_search',
   category: 'Clients',
   description:
-    'Segment the client base of one location and count the segment. This is the client-base analytics engine: filter by lifetime spend, visit count and recency, loyalty importance, tags, gender, birthday, age, memberships, gift cards, client-account balance, mobile-app and marketing consent, and — most powerfully — by appointment history with a team member, service or category, a status, a count, an amount and an `exclude` flag that turns the filter into a lapsed / win-back segment. Returns the total match count plus a page of clients (id and name), orderable by total_spent, visit_count, first/last visit date. Use it for "how many VIP clients do we have", "clients who spent over X", "clients with no visit in 90 days", "who has an active membership", "birthdays this month for a campaign". For one client’s full card use clients_get_card; for one client’s visit history use clients_get_visit_history; for per-client predicted revenue use analytics_get_client_forecast, and for the aggregate forecast use analytics_get_forecast. Needs access to clients in this location.',
+    'Segment and count the client base of one location — the client analytics engine. Filter by lifetime spend, visits, loyalty, tags, gender, birthday, age, memberships, gift cards, balance, consent and appointment history (team member, service, outcome, count, amount; exclude=true for lapsed / win-back). Returns the exact count and a page of ids and names, orderable by total_spent, visit_count or visit dates. Next: clients_get_card, clients_get_visit_history.',
   annotations: { title: 'Clients: segment the client base', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -78,7 +72,7 @@ export const clientsSearchTool = defineTool({
       ])
       .optional()
       .describe(
-        'Sort field. Use total_spent or visit_count with order_direction=desc for the top clients.'
+        'Sort field; total_spent or visit_count with desc for top clients.'
       ),
     order_direction: z.enum(['asc', 'desc']).optional(),
     page: pageArg,
@@ -87,7 +81,7 @@ export const clientsSearchTool = defineTool({
       .array(z.string())
       .optional()
       .describe(
-        'Advanced: extra client fields to return per row beyond id and name. Leave unset for a reliable id+name list; the total count is always returned. Contact fields (phone, email) are dropped from this list unless include_contacts is true.'
+        'Advanced: extra fields per row beyond id and name; contacts need include_contacts.'
       ),
     include_contacts: includeContactsArg,
   }),
@@ -118,7 +112,7 @@ export const clientsGetSegmentReportTool = defineTool({
   name: 'clients_get_segment_report',
   category: 'Clients',
   description:
-    'A paged client-base report from one API request: each matching client’s id and name, first and last arrived-visit dates, lifetime sold amount, arrived-visit count, discount and client-account balance. Filter with the same model as clients_search, then order by total_spent or visit_count to find high-value clients without fetching every client card. The money and visit values are lifetime client-base measures, not revenue for the filter period. Returns an exact segment count and at most 200 rows per page; page totals must not be presented as whole-base totals. Contact details are never included. Needs access to clients in this location.',
+    'Paged client-base report: per client id, name, first and last arrived visit, lifetime sales, visit count, discount and balance. Same filters as clients_search; order by total_spent or visit_count. Values are lifetime, not for a period; page totals are not base totals. Exact count, up to 200 rows per page, no contacts.',
   annotations: { title: 'Clients: client segment report', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -180,7 +174,7 @@ export const clientsListProfilesTool = defineTool({
   name: 'clients_list_profiles',
   category: 'Clients',
   description:
-    'Read a page of full client profiles in ascending client-id order, with tags, loyalty card, birthday, comments, lifetime spent and paid amounts, visit count and client-account balance. Supports name/contact/card, client-id, lifetime total-paid range (total_paid_min/total_paid_max) and last-changed filters. Returns exact total count and up to 50 profiles per page. Standard phone and email fields require include_contacts; custom fields require include_custom_fields. This older client-list API has simpler filtering than clients_search: use clients_search for loyalty or appointment-history segments, then pass its ids here to fetch their full profiles. Needs edit-location and client-base access.',
+    'A page of full client profiles by ascending id: tags, loyalty card, birthday, comments, lifetime spent and paid, visits, balance. Filters: name/contact/card, client ids, total_paid_min/max, change time. Up to 50 per page with exact total. Contacts need include_contacts, custom fields include_custom_fields. For segments use clients_search, then fetch profiles by id here.',
   annotations: { title: 'Clients: list full profiles', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -204,16 +198,14 @@ export const clientsListProfilesTool = defineTool({
       .int()
       .positive()
       .optional()
-      .describe(
-        'Lowest lifetime total_paid to include, inclusive, in major units. Whole number, at least 1.'
-      ),
+      .describe('Lowest lifetime total_paid, major units, inclusive.'),
     total_paid_max: z
       .number()
       .int()
       .positive()
       .optional()
       .describe(
-        'Highest lifetime total_paid to include, inclusive, in major units. Whole number, at least 1; with only this bound, clients who paid nothing are included.'
+        'Highest lifetime total_paid, major units, inclusive (alone it includes clients who paid nothing).'
       ),
     changed_after: z.string().datetime({ offset: true }).optional(),
     changed_before: z.string().datetime({ offset: true }).optional(),
@@ -221,9 +213,7 @@ export const clientsListProfilesTool = defineTool({
     include_custom_fields: z
       .boolean()
       .optional()
-      .describe(
-        'Include location-defined client fields in each profile (default false).'
-      ),
+      .describe('Include location-defined client fields.'),
   }),
   outputSchema: objectSchema({
     location_id: { type: 'integer' as const },
@@ -274,7 +264,7 @@ export const clientsGetCardTool = defineTool({
   name: 'clients_get_card',
   category: 'Clients',
   description:
-    'The full card of one client: name, loyalty importance and discount, lifetime money spent, client-account balance, visit count, tags, birthday-greeting and campaign-exclusion flags, and custom fields. Phone and email are withheld unless you pass include_contacts: true. Use it after clients_search or clients_lookup gives you a client id. For the client’s visit-by-visit history use clients_get_visit_history. Needs access to clients in this location.',
+    'One client’s full card: loyalty importance and discount, lifetime spend, balance, visit count, tags, greeting and campaign flags, custom fields. Contacts need include_contacts. Visit by visit: clients_get_visit_history.',
   annotations: { title: 'Clients: client card', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -282,7 +272,7 @@ export const clientsGetCardTool = defineTool({
       .number()
       .int()
       .positive()
-      .describe('Client id, from clients_search or clients_lookup.'),
+      .describe('From clients_search or clients_lookup.'),
     include_contacts: includeContactsArg,
   }),
   outputSchema: objectSchema({
@@ -320,7 +310,7 @@ export const clientsGetVisitHistoryTool = defineTool({
   name: 'clients_get_visit_history',
   category: 'Clients',
   description:
-    'One client’s visit and purchase history, visit by visit: date, outcome (arrived, no_show, waiting, confirmed), the team member, the services and products with their cost, and how much was sold and paid. Identify the client by client_id or client_phone. Filter by date window, by payment status (unpaid, partly_paid, fully_paid, overpaid) and by outcome. Results are newest first and paged by date: pass pagination.next_date_to as date_to to get the previous page. Use it for "what has this client bought", "does this client have unpaid visits", "when did they last come". For a base-wide segment use clients_search. Needs access to clients in this location.',
+    'One client’s visits, newest first: date, outcome, team member, services and products with cost, sold and paid. Identify by client_id or client_phone; filter by dates, payment status and outcome. Paged by date: pass pagination.next_date_to as date_to.',
   annotations: { title: 'Clients: visit history', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -390,7 +380,7 @@ export const clientsLookupTool = defineTool({
   name: 'clients_lookup',
   category: 'Clients',
   description:
-    'Fast typeahead lookup of a client by a name fragment (also matches walk-in "comers"). Returns a short list of id and name; the phone is withheld unless you pass include_contacts: true. Use it to resolve a name to a client id before clients_get_card or clients_get_visit_history. For a filtered, countable segment of the whole base use clients_search instead. Needs access to clients in this location.',
+    'Typeahead: client ids and names for a name fragment (walk-ins included); phone needs include_contacts. For counted segments use clients_search.',
   annotations: { title: 'Clients: quick lookup', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -427,7 +417,7 @@ export const clientsDeleteTool = defineTool({
   name: 'clients_delete',
   category: 'Clients',
   description:
-    'Permanently delete one specifically identified client from one location. AUTHENTICATION REQUIRED. Resolve and verify the exact client ID with clients_lookup or clients_get_card first; this is not a bulk cleanup operation.',
+    'Permanently delete one specifically identified client from one location. Resolve and verify the exact client ID with clients_lookup or clients_get_card first; this is not a bulk cleanup operation.',
   annotations: {
     title: 'Clients: Delete One Client',
     destructiveHint: true,

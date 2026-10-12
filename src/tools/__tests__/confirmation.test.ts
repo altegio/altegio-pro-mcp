@@ -281,13 +281,60 @@ describe('gate on a host WITHOUT elicitation', () => {
   it('performs nothing on the first call and returns the consequences plus a token', async () => {
     const result = await gate(ARGS, runtime());
     expect(result).toBeDefined();
-    expect(result?.isError).toBe(true);
+    // Waiting for a person is not a failure: hosts that read an error as
+    // "try something else" looped on it.
+    expect(result?.isError).toBeUndefined();
 
     const text = result!.content[0]!.text!;
-    expect(text).toContain('nothing was changed yet');
+    expect(text).toContain('nothing was changed');
     expect(text).toContain('client 5 at location 4564');
     expect(text).toContain('The whole client card leaves the base.');
-    expect(tokenFrom(text)).toBeTruthy();
+    const token = tokenFrom(text);
+    expect(result?.structuredContent).toMatchObject({
+      status: 'confirmation_required',
+      changed: false,
+      tool: 'clients_delete',
+      [CONFIRMATION_TOKEN_ARG]: token,
+    });
+    const { expires_at } = result!.structuredContent as { expires_at: string };
+    expect(Date.parse(expires_at)).toBeGreaterThan(Date.now());
+  });
+
+  it('accepts the repeat with cosmetic differences, but not a different target', async () => {
+    const prepareNormalized = prepareConfirmation<DemoInput>(spec, (args) => {
+      const raw = args as Record<string, unknown>;
+      const location_id = Number(raw.location_id);
+      const client_id = Number(raw.client_id);
+      return Number.isInteger(location_id) && Number.isInteger(client_id)
+        ? { location_id, client_id }
+        : undefined;
+    });
+    const run = (args: Record<string, unknown>) =>
+      requireConfirmation({
+        toolName: 'clients_delete',
+        args,
+        prepared: prepareNormalized(args)!,
+        client,
+        runtime: runtime(),
+      });
+    const first = await run({ location_id: 4564, client_id: 5 });
+    const token = tokenFrom(first!.content[0]!.text!);
+
+    // The same call spelled differently: string ids, a null optional.
+    await expect(
+      run({
+        location_id: '4564',
+        client_id: '5',
+        comment: null,
+        [CONFIRMATION_TOKEN_ARG]: token,
+      })
+    ).resolves.toBeUndefined();
+    const other = await run({
+      location_id: 4564,
+      client_id: 7,
+      [CONFIRMATION_TOKEN_ARG]: token,
+    });
+    expect(other?.isError).toBe(true);
   });
 
   it('lets the repeated call through when it carries that token', async () => {

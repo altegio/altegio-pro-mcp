@@ -13,7 +13,7 @@ export const getStaffTool = defineTool({
   name: 'team_members_list',
   category: 'Team members',
   description:
-    'List the team members of a location with their position, rating, online-booking visibility and dismissal state. Paged and ordered by id: 25 per page by default; pagination.total is exact and pagination.next_page is null on the last page.',
+    'Team members of a location: position, rating, online-booking visibility, dismissal. Paged by id with exact total.',
   annotations: {
     title: 'List Team Members',
     readOnlyHint: true,
@@ -84,7 +84,7 @@ export const createStaffTool = defineTool({
   name: 'team_members_create',
   category: 'Team members',
   description:
-    'Create a team member. Required: name, specialization, position_id, has_paid_seat and has_schedule_access. Ask the location owner for has_paid_seat and has_schedule_access and never choose them yourself: on per-seat licensing a paid seat is billed, and only a paid team member can be in the work schedule. A team member needs has_schedule_access=true to get working hours or appointments. Omit user_email and user_phone to create a team member without a user account; pass them to link an existing Altegio user, or add invite_user=true to invite that person (the API refuses an unknown email or phone without an invitation). This call stores no contact phone for the team member.',
+    'Create a team member. Ask the owner for has_paid_seat and has_schedule_access, never choose them: a paid seat is billed on per-seat licensing, and only schedule access gives working hours and appointments. user_email/user_phone link an Altegio user (invite_user=true invites a new one); omit both for no account.',
   annotations: {
     title: 'Create Team Member',
     destructiveHint: false,
@@ -101,28 +101,24 @@ export const createStaffTool = defineTool({
       .email()
       .nullable()
       .optional()
-      .describe(
-        'Email of an existing Altegio user to link, or of the person to invite with invite_user=true. Omit for a team member without a user account.'
-      ),
+      .describe('Email of an Altegio user to link or invite.'),
     user_phone: z
       .string()
       .min(1)
       .nullable()
       .optional()
       .describe(
-        'Phone of an existing Altegio user to link (without +, 9-15 digits), or of the person to invite. Omit for a team member without a user account.'
+        'Phone of an Altegio user to link or invite, digits without +.'
       ),
     invite_user: z
       .boolean()
       .optional()
-      .describe(
-        'Invite user_email/user_phone to create their user account (default false). Without it, they must belong to an existing Altegio user.'
-      ),
+      .describe('Invite user_email/user_phone as a new user (default false).'),
     has_schedule_access: scheduleAccessChoice.describe(
-      "The owner's answer: should the team member be in the work schedule, able to have working hours and take appointments? Locations on the new team-member model refuse a schedule or appointments without it; per-seat licensing allows it only with has_paid_seat=true. Never defaulted."
+      "Owner's answer: in the work schedule, can have hours and appointments (per-seat licensing needs has_paid_seat). Never defaulted."
     ),
     has_paid_seat: paidSeatChoice.describe(
-      "The owner's answer: does the team member take a paid seat? On per-seat licensing a paid seat is billed and counts against the location's team member limit; false creates a team member without a seat (for example test or demo data). Ignored by locations without per-seat licensing. Never defaulted."
+      "Owner's answer: takes a paid seat (billed and counted on per-seat licensing; false e.g. for demo data). Never defaulted."
     ),
   }),
   outputSchema: staffEntityOutput,
@@ -161,7 +157,7 @@ export const updateStaffTool = defineTool({
   name: 'team_members_update',
   category: 'Team members',
   description:
-    'Update a team member: name, specialization, profile text, display order, online-booking visibility, dismissal state, external id or linked user. Pass only the fields to change.',
+    'Update a team member: name, specialization, profile, order, online-booking visibility, dismissal, external id or user. Pass only changes.',
   annotations: {
     title: 'Update Team Member',
     destructiveHint: false,
@@ -173,18 +169,12 @@ export const updateStaffTool = defineTool({
     team_member_id: z.number().int().positive().describe('Team member ID'),
     name: z.string().min(1).optional().describe('Team member name'),
     specialization: z.string().optional().describe('Specialization'),
-    sort_weight: z
-      .number()
-      .optional()
-      .describe('Display order weight; a higher value sorts first'),
+    sort_weight: z.number().optional().describe('Sort weight, higher first.'),
     information: z
       .string()
       .optional()
-      .describe('Profile text shown in online booking (HTML allowed)'),
-    external_id: z
-      .string()
-      .optional()
-      .describe("The team member's identifier in an external system"),
+      .describe('Online booking profile (HTML).'),
+    external_id: z.string().optional().describe('External system id.'),
     hidden_from_online_booking: z
       .boolean()
       .optional()
@@ -192,12 +182,12 @@ export const updateStaffTool = defineTool({
     dismissed: z
       .boolean()
       .optional()
-      .describe('Mark the team member as dismissed (no longer working here)'),
+      .describe('Dismissed (no longer working here).'),
     user_id: z
       .number()
       .int()
       .optional()
-      .describe('Linked Altegio user id; 0 unlinks the user account'),
+      .describe('Altegio user id; 0 unlinks.'),
   }),
   outputSchema: staffEntityOutput,
   handler: async ({ input, client }) => {

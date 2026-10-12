@@ -312,6 +312,36 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     },
   },
 
+  appointments_find_free_slots: {
+    what: 'the titles of the services searched for',
+    canary: {
+      args: { location_id: 1, service_ids: [3], date_from: '2026-10-13' },
+      routes: [
+        {
+          match: /\/services\/1/,
+          body: ok(
+            envelope([
+              {
+                id: 3,
+                title: CANARY,
+                staff: [{ id: 10, seance_length: 1800 }],
+              },
+            ])
+          ),
+        },
+        {
+          match: /\/timetable\/seances\/1\/10\/2026-10-13/,
+          body: ok(
+            envelope([
+              { time: '10:00', is_free: true },
+              { time: '10:15', is_free: true },
+            ])
+          ),
+        },
+      ],
+    },
+  },
+
   services_list: {
     what: 'service title and comment',
     canary: {

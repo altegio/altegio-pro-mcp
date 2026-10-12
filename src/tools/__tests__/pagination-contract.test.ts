@@ -16,7 +16,7 @@ describe('legacy list pagination contract', () => {
   ];
 
   it.each(tools.map((tool) => [tool.meta.name, tool] as const))(
-    '%s is consistently 1-based and capped at 300 rows',
+    '%s is consistently 1-based and capped at 100 rows',
     (_name, tool) => {
       const schema = tool.toMcpTool().inputSchema as {
         properties: Record<
@@ -29,9 +29,9 @@ describe('legacy list pagination contract', () => {
           }
         >;
       };
-      expect(schema.properties.page?.exclusiveMinimum).toBe(0);
+      expect(schema.properties.page?.minimum).toBe(1);
       expect(schema.properties.page?.description).toContain('1-based');
-      expect(schema.properties.page_size?.maximum).toBe(300);
+      expect(schema.properties.page_size?.maximum).toBe(100);
     }
   );
 

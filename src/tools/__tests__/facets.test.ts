@@ -124,6 +124,7 @@ describe('static views', () => {
         'clients_search',
         'appointments_create',
         'appointments_delete',
+        'appointments_find_free_slots',
         'appointments_list',
         'events_book_clients',
         'events_create',

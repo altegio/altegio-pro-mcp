@@ -88,28 +88,88 @@ function names(text: string, toolName: string): boolean {
 }
 
 /**
+ * Tool annotations without the hints that only repeat the protocol default
+ * (`openWorldHint: true`, `idempotentHint: false`, `readOnlyHint: false`), and
+ * without `destructiveHint` on a read-only tool, where MCP says it is
+ * meaningless. What a host concludes is unchanged; the list is shorter.
+ */
+function listedAnnotations(
+  annotations: Record<string, unknown> | undefined
+): Record<string, unknown> | undefined {
+  if (!annotations) return undefined;
+  const out = { ...annotations };
+  if (out.openWorldHint === true) delete out.openWorldHint;
+  if (out.idempotentHint === false) delete out.idempotentHint;
+  if (out.readOnlyHint === false) delete out.readOnlyHint;
+  if (out.readOnlyHint === true) delete out.destructiveHint;
+  return out;
+}
+
+/**
+ * The input schema without the top-level `additionalProperties: false`. The
+ * server still refuses an unknown argument — and names the accepted ones in
+ * the refusal — so repeating the rule on every tool only costs tokens.
+ */
+function listedInputSchema(schema: unknown): unknown {
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
+    return schema;
+  }
+  const { additionalProperties, ...rest } = schema as Record<string, unknown>;
+  return additionalProperties === false ? rest : schema;
+}
+
+/**
  * A tool's spec as one view lists it.
  *
- * Descriptions point at neighbouring tools — "for day-by-day numbers use
- * analytics_get_daily_series", "find the service with services_list" — and a
- * narrower view may not serve the neighbour. When the description or the input
- * schema names a tool this view does not serve, one sentence is appended saying
- * where each is served, so a view's `tools/list` never offers a name it would
- * refuse without saying so. A spec whose references are all served here is
- * returned unchanged, which is every spec on the complete surface.
+ * Three things differ from the definition:
+ *
+ * - **Annotations** drop hints equal to the protocol default
+ *   (`listedAnnotations`), and the input schema its top-level
+ *   `additionalProperties: false` (`listedInputSchema`).
+ * - **No `outputSchema`.** It is optional in MCP, results still carry
+ *   `structuredContent`, and it was the largest part of `tools/list` (up to
+ *   44% of the read-only view) — paid by every host on every connection, for a
+ *   schema no host shows a model before the call. The schemas stay in the
+ *   definitions as the tested contract of `structuredContent`.
+ * - **Unserved neighbours named.** Descriptions point at neighbouring tools —
+ *   "for day-by-day numbers use analytics_get_daily_series", "find the service
+ *   with services_list" — and a narrower view may not serve the neighbour.
+ *   When the description or the input schema names a tool this view does not
+ *   serve, one sentence is appended saying where each is served, so a view's
+ *   `tools/list` never offers a name it would refuse without saying so.
  */
 export function listedOnView<
-  T extends { name: string; description?: string; inputSchema: unknown },
->(spec: T, view: ServingView, toolNames: readonly string[]): T {
-  const text = JSON.stringify([spec.description, spec.inputSchema]);
-  const unserved = toolNames.filter(
-    (name) => name !== spec.name && !view.serves(name) && names(text, name)
+  T extends {
+    name: string;
+    description?: string;
+    inputSchema: unknown;
+    outputSchema?: unknown;
+  },
+>(
+  spec: T,
+  view: ServingView,
+  toolNames: readonly string[]
+): Omit<T, 'outputSchema'> {
+  const { outputSchema: _contractOnly, ...rest } = spec;
+  void _contractOnly;
+  const annotations = listedAnnotations(
+    (rest as { annotations?: Record<string, unknown> }).annotations
   );
-  if (unserved.length === 0) return spec;
+  const listed = {
+    ...rest,
+    inputSchema: listedInputSchema(rest.inputSchema),
+    ...(annotations ? { annotations } : {}),
+  } as Omit<T, 'outputSchema'>;
+  const text = JSON.stringify([listed.description, listed.inputSchema]);
+  const unserved = toolNames.filter(
+    (name) => name !== listed.name && !view.serves(name) && names(text, name)
+  );
+  if (unserved.length === 0) return listed;
 
   const byAddress = new Map<string, string[]>();
   for (const name of unserved) {
-    const where = view.addressesServing(name).join(' and ');
+    // The narrowest view that serves it; the complete surface is the fallback.
+    const where = view.addressesServing(name)[0] ?? '';
     byAddress.set(where, [...(byAddress.get(where) ?? []), `\`${name}\``]);
   }
   const clauses = [...byAddress].map(
@@ -117,7 +177,7 @@ export function listedOnView<
       `${tools.join(', ')} (${where ? `served on ${where}` : 'not served by this deployment'})`
   );
   return {
-    ...spec,
-    description: `${spec.description ?? ''} Not served on this address: ${clauses.join('; ')}.`,
+    ...listed,
+    description: `${listed.description ?? ''} Not served on this address: ${clauses.join('; ')}.`,
   };
 }

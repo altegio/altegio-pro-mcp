@@ -271,6 +271,7 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
 
   // --- Appointments ---------------------------------------------------------
   appointments_list: 'appointments:read',
+  appointments_find_free_slots: 'appointments:read',
   appointments_preview_attendance: 'appointments:read',
   appointments_apply_attendance: 'appointments:write',
   appointments_create: 'appointments:create',

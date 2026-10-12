@@ -21,10 +21,7 @@ import { z } from 'zod';
 
 /** Description of the `include_contacts` argument, identical on every tool. */
 export const CONTACTS_OPT_IN_DESCRIPTION =
-  'Return the client’s contact details (phone, and email where the tool has one). ' +
-  'Off by default: contacts are personal data and most questions do not need them, ' +
-  'and one call can cover hundreds of clients. Turn it on only when the user ' +
-  'explicitly asked to see or use a contact.';
+  'Include client phone/email — personal data, only when the user asked for it.';
 
 /**
  * The `include_contacts` argument itself. Shared so a new pack opts into the

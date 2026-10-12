@@ -37,7 +37,7 @@ export const listLocationsTool = defineTool({
   name: 'locations_list',
   category: 'Location',
   description:
-    'List only locations the signed-in user has rights to manage. The server always applies my=1; callers cannot request the public location directory. Use this first to find a location_id. Ask which location to work with when several come back. Paged: 25 per page by default; follow pagination.next_page until it is null (a full last page may need one empty request).',
+    'Locations the user manages — call first for a location_id; ask which one when several. Paged: follow pagination.next_page.',
   annotations: {
     title: 'List Locations',
     readOnlyHint: true,
@@ -47,9 +47,7 @@ export const listLocationsTool = defineTool({
     managed_only: z
       .boolean()
       .default(true)
-      .describe(
-        'Deprecated compatibility parameter. The server always returns managed locations, even when this is false.'
-      ),
+      .describe('Deprecated; managed locations are always returned.'),
     ...paginationInput,
   }),
   outputSchema: companiesOutput,
@@ -93,7 +91,7 @@ export const updateLocationTool = defineTool({
   name: 'locations_update',
   category: 'Location',
   description:
-    'Update a location: rename it or change its address, city or country, postal code, website, coordinates, description, business type or phones. Needs administrator access to the location. The result verifies every requested field against a fresh read of the location; a field the API accepted but did not persist (phones sometimes) is reported as unconfirmed, never as updated.',
+    'Update a location’s name, address, city, country, postal code, website, coordinates, description, business type or phones (admin access). Fields are verified by a fresh read; unpersisted ones are reported unconfirmed.',
   annotations: {
     title: 'Update Location',
     destructiveHint: false,
@@ -123,7 +121,7 @@ export const updateLocationTool = defineTool({
       .array(z.string())
       .optional()
       .describe(
-        'Location phone numbers (without +). Some locations accept this field without persisting it; the tool reports the read-back mismatch.'
+        'Phones without +; the result reports any the API did not persist.'
       ),
     website: z.string().optional().describe('Website URL'),
     coordinate_lat: z.number().optional().describe('Latitude'),
@@ -138,7 +136,7 @@ export const updateLocationTool = defineTool({
     short_description: z
       .string()
       .optional()
-      .describe('Business category or tagline shown under the name'),
+      .describe('Tagline under the name.'),
   }),
   outputSchema: locationUpdateOutput,
   handler: async ({ input, client }) => {

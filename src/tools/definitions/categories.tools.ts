@@ -8,27 +8,21 @@ export const getServiceCategoriesTool = defineTool({
   name: 'service_categories_list',
   category: 'Categories',
   description:
-    'Get list of service categories at a location. PUBLIC API - NO AUTHENTICATION REQUIRED. Use this for online booking - shows how services are organized. Returns a stable page ordered by ID, with next_page and total. Default 25 rows.',
+    'Service categories of a location (how services are grouped). Paged by id with total.',
   annotations: {
     title: 'Get Service Categories',
     readOnlyHint: true,
     openWorldHint: true,
   },
   input: z.object({
-    location_id: z
-      .number()
-      .int()
-      .positive()
-      .describe('ID of the location to get service categories for'),
+    location_id: z.number().int().positive().describe('From locations_list.'),
     category_id: z
       .number()
       .int()
       .min(0)
       .optional()
       .default(0)
-      .describe(
-        'Parent category ID to get subcategories for. Use 0 (default) to get root-level categories.'
-      ),
+      .describe('Parent category id; 0 (default) for root categories.'),
     ...paginationInput,
   }),
   outputSchema: categoriesOutput,
@@ -67,7 +61,7 @@ export const deleteServiceCategoryTool = defineTool({
   name: 'service_categories_delete',
   category: 'Categories',
   description:
-    'Permanently delete one specifically identified service category. AUTHENTICATION REQUIRED. Delete or move its location-owned services first. A 403 for a chain-owned category is an ownership boundary; do not retry it at chain scope.',
+    'Delete a service category; delete or move its services first. A 403 on a chain-owned category is an ownership boundary — do not retry.',
   annotations: {
     title: 'Delete Service Category',
     destructiveHint: true,

@@ -9,7 +9,7 @@ describe('locations_list management filter', () => {
     expect(listLocationsTool.toMcpTool().inputSchema.properties).toMatchObject({
       managed_only: {
         default: true,
-        description: expect.stringContaining('even when this is false'),
+        description: expect.stringContaining('always returned'),
       },
     });
   });

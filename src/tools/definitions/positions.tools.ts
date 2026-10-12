@@ -12,7 +12,7 @@ export const getPositionsTool = defineTool({
   name: 'positions_list',
   category: 'Positions',
   description:
-    'Get the positions that can be assigned to team members in a location, with their descriptions. AUTHENTICATION REQUIRED.',
+    'Get the positions that can be assigned to team members in a location, with their descriptions.',
   annotations: {
     title: 'Get Positions',
     readOnlyHint: true,
@@ -63,7 +63,7 @@ export const createPositionTool = defineTool({
   name: 'positions_create',
   category: 'Positions',
   description:
-    'Create a new position with a title and an optional description. AUTHENTICATION REQUIRED. Positions categorize team-member roles (for example Manager, Stylist, Receptionist).',
+    'Create a position (team-member role, e.g. Stylist) with a title and optional description.',
   annotations: {
     title: 'Create Position',
     destructiveHint: false,

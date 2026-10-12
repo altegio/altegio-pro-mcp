@@ -14,7 +14,7 @@ export const getCurrentUserTool = defineTool({
   name: 'users_get_current',
   category: 'Users',
   description:
-    'Who is signed in: the user id, display name, approval state and the interface language this person chose in Altegio (ISO 639-1; null only when Altegio could not report it). AUTHENTICATION REQUIRED. Use it to answer in the language the user reads Altegio in; it reads no location data and needs no location_id.',
+    'The signed-in user: id, name, approval state and Altegio interface language (ISO 639-1) — answer in that language. Needs no location_id.',
   annotations: {
     title: 'Get Current User',
     readOnlyHint: true,
@@ -54,7 +54,7 @@ export const removeLocationUserTool = defineTool({
   name: 'locations_remove_user',
   category: 'Users',
   description:
-    'Remove one specifically identified user from one location. AUTHENTICATION REQUIRED and subject to the caller’s user-management permission. First read get_location_users with api_call_operation, verify that the access is safe to revoke, and supply the same exact ID twice. Do not infer that an owner, administrator, human, CI identity, or integration is obsolete from its display name.',
+    'Remove one user from one location (needs user-management rights). First list the location’s users with the executor, check the access is safe to revoke, and give the same exact id twice. Never judge an owner, admin or integration obsolete by its name.',
   annotations: {
     title: 'Remove Location User',
     destructiveHint: true,
@@ -69,7 +69,7 @@ export const removeLocationUserTool = defineTool({
         .number()
         .int()
         .positive()
-        .describe('Repeat the exact user ID as a destructive safeguard'),
+        .describe('The same user id again, as a safeguard.'),
     })
     .refine((input) => input.user_id === input.confirm_user_id, {
       path: ['confirm_user_id'],

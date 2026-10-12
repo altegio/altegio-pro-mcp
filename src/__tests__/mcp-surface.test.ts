@@ -121,6 +121,7 @@ describe('tools/list per facet', () => {
       'appointments_create',
       'appointments_create_tag',
       'appointments_delete',
+      'appointments_find_free_slots',
       'appointments_list',
       'appointments_list_tags',
       'appointments_preview_attendance',
@@ -414,38 +415,38 @@ describe('server instructions', () => {
     // Views are named relative to the server's own address, so the text is
     // right on the short customer address and on the internal /mcp lane.
     expect(instructions).toContain('same address plus');
-    expect(instructions).toContain('/analytics and');
-    expect(instructions).toContain('/onboarding for hosts');
+    expect(instructions).toContain('/analytics, /onboarding');
     expect(instructions).not.toContain('/mcp/');
     // The report builder is withheld until the backend works, so the
     // instructions must not point at it (src/tools/disabled-tools.ts).
     expect(instructions).toContain('no ad-hoc report builder');
     expect(instructions).toContain('executor');
     expect(instructions).toContain('delegated Altegio identity');
+    // The two behaviours that otherwise cost retries.
+    expect(instructions).toContain('appointments_find_free_slots');
+    expect(instructions).toContain('confirmation_required');
     for (const uri of [
       PRODUCT_LOGIC_URI,
       GLOSSARY_URI,
       CLIENTS_SEGMENTATION_URI,
-      ANALYTICS_GLOSSARY_URI,
-      ANALYTICS_COVERAGE_URI,
       ANALYTICS_PLAYBOOK_URI,
-      ANALYTICS_DATA_MODEL_URI,
     ]) {
       expect(instructions).toContain(uri);
     }
-    for (const prompt of [
-      ONBOARDING_WALKTHROUGH_PROMPT,
-      'analytics_location_health_check',
-      'analytics_monthly_review',
-      'analytics_team_member_review',
-      'analytics_compare_periods',
-    ]) {
-      expect(instructions).toContain(prompt);
-    }
-    // Two paragraphs now: the product tour plus the trust boundary. Still a
-    // budget, so the paragraph cannot grow into a manual.
-    expect(instructions.split(/\s+/).filter(Boolean).length).toBeLessThan(290);
     await client.close();
+  });
+
+  it('fits the host budget on every view, trust boundary first', async () => {
+    // Claude Code cuts server instructions at 2,048 characters; the old text
+    // lost its trust-boundary tail there.
+    for (const view of VIEW_KEYS) {
+      const client = await connect(view);
+      const instructions = client.getInstructions() ?? '';
+      expect(instructions.length).toBeLessThanOrEqual(1900);
+      expect(instructions.indexOf('Trust boundary')).toBeGreaterThan(-1);
+      expect(instructions.indexOf('Trust boundary')).toBeLessThan(700);
+      await client.close();
+    }
   });
 
   it('tells the model that tool results are data, not instructions', async () => {
@@ -745,7 +746,7 @@ describe('names on a view', () => {
       (tool) => tool.name === 'appointments_preview_attendance'
     );
     expect(preview?.description).toMatch(
-      /Not served on this address: `appointments_apply_attendance` \(served on https:\/\/mcp\.alteg\.io\/pro\/ops and https:\/\/mcp\.alteg\.io\/pro\)\.$/
+      /Not served on this address: `appointments_apply_attendance` \(served on https:\/\/mcp\.alteg\.io\/pro\/ops\)\.$/
     );
     await client.close();
   });

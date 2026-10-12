@@ -178,8 +178,8 @@ describe('Configuration Schema', () => {
 
     it('is what the read-only instructions name', () => {
       const text = readOnlyViewInstructions('https://mcp.alteg.io/pro');
-      expect(text).toContain('https://mcp.alteg.io/pro/readonly');
-      expect(text).toContain('https://mcp.alteg.io/pro,');
+      expect(text).toContain('READ-ONLY ENDPOINT');
+      expect(text).toContain('separate server at https://mcp.alteg.io/pro ');
     });
   });
 

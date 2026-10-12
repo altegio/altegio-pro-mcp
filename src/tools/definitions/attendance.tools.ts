@@ -70,13 +70,7 @@ const objectSchema = (
 const statusSchema = { type: 'string', enum: STATUSES };
 
 const selectionInput = z.object({
-  location_id: z
-    .number()
-    .int()
-    .positive()
-    .describe(
-      'Location of the appointments. Call locations_list when the id is unknown.'
-    ),
+  location_id: z.number().int().positive().describe('From locations_list.'),
   appointment_ids: z
     .array(z.number().int().positive())
     .min(1)
@@ -167,7 +161,7 @@ const httpStatus = (error: unknown): number | null =>
 export const appointmentsPreviewAttendanceTool = defineTool({
   name: PREVIEW_TOOL,
   category: 'Appointments',
-  description: `Preview an attendance change for at most ${MAX_APPOINTMENTS} appointments. Reads each appointment’s current status and visit, plus the user’s appointment edit rights and edit window when available, and returns a preview token valid for ten minutes. Changing one appointment can change the other appointments of its visit, including unselected ones. The backend stays authoritative for the edit window, online payment and printed-receipt rules. Nothing is changed; pass the token to ${APPLY_TOOL}.`,
+  description: `Preview an attendance change for up to ${MAX_APPOINTMENTS} appointments: current status, visit and edit rights, and a preview token valid 10 minutes. One appointment can change others of its visit. Changes nothing; pass the token to ${APPLY_TOOL}.`,
   annotations: {
     title: 'Preview attendance changes',
     readOnlyHint: true,
@@ -256,7 +250,7 @@ interface GroupOutcome {
 export const appointmentsApplyAttendanceTool = defineTool({
   name: APPLY_TOOL,
   category: 'Appointments',
-  description: `Apply an attendance change previewed by ${PREVIEW_TOOL}. Pass the same location, appointment ids and target status with the preview token. Re-reads every appointment first and refuses when anything changed since the preview. Sends one single-appointment request per visit group, re-reads the selected appointments after each write and stops at the first failure. Earlier groups cannot be rolled back automatically; permissions, the edit window, online payment and a printed receipt may refuse a group.`,
+  description: `Apply an attendance change previewed by ${PREVIEW_TOOL}: same location, appointment ids, status and the preview token. Refuses when anything changed since the preview; writes one visit group at a time and stops at the first failure (no automatic rollback).`,
   annotations: {
     title: 'Apply attendance changes',
     readOnlyHint: false,

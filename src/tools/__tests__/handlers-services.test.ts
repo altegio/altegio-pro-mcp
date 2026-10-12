@@ -36,13 +36,15 @@ describe('ToolHandlers - Services CRUD', () => {
 
       const text = result.content[0]?.text ?? '';
       expect(text).toContain('price 100–150');
-      expect(text).toContain('active true');
+      expect(text).toContain('60 min');
+      expect(text).toContain('active');
+      expect(text).toContain('team members 123');
       expect(text).not.toContain('undefined');
       // The title is free input typed at the location: fenced, not in our row.
       const [ours, theirs] = text.split('\n\n');
-      expect(ours).toContain('Service 789');
+      expect(ours).toContain('- 789');
       expect(ours).not.toContain('Haircut');
-      expect(theirs).toContain('service 789 title: Haircut');
+      expect(theirs).toContain('service 789: Haircut');
       expect(result.structuredContent).toMatchObject({
         items: [
           {
@@ -58,6 +60,35 @@ describe('ToolHandlers - Services CRUD', () => {
         ],
       });
       expect(mockClient.getServices).toHaveBeenCalledWith(456);
+    });
+
+    it('reads a zero price_max as a fixed price and takes duration from the links', async () => {
+      mockClient.getServices.mockResolvedValue([
+        {
+          id: 1,
+          title: 'Highlights',
+          price_min: 1700,
+          price_max: 0,
+          staff: [
+            { id: 5, seance_length: 2700 },
+            { id: 6, seance_length: 3600 },
+          ],
+        },
+        { id: 2, title: 'Unlinked', price_min: 300, price_max: 300 },
+      ] as Awaited<ReturnType<AltegioClient['getServices']>>);
+
+      const result = await handlers.getServices({ location_id: 456, page: 1 });
+      const text = result.content[0]?.text ?? '';
+      expect(text).toContain('- 1 · price 1700 · 45 min–60 min by team member');
+      expect(text).not.toContain('1700–0');
+      expect(text).not.toContain('not reported');
+      expect(text).toContain('- 2 · price 300 · no team members linked');
+      expect(result.structuredContent).toMatchObject({
+        items: [
+          { id: 1, price_min: 1700, price_max: 1700, duration_seconds: null },
+          { id: 2, price_min: 300, price_max: 300, duration_seconds: null },
+        ],
+      });
     });
   });
 

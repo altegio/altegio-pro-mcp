@@ -3,7 +3,7 @@
  * Each schema describes the shape of `structuredContent` returned by a tool.
  */
 import { AGENT_ONBOARDING_PHASES } from '../types/onboarding.types.js';
-import { collectionSchema } from './pagination.js';
+import { collectionSchema, windowPaginationOutput } from './pagination.js';
 
 // Reusable property definitions
 const idProp = { type: 'number' as const };
@@ -104,9 +104,7 @@ export const locationUpdateOutput = entitySchema(
 export const bookingsOutput = listSchema(
   {
     id: idProp,
-    location_id: idProp,
     datetime: nullableStrProp,
-    date: nullableStrProp,
     status: strProp,
     team_member_id: nullableNumProp,
     team_member_name: nullableStrProp,
@@ -146,7 +144,7 @@ export const bookingsOutput = listSchema(
   },
   ['id', 'status', 'services', 'deleted'],
   // Whether `client_phone` is present on the rows at all (see include_contacts).
-  { contacts_included: boolProp }
+  { location_id: idProp, contacts_included: boolProp }
 );
 
 export const staffListOutput = listSchema(
@@ -219,11 +217,25 @@ const scheduleEntryProps = {
   is_working: boolProp,
 };
 
-export const scheduleOutput = listSchema(
-  scheduleEntryProps,
-  ['date', 'slots', 'is_working'],
-  { team_member_id: idProp, date_from: strProp, date_to: strProp }
-);
+export const scheduleOutput = {
+  type: 'object' as const,
+  properties: {
+    team_member_id: idProp,
+    date_from: strProp,
+    date_to: strProp,
+    items: {
+      type: 'array' as const,
+      items: {
+        type: 'object' as const,
+        properties: scheduleEntryProps,
+        required: ['date', 'slots', 'is_working'],
+      },
+    },
+    // A long range is cut to the response budget and continues by date.
+    pagination: windowPaginationOutput,
+  },
+  required: ['items', 'pagination'],
+};
 
 // ========== Single entity (CREATE/UPDATE) ==========
 
@@ -285,7 +297,6 @@ export const bookingEntityOutput = entitySchema(
     id: idProp,
     team_member_id: nullableNumProp,
     datetime: nullableStrProp,
-    date: nullableStrProp,
   },
   ['id']
 );
