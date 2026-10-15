@@ -80,7 +80,8 @@ describe('ToolHandlers - Appointments CRUD', () => {
 
       const text = result.content[0]?.text ?? '';
       expect(text).toContain('· waiting ·');
-      expect(text).toContain('total 200');
+      // A line's cost is its total for the quantity: two units for 100 is 100.
+      expect(text).toContain('total 100');
       expect(text).not.toContain('undefined');
       // Names and service titles are free input: fenced, not in our own row.
       const [ours, theirs] = text.split('\n\n');
@@ -113,7 +114,7 @@ describe('ToolHandlers - Appointments CRUD', () => {
             // verification flag, not the status.
             status: 'waiting',
             client_id: 321,
-            total_cost: 200,
+            total_cost: 100,
             duration_seconds: 3600,
             visit_id: 42,
             paid_in_full: true,

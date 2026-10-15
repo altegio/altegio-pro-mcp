@@ -343,11 +343,11 @@ export const SLICING_NOTES: readonly SlicingNote[] = [
   },
   {
     dimension: 'Group-by',
-    how: 'Curated grouped tables exist for client sales, client retention, service profitability, team-member sales and the team-member × service matrix. A dimension those tables do not group by can still be computed from tool results that carry it — revenue by weekday from the daily series, appointments by hour of day or online share from the appointment list, revenue per scheduled hour from team-member sales and capacity — stated as a calculation with its formula. The ad-hoc report builder is switched off, so only a dimension no tool result carries is named as a gap rather than approximated.',
+    how: 'Curated grouped tables exist for client sales, client retention, service profitability, team-member sales and the team-member × service matrix. A dimension those tables do not group by can still be computed from tool results that carry it — revenue by weekday from the daily series, appointments by hour of day or online share from the appointment list, revenue per scheduled hour from team-member sales and capacity, any split of rows joined across tools on the shared ids in altegio://analytics/data-model — stated as a calculation with its formula. The ad-hoc report builder is switched off, so only a dimension no tool result carries is named as a gap rather than approximated.',
   },
   {
     dimension: 'Scope',
-    how: 'Everything is one location. There is no chain-wide roll-up — call the tools once per location and add the numbers up.',
+    how: 'Everything is one location; there is no chain-wide roll-up. For several locations call the tools once per location with the same period and definitions. Each location reports money in its own currency (the currency field): add or average amounts only across locations with the same currency, and otherwise report each location’s amounts in its own currency. Counts and percentages compare directly.',
   },
 ] as const;
 
@@ -421,6 +421,10 @@ export const ANALYSIS_NOTES: readonly AnalysisNote[] = [
   },
   {
     title: 'Curated metrics, derived calculations',
-    text: 'Take each metric from the curated tool that returns it, including profit-and-loss, cash-flow, capacity, leakage, team-member × service, product-sales and inventory-risk views: it applies Altegio’s own inclusion rules. Derive everything else in code from those results — ratios, growth, mixes, concentration, weekday patterns — and state the formula; combine averages and percentages through their numerators and denominators. The ad-hoc report builder is switched off, so name the gap for a dimension no tool result carries or a complete statutory statement instead of improvising one.',
+    text: 'Take each metric from the curated tool that returns it, including profit-and-loss, cash-flow, capacity, leakage, team-member × service, product-sales and inventory-risk views: it applies Altegio’s own inclusion rules. Derive everything else in code from those results — ratios, growth, mixes, concentration, weekday patterns — and state the formula; combine averages and percentages through their numerators and denominators. Never improvise a complete statutory statement.',
+  },
+  {
+    title: 'Computable is not unavailable',
+    text: 'That no report splits a figure the asked way does not make it unavailable. When tool rows carry its inputs, from one tool or several joined on shared ids, compute it with its formula so it means exactly what its name says. Call a figure unavailable only when no tool returns its inputs, and then name the missing data or the exact read that failed.',
   },
 ] as const;

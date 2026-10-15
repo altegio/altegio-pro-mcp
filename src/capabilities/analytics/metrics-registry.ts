@@ -333,7 +333,7 @@ export const ANALYTICS_RULES: readonly {
   },
   {
     title: 'Money',
-    text: 'Amounts are in major units (whole currency, two decimals) with an ISO currency code next to them. They are not minor units.',
+    text: 'Amounts are in major units (whole currency, two decimals) with an ISO currency code next to them. They are not minor units. Each location has its own currency, and amounts in different currencies are never added.',
   },
   {
     title: 'Client deduplication',
@@ -386,7 +386,7 @@ export const COVERAGE_GAPS: readonly {
     reason:
       'The ad-hoc Analytics Constructor is switched off and its available data route ignores requested periods.',
     alternative:
-      'Use analytics_get_client_sales, analytics_get_service_profitability, analytics_get_team_member_sales or analytics_get_team_member_service_matrix when their fixed dimensions fit; otherwise name the gap.',
+      'Use analytics_get_client_sales, analytics_get_service_profitability, analytics_get_team_member_sales or analytics_get_team_member_service_matrix when their fixed dimensions fit; otherwise compute the dimension in code from tool rows that carry it, joined on the shared ids in altegio://analytics/data-model, and name the gap only when no tool returns it.',
   },
   {
     topic: 'Team member dynamics over time',
@@ -396,9 +396,10 @@ export const COVERAGE_GAPS: readonly {
   },
   {
     topic: 'Custom client retention cohorts',
-    reason: 'Only the fixed team-member retention report is available.',
+    reason:
+      'No report builds cohorts other than the fixed team-member retention report.',
     alternative:
-      'analytics_get_client_retention reports new, returning and eligible clients by team member, optionally for one service.',
+      'analytics_get_client_retention reports new, returning and eligible clients by team member, optionally for one service. Other cohorts are computed in code: clients_get_segment_report gives each client’s first and last visit dates, which join appointment rows and client sales on the client id.',
   },
   {
     topic: 'Reviews and ratings analytics',
@@ -453,6 +454,7 @@ export const COVERAGE_GAPS: readonly {
   {
     topic: 'Chain-level analytics across locations',
     reason: 'Out of scope for this pack.',
-    alternative: 'Call the tools once per location and add the numbers up.',
+    alternative:
+      'Call the tools once per location. Add amounts only across locations with the same currency; otherwise report each location in its own currency.',
   },
 ] as const;

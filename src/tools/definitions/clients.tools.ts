@@ -112,7 +112,7 @@ export const clientsGetSegmentReportTool = defineTool({
   name: 'clients_get_segment_report',
   category: 'Clients',
   description:
-    'Paged client-base report: per client id, name, first and last arrived visit, lifetime sales, visit count, discount and balance. Same filters as clients_search; order by total_spent or visit_count. Values are lifetime, not for a period; page totals are not base totals. Exact count, up to 200 rows per page, no contacts.',
+    'Paged client-base report: per client id (the client_id of appointments and sales), name, first and last arrived visit dates, lifetime sales, visit count, discount and balance. Same filters as clients_search; order by total_spent or visit_count. Values are lifetime, not for a period; page totals are not base totals. Exact count, up to 200 rows per page, no contacts.',
   annotations: { title: 'Clients: client segment report', ...READ_ONLY },
   input: z.object({
     location_id: locationId,

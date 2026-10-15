@@ -6,6 +6,36 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — the analytics data model says how tool results combine
+
+- `altegio://analytics/data-model` gains a section on combining tool results:
+  the ids that join one tool's rows to another's (client, team member,
+  service, location; each field path is checked against the tool's output
+  schema), what one item of `appointments_list`,
+  `analytics_get_client_sales`, `clients_get_segment_report` and
+  `analytics_get_team_member_sales` means, and how to read a paged result to
+  its end. Each fact was checked live on locations 4564, 720441 and 703092:
+  arrived appointments' `services[].cost` add up to the overview's services
+  revenue and, per team member, to `services_revenue`; client-sales
+  `totals.revenue` also counts sales to no client; `first_visit_date` is the
+  first arrived visit.
+- Multi-location guidance no longer says to add the numbers up. An owner's
+  locations can have different currencies (CZK, PLN and UAH on the test
+  locations), so amounts are added only within one currency.
+- The playbook states once that a figure the tool rows can compute is not
+  unavailable; the coverage gaps for custom dimensions and cohorts point to
+  computing them in code instead of naming a gap.
+- Every `page_size` states its maximum in words (`Items per page. At most
+  100.`): hosts that render a schema as a code signature drop `maximum`, and a
+  larger page size is refused.
+
+### Fixed — an appointment's total_cost counts each service line once
+
+- `appointments_list` multiplied each service line's `cost` by its `amount`,
+  but `cost` is already the line total after quantity and discount: two units
+  at 200 with 10% off (`cost` 360) showed `total_cost` 720. `total_cost` is now
+  the sum of the lines' `cost`.
+
 ### Fixed — a page keeps the requested page size
 
 - `appointments_list`, `services_list` and `memberships_list_types` cut a page
