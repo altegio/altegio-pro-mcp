@@ -40,8 +40,11 @@ import {
 import {
   CODED_VALUES,
   ENTITY_MODEL,
+  JOIN_KEYS,
   LEDGER_NOTE,
   METRIC_SOURCES,
+  PAGING_NOTE,
+  SOURCE_FACTS,
 } from '../capabilities/analytics/data-model.js';
 import {
   DATASETS,
@@ -198,6 +201,17 @@ export function renderPlaybook(): string {
 
 // ========== data model ==========
 
+/** `items[].client_id` in a, b; `items[].id` in c — fields in first-seen order. */
+function keyFields(key: (typeof JOIN_KEYS)[number]): string {
+  const tools = new Map<string, string[]>();
+  for (const { tool, field } of key.fields) {
+    tools.set(field, [...(tools.get(field) ?? []), tool]);
+  }
+  return [...tools]
+    .map(([field, names]) => `\`${field}\` in ${names.join(', ')}`)
+    .join('; ');
+}
+
 export function renderDataModel(): string {
   const entities = ENTITY_MODEL.map(
     (node) => `- **${node.name}** — ${node.is}\n  - ${node.carries}`
@@ -205,6 +219,15 @@ export function renderDataModel(): string {
 
   const sources = METRIC_SOURCES.map(
     (source) => `| ${source.family} | ${source.from} | ${source.note} |`
+  ).join('\n');
+
+  const keys = JOIN_KEYS.map(
+    (key) =>
+      `- **${key.object}** — ${keyFields(key)}.${key.note ? ` ${key.note}` : ''}`
+  ).join('\n');
+
+  const rows = SOURCE_FACTS.map(
+    (fact) => `- **${fact.tool}** — ${fact.text}`
   ).join('\n');
 
   const coded = CODED_VALUES.map(
@@ -233,6 +256,18 @@ export function renderDataModel(): string {
     '| Metric family | Computed from | What to remember |',
     '|---|---|---|',
     sources,
+    '',
+    '## Combining tool results: shared ids and what a row means',
+    '',
+    'An id names the same object in every tool, so rows of different tools join on it in code:',
+    '',
+    keys,
+    '',
+    'What one item of a widely joined result means:',
+    '',
+    rows,
+    '',
+    PAGING_NOTE,
     '',
     '## Two ledgers',
     '',
@@ -290,8 +325,8 @@ export function renderCoverage(): string {
     '## Hard limits',
     '',
     '- At most 365 days per call.',
-    '- There is no ad-hoc report builder. Use the curated report tools for their stable tables; arbitrary custom tables and a complete statutory cash-flow statement remain unavailable.',
-    '- Everything is scoped to one location; there is no chain-wide roll-up.',
+    '- There is no ad-hoc report builder: the curated tools give their stable tables, any other table is computed in code from tool rows, and a complete statutory cash-flow statement remains unavailable.',
+    '- Everything is scoped to one location; there is no chain-wide roll-up, and amounts in different currencies are never added.',
     '',
   ].join('\n');
 }
@@ -369,7 +404,7 @@ export function listAnalyticsResources(): ResourceEntry[] {
       name: 'analytics-data-model',
       title: 'Analytics data model',
       description:
-        'Where each number comes from: the appointment → visit → client spine, which object every metric family is computed from, the two ledgers (money and products), the coded values an answer carries (visit status, payment status, source, client priority, money units), and what a figure can be sliced by. Read this to know what a number means.',
+        'Where each number comes from: the appointment → visit → client spine, which object every metric family is computed from, the ids that join one tool’s rows to another’s and what a row of the main reads means, the two ledgers (money and products), and the coded values an answer carries (visit status, payment status, source, client priority, money units). Read this to know what a number means and how to combine results.',
       mimeType: 'text/markdown',
     },
   ];

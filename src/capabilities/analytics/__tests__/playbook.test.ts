@@ -16,7 +16,11 @@ import {
   ANALYSIS_NOTES,
   BENCHMARKS,
 } from '../playbook.js';
-import { renderPlaybook } from '../../../resources/analytics.resources.js';
+import {
+  renderCoverage,
+  renderGlossary,
+  renderPlaybook,
+} from '../../../resources/analytics.resources.js';
 import { isToolDisabled } from '../../../tools/disabled-tools.js';
 
 const analyticsToolNames = new Set(
@@ -108,6 +112,21 @@ describe('analytics playbook', () => {
     expect(text).not.toMatch(/must be declined rather than approximated/);
     expect(text).toContain('stated as a calculation with its formula');
     expect(text).toContain('Derive everything else in code from those results');
+  });
+
+  it('treats a figure the rows can compute as available', () => {
+    expect(renderPlaybook()).toContain('Computable is not unavailable');
+    expect(renderCoverage()).not.toMatch(/otherwise name the gap\./);
+    expect(renderCoverage()).toContain('computed in code');
+  });
+
+  it('never adds amounts in different currencies across locations', () => {
+    for (const text of [renderPlaybook(), renderCoverage(), renderGlossary()]) {
+      expect(text).not.toMatch(/add the numbers up/i);
+    }
+    expect(renderPlaybook()).toContain('in its own currency');
+    expect(renderCoverage()).toContain('in its own currency');
+    expect(renderGlossary()).toContain('never added');
   });
 
   it('carries content for every section', () => {

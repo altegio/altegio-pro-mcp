@@ -5,6 +5,38 @@ import {
   getStaffTool,
   listLocationsTool,
 } from '../definitions/index.js';
+import { allToolEntries } from '../inventory.js';
+
+describe('page size limits', () => {
+  // A host that renders the schema as a code signature drops `maximum`, and a
+  // larger page size is refused, so the limit has to be readable in words.
+  const paged = allToolEntries().flatMap((entry) => {
+    const properties = (
+      entry.spec.inputSchema as {
+        properties?: Record<string, { maximum?: number; description?: string }>;
+      }
+    ).properties;
+    const pageSize = properties?.page_size;
+    return entry.disabled || pageSize?.maximum === undefined
+      ? []
+      : [[entry.name, pageSize] as const];
+  });
+
+  it('covers the bulk reads models page through', () => {
+    const names = paged.map(([name]) => name);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'appointments_list',
+        'clients_get_segment_report',
+        'analytics_get_client_sales',
+      ])
+    );
+  });
+
+  it.each(paged)('%s states its page_size maximum', (_name, pageSize) => {
+    expect(pageSize.description).toContain(String(pageSize.maximum));
+  });
+});
 
 describe('legacy list pagination contract', () => {
   const tools = [

@@ -34,7 +34,11 @@ export const pageArg = z
   .default(1)
   .describe('1-based page.');
 
-/** `page_size` with a tool-specific ceiling. */
+/**
+ * `page_size` with a tool-specific ceiling. The ceiling is also stated in
+ * words: hosts that render a schema as a code signature drop `maximum`, and a
+ * larger page size is refused rather than clamped.
+ */
 export function pageSizeArg(max = MAX_PAGE_SIZE, fallback = DEFAULT_PAGE_SIZE) {
   return z
     .number()
@@ -42,7 +46,7 @@ export function pageSizeArg(max = MAX_PAGE_SIZE, fallback = DEFAULT_PAGE_SIZE) {
     .positive()
     .max(max)
     .default(fallback)
-    .describe('Items per page.');
+    .describe(`Items per page. At most ${max}.`);
 }
 
 /** Shared one-based pagination arguments for collection tools. */

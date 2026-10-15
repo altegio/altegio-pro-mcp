@@ -603,7 +603,7 @@ export const analyticsGetClientSalesTool = defineTool({
   name: 'analytics_get_client_sales',
   category: 'Analytics',
   description:
-    'Revenue and visit totals by client from the stable sales-by-client report: client id, revenue, share of location revenue, average check and visit count. Use it for “top clients this month” and per-client sales analysis; use clients_search for lifetime segmentation instead. Results are source-paginated. Client phone and email are withheld unless include_contacts=true. Read from a temporary report source; it never creates a saved report. Needs the Sales by clients report permission.',
+    'Revenue and visit totals by client from the stable sales-by-client report: client id, revenue (services and products), share of location revenue, average check and visits (days with an arrived visit); totals.revenue also counts sales without a client. Use it for “top clients this month” and per-client sales analysis; use clients_search for lifetime segmentation instead. Results are source-paginated. Client phone and email are withheld unless include_contacts=true. Read from a temporary report source; it never creates a saved report. Needs the Sales by clients report permission.',
   annotations: { title: 'Analytics: sales by client', ...READ_ONLY },
   input: z.object({
     location_id: locationId,

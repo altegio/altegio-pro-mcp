@@ -109,15 +109,17 @@ const serviceItemSchema = z.object({
   amount: z.number().positive().optional().describe('Amount/quantity'),
 });
 
+/**
+ * The appointment's service value: the sum of its lines' `cost`. A line's
+ * `cost` is already its total after discount and quantity (`cost_per_unit` ×
+ * `amount`, less the discount), so it is never multiplied by `amount`.
+ */
 function appointmentTotalCost(appointment: AltegioBooking): number | null {
   const priced = (appointment.services ?? []).filter(
     (service) => typeof service.cost === 'number'
   );
   if (priced.length === 0) return null;
-  return priced.reduce(
-    (total, service) => total + service.cost * (service.amount ?? 1),
-    0
-  );
+  return priced.reduce((total, service) => total + service.cost, 0);
 }
 
 function projectAppointment(
@@ -170,7 +172,7 @@ export const getAppointmentsTool = defineTool({
   name: 'appointments_list',
   category: 'Appointments',
   description:
-    'Appointments of a location by date range, team member, client, creator, group event, creation or change time; deleted only with include_deleted. Each has status, team member, client, services, tags and color; phones need include_contacts. Paged: follow pagination.next_page with the same page_size.',
+    'Appointments of a location by date range, team member, client, creator, group event, creation or change time; cancelled (deleted) ones only with include_deleted. Each has status (arrived is a visit), team member, client (null for a walk-in), services with cost (the line total after discount), tags and color; phones need include_contacts. Paged: follow pagination.next_page with the same page_size.',
   annotations: {
     title: 'Get Appointments',
     readOnlyHint: true,
