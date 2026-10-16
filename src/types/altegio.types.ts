@@ -105,7 +105,10 @@ export interface AltegioBooking {
     amount?: number;
     discount?: number;
     manual_cost?: number;
-    /** Catalog price before reductions. */
+    /**
+     * Price before reductions: for the whole line (quantity included) in the
+     * appointment list, per unit in the single-appointment read.
+     */
     first_cost?: number;
     cost_per_unit?: number;
     currency?: string;
