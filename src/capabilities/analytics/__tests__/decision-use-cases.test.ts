@@ -489,6 +489,99 @@ describe('decision-ready statements', () => {
     expectDecisionContract(analyticsGetRevenueLeakageTool, body);
   });
 
+  // Shapes as the appointment list returns them (live, location 4564): a
+  // line's cost, cost_to_pay, manual_cost and first_cost cover the whole line;
+  // only cost_per_unit is per unit.
+  it.each([
+    [
+      'one unit at 100 less 20%',
+      {
+        amount: 1,
+        cost_per_unit: 100,
+        discount: 20,
+        first_cost: 100,
+        manual_cost: 80,
+        cost: 80,
+        cost_to_pay: 80,
+      },
+      { price: 80, reduction: 20 },
+    ],
+    [
+      'two units at 200 less 10%',
+      {
+        amount: 2,
+        cost_per_unit: 200,
+        discount: 10,
+        first_cost: 400,
+        manual_cost: 360,
+        cost: 360,
+        cost_to_pay: 360,
+      },
+      { price: 360, reduction: 40 },
+    ],
+    [
+      'two units at 25 without a reduction',
+      {
+        amount: 2,
+        cost_per_unit: 25,
+        discount: 0,
+        first_cost: 50,
+        manual_cost: 50,
+        cost: 50,
+        cost_to_pay: 50,
+      },
+      { price: 50, reduction: 0 },
+    ],
+    [
+      'two units at 25 less 10% without first_cost',
+      { amount: 2, cost_per_unit: 25, discount: 10, cost: 45, cost_to_pay: 45 },
+      { price: 45, reduction: 5 },
+    ],
+  ])(
+    'counts a service line of %s once in leakage',
+    async (_shape, line, expected) => {
+      const client = {
+        getCompanies: periodClient.getCompanies,
+        getBookings: async (_id: number, params: { page?: number }) =>
+          params.page === 1
+            ? [
+                {
+                  id: 1,
+                  company_id: 4564,
+                  staff_id: 7,
+                  date: '2026-09-10T09:00:00-03:00',
+                  datetime: '2026-09-10T09:00:00-03:00',
+                  seance_length: 3600,
+                  attendance: -1,
+                  services: [{ id: 3, title: 'A', currency: 'CZK', ...line }],
+                },
+              ]
+            : [],
+      } as unknown as AltegioClient;
+
+      const result = await getRevenueLeakage(client, {
+        location_id: 4564,
+        date_from: '2026-09-10',
+        date_to: '2026-09-10',
+        include_capacity_opportunity: false,
+      });
+      const body = result.structuredContent as {
+        categories: Array<Record<string, unknown>>;
+      };
+      const category = (key: string) =>
+        body.categories.find((item) => item.key === key);
+      expect(category('no_show_appointments')).toMatchObject({
+        observed_count: 1,
+        estimated_opportunity_amount: expected.price,
+      });
+      expect(category('discounts')).toMatchObject({
+        observed_count: expected.reduction > 0 ? 1 : 0,
+        observed_amount: expected.reduction,
+      });
+      expectDecisionContract(analyticsGetRevenueLeakageTool, body);
+    }
+  );
+
   it('does not apply all-service capacity to a service-filtered leakage request', async () => {
     const client = {
       getCompanies: periodClient.getCompanies,

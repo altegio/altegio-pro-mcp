@@ -39,6 +39,27 @@ function safe(value: string | null | undefined, maxChars = 180): string | null {
 
 type AppointmentService = AltegioBooking['services'][number];
 
+// The appointment list (the only appointment source here) gives a service
+// line's money for the whole line, quantity included: two units at 200 with
+// 10% off read `cost` 360, `cost_to_pay` 360 and `first_cost` 400. Only
+// `cost_per_unit` (200) is per unit. The single-appointment read gives
+// `first_cost` per unit instead; nothing here reads it.
+
+/** The line's final value; already the line total, never × `amount`. */
+function lineFinalValue(service: AppointmentService): number | null {
+  if (typeof service.cost_to_pay === 'number') return service.cost_to_pay;
+  if (typeof service.cost === 'number') return service.cost;
+  return null;
+}
+
+/** The line's value before reductions, for the booked quantity. */
+function lineValueBeforeReductions(service: AppointmentService): number | null {
+  if (typeof service.first_cost === 'number') return service.first_cost;
+  if (typeof service.cost_per_unit === 'number')
+    return service.cost_per_unit * (service.amount ?? 1);
+  return null;
+}
+
 function appointmentPrice(
   appointment: AltegioBooking,
   include: (service: AppointmentService) => boolean = () => true
@@ -48,15 +69,10 @@ function appointmentPrice(
   let found = false;
   let total = 0;
   for (const service of services) {
-    const price =
-      typeof service.cost_to_pay === 'number'
-        ? service.cost_to_pay
-        : typeof service.cost === 'number'
-          ? service.cost
-          : null;
+    const price = lineFinalValue(service);
     if (price === null) continue;
     found = true;
-    total += price * (service.amount ?? 1);
+    total += price;
   }
   return found ? round(total) : null;
 }
@@ -68,21 +84,11 @@ function appointmentDiscount(
   let found = false;
   let total = 0;
   for (const service of (appointment.services ?? []).filter(include)) {
-    const before =
-      typeof service.first_cost === 'number'
-        ? service.first_cost
-        : typeof service.manual_cost === 'number'
-          ? service.manual_cost
-          : null;
-    const after =
-      typeof service.cost_to_pay === 'number'
-        ? service.cost_to_pay
-        : typeof service.cost === 'number'
-          ? service.cost
-          : null;
+    const before = lineValueBeforeReductions(service);
+    const after = lineFinalValue(service);
     if (before === null || after === null) continue;
     found = true;
-    total += Math.max(0, before - after) * (service.amount ?? 1);
+    total += Math.max(0, before - after);
   }
   return found ? round(total) : null;
 }
@@ -1032,7 +1038,7 @@ export async function getRevenueLeakage(
       discounted,
       filteredDiscount,
       'high',
-      'Observed reduction = sum of max(0, pre-reduction service price - final service price) × quantity. It is an observed reduction, not necessarily avoidable loss.'
+      'Observed reduction = sum over service lines of max(0, pre-reduction line price - final line price), both for the booked quantity. It is an observed reduction, not necessarily avoidable loss.'
     ),
     {
       key: 'loyalty_write_offs',

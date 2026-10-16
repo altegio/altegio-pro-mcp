@@ -36,6 +36,19 @@ is declared stable.
   at 200 with 10% off (`cost` 360) showed `total_cost` 720. `total_cost` is now
   the sum of the lines' `cost`.
 
+### Fixed — revenue leakage counts a multi-unit service line once
+
+- `analytics_get_revenue_leakage` multiplied each service line's final price
+  by its `amount`, but the appointment list already gives it for the whole
+  line: two units at 200 with 10% off (`cost` 360) counted 720 in the no-show,
+  cancelled and not-marked-paid estimates, and 80 in observed discounts. A
+  line now counts its final price once. Its reduction is the pre-reduction
+  price less the final price, never below 0: 40 here. The pre-reduction price
+  is `first_cost`, which the list also gives for the whole line (400 here), or
+  the unit price times the quantity when `first_cost` is missing.
+- `analytics_get_capacity_heatmap` revenue per scheduled hour and the leakage
+  capacity estimate used the same line price and are corrected with it.
+
 ### Fixed — a page keeps the requested page size
 
 - `appointments_list`, `services_list` and `memberships_list_types` cut a page
