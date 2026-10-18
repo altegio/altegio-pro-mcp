@@ -210,6 +210,72 @@ describe('HTML reports', () => {
     });
   });
 
+  it('reads service profitability after the membership-discount column', () => {
+    // October 2026: Altegio added the column after the count, which moved every
+    // later column one place right.
+    const report = parseServiceProfitabilityHtml({
+      html: fixture('service-profitability-en.html'),
+      count: 1,
+      page: 1,
+      pageSize: 100,
+      currency: 'USD',
+      groupBy: 'service',
+    });
+    expect(report.rows).toEqual([
+      {
+        service_id: 13833130,
+        service_category_id: null,
+        title: 'Haircut',
+        service_category_title: 'Hair',
+        services_rendered_count: 47,
+        payments: {
+          discount: 0,
+          loyalty_points: 429.76,
+          memberships: 20,
+          gift_cards: 0,
+          client_accounts: 50,
+        },
+        cash_or_card_revenue: 36194.64,
+        consumables_cost: 100,
+        team_member_compensation: 300,
+        contribution_result: 35794.64,
+        revenue_share_percent: 13.7,
+      },
+    ]);
+    expect(report.totals).toMatchObject({
+      services_rendered_count: 47,
+      payments: { loyalty_points: 429.76, client_accounts: 50 },
+      cash_or_card_revenue: 36194.64,
+      consumables_cost: 100,
+      team_member_compensation: 300,
+      contribution_result: 35794.64,
+    });
+  });
+
+  it.each([
+    [
+      'a further column',
+      (html: string) =>
+        html.replace('<td>$15.00</td>', '<td>$15.00</td><td>$1.00</td>'),
+    ],
+    [
+      'no marked payroll cell',
+      (html: string) =>
+        html.replace(' data-locator="analytics_services_row_salary"', ''),
+    ],
+  ])('refuses a service profitability row with %s', (_case, change) => {
+    expect(() =>
+      parseServiceProfitabilityHtml({
+        html: change(fixture('service-profitability-en.html')),
+        count: 1,
+        page: 1,
+        pageSize: 100,
+        currency: 'USD',
+        groupBy: 'service',
+      })
+    ).toThrow(/unknown column layout/);
+  });
+
   it('parses team-member sales and matches the canonical id', () => {
     const report = parseTeamMemberSalesHtml({
       html: fixture('team-member-sales-en.html'),

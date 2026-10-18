@@ -29,6 +29,19 @@ is declared stable.
   100.`): hosts that render a schema as a code signature drop `maximum`, and a
   larger page size is refused.
 
+### Fixed — service profitability reads the right columns again
+
+- Altegio added a "Membership discount" column after the count to the service
+  profitability report (between 2026-10-14 and 2026-10-16), which moved every
+  later column one place right. `analytics_get_service_profitability` read
+  cells by position, so it reported the revenue as `consumables_cost`, zero
+  `cash_or_card_revenue` and `contribution_result`, the profit as
+  `revenue_share_percent` and the discount as `loyalty_points`, for every
+  location. The money columns are now found from the payroll cell, which the
+  report marks in every interface language, so both layouts read correctly.
+  A row in any other layout is refused as a changed report instead of being
+  misread. The new column itself is not served yet.
+
 ### Fixed — an appointment's total_cost counts each service line once
 
 - `appointments_list` multiplied each service line's `cost` by its `amount`,
