@@ -497,6 +497,49 @@ function idFromGraphRow($: CheerioAPI, row: unknown): number | null {
   return integer(graph.match(/^graph-row-(\d+)$/)?.[1]);
 }
 
+interface ProfitabilityColumns {
+  payments: number;
+  money: number;
+  consumables: number;
+  payroll: number;
+  profit: number;
+  share: number;
+}
+
+/**
+ * Where a service profitability row keeps its money, found from its payroll cell: the
+ * one money cell the report marks, in every interface language. The row runs: name,
+ * count, [membership discount,] the four loyalty-based payments, client accounts,
+ * money, consumables, payroll, profit, revenue share, chart. Altegio added the
+ * membership discount in October 2026; the fixed positions read before it then took
+ * the revenue for the consumables cost and reported zero revenue and profit. A row in
+ * neither layout is refused, never read by position.
+ */
+function profitabilityColumns(
+  $: CheerioAPI,
+  row: unknown,
+  locator: string
+): ProfitabilityColumns | null {
+  const payroll = $(row as never)
+    .children('th,td')
+    .toArray()
+    .findIndex((cell) => $(cell).attr('data-locator') === locator);
+  return payroll === 9 || payroll === 10
+    ? profitabilityColumnsAt(payroll)
+    : null;
+}
+
+function profitabilityColumnsAt(payroll: number): ProfitabilityColumns {
+  return {
+    payments: payroll - 7,
+    money: payroll - 2,
+    consumables: payroll - 1,
+    payroll,
+    profit: payroll + 1,
+    share: payroll + 2,
+  };
+}
+
 export function parseServiceProfitabilityHtml(args: {
   html: string;
   count: number;
@@ -511,7 +554,18 @@ export function parseServiceProfitabilityHtml(args: {
       const row = $(nameCell).parent('tr');
       const values = cells($, row);
       const id = idFromGraphRow($, row.get(0));
-      if (values.length < 12 || !id || id <= 0) {
+      const columns = profitabilityColumns(
+        $,
+        row.get(0),
+        'analytics_services_row_salary'
+      );
+      if (!columns) {
+        throw new LegacyAnalyticsParseError(
+          'service profitability',
+          'unknown column layout'
+        );
+      }
+      if (values.length <= columns.share || !id || id <= 0) {
         throw new LegacyAnalyticsParseError(
           'service profitability',
           'partial service row'
@@ -528,12 +582,12 @@ export function parseServiceProfitabilityHtml(args: {
         service_category_title:
           args.groupBy === 'service' ? category || null : null,
         services_rendered_count: integer(values[1]) ?? 0,
-        payments: paymentBreakdown(values, 2),
-        cash_or_card_revenue: parseLocaleNumber(values[7]),
-        consumables_cost: parseLocaleNumber(values[8]),
-        team_member_compensation: parseLocaleNumber(values[9]),
-        contribution_result: parseLocaleNumber(values[10]),
-        revenue_share_percent: percent(values[11]),
+        payments: paymentBreakdown(values, columns.payments),
+        cash_or_card_revenue: parseLocaleNumber(values[columns.money]),
+        consumables_cost: parseLocaleNumber(values[columns.consumables]),
+        team_member_compensation: parseLocaleNumber(values[columns.payroll]),
+        contribution_result: parseLocaleNumber(values[columns.profit]),
+        revenue_share_percent: percent(values[columns.share]),
       };
     })
     .get();
@@ -547,23 +601,33 @@ export function parseServiceProfitabilityHtml(args: {
     .filter((_index, row) => $(row).children('th').length >= 10)
     .first();
   const totalValues = totalRow.length ? cells($, totalRow) : [];
-  if (args.count > 0 && totalValues.length < 11) {
+  const totalColumns = totalRow.length
+    ? profitabilityColumns(
+        $,
+        totalRow.get(0),
+        'analytics_services_total_salary'
+      )
+    : null;
+  if (args.count > 0 && !totalColumns) {
     throw new LegacyAnalyticsParseError(
       'service profitability',
-      'totals row not found'
+      totalRow.length ? 'unknown totals layout' : 'totals row not found'
     );
   }
+  // An empty report may carry no readable totals row; its totals are then unknown.
+  const totalCells = totalColumns ? totalValues : [];
+  const total = totalColumns ?? profitabilityColumnsAt(9);
   return {
     currency: args.currency,
     group_by: args.groupBy,
     rows,
     totals: {
       services_rendered_count: integer(totalValues[1]) ?? 0,
-      payments: paymentBreakdown(totalValues, 2),
-      cash_or_card_revenue: parseLocaleNumber(totalValues[7]),
-      consumables_cost: parseLocaleNumber(totalValues[8]),
-      team_member_compensation: parseLocaleNumber(totalValues[9]),
-      contribution_result: parseLocaleNumber(totalValues[10]),
+      payments: paymentBreakdown(totalCells, total.payments),
+      cash_or_card_revenue: parseLocaleNumber(totalCells[total.money]),
+      consumables_cost: parseLocaleNumber(totalCells[total.consumables]),
+      team_member_compensation: parseLocaleNumber(totalCells[total.payroll]),
+      contribution_result: parseLocaleNumber(totalCells[total.profit]),
     },
     page: pageMeta(args.page, args.pageSize, args.count, rows.length),
   };
