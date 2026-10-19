@@ -1,7 +1,11 @@
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
-import { createLogger } from '../../utils/logger.js';
-import { currentCallCorrelation } from '../../utils/tool-call-observation.js';
+import { requestPrincipalKey } from '../../request-context.js';
+import { createLogger, logSafeToken } from '../../utils/logger.js';
+import {
+  currentCallCorrelation,
+  noteRateLimited,
+} from '../../utils/tool-call-observation.js';
 import { getOperation } from '../executor/catalog.js';
 import { defineTool } from '../factory.js';
 import { feedbackReceiptOutput } from '../output-schemas.js';
@@ -73,17 +77,56 @@ export function maskFeedbackText(
 
 const feedbackLog = createLogger('agent-feedback');
 
+/**
+ * The sentence a failed call ends with when it looks like a defect (see
+ * `invitesFeedback` in `../registry.ts`): the one moment an agent has both
+ * the reason and the details to report, at no standing cost in context.
+ */
+export const FEEDBACK_NUDGE =
+  'If this looks like a defect of the server or the API, report it with feedback_submit; no need to ask the user.';
+
+/** The same, for an operation search that matched nothing at all. */
+export const MISSING_OPERATION_NUDGE =
+  'If broader words find nothing either and the task needs it, report it with feedback_submit (feature_request); no need to ask the user.';
+
+/**
+ * Reports one caller may file per window. A caller is the signed-in principal,
+ * else the MCP session: some hosts open a session per call, so a session
+ * alone would not bound a looping agent. Process-local, like the sessions.
+ */
+export const FEEDBACK_RATE_LIMIT = { reports: 5, windowMs: 10 * 60_000 };
+/** Callers tracked at once; the least recently reporting is forgotten first. */
+const MAX_TRACKED_CALLERS = 10_000;
+const recentReports = new Map<string, number[]>();
+
+/** Count one report for `caller`, or refuse it when the window is full. */
+function admitReport(caller: string, now: number): boolean {
+  const since = now - FEEDBACK_RATE_LIMIT.windowMs;
+  const times = (recentReports.get(caller) ?? []).filter((t) => t > since);
+  const admitted = times.length < FEEDBACK_RATE_LIMIT.reports;
+  if (admitted) times.push(now);
+  recentReports.delete(caller);
+  recentReports.set(caller, times);
+  if (recentReports.size > MAX_TRACKED_CALLERS) {
+    const oldest = recentReports.keys().next().value;
+    if (oldest !== undefined) recentReports.delete(oldest);
+  }
+  return admitted;
+}
+
+/** Forget every caller's recent reports. */
+export function clearFeedbackRateLimit(): void {
+  recentReports.clear();
+}
+
 export const submitFeedbackTool = defineTool({
   name: 'feedback_submit',
   category: 'Feedback',
   description:
-    'Report a problem with this server or the Altegio API to the team that runs this server (on the hosted Altegio endpoint, the Altegio team). ' +
-    'kind "bug": a tool or operation failed, contradicted its description, or returned wrong or inconsistent data. ' +
-    'kind "feature_request": the user\'s task needs a capability no tool and no documented operation offers (check api_search_operations first). ' +
-    'One report per distinct problem; it changes nothing in the location and returns a report id. ' +
-    "Not for the user's own complaints about their business, clients or the Altegio product (point them to Altegio support), for arguments you can correct yourself, or for access the user can grant. " +
-    'Never include personal data of clients or team members — no names, phones, emails or comment text; refer to records by id. Contact details and tokens that slip through are masked. ' +
-    'Tell the user in one line that you sent a report.',
+    'Report a bug or a missing capability of this server or the Altegio API to the team that runs it. ' +
+    'bug: a tool or operation failed or answered wrongly; feature_request: no tool or documented operation does what the task needs. ' +
+    "One report per problem; refer to records by id, never personal data (names, phones, emails, comments). Not for the user's own complaints. " +
+    'Do not ask the user first; mention the report in one line.',
   annotations: {
     title: 'Report a Bug or Missing Capability',
     // It writes one line to this server's own log and nothing to the
@@ -92,53 +135,50 @@ export const submitFeedbackTool = defineTool({
     openWorldHint: false,
   },
   input: z.object({
-    kind: z
-      .enum(['bug', 'feature_request'])
-      .describe(
-        'bug: something failed or answered wrongly; feature_request: a capability the task needs is missing.'
-      ),
+    kind: z.enum(['bug', 'feature_request']),
     summary: text('summary').describe(
-      'One line naming the problem, e.g. "appointments_list ignores team_member_id".'
+      'One line, e.g. "appointments_list ignores team_member_id".'
     ),
-    goal: text('goal').describe(
-      'What the user asked for and what you were trying to do when it happened.'
-    ),
+    goal: text('goal').describe('What the user wanted and what you tried.'),
     tool: z
       .string()
       .regex(/^[a-z][a-z0-9_]{0,63}$/)
       .optional()
-      .describe(
-        'The tool involved; for a feature request, the tool you expected to exist.'
-      ),
+      .describe('The tool involved, or the one you expected to exist.'),
     operation_id: z
       .string()
       .regex(/^[A-Za-z][A-Za-z0-9_]{0,127}$/)
-      .optional()
-      .describe('The catalog operation_id involved, if any.'),
-    location_id: z
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe('The location where it happened, so a bug can be reproduced.'),
-    observed: text('observed')
-      .optional()
-      .describe('What happened: the result or behaviour you saw.'),
-    expected: text('expected')
-      .optional()
-      .describe('What should have happened, or the capability you needed.'),
-    error_text: text('error_text')
-      .optional()
-      .describe('The error message as returned, without personal data.'),
+      .optional(),
+    location_id: z.number().int().positive().optional(),
+    observed: text('observed').optional(),
+    expected: text('expected').optional(),
+    error_text: text('error_text').optional(),
     impact: z
       .enum(['blocked', 'workaround', 'minor'])
       .optional()
-      .describe(
-        'blocked: the task could not be done; workaround: done another way; minor: cosmetic or slower.'
-      ),
+      .describe('blocked: task not done; workaround: done another way.'),
+    model: z
+      .string()
+      .trim()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe('The model you run as, if you know it.'),
   }),
   outputSchema: feedbackReceiptOutput,
   handler: async ({ input }) => {
+    const correlation = currentCallCorrelation();
+    const principal = requestPrincipalKey();
+    const caller =
+      principal ??
+      (typeof correlation.session === 'string' ? correlation.session : 'local');
+    if (!admitReport(caller, Date.now())) {
+      noteRateLimited();
+      return {
+        isError: true,
+        text: `Report not recorded: this caller already sent ${FEEDBACK_RATE_LIMIT.reports} reports in the last ${FEEDBACK_RATE_LIMIT.windowMs / 60_000} minutes. Continue the user's task; report again later only for a new problem.`,
+      };
+    }
     const reportId = `fb_${randomBytes(6).toString('hex')}`;
     let maskedValues = 0;
     const freeText: Partial<Record<FeedbackTextField, string>> = {};
@@ -161,9 +201,11 @@ export const submitFeedbackTool = defineTool({
     feedbackLog.info(
       {
         event: 'agent_feedback',
-        ...currentCallCorrelation(),
+        ...correlation,
+        ...(principal ? { principal } : {}),
         report_id: reportId,
         kind: input.kind,
+        ...(input.model ? { model: logSafeToken(input.model) } : {}),
         ...(input.impact ? { impact: input.impact } : {}),
         ...(input.tool ? { reported_tool: input.tool } : {}),
         ...(input.operation_id

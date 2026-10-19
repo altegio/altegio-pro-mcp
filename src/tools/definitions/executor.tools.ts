@@ -17,6 +17,7 @@ import { foldCallArguments, takeFoldNotes } from '../executor/input.js';
 import { includeContactsArg } from '../contacts.js';
 import { ExecutorRefusalError } from '../../utils/errors.js';
 import { currentView, elsewhereClause } from '../serving-view.js';
+import { MISSING_OPERATION_NUDGE } from './feedback.tools.js';
 import {
   pageArg,
   pageMetadata,
@@ -119,7 +120,8 @@ export const searchOperationsTool = defineTool({
         text:
           `No operation matches "${input.query}" among ${result.searched} searched operations.\n` +
           'Try fewer or broader words, drop the `domain` filter, or set `include_preview` ' +
-          `to also search the V3 contract. Domains: ${DOMAINS}.`,
+          `to also search the V3 contract. Domains: ${DOMAINS}.` +
+          (result.totalMatches === 0 ? `\n${MISSING_OPERATION_NUDGE}` : ''),
         structuredContent: {
           items: [],
           pagination,

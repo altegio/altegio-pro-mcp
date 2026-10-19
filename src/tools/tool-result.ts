@@ -12,7 +12,10 @@ import {
   ExecutorRefusalError,
 } from '../utils/errors.js';
 import { signInInstruction } from './serving-view.js';
-import { noteValidationIssues } from '../utils/tool-call-observation.js';
+import {
+  noteUnexpectedError,
+  noteValidationIssues,
+} from '../utils/tool-call-observation.js';
 
 /** The ordinary text block every tool returns. */
 export interface TextContent {
@@ -121,8 +124,10 @@ export async function withErrorHandling(
     } else if (error instanceof AltegioApiError) {
       message = error.message;
     } else if (error instanceof Error) {
+      noteUnexpectedError();
       message = `${toolName} failed: ${error.message}`;
     } else {
+      noteUnexpectedError();
       message = `${toolName} failed with an unexpected error`;
     }
 

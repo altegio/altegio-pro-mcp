@@ -140,8 +140,13 @@ answered wrongly) or a feature request (a capability the task needs is missing)
 to the team that runs the server. Every view serves it, the read-only one
 included, and no token scope gates it: it changes nothing in the location. The
 report is one `agent_feedback` event in the server log, carrying the same
-request, route, session and client fields as the call's `tool_call` line, with
-bounded free text in which contact details and secrets are masked.
+request, route, session and client fields as the call's `tool_call` line, plus
+a hash of the signed-in user and the model the agent names, with bounded free
+text in which contact details and secrets are masked. A failed call that looks
+like a defect (an API 5xx answer, an untyped error) and an operation search
+that matches nothing end with one sentence pointing at the tool; validation,
+access and transient failures do not. Each user may file 5 reports per 10
+minutes.
 
 ## Resources and prompts
 

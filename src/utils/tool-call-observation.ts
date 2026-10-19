@@ -48,6 +48,10 @@ export interface ToolCallObservation {
   validationIssues?: ValidationIssue[];
   /** The registry's correlation fields for this call, set before it runs. */
   correlation?: Readonly<Record<string, unknown>>;
+  /** The call failed on an error no typed class describes: a likely defect. */
+  unexpectedError?: boolean;
+  /** The call was refused by a rate limit, before doing its work. */
+  rateLimited?: boolean;
 }
 
 /** Bounds on what one call may add to its log line. */
@@ -147,6 +151,18 @@ export function summarizeIssues(
  */
 export function currentCallCorrelation(): Readonly<Record<string, unknown>> {
   return storage.getStore()?.correlation ?? {};
+}
+
+/** Note that an untyped error ended the call. A no-op outside a tool call. */
+export function noteUnexpectedError(): void {
+  const observation = storage.getStore();
+  if (observation) observation.unexpectedError = true;
+}
+
+/** Note that a rate limit refused the call. A no-op outside a tool call. */
+export function noteRateLimited(): void {
+  const observation = storage.getStore();
+  if (observation) observation.rateLimited = true;
 }
 
 /** Note a typed error at construction. A no-op outside a tool call. */
