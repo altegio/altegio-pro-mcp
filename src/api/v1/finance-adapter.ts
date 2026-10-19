@@ -994,5 +994,5 @@ export class FinanceAdapter implements FinanceApi {
 
 const TRANSACTION_WRITE_HINTS: FinanceErrorHints = {
   invalid:
-    'Take account_id from accounts_and_cash_registers_list and payment_item_id from financial_transactions_list_payment_items; the amount must be above zero, and a user may be limited to some accounts, payment items or recent days.',
+    'Take account_id from accounts_and_cash_registers_list, payment_item_id from financial_transactions_list_payment_items and supplier_id from suppliers_list; the amount must be above zero, and a user may be limited to some accounts, payment items or recent days.',
 };

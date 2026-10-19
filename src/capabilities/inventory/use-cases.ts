@@ -819,6 +819,10 @@ export async function listSuppliers(
     lines.push(
       `More follow: request page ${pagination.next_page} with page_size ${pagination.page_size}.`
     );
+  if (items.length > 0)
+    lines.push(
+      'Use an id as supplier_id in financial_transactions_create, _update or _list, or in a product receipt (inventory_create_operation).'
+    );
   return {
     text: withUntrustedBlock(
       lines.join('\n'),

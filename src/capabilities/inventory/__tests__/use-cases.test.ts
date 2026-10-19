@@ -710,6 +710,9 @@ describe('listSuppliers', () => {
       pagination: { total: 2, has_more: false },
     });
     expect(summary(result.text)).not.toContain('Beauty');
+    expect(summary(result.text)).toContain(
+      'supplier_id in financial_transactions_create'
+    );
   });
 
   it('names the Finances right on a 403', async () => {
