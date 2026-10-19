@@ -369,6 +369,10 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   visits_get: 'checkout:read',
   visits_add_payment: 'checkout:capture',
   visits_cancel_payment: 'checkout:cancel',
+  // A product line in a sale is `inventory:sell`, as on V3 `addVisitItem`; the
+  // V2 save rewrites the whole appointment and may mark it arrived, so it also
+  // needs `appointments:write`.
+  visits_add_product: ['inventory:sell', 'appointments:write'],
   client_accounts_list_for_client: 'client_accounts:read',
   client_accounts_deposit: 'client_accounts:write',
   accounts_and_cash_registers_list: 'finance:read',

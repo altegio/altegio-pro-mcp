@@ -995,6 +995,55 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       bodyParams: ['payment'],
     },
   ],
+  // Read-modify-write on the V2 appointment save the web app uses: the save
+  // replaces the whole appointment, so it is read with every include, read
+  // again right before the save and read back after it. The product read gives
+  // the sale price, the sale unit and the stock per inventory; the bill read
+  // after the save gives the total.
+  visits_add_product: [
+    {
+      path: '/locations/{location_id}/attendances/{attendance_id}/appointments',
+      method: 'get',
+      operationId: 'list_attendance_appointments',
+      pathParams: ['location_id', 'attendance_id'],
+      queryParams: ['include'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/attendance/appointments',
+      method: 'post',
+      operationId: 'save_attendance_appointments',
+      pathParams: ['location_id'],
+      bodyParams: ['ignore_conflicts', 'records'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/products/{product_id}',
+      method: 'get',
+      operationId: 'get_product',
+      pathParams: ['location_id', 'product_id'],
+      queryParams: ['include'],
+      spec: 'v2',
+    },
+    {
+      path: '/storages/{location_id}',
+      method: 'get',
+      operationId: 'get_location_inventories',
+      pathParams: ['location_id'],
+    },
+    {
+      path: '/locations/{location_id}/appointments/{record_id}',
+      method: 'get',
+      operationId: 'get_appointment',
+      pathParams: ['location_id', 'record_id'],
+    },
+    {
+      path: '/locations/{location_id}/sale/{document_id}',
+      method: 'get',
+      operationId: 'get_sale_transaction',
+      pathParams: ['location_id', 'document_id'],
+    },
+  ],
   visits_cancel_payment: [
     {
       path: '/locations/{location_id}/appointments/{record_id}',

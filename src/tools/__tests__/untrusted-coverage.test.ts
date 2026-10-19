@@ -1351,6 +1351,10 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       },
     ])
   ),
+  visits_add_product: {
+    what: 'the title of the product sold',
+    coveredBy: 'src/capabilities/finance/__tests__/visit-products.test.ts',
+  },
 };
 
 // ===========================================================================

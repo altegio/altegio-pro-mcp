@@ -6,6 +6,34 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — `visits_add_product`: sell a product on a visit
+
+- **`visits_add_product`** sells a product on an appointment's visit bill the
+  way the appointment window in Altegio does: a product already on the
+  appointment gets its quantity raised (decimal sale units allowed); otherwise
+  a line is added at the product's sale price in its sale unit, sold by the
+  appointment's team member, with the client's personal discount, from the
+  highest-ranked inventory for sale that holds the product. Inventory, team
+  member and discount can be overridden; goods marking codes are optional.
+- **Guards.** The caller states the quantity already on the bill
+  (`expected_current_quantity`), so a repeated confirmed call cannot sell
+  twice. A waiting appointment is marked arrived only with
+  `mark_arrived: true`, and the confirmation says what that triggers. Refused
+  before anyone is asked: group event appointments, a printed bill, a no-show,
+  gift card and membership products or lines, a visit whose other appointments
+  sell products, appointments with a walk-in visitor or an unreadable
+  composite service.
+- **How it saves.** It runs on the V2 appointment save the web app uses, which
+  replaces the whole appointment: the appointment is read with every include,
+  read again right before the save (refused if anything changed), sent back
+  key by key with the one line added or raised, and read back. A change to the
+  start time, team member, services or anything else is reported as an error;
+  the line is returned as saved, after loyalty programs, with the bill total
+  and the currency. The tool moves to V3 `addVisitItem` once it is served.
+- Scopes `inventory:sell` and `appointments:write`; served on `/mcp`,
+  `/mcp/ops` and `/mcp/finance`. The catalog now includes the V2
+  `save_attendance_appointments` operation.
+
 ### Changed — financial transactions point at `suppliers_list`
 
 - `supplier_id` on `financial_transactions_create`, `_update` and `_list`

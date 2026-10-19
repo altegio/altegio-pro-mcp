@@ -169,6 +169,7 @@ describe('tools/list per facet', () => {
       'products_search',
       'users_get_current',
       'visits_add_payment',
+      'visits_add_product',
       'visits_cancel_payment',
       'visits_get',
     ]);

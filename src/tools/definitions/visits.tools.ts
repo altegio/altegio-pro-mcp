@@ -1,6 +1,6 @@
 /**
- * `[Visits]` tool pack — the bill of an appointment's visit and the payments
- * recorded against it.
+ * `[Visits]` tool pack — the bill of an appointment's visit, the products sold
+ * on it and the payments recorded against it.
  *
  * A visit's bill lists what the client pays for (service lines from the
  * appointment, product lines sold with it), the payments already recorded, the
@@ -12,11 +12,13 @@
  *
  * Names, parameters and results use the product glossary; the wire vocabulary
  * (`document`, `sale`, `deposit`, `loyalty_certificate`, `loyalty_abonement`,
- * `prepay_hold`, `record`, `good`) stops in `src/api/v1/finance-adapter.ts`.
+ * `prepay_hold`, `record`, `good`, `storage`, `attendance_good_items`) stops in
+ * `src/api/v1/finance-adapter.ts` and `src/api/v2/visit-products-adapter.ts`.
  */
 import { z } from 'zod';
 import { defineTool } from '../factory.js';
 import * as finance from '../../capabilities/finance/use-cases.js';
+import * as visitProducts from '../../capabilities/finance/visit-products.js';
 
 const READ_ONLY = { readOnlyHint: true, openWorldHint: true } as const;
 
@@ -281,4 +283,139 @@ export const visitsCancelPaymentTool = defineTool({
   },
   outputSchema: billSchema,
   handler: async ({ input, client }) => finance.cancelPayment(client, input),
+});
+
+const productLineSchema = {
+  type: 'object' as const,
+  properties: {
+    id: { type: 'integer' as const },
+    product_id: { type: 'integer' as const },
+    quantity: { type: 'number' as const },
+    unit_kind: { type: 'string' as const, enum: ['sale', 'consumable'] },
+    inventory_id: { type: 'integer' as const },
+    team_member_id: { type: 'integer' as const },
+    unit_price: { type: 'number' as const },
+    discount_percent: { type: 'number' as const },
+    amount: { type: 'number' as const },
+    amount_after_loyalty: num,
+    marks: { type: 'array' as const, items: { type: 'string' as const } },
+  },
+  required: ['id', 'product_id', 'quantity', 'amount'],
+};
+
+const ATTENDANCE = ['waiting', 'confirmed', 'arrived', 'no_show', 'unknown'];
+
+export const visitsAddProductTool = defineTool({
+  name: 'visits_add_product',
+  category: 'Visits',
+  description:
+    'Sell a product on an appointment’s visit bill, as the appointment window in Altegio does: a product already on the appointment gets its quantity raised, otherwise a line is added at the product’s sale price in its sale unit, sold by the appointment’s team member, with the client’s personal discount, from the inventory Altegio would pick (override with inventory_id, team_member_id, discount_percent). Stock is written off at once; loyalty programs may take more off the line, and the result shows the line and bill as saved. The appointment must be arrived or confirmed — for a waiting one pass mark_arrived: true once the client is there. Pass the quantity of this product already on the bill (visits_get; 0 if none) as expected_current_quantity; the call is refused if it differs. Refused for group event appointments, a printed bill, gift cards and memberships, and a visit whose other appointments sell products. Altegio saves the whole appointment again from a fresh read and the call is refused if it changed meanwhile; a change made in the same instant can still be overwritten. No tool removes a line. Asks for confirmation first.',
+  annotations: {
+    title: 'Visits: sell a product',
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: true,
+  },
+  input: z.object({
+    location_id: locationId,
+    appointment_id: appointmentId,
+    product_id: z
+      .number()
+      .int()
+      .positive()
+      .describe('Product id, from products_search.'),
+    quantity: z
+      .number()
+      .positive()
+      .max(1_000_000)
+      .refine(
+        (v) => v >= 0.001 && Math.abs(v * 1000 - Math.round(v * 1000)) < 1e-6,
+        {
+          message: 'Use at least 0.001 and at most three decimals.',
+        }
+      )
+      .describe('How much to sell, in the product’s sale unit.'),
+    expected_current_quantity: z
+      .number()
+      .min(0)
+      .describe(
+        'Quantity of this product already on the bill, from visits_get (0 if none).'
+      ),
+    inventory_id: optionalId(
+      'Inventory to take it from (inventory_list). Default: as Altegio picks.'
+    ),
+    team_member_id: optionalId(
+      'Team member credited with the sale. Default: the appointment’s.'
+    ),
+    discount_percent: z
+      .number()
+      .min(0)
+      .max(100)
+      .optional()
+      .describe(
+        'Line discount in percent. Default: the client’s personal discount.'
+      ),
+    marks: z
+      .array(z.string().min(1).max(256))
+      .max(100)
+      .optional()
+      .describe('Goods marking codes, where marked goods are enforced.'),
+    mark_arrived: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Mark a waiting appointment arrived with the sale (only when the client is there).'
+      ),
+  }),
+  confirm: {
+    action: 'Sell a product on a visit',
+    target: (input) =>
+      `product ${input.product_id} ×${input.quantity} on appointment ${input.appointment_id} at location ${input.location_id}`,
+    consequence: (input) =>
+      `Altegio saves the appointment again exactly as it reads now, with the product line added or its quantity raised. The product is written off the inventory at once and the bill grows by the line total after loyalty programs. Integrations receive an appointment update; the client gets no message.${input.mark_arrived ? ' If the appointment is waiting, it is marked arrived.' : ''} This server cannot remove the line afterwards; a person removes it in Altegio.`,
+    detail: (input, client) => visitProducts.describeSale(client, input),
+  },
+  outputSchema: {
+    type: 'object' as const,
+    properties: {
+      location_id: { type: 'integer' as const },
+      appointment_id: { type: 'integer' as const },
+      visit_id: int,
+      currency: str,
+      added_line: { type: 'boolean' as const },
+      previous_quantity: { type: 'number' as const },
+      line: { anyOf: [productLineSchema, { type: 'null' as const }] },
+      attendance_before: { type: 'string' as const, enum: ATTENDANCE },
+      attendance: { type: 'string' as const, enum: ATTENDANCE },
+      bill: {
+        anyOf: [
+          {
+            type: 'object' as const,
+            properties: {
+              total_amount: { type: 'number' as const },
+              paid_amount: { type: 'number' as const },
+              amount_due: { type: 'number' as const },
+            },
+            required: ['total_amount', 'paid_amount', 'amount_due'],
+          },
+          { type: 'null' as const },
+        ],
+      },
+      product_lines: { type: 'array' as const, items: productLineSchema },
+      unexpected_changes: {
+        type: 'array' as const,
+        items: { type: 'string' as const },
+      },
+    },
+    required: [
+      'location_id',
+      'appointment_id',
+      'currency',
+      'line',
+      'bill',
+      'product_lines',
+      'unexpected_changes',
+    ],
+  },
+  handler: async ({ input, client }) => visitProducts.addProduct(client, input),
 });

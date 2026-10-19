@@ -16,13 +16,13 @@ the code disagree, which is how a surface change reaches a reviewer’s diff
 
 ## Counts
 
-**151 tools served (157 defined, 6 withheld from every view).**
+**152 tools served (158 defined, 6 withheld from every view).**
 
 | What | Count | Where |
 | --- | --- | --- |
-| Defined | 157 | 145 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
+| Defined | 158 | 146 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
 | Withheld from every view | 6 | `src/tools/disabled-tools.ts` (the report builder) |
-| **Served** | **151** | what `stdio` lists; every HTTP view is a subset |
+| **Served** | **152** | what `stdio` lists; every HTTP view is a subset |
 
 Served tools per category, in `tools/list` order:
 
@@ -49,21 +49,21 @@ Served tools per category, in `tools/list` order:
 | Settings | 7 |
 | Team members | 4 |
 | Users | 2 |
-| Visits | 3 |
+| Visits | 4 |
 
 ## Views
 
-| View | Address | Serves (of 157 defined) | Reasons |
+| View | Address | Serves (of 158 defined) | Reasons |
 | --- | --- | --- | --- |
-| `all` | stdio (no HTTP route) | 151 | all ×151, -off ×6 |
-| `default` | `/mcp` | 113 | dflt ×109, -pack ×35, -off ×6, base ×3, -pwd ×2, -name ×1, xtra ×1 |
-| `readonly` | `/mcp/readonly` | 84 | ro ×84, -write ×65, -off ×6, -pwd ×2 |
-| `ops` | `/mcp/ops` | 51 | - ×98, pfx ×27, rule ×21, -off ×6, base ×3, -pwd ×2 |
-| `catalog` | `/mcp/catalog` | 34 | - ×115, rule ×31, -off ×6, base ×3, -pwd ×2 |
-| `finance` | `/mcp/finance` | 55 | - ×94, pfx ×48, -off ×6, rule ×4, base ×3, -pwd ×2 |
-| `marketing` | `/mcp/marketing` | 17 | - ×132, pfx ×13, -off ×6, base ×3, -pwd ×2, rule ×1 |
-| `analytics` | `/mcp/analytics` | 33 | - ×116, pfx ×30, -off ×6, base ×3, -pwd ×2 |
-| `onboarding` | `/mcp/onboarding` | 15 | - ×134, pfx ×12, -off ×6, base ×3, -pwd ×2 |
+| `all` | stdio (no HTTP route) | 152 | all ×152, -off ×6 |
+| `default` | `/mcp` | 114 | dflt ×110, -pack ×35, -off ×6, base ×3, -pwd ×2, -name ×1, xtra ×1 |
+| `readonly` | `/mcp/readonly` | 84 | ro ×84, -write ×66, -off ×6, -pwd ×2 |
+| `ops` | `/mcp/ops` | 52 | - ×98, pfx ×27, rule ×22, -off ×6, base ×3, -pwd ×2 |
+| `catalog` | `/mcp/catalog` | 34 | - ×116, rule ×31, -off ×6, base ×3, -pwd ×2 |
+| `finance` | `/mcp/finance` | 56 | - ×94, pfx ×49, -off ×6, rule ×4, base ×3, -pwd ×2 |
+| `marketing` | `/mcp/marketing` | 17 | - ×133, pfx ×13, -off ×6, base ×3, -pwd ×2, rule ×1 |
+| `analytics` | `/mcp/analytics` | 33 | - ×117, pfx ×30, -off ×6, base ×3, -pwd ×2 |
+| `onboarding` | `/mcp/onboarding` | 15 | - ×135, pfx ×12, -off ×6, base ×3, -pwd ×2 |
 
 A facet answers *how many tools fit in this host’s context*; `readonly`
 answers *what may this agent do at all*. They are different kinds of view —
@@ -375,6 +375,7 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `visits_add_payment` | `all` | `dflt` | `-write` | `rule` | `-` | `pfx` | `-` | `-` | `-` | checkout:capture, confirm |
+| `visits_add_product` | `all` | `dflt` | `-write` | `rule` | `-` | `pfx` | `-` | `-` | `-` | inventory:sell + appointments:write, confirm |
 | `visits_cancel_payment` | `all` | `dflt` | `-write` | `rule` | `-` | `pfx` | `-` | `-` | `-` | checkout:cancel, confirm |
 | `visits_get` | `all` | `dflt` | `ro` | `rule` | `-` | `pfx` | `-` | `-` | `-` | checkout:read |
 
