@@ -1987,6 +1987,8 @@ export function mappingSource(mapping: ApiMapping): 'documented' | 'extended' {
  */
 export const unmappedTools: string[] = [
   'auth_logout',
+  // Writes a report to this server's own log; no API endpoint involved.
+  'feedback_submit',
   // Universal executor (ADR-001 D2): these are backed by the whole generated
   // catalog rather than by one endpoint, so a 1:1 spec mapping cannot exist.
   // Their drift check is `npm run catalog:check` plus the tests in

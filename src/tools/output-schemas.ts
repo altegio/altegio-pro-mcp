@@ -437,3 +437,15 @@ export const resourcesOutput = listSchema({ id: idProp, title: strProp }, [
   'id',
   'title',
 ]);
+
+// ========== Feedback ==========
+
+export const feedbackReceiptOutput = entitySchema(
+  {
+    status: { type: 'string' as const, enum: ['recorded'] },
+    report_id: strProp,
+    kind: { type: 'string' as const, enum: ['bug', 'feature_request'] },
+    masked_values: numProp,
+  },
+  ['status', 'report_id', 'kind', 'masked_values']
+);

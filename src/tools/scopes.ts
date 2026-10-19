@@ -229,6 +229,11 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   // learn the person's interface language on a narrowly granted token.
   users_get_current: null,
 
+  // --- Agent feedback --------------------------------------------------------
+  // Writes one line to this server's own log and reads no business data, so
+  // a read-only grant must still be able to report a missing capability.
+  feedback_submit: null,
+
   // --- Location and its settings -------------------------------------------
   locations_list: 'locations:read',
   locations_diagnose_access: 'locations:read',

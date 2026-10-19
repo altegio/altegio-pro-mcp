@@ -11,6 +11,11 @@
  * It is a leaf module on purpose — no imports — so the error classes and the
  * HTTP client can depend on it without an import cycle. Nothing here is ever
  * logged as-is: the registry reduces it to a class name and a status code.
+ *
+ * One field travels the other way: `correlation`, the registry's own
+ * value-free fields for the call (request, route, session, client), so a tool
+ * that writes an event of its own — `feedback_submit` — writes it joinable to
+ * the `tool_call` line of the same call.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 
@@ -41,6 +46,8 @@ export interface ToolCallObservation {
   lastError?: Error;
   /** The issues of the most recent argument validation that failed. */
   validationIssues?: ValidationIssue[];
+  /** The registry's correlation fields for this call, set before it runs. */
+  correlation?: Readonly<Record<string, unknown>>;
 }
 
 /** Bounds on what one call may add to its log line. */
@@ -131,6 +138,15 @@ export function summarizeIssues(
       ...(keys && keys.length > 0 ? { keys } : {}),
     };
   });
+}
+
+/**
+ * The correlation fields of the tool call in progress: the same request,
+ * route, transport, session and client fields its `tool_call` line carries.
+ * Empty outside a tool call.
+ */
+export function currentCallCorrelation(): Readonly<Record<string, unknown>> {
+  return storage.getStore()?.correlation ?? {};
 }
 
 /** Note a typed error at construction. A no-op outside a tool call. */

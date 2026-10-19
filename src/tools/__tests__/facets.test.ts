@@ -141,6 +141,7 @@ describe('static views', () => {
         'events_update',
         'events_update_appointment',
         'events_update_duplication_strategy',
+        'feedback_submit',
         'locations_list',
         'memberships_freeze',
         'memberships_list_for_client',
@@ -192,7 +193,9 @@ describe('static views', () => {
       (tool) => !tool.name.startsWith('analytics_')
     );
     const index = buildFacetIndex(withoutPack);
-    expect(index.members('analytics')).toEqual([...FACET_BASE_TOOLS]);
+    expect([...index.members('analytics')].sort()).toEqual(
+      [...FACET_BASE_TOOLS].sort()
+    );
     for (const extra of DEFAULT_FACET_EXTRA_TOOLS) {
       expect(index.includes(DEFAULT_FACET, extra)).toBe(false);
     }

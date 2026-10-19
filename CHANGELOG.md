@@ -6,6 +6,29 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — `feedback_submit`: agents report bugs and missing capabilities
+
+- **`feedback_submit`** records a report from the agent: `kind` (`bug` or
+  `feature_request`), a one-line `summary`, the `goal` the user had, and
+  optionally the `tool` or catalog `operation_id` involved, the `location_id`,
+  what was `observed` and `expected`, the `error_text` and the `impact`
+  (`blocked`, `workaround`, `minor`). Free text is bounded (200 characters for
+  the summary, 1,000 per field, 2,000 for the error) and masked: emails, phone
+  numbers in phone shapes, bearer tokens and `token=`/`password=` values.
+  Ids, dates and amounts stay. The result is a report id; the text is not
+  echoed.
+- **The sink is the server log.** Each report is one `agent_feedback` event
+  (logger `agent-feedback`) with the correlation fields of the same call's
+  `tool_call` line — `request_id`, `route`, `transport`, `session`,
+  `client_name`, `client_version` — so a report joins the calls around it. A
+  reported operation also says whether the catalog documents it
+  (`reported_operation_documented`).
+- **Served everywhere.** It is a base tool (every facet and the default view)
+  and `readOnlyHint: true` (the read-only view); `TOOL_SCOPES` maps it to no
+  scope, so a read-only grant can still report. The server instructions say
+  when to use it and that it is not for the user's own complaints; the other
+  sentences were tightened to keep every view under 1,900 characters.
+
 ### Changed — the analytics data model says how tool results combine
 
 - `altegio://analytics/data-model` gains a section on combining tool results:
@@ -26,7 +49,7 @@ is declared stable.
   unavailable; the coverage gaps for custom dimensions and cohorts point to
   computing them in code instead of naming a gap.
 - Every `page_size` states its maximum in words (`Items per page. At most
-  100.`): hosts that render a schema as a code signature drop `maximum`, and a
+100.`): hosts that render a schema as a code signature drop `maximum`, and a
   larger page size is refused.
 
 ### Fixed — service profitability reads the right columns again
