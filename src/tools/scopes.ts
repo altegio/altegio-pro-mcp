@@ -48,10 +48,11 @@ import type { ToolResult } from './tool-result.js';
 /**
  * Scope names taken verbatim from the API team's v3 P0 scope catalog (a draft
  * dated 2026-09-01, explicitly not final). Only the ones this server's tools
- * actually need are listed; the catalog carries more (`visits:*`,
- * `payments:*`, `finance:read`,
- * `availability:read`, `locations:create`, the four `chain_*` names) and they
- * are deliberately absent until a tool needs one.
+ * actually need are listed; the catalog carries more (`availability:read`,
+ * `locations:create`, `inventory:*`, the other `chain_*` names) and they are
+ * deliberately absent until a tool needs one. The checkout, client account,
+ * finance and payroll names below are the ones the V3 preview spec declares
+ * on its visit and payment operations.
  */
 const V3_CATALOG_SCOPES = [
   'locations:read',
@@ -71,6 +72,14 @@ const V3_CATALOG_SCOPES = [
   'chain_loyalty:read',
   'chain_loyalty:configure',
   'chain_loyalty:transact',
+  'checkout:read',
+  'checkout:capture',
+  'checkout:cancel',
+  'client_accounts:read',
+  'client_accounts:write',
+  'finance:read',
+  'finance:write',
+  'payroll:read',
 ] as const;
 
 /**
@@ -328,6 +337,27 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   memberships_unfreeze: 'chain_loyalty:transact',
   memberships_set_balance: 'chain_loyalty:transact',
   memberships_set_validity: 'chain_loyalty:transact',
+
+  // --- Visits, payments and finance -------------------------------------------
+  // Named as the V3 preview spec names them on its visit and payment
+  // operations: reading a visit's bill is `checkout:read`, recording a payment
+  // `checkout:capture`, cancelling one `checkout:cancel` (action-scopes, never
+  // implied by a `:write`); client accounts and their `deposit` top-up are
+  // `client_accounts:*`; accounts and cash registers and financial transactions
+  // are `finance:*` ("cash registers and financial accounts"); payroll reads are
+  // `payroll:read`.
+  visits_get: 'checkout:read',
+  visits_add_payment: 'checkout:capture',
+  visits_cancel_payment: 'checkout:cancel',
+  client_accounts_list_for_client: 'client_accounts:read',
+  client_accounts_deposit: 'client_accounts:write',
+  accounts_and_cash_registers_list: 'finance:read',
+  financial_transactions_list: 'finance:read',
+  financial_transactions_list_payment_items: 'finance:read',
+  financial_transactions_create: 'finance:write',
+  financial_transactions_update: 'finance:write',
+  financial_transactions_delete: 'finance:write',
+  payroll_get_calculation: 'payroll:read',
 
   // --- Client base ----------------------------------------------------------
   clients_search: 'clients:read',

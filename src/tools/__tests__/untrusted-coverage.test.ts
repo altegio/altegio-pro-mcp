@@ -1029,6 +1029,47 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     what: 'the reason the API gave for each test appointment it refused',
     coveredBy: 'src/tools/__tests__/onboarding-handlers.test.ts',
   },
+  // --- visits, payments and finance: fixtures in the finance use-case tests ---
+  ...Object.fromEntries(
+    (
+      [
+        [
+          'visits_get',
+          'service and product titles, account titles, payment method names, loyalty program titles',
+        ],
+        ['visits_add_payment', 'the bill read back after the payment'],
+        ['visits_cancel_payment', 'the bill read back after the cancellation'],
+        ['client_accounts_list_for_client', 'client account type titles'],
+        [
+          'accounts_and_cash_registers_list',
+          'account and cash register titles and comments',
+        ],
+        ['financial_transactions_list_payment_items', 'payment item titles'],
+        [
+          'financial_transactions_list',
+          'payment item and account titles, comments',
+        ],
+        [
+          'financial_transactions_create',
+          'the recorded transaction’s titles and comment',
+        ],
+        [
+          'financial_transactions_update',
+          'the changed transaction’s titles and comment',
+        ],
+        [
+          'financial_transactions_delete',
+          'the deleted transaction’s titles and comment',
+        ],
+      ] as const
+    ).map(([name, what]) => [
+      name,
+      {
+        what,
+        coveredBy: 'src/capabilities/finance/__tests__/use-cases.test.ts',
+      },
+    ])
+  ),
 };
 
 // ===========================================================================
@@ -1036,6 +1077,11 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
 // ===========================================================================
 
 const NO_FREE_TEXT: Record<string, string> = {
+  // --- client accounts and payroll ---
+  client_accounts_deposit:
+    'client, client account, account and financial transaction ids with amounts and balances only',
+  payroll_get_calculation:
+    'counts, amounts, dates and statuses of the team member’s payroll only',
   // --- group events ---
   events_delete: 'the event and location ids only',
   memberships_delete_type: 'the membership type and chain ids only',

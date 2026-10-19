@@ -6,10 +6,11 @@ A TypeScript [Model Context Protocol](https://modelcontextprotocol.io) server fo
 Altegio business owners, administrators, and team members. It provides
 administrative B2B operations, client workflows, onboarding, and analytics.
 
-**130 tools served (136 defined, 6 withheld from every view)** — see the generated
+**142 tools served (148 defined, 6 withheld from every view)** — see the generated
 [tool surface](docs/architecture/tool-surface.md) for exact membership and gates.
 The surface includes a 28-tool analytics pack, a 15-tool group events pack, a
-13-tool memberships pack, a 3-tool API explorer, and 12 onboarding wizard tools. The API explorer executes reads only; administrative
+13-tool memberships pack, 12 visit payment and finance tools, a 3-tool API
+explorer, and 12 onboarding wizard tools. The API explorer executes reads only; administrative
 writes use curated tools. The six unavailable report-builder tools are withheld
 because their upstream report-data service is not usable.
 
@@ -112,6 +113,19 @@ are the `events_*` pack: `events_list`, `events_get` (with the bookings),
 `events_update_duplication_strategy`, `events_delete_duplication_strategy`),
 `events_book_clients` (one client or up to 50, partial success reported per
 client), `events_update_appointment` and `events_reschedule_appointment`.
+
+Money at the reception desk is on `/mcp` and `/mcp/ops`: `visits_get` reads a
+visit's bill (lines, payments, amount due and the ways it can be paid),
+`visits_add_payment` and `visits_cancel_payment` record and cancel a payment,
+`client_accounts_list_for_client` and `client_accounts_deposit` read and top up
+a client account, and `accounts_and_cash_registers_list` lists where money is
+received. Back-office money is on `/mcp/finance` only: `financial_transactions_list`,
+`financial_transactions_create`, `financial_transactions_update`,
+`financial_transactions_delete`, `financial_transactions_list_payment_items`
+(payment items with their income or expense category) and
+`payroll_get_calculation` (a team member's payroll and settlements for a
+period). Amounts are in major units next to the location's ISO currency code,
+and every write that records, moves or deletes money asks for confirmation.
 
 Every collection result uses one pagination contract. Inputs are `page`
 (1-based) and `page_size` (default 25, maximum 300 unless a tool documents a

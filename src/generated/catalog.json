@@ -7,7 +7,7 @@
       "spec": "docs/en/b2b-v1/openapi.yaml",
       "title": "Business Management",
       "version": "1.0.0",
-      "operations": 277
+      "operations": 283
     },
     {
       "source": "v2",
@@ -21,7 +21,7 @@
       "spec": "docs/en/b2b-v3/openapi.yaml",
       "title": "Business Management",
       "version": "3.0.0-preview",
-      "operations": 59
+      "operations": 60
     }
   ],
   "canonicalAliases": {
@@ -34,8 +34,8 @@
     "salon_id": "location_id",
     "staff_id": "team_member_id"
   },
-  "operationCount": 354,
-  "curatedCount": 77,
+  "operationCount": 361,
+  "curatedCount": 93,
   "domains": [
     {
       "domain": "analytics",
@@ -47,7 +47,7 @@
     },
     {
       "domain": "auth",
-      "operations": 6
+      "operations": 7
     },
     {
       "domain": "availability",
@@ -72,6 +72,10 @@
     {
       "domain": "events",
       "operations": 18
+    },
+    {
+      "domain": "finance",
+      "operations": 7
     },
     {
       "domain": "fiscalization",
@@ -103,7 +107,7 @@
     },
     {
       "domain": "payments",
-      "operations": 14
+      "operations": 13
     },
     {
       "domain": "payroll",
@@ -120,10 +124,6 @@
     {
       "domain": "resources",
       "operations": 2
-    },
-    {
-      "domain": "sales",
-      "operations": 4
     },
     {
       "domain": "schedule",
@@ -155,7 +155,7 @@
     },
     {
       "domain": "visits",
-      "operations": 2
+      "operations": 6
     }
   ],
   "supersededCount": 33,
@@ -171,7 +171,7 @@
       "tags": [
         "Payments"
       ],
-      "domain": "payments",
+      "domain": "finance",
       "deprecated": false,
       "security": {
         "required": true,
@@ -219,6 +219,15 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "finance",
+        "tier": "core",
+        "facets": [
+          "ops",
+          "finance"
+        ],
+        "tool_name": "accounts_and_cash_registers_list"
       }
     },
     {
@@ -8838,6 +8847,17 @@
           },
           "type": "object"
         }
+      },
+      "curation": {
+        "domain": "client_accounts",
+        "tier": "core",
+        "facets": [
+          "ops",
+          "finance"
+        ],
+        "tool_name": "client_accounts_deposit",
+        "write_allowed": false,
+        "notes": "The `deposit` operation. The tool refuses when the balance differs from the one the caller read.\n"
       }
     },
     {
@@ -9119,6 +9139,15 @@
       "response": {
         "contentType": "application/json",
         "statusCode": "200"
+      },
+      "curation": {
+        "domain": "client_accounts",
+        "tier": "core",
+        "facets": [
+          "ops",
+          "finance"
+        ],
+        "tool_name": "client_accounts_list_for_client"
       }
     },
     {
@@ -9291,7 +9320,7 @@
       "tags": [
         "Payments"
       ],
-      "domain": "payments",
+      "domain": "finance",
       "deprecated": false,
       "security": {
         "required": true,
@@ -9339,11 +9368,11 @@
               "type": "string"
             },
             "expense_id": {
-              "description": "Payment item",
+              "description": "Payment item ID from [List Location payment items](#tag/Payments/operation/list_location_payment_items)",
               "type": "number"
             },
             "supplier_id": {
-              "description": "Supplier ID",
+              "description": "Supplier ID from [List Location Suppliers](#tag/Payments/operation/list_location_suppliers)",
               "type": "number"
             },
             "team_member_id": {
@@ -9505,6 +9534,16 @@
           },
           "type": "object"
         }
+      },
+      "curation": {
+        "domain": "finance",
+        "tier": "pack",
+        "facets": [
+          "finance"
+        ],
+        "tool_name": "financial_transactions_create",
+        "write_allowed": false,
+        "notes": "Stores `date` as server wall time (Asia/Dubai); the adapter converts from the location's time.\n"
       }
     },
     {
@@ -9518,7 +9557,7 @@
       "tags": [
         "Payments"
       ],
-      "domain": "payments",
+      "domain": "finance",
       "deprecated": false,
       "security": {
         "required": true,
@@ -9697,6 +9736,15 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "finance",
+        "tier": "pack",
+        "facets": [
+          "finance"
+        ],
+        "tool_name": "financial_transactions_update",
+        "notes": "Also read by financial_transactions_delete."
       }
     },
     {
@@ -9710,7 +9758,7 @@
       "tags": [
         "Payments"
       ],
-      "domain": "payments",
+      "domain": "finance",
       "deprecated": false,
       "security": {
         "required": true,
@@ -9768,11 +9816,11 @@
               "type": "string"
             },
             "expense_id": {
-              "description": "Payment item",
+              "description": "Payment item ID from [List Location payment items](#tag/Payments/operation/list_location_payment_items)",
               "type": "number"
             },
             "supplier_id": {
-              "description": "Supplier ID",
+              "description": "Supplier ID from [List Location Suppliers](#tag/Payments/operation/list_location_suppliers)",
               "type": "number"
             },
             "team_member_id": {
@@ -9933,6 +9981,16 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "finance",
+        "tier": "pack",
+        "facets": [
+          "finance"
+        ],
+        "tool_name": "financial_transactions_update",
+        "write_allowed": false,
+        "notes": "PUT replaces every field and converts `date` from location time; the tool reads first and sends every field back.\n"
       }
     },
     {
@@ -9946,7 +10004,7 @@
       "tags": [
         "Payments"
       ],
-      "domain": "payments",
+      "domain": "finance",
       "deprecated": false,
       "security": {
         "required": true,
@@ -9977,6 +10035,15 @@
       ],
       "response": {
         "statusCode": "202"
+      },
+      "curation": {
+        "domain": "finance",
+        "tier": "pack",
+        "facets": [
+          "finance"
+        ],
+        "tool_name": "financial_transactions_delete",
+        "write_allowed": false
       }
     },
     {
@@ -20532,6 +20599,15 @@
           },
           "type": "object"
         }
+      },
+      "curation": {
+        "domain": "payroll",
+        "tier": "pack",
+        "facets": [
+          "finance"
+        ],
+        "tool_name": "payroll_get_calculation",
+        "notes": "Settlements (accrued, paid, balance) for the same period."
       }
     },
     {
@@ -20832,6 +20908,15 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "payroll",
+        "tier": "pack",
+        "facets": [
+          "finance"
+        ],
+        "tool_name": "payroll_get_calculation",
+        "notes": "Saved payroll calculations for the same period."
       }
     },
     {
@@ -21171,6 +21256,15 @@
           },
           "type": "object"
         }
+      },
+      "curation": {
+        "domain": "payroll",
+        "tier": "pack",
+        "facets": [
+          "finance"
+        ],
+        "tool_name": "payroll_get_calculation",
+        "notes": "Answers 416 when no payroll scheme applies; the tool reports no calculation."
       }
     },
     {
@@ -21648,7 +21742,7 @@
       "tags": [
         "Sales"
       ],
-      "domain": "sales",
+      "domain": "visits",
       "deprecated": false,
       "security": {
         "required": true,
@@ -21806,6 +21900,16 @@
           },
           "type": "object"
         }
+      },
+      "curation": {
+        "domain": "visits",
+        "tier": "core",
+        "facets": [
+          "ops",
+          "finance"
+        ],
+        "tool_name": "visits_get",
+        "notes": "Read for the visit document of an appointment (documents[] type 7 on the appointment). Also read by visits_add_payment and visits_cancel_payment, which check the bill before they write.\n"
       }
     },
     {
@@ -21819,7 +21923,7 @@
       "tags": [
         "Sales"
       ],
-      "domain": "sales",
+      "domain": "visits",
       "deprecated": false,
       "security": {
         "required": true,
@@ -22239,6 +22343,17 @@
           },
           "type": "object"
         }
+      },
+      "curation": {
+        "domain": "visits",
+        "tier": "core",
+        "facets": [
+          "ops",
+          "finance"
+        ],
+        "tool_name": "visits_add_payment",
+        "write_allowed": false,
+        "notes": "The tool refuses when the amount due differs from the one the caller read, so a repeated confirmed call cannot record the payment twice.\n"
       }
     },
     {
@@ -22252,7 +22367,7 @@
       "tags": [
         "Sales"
       ],
-      "domain": "sales",
+      "domain": "visits",
       "deprecated": false,
       "security": {
         "required": true,
@@ -22407,6 +22522,17 @@
           },
           "type": "object"
         }
+      },
+      "curation": {
+        "domain": "visits",
+        "tier": "core",
+        "facets": [
+          "ops",
+          "finance"
+        ],
+        "tool_name": "visits_cancel_payment",
+        "write_allowed": false,
+        "notes": "Client account and loyalty payments (payment id l<number>)."
       }
     },
     {
@@ -22420,7 +22546,7 @@
       "tags": [
         "Sales"
       ],
-      "domain": "sales",
+      "domain": "visits",
       "deprecated": false,
       "security": {
         "required": true,
@@ -22575,6 +22701,17 @@
           },
           "type": "object"
         }
+      },
+      "curation": {
+        "domain": "visits",
+        "tier": "core",
+        "facets": [
+          "ops",
+          "finance"
+        ],
+        "tool_name": "visits_cancel_payment",
+        "write_allowed": false,
+        "notes": "Money payments (payment id t<number>)."
       }
     },
     {
@@ -29789,6 +29926,684 @@
     },
     {
       "source": "v1",
+      "operationId": "list_location_payment_items",
+      "method": "GET",
+      "path": "/references/expenses/{location_id}",
+      "displayPath": "/references/expenses/{location_id}",
+      "summary": "List Location payment items",
+      "description": "Returns the payment items (expense categories) available in the Location: built-in items such as\nProduct purchase or Team salaries and the Location's custom items. Use an item `id` as `expense_id`\nin [Create a Financial Transaction](#tag/Payments/operation/create_financial_transaction).\nIncome items (`type: 7`) classify incoming money; the other types classify expenses.\n\nThe Business User needs Finances access in the Location; otherwise the request returns `403`.\nIf the Business User's access is limited to selected payment items, only those items are returned;\nwithout such a limit all items are returned.",
+      "tags": [
+        "Payments"
+      ],
+      "domain": "finance",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "items": {
+            "description": "A payment item (expense category) classifies a financial transaction in finance reports. Pass its `id` as `expense_id` when you create or update a financial transaction.",
+            "properties": {
+              "id": {
+                "description": "Payment item ID",
+                "type": "integer"
+              },
+              "title": {
+                "description": "Payment item name",
+                "type": "string"
+              },
+              "type": {
+                "description": "Payment item type, the report section the item belongs to: - `1` - Prime cost expenses - `2` - Commercial expenses - `3` - Personnel expenses - `4` - Administrative expenses - `5` - Taxes and fees -…",
+                "enum": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ],
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "curation": {
+        "domain": "finance",
+        "tier": "pack",
+        "facets": [
+          "finance"
+        ],
+        "tool_name": "financial_transactions_list_payment_items",
+        "notes": "Payment items with the income or expense category (`type` 1–7) they belong to; the id is `expense_id` on the wire.\n"
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "list_location_suppliers",
+      "method": "GET",
+      "path": "/references/suppliers/{location_id}",
+      "displayPath": "/references/suppliers/{location_id}",
+      "summary": "List Location Suppliers",
+      "description": "Returns the Location's Suppliers (counterparties), sorted by ID. Deleted Suppliers are not returned.\nUse a Supplier `id` as `supplier_id` in\n[Create a Financial Transaction](#tag/Payments/operation/create_financial_transaction) and in\n[Create an inventory operation](#tag/Inventory/operation/create_inventory_operation).\n\nThe Business User needs Finances access in the Location; otherwise the request returns `403`.",
+      "tags": [
+        "Payments"
+      ],
+      "domain": "payments",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "items": {
+            "description": "A Supplier (counterparty) of the Location. Pass its `id` as `supplier_id` in financial transactions and in inventory operations such as a product receipt.",
+            "properties": {
+              "address": {
+                "description": "Address",
+                "type": "string"
+              },
+              "comment": {
+                "description": "Comment",
+                "type": "string"
+              },
+              "company_id": {
+                "description": "Location ID",
+                "type": "integer"
+              },
+              "contact": {
+                "description": "Contact person",
+                "type": "string"
+              },
+              "email": {
+                "description": "Email address",
+                "type": "string"
+              },
+              "id": {
+                "description": "Supplier ID",
+                "type": "integer"
+              },
+              "inn": {
+                "description": "Taxpayer identification number",
+                "type": "string"
+              },
+              "kpp": {
+                "description": "Tax registration reason code (legal entities)",
+                "type": "string"
+              },
+              "phone": {
+                "description": "Phone number",
+                "type": "string"
+              },
+              "title": {
+                "description": "Supplier name",
+                "type": "string"
+              },
+              "type": {
+                "description": "Legal form",
+                "properties": {
+                  "id": {
+                    "description": "Legal form ID, same as `type_id`",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "title": {
+                    "description": "Legal form name in the Business User's language",
+                    "type": "string",
+                    "x-truncated": true
+                  }
+                },
+                "type": "object"
+              },
+              "type_id": {
+                "description": "Legal form: - `0` - Legal entity - `1` - Individual entrepreneur - `2` - Individual",
+                "enum": [
+                  0,
+                  1,
+                  2
+                ],
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        }
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "create_location_supplier",
+      "method": "POST",
+      "path": "/references/suppliers/{location_id}",
+      "displayPath": "/references/suppliers/{location_id}",
+      "summary": "Create a Supplier",
+      "description": "Creates a Supplier (counterparty) in the Location. `title` and `type_id` are required.\nThe Business User needs Finances access in the Location; otherwise the request returns `403`.",
+      "tags": [
+        "Payments"
+      ],
+      "domain": "payments",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "allOf": [
+            {
+              "description": "Creating a Supplier requires `title` and `type_id`. On update, send only the fields to change: omitted fields keep their current values, and `null` does not clear a field.",
+              "properties": {
+                "address": {
+                  "description": "Address",
+                  "type": "string"
+                },
+                "comment": {
+                  "description": "Comment",
+                  "type": "string"
+                },
+                "contact": {
+                  "description": "Contact person",
+                  "type": "string"
+                },
+                "email": {
+                  "description": "Email address",
+                  "type": "string"
+                },
+                "inn": {
+                  "description": "Taxpayer identification number",
+                  "type": "string"
+                },
+                "kpp": {
+                  "description": "Tax registration reason code (legal entities)",
+                  "type": "string"
+                },
+                "phone": {
+                  "description": "Phone number",
+                  "type": "string"
+                },
+                "title": {
+                  "description": "Supplier name. Required on create",
+                  "type": "string"
+                },
+                "type_id": {
+                  "description": "Legal form: - `0` - Legal entity - `1` - Individual entrepreneur - `2` - Individual",
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ],
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            {
+              "required": [
+                "title",
+                "type_id"
+              ]
+            }
+          ]
+        }
+      },
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "description": "A Supplier (counterparty) of the Location. Pass its `id` as `supplier_id` in financial transactions and in inventory operations such as a product receipt.",
+          "properties": {
+            "address": {
+              "description": "Address",
+              "type": "string"
+            },
+            "comment": {
+              "description": "Comment",
+              "type": "string"
+            },
+            "company_id": {
+              "description": "Location ID",
+              "type": "integer"
+            },
+            "contact": {
+              "description": "Contact person",
+              "type": "string"
+            },
+            "email": {
+              "description": "Email address",
+              "type": "string"
+            },
+            "id": {
+              "description": "Supplier ID",
+              "type": "integer"
+            },
+            "inn": {
+              "description": "Taxpayer identification number",
+              "type": "string"
+            },
+            "kpp": {
+              "description": "Tax registration reason code (legal entities)",
+              "type": "string"
+            },
+            "phone": {
+              "description": "Phone number",
+              "type": "string"
+            },
+            "title": {
+              "description": "Supplier name",
+              "type": "string"
+            },
+            "type": {
+              "description": "Legal form",
+              "properties": {
+                "id": {
+                  "description": "Legal form ID, same as `type_id`",
+                  "type": "integer"
+                },
+                "title": {
+                  "description": "Legal form name in the Business User's language",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type_id": {
+              "description": "Legal form: - `0` - Legal entity - `1` - Individual entrepreneur - `2` - Individual",
+              "enum": [
+                0,
+                1,
+                2
+              ],
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        }
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "get_location_supplier",
+      "method": "GET",
+      "path": "/references/suppliers/{location_id}/{supplier_id}",
+      "displayPath": "/references/suppliers/{location_id}/{supplier_id}",
+      "summary": "Get a Supplier",
+      "description": "Returns one Supplier (counterparty) of the Location.\nThe Business User needs Finances access in the Location; otherwise the request returns `403`.",
+      "tags": [
+        "Payments"
+      ],
+      "domain": "payments",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Supplier ID",
+          "name": "supplier_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "description": "A Supplier (counterparty) of the Location. Pass its `id` as `supplier_id` in financial transactions and in inventory operations such as a product receipt.",
+          "properties": {
+            "address": {
+              "description": "Address",
+              "type": "string"
+            },
+            "comment": {
+              "description": "Comment",
+              "type": "string"
+            },
+            "company_id": {
+              "description": "Location ID",
+              "type": "integer"
+            },
+            "contact": {
+              "description": "Contact person",
+              "type": "string"
+            },
+            "email": {
+              "description": "Email address",
+              "type": "string"
+            },
+            "id": {
+              "description": "Supplier ID",
+              "type": "integer"
+            },
+            "inn": {
+              "description": "Taxpayer identification number",
+              "type": "string"
+            },
+            "kpp": {
+              "description": "Tax registration reason code (legal entities)",
+              "type": "string"
+            },
+            "phone": {
+              "description": "Phone number",
+              "type": "string"
+            },
+            "title": {
+              "description": "Supplier name",
+              "type": "string"
+            },
+            "type": {
+              "description": "Legal form",
+              "properties": {
+                "id": {
+                  "description": "Legal form ID, same as `type_id`",
+                  "type": "integer"
+                },
+                "title": {
+                  "description": "Legal form name in the Business User's language",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type_id": {
+              "description": "Legal form: - `0` - Legal entity - `1` - Individual entrepreneur - `2` - Individual",
+              "enum": [
+                0,
+                1,
+                2
+              ],
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        }
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "update_location_supplier",
+      "method": "PUT",
+      "path": "/references/suppliers/{location_id}/{supplier_id}",
+      "displayPath": "/references/suppliers/{location_id}/{supplier_id}",
+      "summary": "Update a Supplier",
+      "description": "Updates a Supplier (counterparty) of the Location. Send only the fields to change: omitted fields\nkeep their current values. The Business User needs Finances access in the Location; otherwise the\nrequest returns `403`.",
+      "tags": [
+        "Payments"
+      ],
+      "domain": "payments",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Supplier ID",
+          "name": "supplier_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "description": "Creating a Supplier requires `title` and `type_id`. On update, send only the fields to change: omitted fields keep their current values, and `null` does not clear a field.",
+          "properties": {
+            "address": {
+              "description": "Address",
+              "type": "string"
+            },
+            "comment": {
+              "description": "Comment",
+              "type": "string"
+            },
+            "contact": {
+              "description": "Contact person",
+              "type": "string"
+            },
+            "email": {
+              "description": "Email address",
+              "type": "string"
+            },
+            "inn": {
+              "description": "Taxpayer identification number",
+              "type": "string"
+            },
+            "kpp": {
+              "description": "Tax registration reason code (legal entities)",
+              "type": "string"
+            },
+            "phone": {
+              "description": "Phone number",
+              "type": "string"
+            },
+            "title": {
+              "description": "Supplier name. Required on create",
+              "type": "string"
+            },
+            "type_id": {
+              "description": "Legal form: - `0` - Legal entity - `1` - Individual entrepreneur - `2` - Individual",
+              "enum": [
+                0,
+                1,
+                2
+              ],
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "v1",
+        "schema": {
+          "description": "A Supplier (counterparty) of the Location. Pass its `id` as `supplier_id` in financial transactions and in inventory operations such as a product receipt.",
+          "properties": {
+            "address": {
+              "description": "Address",
+              "type": "string"
+            },
+            "comment": {
+              "description": "Comment",
+              "type": "string"
+            },
+            "company_id": {
+              "description": "Location ID",
+              "type": "integer"
+            },
+            "contact": {
+              "description": "Contact person",
+              "type": "string"
+            },
+            "email": {
+              "description": "Email address",
+              "type": "string"
+            },
+            "id": {
+              "description": "Supplier ID",
+              "type": "integer"
+            },
+            "inn": {
+              "description": "Taxpayer identification number",
+              "type": "string"
+            },
+            "kpp": {
+              "description": "Tax registration reason code (legal entities)",
+              "type": "string"
+            },
+            "phone": {
+              "description": "Phone number",
+              "type": "string"
+            },
+            "title": {
+              "description": "Supplier name",
+              "type": "string"
+            },
+            "type": {
+              "description": "Legal form",
+              "properties": {
+                "id": {
+                  "description": "Legal form ID, same as `type_id`",
+                  "type": "integer"
+                },
+                "title": {
+                  "description": "Legal form name in the Business User's language",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type_id": {
+              "description": "Legal form: - `0` - Legal entity - `1` - Individual entrepreneur - `2` - Individual",
+              "enum": [
+                0,
+                1,
+                2
+              ],
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        }
+      }
+    },
+    {
+      "source": "v1",
+      "operationId": "delete_location_supplier",
+      "method": "DELETE",
+      "path": "/references/suppliers/{location_id}/{supplier_id}",
+      "displayPath": "/references/suppliers/{location_id}/{supplier_id}",
+      "summary": "Delete a Supplier",
+      "description": "Marks a Supplier (counterparty) of the Location as deleted. A deleted Supplier is no longer\nlisted or returned. The Business User needs Finances access in the Location; otherwise the request returns `403`.",
+      "tags": [
+        "Payments"
+      ],
+      "domain": "payments",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "description": "Supplier ID",
+          "name": "supplier_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "202",
+        "envelope": "v1",
+        "schema": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "source": "v1",
       "operationId": "get_day_report",
       "method": "GET",
       "path": "/reports/day_report/{location_id}/{date}",
@@ -32555,7 +33370,7 @@
               "type": "number"
             },
             "supplier_id": {
-              "description": "Vendor ID",
+              "description": "Supplier ID from [List Location Suppliers](#tag/Payments/operation/list_location_suppliers)",
               "type": "number"
             },
             "team_member_id": {
@@ -33552,7 +34367,7 @@
               "type": "number"
             },
             "supplier_id": {
-              "description": "Vendor ID",
+              "description": "Supplier ID from [List Location Suppliers](#tag/Payments/operation/list_location_suppliers)",
               "type": "number"
             },
             "team_member_id": {
@@ -35971,7 +36786,7 @@
       "tags": [
         "Payments"
       ],
-      "domain": "payments",
+      "domain": "finance",
       "deprecated": false,
       "security": {
         "required": true,
@@ -36276,6 +37091,14 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "finance",
+        "tier": "pack",
+        "facets": [
+          "finance"
+        ],
+        "tool_name": "financial_transactions_list"
       }
     },
     {
@@ -50401,6 +51224,63 @@
     },
     {
       "source": "v3",
+      "operationId": "getOAuthProtectedResourceMetadata",
+      "method": "GET",
+      "path": "/.well-known/oauth-protected-resource/api/v3",
+      "displayPath": "/.well-known/oauth-protected-resource/api/v3",
+      "summary": "Get protected resource metadata",
+      "description": "OAuth 2.0 protected resource metadata (RFC 9728) of API V3: the resource identifier,\nthe authorization server that issues tokens for it, and the scopes it accepts. The\npath follows RFC 9728 §3.1: the well-known suffix is inserted between the host and\nthe path of the resource identifier `https://api.alteg.io/api/v3`. A `401` from\n`/api/v3` points here in `WWW-Authenticate: Bearer resource_metadata=\"...\"`.",
+      "tags": [
+        "Authorization"
+      ],
+      "domain": "auth",
+      "deprecated": false,
+      "status": "preview",
+      "security": {
+        "required": false,
+        "schemes": []
+      },
+      "parameters": [],
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "schema": {
+          "additionalProperties": false,
+          "description": "OAuth 2.0 protected resource metadata (RFC 9728).",
+          "properties": {
+            "authorization_servers": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "bearer_methods_supported": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "resource": {
+              "description": "Resource identifier, also the audience of tokens accepted here.",
+              "type": "string"
+            },
+            "scopes_supported": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "resource",
+            "authorization_servers"
+          ],
+          "type": "object"
+        }
+      }
+    },
+    {
+      "source": "v3",
       "operationId": "createLocation",
       "method": "POST",
       "path": "/locations",
@@ -51026,7 +51906,7 @@
       "path": "/locations/{location_id}/access_roles",
       "displayPath": "/locations/{location_id}/access_roles",
       "summary": "List location access roles",
-      "description": "Returns public role ids and titles only; internal permission slugs are never exposed.\n\nCursor-paginated list. Default ordering: title, role_id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Returns public role ids and titles only; internal permission slugs are never exposed.\n\nCursor-paginated list. Default ordering: title, role_id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
       "tags": [
         "Team Members"
       ],
@@ -51050,7 +51930,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. An empty value is the same as omitting the parameter and returns the first page. Cursors expire one hour after the response that issued them (every page issues a fresh cursor) and are bound to credential, tenant, list, filters, and ordering; for OAuth the credential is the user's authorization, so a cursor survives a token refresh; a row whose ordering column changed between pages may be skipped or returned twice, and a row created while you page may be missing from this pass if it sorts before the current position (start a new pass to pick it up); expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor` (also a cursor whose number of key values does not match the list's ordering), `foreign_cursor` (another credential or tenant), or `filter_changed` (another list, ordering, or filters).",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -51059,7 +51939,7 @@
           }
         },
         {
-          "description": "Page size for cursor pagination. Default is 25; maximum is 100.",
+          "description": "Page size for cursor pagination. Default is 25; maximum is 100. Values outside 1..100 or non-integers fail with `422 validation_failed`; the value is never clamped.",
           "name": "limit",
           "in": "query",
           "required": false,
@@ -51150,7 +52030,7 @@
       "path": "/locations/{location_id}/accounts",
       "displayPath": "/locations/{location_id}/accounts",
       "summary": "List accounts",
-      "description": "Returns the cash/settlement accounts of the Location. Use an account's `id` as\n`account_id` in `createPayment` — either as the target of an `account` payment or as\nan override of a payment method's default account.\n\n\nCursor-paginated list. Default ordering: title, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Returns the cash/settlement accounts of the Location. Use an account's `id` as\n`account_id` in `createPayment` — either as the target of an `account` payment or as\nan override of a payment method's default account.\n\n\nCursor-paginated list. Default ordering: title, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
       "tags": [
         "Payments"
       ],
@@ -51175,7 +52055,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. An empty value is the same as omitting the parameter and returns the first page. Cursors expire one hour after the response that issued them (every page issues a fresh cursor) and are bound to credential, tenant, list, filters, and ordering; for OAuth the credential is the user's authorization, so a cursor survives a token refresh; a row whose ordering column changed between pages may be skipped or returned twice, and a row created while you page may be missing from this pass if it sorts before the current position (start a new pass to pick it up); expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor` (also a cursor whose number of key values does not match the list's ordering), `foreign_cursor` (another credential or tenant), or `filter_changed` (another list, ordering, or filters).",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -51184,7 +52064,7 @@
           }
         },
         {
-          "description": "Page size for cursor pagination. Default is 25; maximum is 100.",
+          "description": "Page size for cursor pagination. Default is 25; maximum is 100. Values outside 1..100 or non-integers fail with `422 validation_failed`; the value is never clamped.",
           "name": "limit",
           "in": "query",
           "required": false,
@@ -51285,7 +52165,7 @@
       "path": "/locations/{location_id}/appointments",
       "displayPath": "/locations/{location_id}/appointments",
       "summary": "List appointments",
-      "description": "Returns the appointments of the Location as a cursor-paginated list, newest window\nfirst by start time with a stable tie-breaker. Client contact data inside\n`expand[]=client` uses redacted contact fields without `clients:read_contact`.\n\nCancelled appointments are included; filter them out on the `status` field. There is no\nstatus query parameter in the first iteration.\n\n\nCursor-paginated list. Default ordering: starts_at desc, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Returns the appointments of the Location as a cursor-paginated list, newest window\nfirst by start time with a stable tie-breaker. Client contact data inside\n`expand[]=client` uses redacted contact fields without `clients:read_contact`.\n\nCancelled appointments are included; filter them out on the `status` field. There is no\nstatus query parameter in the first iteration.\n\n\nCursor-paginated list. Default ordering: starts_at desc, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
       "tags": [
         "Appointments"
       ],
@@ -51319,7 +52199,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. An empty value is the same as omitting the parameter and returns the first page. Cursors expire one hour after the response that issued them (every page issues a fresh cursor) and are bound to credential, tenant, list, filters, and ordering; for OAuth the credential is the user's authorization, so a cursor survives a token refresh; a row whose ordering column changed between pages may be skipped or returned twice, and a row created while you page may be missing from this pass if it sorts before the current position (start a new pass to pick it up); expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor` (also a cursor whose number of key values does not match the list's ordering), `foreign_cursor` (another credential or tenant), or `filter_changed` (another list, ordering, or filters).",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -51344,7 +52224,7 @@
           }
         },
         {
-          "description": "Page size for cursor pagination. Default is 25; maximum is 100.",
+          "description": "Page size for cursor pagination. Default is 25; maximum is 100. Values outside 1..100 or non-integers fail with `422 validation_failed`; the value is never clamped.",
           "name": "limit",
           "in": "query",
           "required": false,
@@ -55923,7 +56803,7 @@
       "path": "/locations/{location_id}/clients",
       "displayPath": "/locations/{location_id}/clients",
       "summary": "List and search clients",
-      "description": "Searches the client base of the Location. Exact `phone` and `email` contact searches require `clients:read_contact` plus the subject contact permission; without that scope the API returns `403 missing_scope`/`permission_denied`, not an empty result. Free-text `query` remains under `clients:read`. Contact fields use the redaction contract when contact access is absent. This endpoint is rate-limited.\\n\\nCursor-paginated list. Default ordering: display_name, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Searches the client base of the Location. Exact `phone` and `email` contact searches require `clients:read_contact` plus the subject contact permission; without that scope the API returns `403 missing_scope`/`permission_denied`, not an empty result. Free-text `query` remains under `clients:read`. Contact fields use the redaction contract when contact access is absent. This endpoint is rate-limited.\\n\\nCursor-paginated list. Default ordering: id. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
       "tags": [
         "Clients"
       ],
@@ -55948,7 +56828,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. An empty value is the same as omitting the parameter and returns the first page. Cursors expire one hour after the response that issued them (every page issues a fresh cursor) and are bound to credential, tenant, list, filters, and ordering; for OAuth the credential is the user's authorization, so a cursor survives a token refresh; a row whose ordering column changed between pages may be skipped or returned twice, and a row created while you page may be missing from this pass if it sorts before the current position (start a new pass to pick it up); expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor` (also a cursor whose number of key values does not match the list's ordering), `foreign_cursor` (another credential or tenant), or `filter_changed` (another list, ordering, or filters).",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -55967,7 +56847,7 @@
           }
         },
         {
-          "description": "Page size for cursor pagination. Default is 25; maximum is 100.",
+          "description": "Page size for cursor pagination. Default is 25; maximum is 100. Values outside 1..100 or non-integers fail with `422 validation_failed`; the value is never clamped.",
           "name": "limit",
           "in": "query",
           "required": false,
@@ -56874,7 +57754,7 @@
       "path": "/locations/{location_id}/payment_methods",
       "displayPath": "/locations/{location_id}/payment_methods",
       "summary": "List payment methods",
-      "description": "Returns the payment methods configured for the Location - what the business accepts and how\neach method settles. This is the only source of `payment_method_id` for `createPayment`.\n\nIt does not say whether a method can pay a particular visit: read `visit.payment_methods`\nfor that, or `searchLoyaltyInstrument` for a gift card or membership held by number. Both\nreturn `ApplicablePaymentMethod`, a different shape from this one.\n\nCursor-paginated list. Default ordering: name, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Returns the payment methods configured for the Location - what the business accepts and how\neach method settles. This is the only source of `payment_method_id` for `createPayment`.\n\nIt does not say whether a method can pay a particular visit: read `visit.payment_methods`\nfor that, or `searchLoyaltyInstrument` for a gift card or membership held by number. Both\nreturn `ApplicablePaymentMethod`, a different shape from this one.\n\nCursor-paginated list. Default ordering: name, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
       "tags": [
         "Payments"
       ],
@@ -56899,7 +57779,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. An empty value is the same as omitting the parameter and returns the first page. Cursors expire one hour after the response that issued them (every page issues a fresh cursor) and are bound to credential, tenant, list, filters, and ordering; for OAuth the credential is the user's authorization, so a cursor survives a token refresh; a row whose ordering column changed between pages may be skipped or returned twice, and a row created while you page may be missing from this pass if it sorts before the current position (start a new pass to pick it up); expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor` (also a cursor whose number of key values does not match the list's ordering), `foreign_cursor` (another credential or tenant), or `filter_changed` (another list, ordering, or filters).",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -56908,7 +57788,7 @@
           }
         },
         {
-          "description": "Page size for cursor pagination. Default is 25; maximum is 100.",
+          "description": "Page size for cursor pagination. Default is 25; maximum is 100. Values outside 1..100 or non-integers fail with `422 validation_failed`; the value is never clamped.",
           "name": "limit",
           "in": "query",
           "required": false,
@@ -57031,7 +57911,7 @@
       "path": "/locations/{location_id}/positions",
       "displayPath": "/locations/{location_id}/positions",
       "summary": "List positions",
-      "description": "Returns the position directory of the Location. Reference a position from a Team\nMember via `position_id`.\n\n\nCursor-paginated list. Default ordering: weight desc, title, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Returns the position directory of the Location. Reference a position from a Team\nMember via `position_id`.\n\n\nCursor-paginated list. Default ordering: weight desc, title, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
       "tags": [
         "Positions"
       ],
@@ -57056,7 +57936,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. An empty value is the same as omitting the parameter and returns the first page. Cursors expire one hour after the response that issued them (every page issues a fresh cursor) and are bound to credential, tenant, list, filters, and ordering; for OAuth the credential is the user's authorization, so a cursor survives a token refresh; a row whose ordering column changed between pages may be skipped or returned twice, and a row created while you page may be missing from this pass if it sorts before the current position (start a new pass to pick it up); expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor` (also a cursor whose number of key values does not match the list's ordering), `foreign_cursor` (another credential or tenant), or `filter_changed` (another list, ordering, or filters).",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -57065,7 +57945,7 @@
           }
         },
         {
-          "description": "Page size for cursor pagination. Default is 25; maximum is 100.",
+          "description": "Page size for cursor pagination. Default is 25; maximum is 100. Values outside 1..100 or non-integers fail with `422 validation_failed`; the value is never clamped.",
           "name": "limit",
           "in": "query",
           "required": false,
@@ -57431,7 +58311,7 @@
       "path": "/locations/{location_id}/products",
       "displayPath": "/locations/{location_id}/products",
       "summary": "List products",
-      "description": "Returns the minimal product catalog fields available in P0: `id`, `title`,\n`price_minor`, and `unit`. Inventory levels, balances, cost, and standalone product\nsales are not part of the preview scope.\n\nCursor-paginated list. Default ordering: title, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Returns the minimal product catalog fields available in P0: `id`, `title`,\n`price_minor`, and `unit`. Inventory levels, balances, cost, and standalone product\nsales are not part of the preview scope.\n\nCursor-paginated list. Default ordering: title, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
       "tags": [
         "Products"
       ],
@@ -57456,7 +58336,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. An empty value is the same as omitting the parameter and returns the first page. Cursors expire one hour after the response that issued them (every page issues a fresh cursor) and are bound to credential, tenant, list, filters, and ordering; for OAuth the credential is the user's authorization, so a cursor survives a token refresh; a row whose ordering column changed between pages may be skipped or returned twice, and a row created while you page may be missing from this pass if it sorts before the current position (start a new pass to pick it up); expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor` (also a cursor whose number of key values does not match the list's ordering), `foreign_cursor` (another credential or tenant), or `filter_changed` (another list, ordering, or filters).",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -57465,7 +58345,7 @@
           }
         },
         {
-          "description": "Page size for cursor pagination. Default is 25; maximum is 100.",
+          "description": "Page size for cursor pagination. Default is 25; maximum is 100. Values outside 1..100 or non-integers fail with `422 validation_failed`; the value is never clamped.",
           "name": "limit",
           "in": "query",
           "required": false,
@@ -57574,7 +58454,7 @@
       "path": "/locations/{location_id}/resources",
       "displayPath": "/locations/{location_id}/resources",
       "summary": "List resources",
-      "description": "Returns the bookable resources of the Location (rooms, chairs, equipment) with their\ninstances. Pass instance ids as `resource_instance_ids` when creating an appointment\nfor services that require a resource. Resource management (create/update/delete) is\nnot part of the preview scope.\n\n\nCursor-paginated list. Default ordering: title, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Returns the bookable resources of the Location (rooms, chairs, equipment) with their\ninstances. Pass instance ids as `resource_instance_ids` when creating an appointment\nfor services that require a resource. Resource management (create/update/delete) is\nnot part of the preview scope.\n\n\nCursor-paginated list. Default ordering: title, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
       "tags": [
         "Resources"
       ],
@@ -57599,7 +58479,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. An empty value is the same as omitting the parameter and returns the first page. Cursors expire one hour after the response that issued them (every page issues a fresh cursor) and are bound to credential, tenant, list, filters, and ordering; for OAuth the credential is the user's authorization, so a cursor survives a token refresh; a row whose ordering column changed between pages may be skipped or returned twice, and a row created while you page may be missing from this pass if it sorts before the current position (start a new pass to pick it up); expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor` (also a cursor whose number of key values does not match the list's ordering), `foreign_cursor` (another credential or tenant), or `filter_changed` (another list, ordering, or filters).",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -57608,7 +58488,7 @@
           }
         },
         {
-          "description": "Page size for cursor pagination. Default is 25; maximum is 100.",
+          "description": "Page size for cursor pagination. Default is 25; maximum is 100. Values outside 1..100 or non-integers fail with `422 validation_failed`; the value is never clamped.",
           "name": "limit",
           "in": "query",
           "required": false,
@@ -57703,7 +58583,7 @@
       "path": "/locations/{location_id}/service_categories",
       "displayPath": "/locations/{location_id}/service_categories",
       "summary": "List service categories",
-      "description": "Returns the service categories of the Location. Use a category `id` as `category_id`\nwhen creating services.\n\n\nCursor-paginated list. Default ordering: weight desc, name, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Returns the service categories of the Location. Use a category `id` as `category_id`\nwhen creating services.\n\n\nCursor-paginated list. Default ordering: weight desc, name, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
       "tags": [
         "Services"
       ],
@@ -57728,7 +58608,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. An empty value is the same as omitting the parameter and returns the first page. Cursors expire one hour after the response that issued them (every page issues a fresh cursor) and are bound to credential, tenant, list, filters, and ordering; for OAuth the credential is the user's authorization, so a cursor survives a token refresh; a row whose ordering column changed between pages may be skipped or returned twice, and a row created while you page may be missing from this pass if it sorts before the current position (start a new pass to pick it up); expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor` (also a cursor whose number of key values does not match the list's ordering), `foreign_cursor` (another credential or tenant), or `filter_changed` (another list, ordering, or filters).",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -57737,7 +58617,7 @@
           }
         },
         {
-          "description": "Page size for cursor pagination. Default is 25; maximum is 100.",
+          "description": "Page size for cursor pagination. Default is 25; maximum is 100. Values outside 1..100 or non-integers fail with `422 validation_failed`; the value is never clamped.",
           "name": "limit",
           "in": "query",
           "required": false,
@@ -58052,7 +58932,7 @@
       "path": "/locations/{location_id}/services",
       "displayPath": "/locations/{location_id}/services",
       "summary": "List services",
-      "description": "Returns the services of the Location as a cursor-paginated list. Prices are integer\nminor units; `duration_seconds` is the default duration, and `team_members[]` carries\nper-member price/duration overrides.\n\n\nCursor-paginated list. Default ordering: category_id, name, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Returns the services of the Location as a cursor-paginated list. Prices are integer\nminor units; `duration_seconds` is the default duration, and `team_members[]` carries\nper-member price/duration overrides.\n\n\nCursor-paginated list. Default ordering: category_id, name, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
       "tags": [
         "Services"
       ],
@@ -58077,7 +58957,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. An empty value is the same as omitting the parameter and returns the first page. Cursors expire one hour after the response that issued them (every page issues a fresh cursor) and are bound to credential, tenant, list, filters, and ordering; for OAuth the credential is the user's authorization, so a cursor survives a token refresh; a row whose ordering column changed between pages may be skipped or returned twice, and a row created while you page may be missing from this pass if it sorts before the current position (start a new pass to pick it up); expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor` (also a cursor whose number of key values does not match the list's ordering), `foreign_cursor` (another credential or tenant), or `filter_changed` (another list, ordering, or filters).",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -58086,7 +58966,7 @@
           }
         },
         {
-          "description": "Page size for cursor pagination. Default is 25; maximum is 100.",
+          "description": "Page size for cursor pagination. Default is 25; maximum is 100. Values outside 1..100 or non-integers fail with `422 validation_failed`; the value is never clamped.",
           "name": "limit",
           "in": "query",
           "required": false,
@@ -59175,7 +60055,7 @@
       "path": "/locations/{location_id}/team_members",
       "displayPath": "/locations/{location_id}/team_members",
       "summary": "List team members",
-      "description": "Returns the Team Members of the Location as a cursor-paginated list. The base\nrepresentation contains name, position, and bookable services; Team Member personal\ncontact data is not exposed in the preview scope.\n\n\nCursor-paginated list. Default ordering: name, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Returns the Team Members of the Location as a cursor-paginated list. The base\nrepresentation contains name, position, and bookable services; Team Member personal\ncontact data is not exposed in the preview scope.\n\n\nCursor-paginated list. Default ordering: name, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
       "tags": [
         "Team Members"
       ],
@@ -59200,7 +60080,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. An empty value is the same as omitting the parameter and returns the first page. Cursors expire one hour after the response that issued them (every page issues a fresh cursor) and are bound to credential, tenant, list, filters, and ordering; for OAuth the credential is the user's authorization, so a cursor survives a token refresh; a row whose ordering column changed between pages may be skipped or returned twice, and a row created while you page may be missing from this pass if it sorts before the current position (start a new pass to pick it up); expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor` (also a cursor whose number of key values does not match the list's ordering), `foreign_cursor` (another credential or tenant), or `filter_changed` (another list, ordering, or filters).",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -59209,7 +60089,7 @@
           }
         },
         {
-          "description": "Page size for cursor pagination. Default is 25; maximum is 100.",
+          "description": "Page size for cursor pagination. Default is 25; maximum is 100. Values outside 1..100 or non-integers fail with `422 validation_failed`; the value is never clamped.",
           "name": "limit",
           "in": "query",
           "required": false,
@@ -60987,16 +61867,16 @@
                     "type": "integer",
                     "x-truncated": true
                   },
-                  "object": {
-                    "type": "string",
-                    "x-truncated": true
-                  },
-                  "parent_chain_id": {
-                    "description": "The location's main chain, when the resource is a location. A location may belong to more than one chain; this reports its main one and does not imply a grant on any chain.",
+                  "main_chain_id": {
+                    "description": "The main chain of a location; `null` for a chain entry and for a location without a main chain. A location may belong to several chains, only the main one is reported, and it implies no grant on that…",
                     "type": [
                       "integer",
                       "null"
                     ],
+                    "x-truncated": true
+                  },
+                  "object": {
+                    "type": "string",
                     "x-truncated": true
                   },
                   "scopes": {
@@ -61230,7 +62110,7 @@
       "path": "/oauth/token",
       "displayPath": "/oauth/token",
       "summary": "Issue an access token",
-      "description": "OAuth 2.0 token endpoint (RFC 6749). Supports three grants:\n\n- `authorization_code` — exchange a code obtained from the browser\n  `GET /oauth/authorize` flow (PKCE `code_verifier` required). Returns an access\n  token and a rotating refresh token.\n- `client_credentials` — machine-to-machine token for a marketplace installation.\n  Always requires the explicit `location_id`; the installation is resolved from the\n  authenticated OAuth client plus that Location. No refresh token is returned.\n- `refresh_token` — rotate a refresh token from the Authorization Code flow.\n  The previous refresh token is invalidated; replaying it revokes the token family.\n\nConfidential clients authenticate with HTTP Basic (`client_secret_basic`); public\nclients (PKCE-only) send their `client_id` in the form body. There is **no password\ngrant**.\n\nErrors from this endpoint use the standard OAuth 2.0 error object\n(`{\"error\": \"...\", \"error_description\": \"...\"}`), not `application/problem+json`.",
+      "description": "OAuth 2.0 token endpoint (RFC 6749). Supports three grants:\n\n- `authorization_code` — exchange a code obtained from the browser\n  `GET /oauth/authorize` flow (PKCE `code_verifier` required). Returns an access\n  token and a rotating refresh token.\n- `client_credentials` — machine-to-machine token for a marketplace installation.\n  Always requires the explicit `location_id`; the installation is resolved from the\n  authenticated OAuth client plus that Location. No refresh token is returned.\n- `refresh_token` — rotate a refresh token from the Authorization Code flow.\n  The previous refresh token is invalidated; replaying it revokes the token family.\n\nConfidential clients authenticate with HTTP Basic (`client_secret_basic`) or send\n`client_id` and `client_secret` in the form body (`client_secret_post`); public clients\n(PKCE-only) send their `client_id` in the form body. There is **no password grant**.\n\nErrors from this endpoint use the standard OAuth 2.0 error object\n(`{\"error\": \"...\", \"error_description\": \"...\"}`), not `application/problem+json`.",
       "tags": [
         "Authorization"
       ],
@@ -61254,6 +62134,10 @@
                 "client_id": {
                   "type": "string"
                 },
+                "client_secret": {
+                  "description": "Confidential clients using `client_secret_post` only.",
+                  "type": "string"
+                },
                 "code": {
                   "type": "string"
                 },
@@ -61270,11 +62154,8 @@
                   "type": "string"
                 },
                 "resource": {
-                  "description": "RFC 8707 resource indicator selecting the REST API or MCP audience.",
-                  "enum": [
-                    "https://api.alteg.io",
-                    "https://mcp.alteg.io"
-                  ],
+                  "description": "RFC 8707 resource indicator: `https://api.alteg.io/api/v3` or an Altegio MCP address under `https://mcp.alteg.io/pro` (an address ending in `/readonly` caps the scopes at read-only). Compared case-in…",
+                  "format": "uri",
                   "type": "string"
                 },
                 "scope": {
@@ -61296,6 +62177,10 @@
                 "client_id": {
                   "type": "string"
                 },
+                "client_secret": {
+                  "description": "Confidential clients using `client_secret_post` only.",
+                  "type": "string"
+                },
                 "grant_type": {
                   "enum": [
                     "refresh_token"
@@ -61306,11 +62191,8 @@
                   "type": "string"
                 },
                 "resource": {
-                  "description": "RFC 8707 resource indicator selecting the REST API or MCP audience.",
-                  "enum": [
-                    "https://api.alteg.io",
-                    "https://mcp.alteg.io"
-                  ],
+                  "description": "RFC 8707 resource indicator: `https://api.alteg.io/api/v3` or an Altegio MCP address under `https://mcp.alteg.io/pro` (an address ending in `/readonly` caps the scopes at read-only). Compared case-in…",
+                  "format": "uri",
                   "type": "string"
                 },
                 "scope": {
@@ -61338,11 +62220,8 @@
                   "type": "integer"
                 },
                 "resource": {
-                  "description": "RFC 8707 resource indicator selecting the REST API or MCP audience.",
-                  "enum": [
-                    "https://api.alteg.io",
-                    "https://mcp.alteg.io"
-                  ],
+                  "description": "RFC 8707 resource indicator: `https://api.alteg.io/api/v3` or an Altegio MCP address under `https://mcp.alteg.io/pro` (an address ending in `/readonly` caps the scopes at read-only). Compared case-in…",
+                  "format": "uri",
                   "type": "string"
                 },
                 "scope": {
@@ -61403,7 +62282,7 @@
       "path": "/reference/business_types",
       "displayPath": "/reference/business_types",
       "summary": "List business types",
-      "description": "Cursor-paginated list. Default ordering: title, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Cursor-paginated list. Default ordering: title, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
       "tags": [
         "Locations"
       ],
@@ -61419,7 +62298,7 @@
       },
       "parameters": [
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. An empty value is the same as omitting the parameter and returns the first page. Cursors expire one hour after the response that issued them (every page issues a fresh cursor) and are bound to credential, tenant, list, filters, and ordering; for OAuth the credential is the user's authorization, so a cursor survives a token refresh; a row whose ordering column changed between pages may be skipped or returned twice, and a row created while you page may be missing from this pass if it sorts before the current position (start a new pass to pick it up); expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor` (also a cursor whose number of key values does not match the list's ordering), `foreign_cursor` (another credential or tenant), or `filter_changed` (another list, ordering, or filters).",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -61428,7 +62307,7 @@
           }
         },
         {
-          "description": "Page size for cursor pagination. Default is 25; maximum is 100.",
+          "description": "Page size for cursor pagination. Default is 25; maximum is 100. Values outside 1..100 or non-integers fail with `422 validation_failed`; the value is never clamped.",
           "name": "limit",
           "in": "query",
           "required": false,
@@ -61519,7 +62398,7 @@
       "path": "/reference/cities",
       "displayPath": "/reference/cities",
       "summary": "List cities",
-      "description": "Cursor-paginated list. Default ordering: country_id, name, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, and filters. Expired, malformed, or foreign cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, or `foreign_cursor`.",
+      "description": "Cursor-paginated list. Default ordering: country_id, name, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
       "tags": [
         "Locations"
       ],
@@ -61544,7 +62423,7 @@
           }
         },
         {
-          "description": "Opaque cursor from `next_cursor`. Cursors expire after one hour and are bound to credential, tenant, filters, and ordering; expired, malformed, or foreign cursors fail with `422 validation_failed`.",
+          "description": "Opaque cursor from `next_cursor`. An empty value is the same as omitting the parameter and returns the first page. Cursors expire one hour after the response that issued them (every page issues a fresh cursor) and are bound to credential, tenant, list, filters, and ordering; for OAuth the credential is the user's authorization, so a cursor survives a token refresh; a row whose ordering column changed between pages may be skipped or returned twice, and a row created while you page may be missing from this pass if it sorts before the current position (start a new pass to pick it up); expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor` (also a cursor whose number of key values does not match the list's ordering), `foreign_cursor` (another credential or tenant), or `filter_changed` (another list, ordering, or filters).",
           "name": "cursor",
           "in": "query",
           "required": false,
@@ -61553,7 +62432,7 @@
           }
         },
         {
-          "description": "Page size for cursor pagination. Default is 25; maximum is 100.",
+          "description": "Page size for cursor pagination. Default is 25; maximum is 100. Values outside 1..100 or non-integers fail with `422 validation_failed`; the value is never clamped.",
           "name": "limit",
           "in": "query",
           "required": false,

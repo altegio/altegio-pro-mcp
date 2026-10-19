@@ -5,6 +5,7 @@ import { createServer } from '../server.js';
 import { ConfigLoader } from '../config/schema.js';
 import { orderedToolEntries } from '../tools/registry.js';
 import {
+  DEFAULT_FACET_EXCLUDED_PREFIXES,
   DEFAULT_FACET_EXCLUDED_TOOLS,
   FACET_BASE_TOOLS,
   PASSWORD_LOGIN_TOOLS,
@@ -96,7 +97,9 @@ describe('tools/list per facet', () => {
             // public HTTP surface; see src/tools/facets.ts.
             !PASSWORD_LOGIN_TOOLS.includes(name) &&
             !DEFAULT_FACET_EXCLUDED_TOOLS.includes(name) &&
-            (!name.startsWith('analytics_') ||
+            (!DEFAULT_FACET_EXCLUDED_PREFIXES.some((prefix) =>
+              name.startsWith(prefix)
+            ) ||
               DEFAULT_FACET_EXTRA_TOOLS.includes(name))
         )
     );
@@ -117,6 +120,7 @@ describe('tools/list per facet', () => {
     const client = await connect('ops');
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name).sort()).toEqual([
+      'accounts_and_cash_registers_list',
       'appointments_apply_attendance',
       'appointments_create',
       'appointments_create_tag',
@@ -126,6 +130,8 @@ describe('tools/list per facet', () => {
       'appointments_list_tags',
       'appointments_preview_attendance',
       'appointments_update',
+      'client_accounts_deposit',
+      'client_accounts_list_for_client',
       'clients_add_comment',
       'clients_delete',
       'clients_get_card',
@@ -159,6 +165,9 @@ describe('tools/list per facet', () => {
       'memberships_list_for_client',
       'memberships_unfreeze',
       'users_get_current',
+      'visits_add_payment',
+      'visits_cancel_payment',
+      'visits_get',
     ]);
     await client.close();
   });

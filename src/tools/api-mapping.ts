@@ -939,6 +939,217 @@ export const apiMapping: Record<string, ApiMapping> = {
  * or in `catalog/extended/*.yaml`, so the compliance test walks both maps.
  */
 export const multiApiMapping: Record<string, ApiMapping[]> = {
+  // --- Visits, payments and finance (V1: V2 has none, V3 is planned) -------
+  visits_get: [
+    {
+      path: '/locations/{location_id}/appointments/{record_id}',
+      method: 'get',
+      operationId: 'get_appointment',
+      pathParams: ['location_id', 'record_id'],
+    },
+    {
+      path: '/locations/{location_id}/sale/{document_id}',
+      method: 'get',
+      operationId: 'get_sale_transaction',
+      pathParams: ['location_id', 'document_id'],
+    },
+  ],
+  visits_add_payment: [
+    {
+      path: '/locations/{location_id}/appointments/{record_id}',
+      method: 'get',
+      operationId: 'get_appointment',
+      pathParams: ['location_id', 'record_id'],
+    },
+    {
+      path: '/locations/{location_id}/sale/{document_id}',
+      method: 'get',
+      operationId: 'get_sale_transaction',
+      pathParams: ['location_id', 'document_id'],
+    },
+    {
+      path: '/locations/{location_id}/sale/{document_id}/payment',
+      method: 'post',
+      operationId: 'create_payment_with_loyalty_methods',
+      pathParams: ['location_id', 'document_id'],
+      bodyParams: ['payment'],
+    },
+  ],
+  visits_cancel_payment: [
+    {
+      path: '/locations/{location_id}/appointments/{record_id}',
+      method: 'get',
+      operationId: 'get_appointment',
+      pathParams: ['location_id', 'record_id'],
+    },
+    {
+      path: '/locations/{location_id}/sale/{document_id}',
+      method: 'get',
+      operationId: 'get_sale_transaction',
+      pathParams: ['location_id', 'document_id'],
+    },
+    {
+      path: '/locations/{location_id}/sale/{document_id}/payment/payment_transaction/{payment_transaction_id}',
+      method: 'delete',
+      operationId: 'delete_location_account_payment',
+      pathParams: ['location_id', 'document_id', 'payment_transaction_id'],
+    },
+    {
+      path: '/locations/{location_id}/sale/{document_id}/payment/loyalty_transaction/{payment_transaction_id}',
+      method: 'delete',
+      operationId: 'delete_loyalty_payment_transaction',
+      pathParams: ['location_id', 'document_id', 'payment_transaction_id'],
+    },
+  ],
+  client_accounts_list_for_client: [
+    {
+      path: '/deposits/company/{location_id}/client/{client_id}',
+      method: 'get',
+      operationId: 'get_client_account_list_by_location_and_client',
+      pathParams: ['location_id', 'client_id'],
+    },
+  ],
+  client_accounts_deposit: [
+    {
+      path: '/deposits/company/{location_id}/client/{client_id}',
+      method: 'get',
+      operationId: 'get_client_account_list_by_location_and_client',
+      pathParams: ['location_id', 'client_id'],
+    },
+    {
+      path: '/deposits_operations/{location_id}',
+      method: 'post',
+      operationId: 'create_client_account_topup_operation',
+      pathParams: ['location_id'],
+      bodyParams: [
+        'client_id',
+        'deposit_id',
+        'amount',
+        'account_id',
+        'team_member_id',
+      ],
+    },
+  ],
+  accounts_and_cash_registers_list: [
+    {
+      path: '/accounts/{location_id}',
+      method: 'get',
+      operationId: 'get_account_list',
+      pathParams: ['location_id'],
+    },
+  ],
+  financial_transactions_list_payment_items: [
+    {
+      path: '/references/expenses/{location_id}',
+      method: 'get',
+      operationId: 'list_location_payment_items',
+      pathParams: ['location_id'],
+    },
+  ],
+  financial_transactions_list: [
+    {
+      path: '/transactions/{location_id}',
+      method: 'get',
+      operationId: 'get_transactions',
+      pathParams: ['location_id'],
+      queryParams: [
+        'start_date',
+        'end_date',
+        'account_id',
+        'client_id',
+        'team_member_id',
+        'supplier_id',
+        'page',
+        'count',
+      ],
+    },
+  ],
+  financial_transactions_create: [
+    {
+      path: '/transactions/{location_id}',
+      method: 'get',
+      operationId: 'get_transactions',
+      pathParams: ['location_id'],
+      queryParams: ['start_date', 'end_date', 'account_id', 'page', 'count'],
+    },
+    {
+      path: '/finance_transactions/{location_id}',
+      method: 'post',
+      operationId: 'create_financial_transaction',
+      pathParams: ['location_id'],
+      bodyParams: [
+        'expense_id',
+        'account_id',
+        'amount',
+        'date',
+        'comment',
+        'client_id',
+        'team_member_id',
+        'supplier_id',
+      ],
+    },
+  ],
+  financial_transactions_update: [
+    {
+      path: '/finance_transactions/{location_id}/{transaction_id}',
+      method: 'get',
+      operationId: 'get_financial_transaction',
+      pathParams: ['location_id', 'transaction_id'],
+    },
+    {
+      path: '/finance_transactions/{location_id}/{transaction_id}',
+      method: 'put',
+      operationId: 'update_financial_transaction',
+      pathParams: ['location_id', 'transaction_id'],
+      bodyParams: [
+        'expense_id',
+        'account_id',
+        'amount',
+        'date',
+        'comment',
+        'client_id',
+        'team_member_id',
+        'supplier_id',
+      ],
+    },
+  ],
+  financial_transactions_delete: [
+    {
+      path: '/finance_transactions/{location_id}/{transaction_id}',
+      method: 'get',
+      operationId: 'get_financial_transaction',
+      pathParams: ['location_id', 'transaction_id'],
+    },
+    {
+      path: '/finance_transactions/{location_id}/{transaction_id}',
+      method: 'delete',
+      operationId: 'delete_financial_transaction',
+      pathParams: ['location_id', 'transaction_id'],
+    },
+  ],
+  payroll_get_calculation: [
+    {
+      path: '/locations/{location_id}/salary/period/team_members/{team_member_id}',
+      method: 'get',
+      operationId: 'search_team_member_period_salary',
+      pathParams: ['location_id', 'team_member_id'],
+      queryParams: ['date_from', 'date_to'],
+    },
+    {
+      path: '/locations/{location_id}/salary/calculation/team_members/{team_member_id}',
+      method: 'get',
+      operationId: 'search_team_member_calculation_salary',
+      pathParams: ['location_id', 'team_member_id'],
+      queryParams: ['date_from', 'date_to'],
+    },
+    {
+      path: '/locations/{location_id}/salary/payroll/team_members/{team_member_id}/calculation',
+      method: 'get',
+      operationId: 'search_team_member_payroll_calculation',
+      pathParams: ['location_id', 'team_member_id'],
+      queryParams: ['date_from', 'date_to'],
+    },
+  ],
   // The services' team-member links give who qualifies and their session
   // length; the calendar's session grid gives when each of them is free.
   appointments_find_free_slots: [
