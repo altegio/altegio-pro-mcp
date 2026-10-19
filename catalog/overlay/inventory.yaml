@@ -1,0 +1,104 @@
+# Inventory — the operations behind the curated `inventory_*`, `products_search`,
+# `suppliers_list` and `appointments_*_consumables` tools.
+#
+# Format: catalog/overlay/_schema.yaml. Products are read on V2
+# (src/api/v2/products-adapter.ts; `list_products` and `autocomplete_products`
+# are curated in canonical.yaml next to the V1 twins they supersede). V2 has no
+# inventory, inventory-operation, Bill of Materials, Supplier or appointment
+# consumables operation, so those run on V1 (src/api/v1/inventory-adapter.ts).
+
+version: 1
+
+operations:
+  # --- inventories and products ---------------------------------------------
+  get_location_inventories:
+    domain: inventory
+    tier: core
+    facets: [finance]
+    tool_name: inventory_list
+    notes: >
+      Also read by products_search (inventory titles), inventory_create_operation
+      and appointments_set_consumables (the default inventory).
+  get_product:
+    domain: products
+    tier: core
+    facets: [ops, finance]
+    tool_name: products_search
+    notes: >
+      One read per listed product, with include[]=storage_amounts and
+      include[]=actual_cost, for its stock and cost price. Also read by
+      inventory_create_operation and appointments_set_consumables.
+  list_product_units:
+    domain: products
+    tier: core
+    facets: [ops, finance]
+    tool_name: products_search
+    notes: Unit names for products_search and the two write tools.
+
+  # --- inventory operations and documents -------------------------------------
+  search_for_product_transactions:
+    domain: inventory
+    tier: core
+    facets: [finance]
+    tool_name: inventory_list_operations
+    notes: >
+      Also read by inventory_delete_document (the document's lines). Lists
+      product lines, not documents; filters only by dates and document_id.
+  create_inventory_operation:
+    domain: inventory
+    tier: core
+    facets: [finance]
+    tool_name: inventory_create_operation
+    write_allowed: false
+    notes: >
+      Spec drift (backend checked 2026-10-19): the body field is `date`
+      (Y-m-d H:i:s, location time), not `create_date`; the comment is
+      `document.comment`; the lines are `goods_transactions`, in the request
+      and in the answer. Type 5 (transfer) is refused by this endpoint.
+  get_document:
+    domain: inventory
+    tier: core
+    facets: [finance]
+    tool_name: inventory_delete_document
+    notes: Read for the delete confirmation and result.
+  delete_document:
+    domain: inventory
+    tier: core
+    facets: [finance]
+    tool_name: inventory_delete_document
+    write_allowed: false
+
+  # --- Suppliers and Partners -------------------------------------------------
+  list_location_suppliers:
+    tier: core
+    facets: [finance]
+    tool_name: suppliers_list
+
+  # --- Bills of Materials and appointment consumables -------------------------
+  get_bill_of_materials_list:
+    domain: inventory
+    tier: core
+    facets: [finance]
+    tool_name: inventory_list_bills_of_materials
+  get_team_member_service_bill_of_materials:
+    domain: inventory
+    tier: core
+    facets: [finance]
+    tool_name: inventory_list_bills_of_materials
+  get_appointment_consumables:
+    domain: inventory
+    tier: core
+    facets: [ops, finance]
+    tool_name: appointments_get_consumables
+    notes: >
+      Returns every appointment of the visit; also read by
+      appointments_set_consumables before it replaces a service's list.
+  update_appointment_service_consumables:
+    domain: inventory
+    tier: core
+    facets: [ops, finance]
+    tool_name: appointments_set_consumables
+    write_allowed: false
+    notes: >
+      Replaces the service's whole list (new line ids, omitted lines deleted),
+      ignores `price`, and matches by service across the visit.

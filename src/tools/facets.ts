@@ -171,8 +171,10 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
    * `events_*` pack (timetable, bookings, duplication) and the `clients_*` pack
    * (segmentation, client card, visit history, lookup) join by prefix; the
    * reception's membership tasks (a client's memberships, freeze, unfreeze)
-   * join by name, the rest of that pack lives on `marketing`. The journal
-   * tools do not exist yet.
+   * join by name, the rest of that pack lives on `marketing`. So do the
+   * reception's inventory tasks — an appointment's consumables and a product
+   * lookup with its stock; the rest of the inventory pack lives on `finance`.
+   * The journal tools do not exist yet.
    */
   ops: {
     tools: [
@@ -194,6 +196,9 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
       'client_accounts_list_for_client',
       'client_accounts_deposit',
       'accounts_and_cash_registers_list',
+      'appointments_get_consumables',
+      'appointments_set_consumables',
+      'products_search',
     ],
     prefixes: ['events_', 'clients_'],
   },
@@ -241,13 +246,22 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
 
   /**
    * Money: a visit's bill and its payments, client accounts, accounts and cash
-   * registers, financial transactions, payroll, and the analytics pack.
+   * registers, financial transactions, payroll, inventory, and the analytics
+   * pack. Inventory is stock valued at cost price, bought from Suppliers and
+   * Partners and sold or used up — the money side of products, next to the
+   * product-sales and reorder-risk analytics. The `inventory_` and `products_`
+   * packs join by prefix, Suppliers and the appointment consumables by name.
    * Still partial: product sales on a visit (V3 `addVisitItem` is not served
    * yet), payroll payouts (no operation in the catalog) and fiscalization are
    * not built.
    */
   finance: {
-    tools: ['clients_get_membership_purchases'],
+    tools: [
+      'clients_get_membership_purchases',
+      'suppliers_list',
+      'appointments_get_consumables',
+      'appointments_set_consumables',
+    ],
     prefixes: [
       'visits_',
       'client_accounts_',
@@ -255,6 +269,8 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
       'financial_transactions_',
       'payroll_',
       'analytics_',
+      'inventory_',
+      'products_',
     ],
   },
 

@@ -927,6 +927,26 @@ export const apiMapping: Record<string, ApiMapping> = {
       'count',
     ],
   },
+  // --- Inventory (V1: V2 has no inventory, operation or Supplier read) ---
+  inventory_list: {
+    path: '/storages/{location_id}',
+    method: 'get',
+    operationId: 'get_location_inventories',
+    pathParams: ['location_id'],
+  },
+  inventory_list_operations: {
+    path: '/storages/transactions/{location_id}',
+    method: 'get',
+    operationId: 'search_for_product_transactions',
+    pathParams: ['location_id'],
+    queryParams: ['start_date', 'end_date', 'document_id', 'page', 'count'],
+  },
+  suppliers_list: {
+    path: '/references/suppliers/{location_id}',
+    method: 'get',
+    operationId: 'list_location_suppliers',
+    pathParams: ['location_id'],
+  },
 };
 
 /**
@@ -2173,6 +2193,201 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
         'page',
         'count',
       ],
+    },
+  ],
+  // --- Inventory: products are V2; the stock reads and writes are V1 ---
+  // Search or page, then one product read per product for its stock and
+  // cost price; unit names and inventory titles come from one read each.
+  products_search: [
+    {
+      path: '/locations/{location_id}/products',
+      method: 'get',
+      operationId: 'list_products',
+      pathParams: ['location_id'],
+      queryParams: ['filter[ids][]', 'page', 'limit', 'include'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/products/autocomplete',
+      method: 'get',
+      operationId: 'autocomplete_products',
+      pathParams: ['location_id'],
+      queryParams: ['filter[term]', 'page', 'limit'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/products/{product_id}',
+      method: 'get',
+      operationId: 'get_product',
+      pathParams: ['location_id', 'product_id'],
+      queryParams: ['include'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/units',
+      method: 'get',
+      operationId: 'list_product_units',
+      pathParams: ['location_id'],
+      spec: 'v2',
+    },
+    {
+      path: '/storages/{location_id}',
+      method: 'get',
+      operationId: 'get_location_inventories',
+      pathParams: ['location_id'],
+    },
+  ],
+  // Products, units and the inventory are resolved and every line priced
+  // before the one write.
+  inventory_create_operation: [
+    {
+      path: '/storage_operations/operation/{location_id}',
+      method: 'post',
+      operationId: 'create_inventory_operation',
+      pathParams: ['location_id'],
+      bodyParams: [
+        'type_id',
+        'storage_id',
+        'master_id',
+        'date',
+        'document',
+        'client',
+        'goods_transactions',
+      ],
+    },
+    {
+      path: '/storages/{location_id}',
+      method: 'get',
+      operationId: 'get_location_inventories',
+      pathParams: ['location_id'],
+    },
+    {
+      path: '/locations/{location_id}/products/autocomplete',
+      method: 'get',
+      operationId: 'autocomplete_products',
+      pathParams: ['location_id'],
+      queryParams: ['filter[term]', 'page', 'limit'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/products/{product_id}',
+      method: 'get',
+      operationId: 'get_product',
+      pathParams: ['location_id', 'product_id'],
+      queryParams: ['include'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/units',
+      method: 'get',
+      operationId: 'list_product_units',
+      pathParams: ['location_id'],
+      spec: 'v2',
+    },
+  ],
+  // The document and its lines are read for the confirmation and the result.
+  inventory_delete_document: [
+    {
+      path: '/storage_operations/documents/{location_id}/{document_id}',
+      method: 'get',
+      operationId: 'get_document',
+      pathParams: ['location_id', 'document_id'],
+    },
+    {
+      path: '/storage_operations/documents/{location_id}/{document_id}',
+      method: 'delete',
+      operationId: 'delete_document',
+      pathParams: ['location_id', 'document_id'],
+    },
+    {
+      path: '/storages/transactions/{location_id}',
+      method: 'get',
+      operationId: 'search_for_product_transactions',
+      pathParams: ['location_id'],
+      queryParams: ['document_id', 'page', 'count'],
+    },
+  ],
+  inventory_list_bills_of_materials: [
+    {
+      path: '/technological_cards/{location_id}',
+      method: 'get',
+      operationId: 'get_bill_of_materials_list',
+      pathParams: ['location_id'],
+      queryParams: ['search', 'page', 'count'],
+    },
+    {
+      path: '/technological_cards/default_for_staff_and_service/{location_id}/{team_member_id}/{service_id}',
+      method: 'get',
+      operationId: 'get_team_member_service_bill_of_materials',
+      pathParams: ['location_id', 'team_member_id', 'service_id'],
+    },
+  ],
+  // The consumables read covers the whole visit; the appointment read gives
+  // its attendance, which decides whether they have moved stock.
+  appointments_get_consumables: [
+    {
+      path: '/technological_cards/record_consumables/{location_id}/{record_id}',
+      method: 'get',
+      operationId: 'get_appointment_consumables',
+      pathParams: ['location_id', 'record_id'],
+    },
+    {
+      path: '/locations/{location_id}/appointments/{record_id}',
+      method: 'get',
+      operationId: 'get_appointment',
+      pathParams: ['location_id', 'record_id'],
+    },
+  ],
+  // Read-modify-write: the PUT replaces the service's list, so the current
+  // one is read first; new products are resolved like an operation's lines.
+  appointments_set_consumables: [
+    {
+      path: '/technological_cards/record_consumables/{location_id}/{record_id}',
+      method: 'get',
+      operationId: 'get_appointment_consumables',
+      pathParams: ['location_id', 'record_id'],
+    },
+    {
+      path: '/locations/{location_id}/appointments/{record_id}',
+      method: 'get',
+      operationId: 'get_appointment',
+      pathParams: ['location_id', 'record_id'],
+    },
+    {
+      path: '/technological_cards/record_consumables/consumables/{location_id}/{record_id}/{service_id}',
+      method: 'put',
+      operationId: 'update_appointment_service_consumables',
+      pathParams: ['location_id', 'record_id', 'service_id'],
+      bodyParams: ['consumables'],
+    },
+    {
+      path: '/storages/{location_id}',
+      method: 'get',
+      operationId: 'get_location_inventories',
+      pathParams: ['location_id'],
+    },
+    {
+      path: '/locations/{location_id}/products/autocomplete',
+      method: 'get',
+      operationId: 'autocomplete_products',
+      pathParams: ['location_id'],
+      queryParams: ['filter[term]', 'page', 'limit'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/products/{product_id}',
+      method: 'get',
+      operationId: 'get_product',
+      pathParams: ['location_id', 'product_id'],
+      queryParams: ['include'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/units',
+      method: 'get',
+      operationId: 'list_product_units',
+      pathParams: ['location_id'],
+      spec: 'v2',
     },
   ],
 };

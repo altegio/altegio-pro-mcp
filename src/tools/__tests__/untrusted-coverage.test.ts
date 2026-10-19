@@ -190,6 +190,118 @@ function membershipRow(): Record<string, unknown> {
   };
 }
 
+/** A V1 inventory whose title and comment are the canary. */
+function inventoryRow(): Record<string, unknown> {
+  return { id: 3, title: CANARY, for_sale: 1, for_service: 1, comment: CANARY };
+}
+
+/** A V1 inventory line whose product, inventory and comment are the canary. */
+function movementRow(): Record<string, unknown> {
+  return {
+    id: 11,
+    document_id: 21,
+    type_id: 1,
+    create_date: '2026-10-19T10:00:00+0200',
+    good: { id: 5, title: CANARY },
+    amount: -1,
+    unit: { short_title: 'pcs' },
+    cost_per_unit: 100,
+    discount: 0,
+    cost: 100,
+    storage: { id: 3, title: CANARY },
+    master: { id: 7 },
+    comment: CANARY,
+  };
+}
+
+/** A V1 inventory operation document whose comment is the canary. */
+function documentRow(): Record<string, unknown> {
+  return {
+    id: 21,
+    type_id: 1,
+    number: 21,
+    storage_id: 3,
+    create_date: '2026-10-19 10:00:00',
+    comment: CANARY,
+  };
+}
+
+/** A V2 product whose title is the canary, with stock in inventory 3. */
+function productResource(): Record<string, unknown> {
+  return {
+    type: 'good',
+    id: '5',
+    attributes: {
+      title: CANARY,
+      cost: 100,
+      actual_cost: 40,
+      sale_unit_id: 1,
+      consumable_unit_id: 2,
+      sale_unit_to_consumable_unit_ratio: 100,
+    },
+    relationships: {
+      storage_amounts: { data: [{ type: 'good_storage_amount', id: '51' }] },
+    },
+  };
+}
+
+const productStock = {
+  type: 'good_storage_amount',
+  id: '51',
+  attributes: { storage_id: 3, sale_amount: 4, consumable_amount: 400 },
+};
+
+const productUnits = {
+  data: [
+    {
+      type: 'unit',
+      id: '1',
+      attributes: { title: 'piece', short_title: 'pcs' },
+    },
+    {
+      type: 'unit',
+      id: '2',
+      attributes: { title: 'millilitre', short_title: 'ml' },
+    },
+  ],
+};
+
+/** A V1 consumables block of appointment 9 whose titles are the canary. */
+function consumablesBlock(amount = 10): Record<string, unknown> {
+  return {
+    record_id: 9,
+    service_id: 3,
+    technological_cards: [{ id: 8, title: CANARY }],
+    consumables: [
+      {
+        goods_transaction_id: 61,
+        good_id: 5,
+        good: { id: 5, title: CANARY, unit: 'ml' },
+        storage_id: 3,
+        amount,
+        price: 4,
+      },
+    ],
+  };
+}
+
+const currencyRoute: Route = {
+  match: /\/analytics\/overall/,
+  body: ok(envelope({ income_total_stats: { currency: { iso: 'CZK' } } })),
+};
+
+const inventoriesRoute: Route = {
+  match: /\/storages\/1(\?|$)/,
+  body: ok(envelope([inventoryRow()])),
+};
+
+const appointmentRoute: Route = {
+  match: /\/locations\/1\/appointments\/9(\?|$)/,
+  body: ok(
+    envelope({ id: 9, company_id: 1, attendance: 1, services: [{ id: 3 }] })
+  ),
+};
+
 // ===========================================================================
 // The tools that hand over other people's text
 // ===========================================================================
@@ -893,6 +1005,175 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
           match: /\/abonements\/81\/set_period/,
           body: ok(envelope(membershipRow())),
         },
+      ],
+    },
+  },
+  inventory_list: {
+    what: 'inventory titles and comments',
+    canary: {
+      args: { location_id: 1 },
+      routes: [inventoriesRoute],
+    },
+  },
+  products_search: {
+    what: 'product titles and inventory titles',
+    canary: {
+      args: { location_id: 1, query: 'sh' },
+      routes: [
+        {
+          match: /\/products\/autocomplete/,
+          body: ok({ data: [productResource()] }),
+        },
+        {
+          match: /\/products\/5(\?|$)/,
+          body: ok({ data: productResource(), included: [productStock] }),
+        },
+        { match: /\/units/, body: ok(productUnits) },
+        inventoriesRoute,
+        currencyRoute,
+      ],
+    },
+  },
+  inventory_list_operations: {
+    what: 'product titles, inventory titles and line comments',
+    canary: {
+      args: { location_id: 1, date_from: '2026-10-01', date_to: '2026-10-19' },
+      routes: [
+        {
+          match: /\/storages\/transactions\/1/,
+          body: ok(envelope([movementRow()])),
+        },
+        currencyRoute,
+      ],
+    },
+  },
+  inventory_create_operation: {
+    what: 'the created document’s comment, product and inventory titles',
+    canary: {
+      args: {
+        location_id: 1,
+        kind: 'sale',
+        team_member_id: 7,
+        lines: [{ product_id: 5, quantity: 1 }],
+      },
+      routes: [
+        {
+          match: /\/storage_operations\/operation\/1/,
+          body: ok(
+            envelope({
+              document: documentRow(),
+              goods_transactions: [movementRow()],
+            })
+          ),
+        },
+        {
+          match: /\/products\/5(\?|$)/,
+          body: ok({ data: productResource() }),
+        },
+        { match: /\/units/, body: ok(productUnits) },
+        inventoriesRoute,
+        currencyRoute,
+      ],
+    },
+  },
+  inventory_delete_document: {
+    what: 'the deleted document’s comment, product and inventory titles',
+    canary: {
+      args: { location_id: 1, document_id: 21 },
+      routes: [
+        {
+          match: /\/storage_operations\/documents\/1\/21/,
+          body: ok(envelope(documentRow())),
+        },
+        {
+          match: /\/storages\/transactions\/1/,
+          body: ok(envelope([movementRow()])),
+        },
+        currencyRoute,
+      ],
+    },
+  },
+  suppliers_list: {
+    what: 'Supplier and Partner names',
+    canary: {
+      args: { location_id: 1 },
+      routes: [
+        {
+          match: /\/references\/suppliers\/1/,
+          body: ok(envelope([{ id: 4, title: CANARY, type_id: 0 }])),
+        },
+      ],
+    },
+  },
+  inventory_list_bills_of_materials: {
+    what: 'Bill of Materials titles and product titles',
+    canary: {
+      args: { location_id: 1 },
+      routes: [
+        {
+          match: /\/technological_cards\/1/,
+          body: ok(
+            envelope([
+              {
+                id: 8,
+                title: CANARY,
+                technological_card_items: [
+                  {
+                    good_id: 5,
+                    good: { id: 5, title: CANARY, unit: 'ml' },
+                    storage_id: 3,
+                    amount: 10,
+                    price: 4,
+                  },
+                ],
+              },
+            ])
+          ),
+        },
+        currencyRoute,
+      ],
+    },
+  },
+  appointments_get_consumables: {
+    what: 'product and Bill of Materials titles on the appointment',
+    canary: {
+      args: { location_id: 1, appointment_id: 9 },
+      routes: [
+        {
+          match: /\/technological_cards\/record_consumables\/1\/9/,
+          body: ok(envelope([consumablesBlock()])),
+        },
+        appointmentRoute,
+        currencyRoute,
+      ],
+    },
+  },
+  appointments_set_consumables: {
+    what: 'product and Bill of Materials titles read back after the change',
+    canary: {
+      args: {
+        location_id: 1,
+        appointment_id: 9,
+        service_id: 3,
+        consumables: [{ product_id: 5, quantity: 12 }],
+      },
+      routes: [
+        {
+          match: /\/record_consumables\/consumables\/1\/9\/3/,
+          body: ok(envelope([consumablesBlock(12)])),
+        },
+        {
+          match: /\/technological_cards\/record_consumables\/1\/9/,
+          body: ok(envelope([consumablesBlock()])),
+        },
+        appointmentRoute,
+        {
+          match: /\/products\/5(\?|$)/,
+          body: ok({ data: productResource() }),
+        },
+        { match: /\/units/, body: ok(productUnits) },
+        inventoriesRoute,
+        currencyRoute,
       ],
     },
   },

@@ -179,6 +179,8 @@ Stay on SDK 1.x / protocol 2025-11-25 in production, but write code that is alre
 - **Booking times come from `appointments_find_free_slots`**, on the appointment calendar's session grid (V1); V2 has no availability read, and the V3 `getAvailability` preview will replace the adapter. `appointments_create` answers 409/400 with that next step.
 - **Server instructions stay under 1,900 characters on every view**, trust boundary second: Claude Code cuts them at 2,048.
 
+**Addendum (2026-10-19) — inventory writes and confirmations that show the change.** Recording an inventory operation overwrites nothing, so `inventory_create_operation` keeps `destructiveHint: false`, but it moves stock at prices a person has to stand behind, so it is gated too; the destructive-coverage test names such additive writes explicitly so the gate does not spread to ordinary creates. A confirmation may now carry `detail`: lines read from the API under the consequence — the priced lines of an operation, the lines a document deletion reverses, the before → after of a list a write replaces (`appointments_set_consumables` is a read-modify-write because the API replaces a service's whole list). The detail is computed by the same plan the call runs, cleaned line by line like a resolved label, and a plan that would be refused (an ambiguous product name, an empty change, the same service on two appointments of a visit) is refused before anyone is asked.
+
 ### D9 — Quality loop
 
 - Spec-compliance test (exists) → becomes catalog drift check (D4).

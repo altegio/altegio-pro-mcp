@@ -16,13 +16,13 @@ the code disagree, which is how a surface change reaches a reviewer’s diff
 
 ## Counts
 
-**142 tools served (148 defined, 6 withheld from every view).**
+**151 tools served (157 defined, 6 withheld from every view).**
 
 | What | Count | Where |
 | --- | --- | --- |
-| Defined | 148 | 136 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
+| Defined | 157 | 145 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
 | Withheld from every view | 6 | `src/tools/disabled-tools.ts` (the report builder) |
-| **Served** | **142** | what `stdio` lists; every HTTP view is a subset |
+| **Served** | **151** | what `stdio` lists; every HTTP view is a subset |
 
 Served tools per category, in `tools/list` order:
 
@@ -30,13 +30,14 @@ Served tools per category, in `tools/list` order:
 | --- | --- |
 | API | 3 |
 | Analytics | 30 |
-| Appointments | 9 |
+| Appointments | 11 |
 | Auth | 2 |
 | Categories | 2 |
 | Clients | 12 |
 | Events | 15 |
 | Feedback | 1 |
 | Finance | 8 |
+| Inventory | 7 |
 | Location | 3 |
 | Memberships | 13 |
 | Onboarding | 12 |
@@ -52,17 +53,17 @@ Served tools per category, in `tools/list` order:
 
 ## Views
 
-| View | Address | Serves (of 148 defined) | Reasons |
+| View | Address | Serves (of 157 defined) | Reasons |
 | --- | --- | --- | --- |
-| `all` | stdio (no HTTP route) | 142 | all ×142, -off ×6 |
-| `default` | `/mcp` | 104 | dflt ×100, -pack ×35, -off ×6, base ×3, -pwd ×2, -name ×1, xtra ×1 |
-| `readonly` | `/mcp/readonly` | 78 | ro ×78, -write ×62, -off ×6, -pwd ×2 |
-| `ops` | `/mcp/ops` | 48 | - ×92, pfx ×27, rule ×18, -off ×6, base ×3, -pwd ×2 |
-| `catalog` | `/mcp/catalog` | 34 | - ×106, rule ×31, -off ×6, base ×3, -pwd ×2 |
-| `finance` | `/mcp/finance` | 46 | - ×94, pfx ×42, -off ×6, base ×3, -pwd ×2, rule ×1 |
-| `marketing` | `/mcp/marketing` | 17 | - ×123, pfx ×13, -off ×6, base ×3, -pwd ×2, rule ×1 |
-| `analytics` | `/mcp/analytics` | 33 | - ×107, pfx ×30, -off ×6, base ×3, -pwd ×2 |
-| `onboarding` | `/mcp/onboarding` | 15 | - ×125, pfx ×12, -off ×6, base ×3, -pwd ×2 |
+| `all` | stdio (no HTTP route) | 151 | all ×151, -off ×6 |
+| `default` | `/mcp` | 113 | dflt ×109, -pack ×35, -off ×6, base ×3, -pwd ×2, -name ×1, xtra ×1 |
+| `readonly` | `/mcp/readonly` | 84 | ro ×84, -write ×65, -off ×6, -pwd ×2 |
+| `ops` | `/mcp/ops` | 51 | - ×98, pfx ×27, rule ×21, -off ×6, base ×3, -pwd ×2 |
+| `catalog` | `/mcp/catalog` | 34 | - ×115, rule ×31, -off ×6, base ×3, -pwd ×2 |
+| `finance` | `/mcp/finance` | 55 | - ×94, pfx ×48, -off ×6, rule ×4, base ×3, -pwd ×2 |
+| `marketing` | `/mcp/marketing` | 17 | - ×132, pfx ×13, -off ×6, base ×3, -pwd ×2, rule ×1 |
+| `analytics` | `/mcp/analytics` | 33 | - ×116, pfx ×30, -off ×6, base ×3, -pwd ×2 |
+| `onboarding` | `/mcp/onboarding` | 15 | - ×134, pfx ×12, -off ×6, base ×3, -pwd ×2 |
 
 A facet answers *how many tools fit in this host’s context*; `readonly`
 answers *what may this agent do at all*. They are different kinds of view —
@@ -168,9 +169,11 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | `appointments_create_tag` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:write |
 | `appointments_delete` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:write, confirm |
 | `appointments_find_free_slots` | `all` | `dflt` | `ro` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:read |
+| `appointments_get_consumables` | `all` | `dflt` | `ro` | `rule` | `-` | `rule` | `-` | `-` | `-` | appointments:read + inventory:read |
 | `appointments_list` | `all` | `dflt` | `ro` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:read |
 | `appointments_list_tags` | `all` | `dflt` | `ro` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:read |
 | `appointments_preview_attendance` | `all` | `dflt` | `ro` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:read |
+| `appointments_set_consumables` | `all` | `dflt` | `-write` | `rule` | `-` | `rule` | `-` | `-` | `-` | appointments:write + inventory:operate, confirm |
 | `appointments_update` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:write |
 
 ### Auth
@@ -242,6 +245,18 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | `financial_transactions_list` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `-` | `-` | finance:read |
 | `financial_transactions_list_payment_items` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `-` | `-` | finance:read |
 | `financial_transactions_update` | `all` | `-pack` | `-write` | `-` | `-` | `pfx` | `-` | `-` | `-` | finance:write, confirm |
+
+### Inventory
+
+| Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `inventory_create_operation` | `all` | `dflt` | `-write` | `-` | `-` | `pfx` | `-` | `-` | `-` | inventory:operate + inventory:sell, confirm |
+| `inventory_delete_document` | `all` | `dflt` | `-write` | `-` | `-` | `pfx` | `-` | `-` | `-` | inventory:operate, confirm |
+| `inventory_list` | `all` | `dflt` | `ro` | `-` | `-` | `pfx` | `-` | `-` | `-` | inventory:read |
+| `inventory_list_bills_of_materials` | `all` | `dflt` | `ro` | `-` | `-` | `pfx` | `-` | `-` | `-` | inventory:read |
+| `inventory_list_operations` | `all` | `dflt` | `ro` | `-` | `-` | `pfx` | `-` | `-` | `-` | inventory:read |
+| `products_search` | `all` | `dflt` | `ro` | `rule` | `-` | `pfx` | `-` | `-` | `-` | inventory:read |
+| `suppliers_list` | `all` | `dflt` | `ro` | `-` | `-` | `rule` | `-` | `-` | `-` | finance:read |
 
 ### Location
 
