@@ -40,6 +40,8 @@ describe('destructive tools are gated', () => {
       'clients_delete',
       'events_delete',
       'events_delete_duplication_strategy',
+      'financial_transactions_delete',
+      'financial_transactions_update',
       'locations_remove_user',
       'memberships_delete_type',
       'memberships_set_balance',
@@ -50,6 +52,7 @@ describe('destructive tools are gated', () => {
       'services_delete',
       'services_unlink_team_member',
       'team_members_delete',
+      'visits_cancel_payment',
     ]);
   });
 
@@ -110,14 +113,26 @@ describe('destructive tools are gated', () => {
     expect(prepared?.consequence).toContain('deleted');
   });
 
-  it('does not gate anything that is not destructive', () => {
+  /**
+   * Recording money is additive — nothing is overwritten, so `destructiveHint`
+   * stays false — but a payment, a client account deposit or a cash operation
+   * moves money a person has to stand behind, so these ask first too. The list
+   * is explicit so the gate does not spread to ordinary creates.
+   */
+  const MONEY_RECORDING = [
+    'client_accounts_deposit',
+    'financial_transactions_create',
+    'visits_add_payment',
+  ];
+
+  it('gates nothing that is not destructive, except recording money', () => {
     const confirmedButNotDestructive = factoryTools.filter(
       (tool) =>
         tool.meta.confirm !== undefined &&
         tool.meta.annotations?.destructiveHint !== true
     );
-    expect(confirmedButNotDestructive.map((tool) => tool.meta.name)).toEqual(
-      []
-    );
+    expect(
+      confirmedButNotDestructive.map((tool) => tool.meta.name).sort()
+    ).toEqual(MONEY_RECORDING);
   });
 });

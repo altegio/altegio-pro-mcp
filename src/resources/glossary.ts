@@ -59,13 +59,30 @@ Decide by audience, not by mechanical replacement: an internal team record is a
 | **Loyalty program** | The rules that earn and spend bonuses or cashback | Loyalty (on its own) |
 | **Client account** | The client's balance held by the location — money, not a login | Deposit, Personal account |
 
-## Finance, payroll and inventory
+## Finance
 
 | Canonical term | What it is | Never use |
 |---|---|---|
-| **Accounts** | Where money is held and counted | Cash registers, Cash drawers |
+| **Payment** | One recorded act of paying against a visit | — |
+| **Amount due** | Money the client still has to pay on a visit's bill | Total |
+| **Total amount** | Monetary sum of a bill or list | Total, Amount |
+| **Advance payment** | A payment recorded before the visit, for part of the amount due | Prepayment |
+| **deposit** | The operation that tops up a **Client account**; never a name for the account or its balance | — |
+| **Accounts and cash registers** | Internal tills and payment accounts where a location records money; each is a **cash settlement** or a **non-cash settlement** | Accounts (alone), Cash drawers, Cashless |
+| **Internal cash register / till** | A software till inside accounts and cash registers, opened and closed by **shift** | Fiscal device, Payment terminal |
+| **Fiscal cash-register device** | The physical device that issues fiscal receipts — not an internal till | Payment terminal, KKM |
 | **Financial transactions** | Individual money movements in and out | — |
+| **Payment item** | What a financial transaction is for (rent, product purchase, services rendered); it decides income or expense | Expense (for an income item) |
+| **Income and expense categories** | Categories that classify payment items | Income and Expenses, Earnings and Expenditure |
+| **Suppliers and Partners** | Counterparties the location pays or is paid by | Providers, Contractors, Vendors |
+| **refund** | Money returned to the client; cancelling a recorded payment is not one | — |
 | **Payroll** | What the team is paid and how it is calculated | Salary, Wage register |
+| **Settlements** | What is accrued to a team member, what is paid out, and the balance owed | Disbursements |
+
+## Inventory
+
+| Canonical term | What it is | Never use |
+|---|---|---|
 | **Inventory** | Stock of products held by a location | Warehouse, Stock, Storage |
 
 ## Working surfaces
@@ -78,6 +95,7 @@ Decide by audience, not by mechanical replacement: an internal team record is a
 
 ## Legacy names still on the wire
 
-Backend API fields such as \`salon_id\` and \`record_id\` remain inside
-adapters. The MCP boundary uses locations, team members, and appointments.
+Backend API fields such as \`salon_id\`, \`record_id\`, \`deposit_id\`,
+\`expense_id\` and \`master_id\` remain inside adapters. The MCP boundary uses
+locations, team members, appointments, client accounts and payment items.
 `;

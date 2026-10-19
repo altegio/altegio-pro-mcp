@@ -346,6 +346,7 @@ describe('HTTP server facet wiring, end to end', () => {
 
       const ops = await toolNamesOn(port, '/mcp/ops');
       expect([...ops].sort()).toEqual([
+        'accounts_and_cash_registers_list',
         'appointments_apply_attendance',
         'appointments_create',
         'appointments_create_tag',
@@ -355,6 +356,8 @@ describe('HTTP server facet wiring, end to end', () => {
         'appointments_list_tags',
         'appointments_preview_attendance',
         'appointments_update',
+        'client_accounts_deposit',
+        'client_accounts_list_for_client',
         'clients_add_comment',
         'clients_delete',
         'clients_get_card',
@@ -388,6 +391,9 @@ describe('HTTP server facet wiring, end to end', () => {
         'memberships_list_for_client',
         'memberships_unfreeze',
         'users_get_current',
+        'visits_add_payment',
+        'visits_cancel_payment',
+        'visits_get',
       ]);
 
       const all = await toolNamesOn(port, '/mcp');

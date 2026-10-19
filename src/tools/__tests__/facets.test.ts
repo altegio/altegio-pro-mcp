@@ -3,6 +3,7 @@ import {
   ALL_TOOLS_FACET,
   buildFacetIndex,
   DEFAULT_FACET,
+  DEFAULT_FACET_EXCLUDED_PREFIXES,
   DEFAULT_FACET_EXCLUDED_TOOLS,
   DEFAULT_FACET_EXTRA_TOOLS,
   FACET_BASE_TOOLS,
@@ -32,6 +33,26 @@ const MEMBERSHIP_TOOLS = [
   'memberships_set_validity',
   'memberships_unfreeze',
   'memberships_update_type',
+];
+
+/** Visit payments, client accounts and the accounts list: reception money. */
+const RECEPTION_MONEY_TOOLS = [
+  'accounts_and_cash_registers_list',
+  'client_accounts_deposit',
+  'client_accounts_list_for_client',
+  'visits_add_payment',
+  'visits_cancel_payment',
+  'visits_get',
+];
+
+/** Back-office money, served on finance only. */
+const BACK_OFFICE_MONEY_TOOLS = [
+  'financial_transactions_create',
+  'financial_transactions_delete',
+  'financial_transactions_list',
+  'financial_transactions_list_payment_items',
+  'financial_transactions_update',
+  'payroll_get_calculation',
 ];
 
 const allNames = () => orderedToolEntries().map((entry) => entry.spec.name);
@@ -87,7 +108,9 @@ describe('static views', () => {
       (name) =>
         !PASSWORD_LOGIN_TOOLS.includes(name) &&
         !DEFAULT_FACET_EXCLUDED_TOOLS.includes(name) &&
-        (!name.startsWith('analytics_') ||
+        (!DEFAULT_FACET_EXCLUDED_PREFIXES.some((prefix) =>
+          name.startsWith(prefix)
+        ) ||
           DEFAULT_FACET_EXTRA_TOOLS.includes(name))
     );
     expect(index.members(DEFAULT_FACET)).toEqual(expected);
@@ -148,6 +171,7 @@ describe('static views', () => {
         'memberships_unfreeze',
         'users_get_current',
         'appointments_update',
+        ...RECEPTION_MONEY_TOOLS,
       ].sort()
     );
   });
@@ -366,7 +390,8 @@ describe('static views', () => {
           analyticsCount +
           DEFAULT_FACET_EXTRA_TOOLS.length -
           PASSWORD_LOGIN_TOOLS.length -
-          DEFAULT_FACET_EXCLUDED_TOOLS.length
+          DEFAULT_FACET_EXCLUDED_TOOLS.length -
+          BACK_OFFICE_MONEY_TOOLS.length
       );
     });
 
@@ -386,7 +411,11 @@ describe('static views', () => {
         FACET_BASE_TOOLS.length + analyticsCount
       );
       expect(index.members('finance')).toHaveLength(
-        FACET_BASE_TOOLS.length + analyticsCount + 1
+        FACET_BASE_TOOLS.length +
+          analyticsCount +
+          1 +
+          RECEPTION_MONEY_TOOLS.length +
+          BACK_OFFICE_MONEY_TOOLS.length
       );
       expect(
         index.includes('finance', 'clients_get_membership_purchases')

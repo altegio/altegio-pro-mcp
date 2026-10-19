@@ -1,0 +1,132 @@
+# Finance — the operations behind the curated visit, payment, client account,
+# accounts and cash registers, financial transaction and payroll tools.
+#
+# Format: catalog/overlay/_schema.yaml. V2 has no visit, payment or finance
+# operation and the V3 visit and payment operations are still `planned`, so
+# the packs run on V1 (src/api/v1/finance-adapter.ts). A visit's bill is the
+# sale state of the appointment's visit document.
+
+version: 1
+
+operations:
+  # --- a visit's bill and its payments ----------------------------------------
+  get_sale_transaction:
+    domain: visits
+    tier: core
+    facets: [ops, finance]
+    tool_name: visits_get
+    notes: >
+      Read for the visit document of an appointment (documents[] type 7 on the
+      appointment). Also read by visits_add_payment and visits_cancel_payment,
+      which check the bill before they write.
+  create_payment_with_loyalty_methods:
+    domain: visits
+    tier: core
+    facets: [ops, finance]
+    tool_name: visits_add_payment
+    write_allowed: false
+    notes: >
+      The tool refuses when the amount due differs from the one the caller read,
+      so a repeated confirmed call cannot record the payment twice.
+  delete_location_account_payment:
+    domain: visits
+    tier: core
+    facets: [ops, finance]
+    tool_name: visits_cancel_payment
+    write_allowed: false
+    notes: Money payments (payment id t<number>).
+  delete_loyalty_payment_transaction:
+    domain: visits
+    tier: core
+    facets: [ops, finance]
+    tool_name: visits_cancel_payment
+    write_allowed: false
+    notes: Client account and loyalty payments (payment id l<number>).
+
+  # --- client accounts ---------------------------------------------------------
+  get_client_account_list_by_location_and_client:
+    domain: client_accounts
+    tier: core
+    facets: [ops, finance]
+    tool_name: client_accounts_list_for_client
+  create_client_account_topup_operation:
+    domain: client_accounts
+    tier: core
+    facets: [ops, finance]
+    tool_name: client_accounts_deposit
+    write_allowed: false
+    notes: >
+      The `deposit` operation. The tool refuses when the balance differs from
+      the one the caller read.
+
+  # --- accounts and cash registers ---------------------------------------------
+  get_account_list:
+    domain: finance
+    tier: core
+    facets: [ops, finance]
+    tool_name: accounts_and_cash_registers_list
+
+  # --- financial transactions ---------------------------------------------------
+  list_location_payment_items:
+    domain: finance
+    tier: pack
+    facets: [finance]
+    tool_name: financial_transactions_list_payment_items
+    notes: >
+      Payment items with the income or expense category (`type` 1–7) they
+      belong to; the id is `expense_id` on the wire.
+  get_transactions:
+    domain: finance
+    tier: pack
+    facets: [finance]
+    tool_name: financial_transactions_list
+  create_financial_transaction:
+    domain: finance
+    tier: pack
+    facets: [finance]
+    tool_name: financial_transactions_create
+    write_allowed: false
+    notes: >
+      Stores `date` as server wall time (Asia/Dubai); the adapter converts from
+      the location's time.
+  get_financial_transaction:
+    domain: finance
+    tier: pack
+    facets: [finance]
+    tool_name: financial_transactions_update
+    notes: Also read by financial_transactions_delete.
+  update_financial_transaction:
+    domain: finance
+    tier: pack
+    facets: [finance]
+    tool_name: financial_transactions_update
+    write_allowed: false
+    notes: >
+      PUT replaces every field and converts `date` from location time; the tool
+      reads first and sends every field back.
+  delete_financial_transaction:
+    domain: finance
+    tier: pack
+    facets: [finance]
+    tool_name: financial_transactions_delete
+    write_allowed: false
+
+  # --- payroll ------------------------------------------------------------------
+  search_team_member_period_salary:
+    domain: payroll
+    tier: pack
+    facets: [finance]
+    tool_name: payroll_get_calculation
+    notes: Answers 416 when no payroll scheme applies; the tool reports no calculation.
+  search_team_member_calculation_salary:
+    domain: payroll
+    tier: pack
+    facets: [finance]
+    tool_name: payroll_get_calculation
+    notes: Settlements (accrued, paid, balance) for the same period.
+  search_team_member_payroll_calculation:
+    domain: payroll
+    tier: pack
+    facets: [finance]
+    tool_name: payroll_get_calculation
+    notes: Saved payroll calculations for the same period.

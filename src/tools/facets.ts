@@ -188,6 +188,12 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
       'memberships_list_for_client',
       'memberships_freeze',
       'memberships_unfreeze',
+      'visits_get',
+      'visits_add_payment',
+      'visits_cancel_payment',
+      'client_accounts_list_for_client',
+      'client_accounts_deposit',
+      'accounts_and_cash_registers_list',
     ],
     prefixes: ['events_', 'clients_'],
   },
@@ -234,13 +240,22 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
   },
 
   /**
-   * Money: analytics today. Intended membership (ADR-001 D3) also covers
-   * visits, payments and payroll; those packs are not built yet, so this facet
-   * is partial on purpose.
+   * Money: a visit's bill and its payments, client accounts, accounts and cash
+   * registers, financial transactions, payroll, and the analytics pack.
+   * Still partial: product sales on a visit (V3 `addVisitItem` is not served
+   * yet), payroll payouts (no operation in the catalog) and fiscalization are
+   * not built.
    */
   finance: {
     tools: ['clients_get_membership_purchases'],
-    prefixes: ['analytics_'],
+    prefixes: [
+      'visits_',
+      'client_accounts_',
+      'accounts_and_cash_registers_',
+      'financial_transactions_',
+      'payroll_',
+      'analytics_',
+    ],
   },
 
   /**
@@ -279,6 +294,11 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
  */
 export const DEFAULT_FACET_EXCLUDED_PREFIXES: readonly string[] = [
   'analytics_',
+  // Back-office money: cash operations, expenses and payroll belong to the
+  // owner's finance work, not to the reception tasks `/mcp` serves (a visit's
+  // payments and client accounts stay there). They live on `/mcp/finance`.
+  'financial_transactions_',
+  'payroll_',
 ];
 
 /**

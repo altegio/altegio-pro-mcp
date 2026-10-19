@@ -6,6 +6,42 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — visit payments, client accounts, financial transactions and payroll
+
+- **A visit's bill and its payments.** `visits_get` reads the bill of an
+  appointment's visit: lines, recorded payments, held advance payments, the
+  total, paid and due amounts, and every way the bill can be paid now with the
+  most each can pay. `visits_add_payment` records one payment (an account or
+  cash register, a client account, a loyalty card or program, a gift card, a
+  membership, or a held advance payment) and needs the `expected_amount_due`
+  read just before, so a replayed call is refused once the bill has changed.
+  `visits_cancel_payment` cancels one payment by its id.
+- **Client accounts.** `client_accounts_list_for_client` reads a client's
+  accounts and balances; `client_accounts_deposit` tops one up (the `deposit`
+  operation), received into one of the accounts and cash registers, guarded by
+  the `expected_balance` read just before.
+- **Accounts and cash registers.** `accounts_and_cash_registers_list` lists the
+  internal tills and payment accounts, with cash or non-cash settlement.
+- **Financial transactions** on `/mcp/finance`: `financial_transactions_list`
+  (a date window of up to 366 days, filtered by account, client, team member or
+  supplier, paged), `financial_transactions_create`, `financial_transactions_update`
+  (merges the changes into the stored transaction) and
+  `financial_transactions_delete`. Update and delete refuse a transaction a
+  visit, a product sale or a deposit recorded, and create refuses an identical
+  transaction recorded a moment earlier. `financial_transactions_list_payment_items`
+  lists the payment items with their income or expense category.
+- **Payroll.** `payroll_get_calculation` reads a team member's payroll for a
+  period (services, product sales, bonuses, penalties, the amount), the
+  settlements balance and the saved calculations; a team member without a
+  payroll scheme reads as no calculation rather than an error.
+- **Money conventions.** Amounts are in major units, as the bill reads, next to
+  the location's ISO currency code on every value. Every write that records,
+  moves or deletes money asks for confirmation. Datetimes are in the location's
+  own offset.
+- **Views.** The bill, payments, client accounts and the accounts list join
+  `/mcp`, `/mcp/ops` and `/mcp/finance`; financial transactions and payroll are
+  served on `/mcp/finance` only.
+
 ### Changed — agents are pointed at `feedback_submit` when it matters
 
 - **A nudge where the defect shows.** A failed call whose cause looks like a
