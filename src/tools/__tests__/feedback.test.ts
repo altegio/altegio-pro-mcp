@@ -1,14 +1,34 @@
-import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import {
+  requestContextFromHeaders,
+  runWithContext,
+} from '../../request-context.js';
 import { createServer } from '../../server.js';
 import { createLogger } from '../../utils/logger.js';
 import {
+  createToolCallObservation,
+  runObservingToolCall,
+} from '../../utils/tool-call-observation.js';
+import { AltegioApiError } from '../../utils/errors.js';
+import {
+  clearFeedbackRateLimit,
+  FEEDBACK_RATE_LIMIT,
   FEEDBACK_TEXT_LIMITS,
   maskFeedbackText,
   submitFeedbackTool,
 } from '../definitions/feedback.tools.js';
+import { withErrorHandling } from '../tool-result.js';
+import { searchOperationsTool } from '../definitions/executor.tools.js';
 import { VIEW_KEYS, type FacetKey } from '../facets.js';
 
 const feedbackLog = createLogger('agent-feedback');
@@ -29,8 +49,20 @@ const REPORT = {
 const call = (args: unknown) =>
   submitFeedbackTool.createHandler({} as never)(args);
 
+/** The same call, made by the signed-in user whose Altegio token is `token`. */
+const callAs = (token: string, args: unknown) =>
+  runWithContext(
+    requestContextFromHeaders({ 'x-altegio-user-token': token }),
+    () => call(args)
+  );
+
+beforeEach(() => {
+  clearFeedbackRateLimit();
+});
+
 afterEach(() => {
   jest.restoreAllMocks();
+  jest.useRealTimers();
 });
 
 describe('maskFeedbackText', () => {
@@ -107,6 +139,33 @@ describe('feedback_submit', () => {
       error_text: 'Client [email] not found',
       masked_values: 1,
     });
+  });
+
+  it('names the model as a log-safe token and the user by a hash', async () => {
+    const info = jest.spyOn(feedbackLog, 'info').mockImplementation(() => {});
+    await callAs('user-token-a', { ...REPORT, model: 'Claude Opus 5.5 (1M)' });
+    const event = info.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(event.model).toBe('Claude_Opus_5.5_1M');
+    expect(event.principal).toMatch(/^token-[0-9a-f]{16}$/);
+    expect(JSON.stringify(event)).not.toContain('user-token-a');
+  });
+
+  it('records at most the rate limit per caller and window', async () => {
+    jest.useFakeTimers({ now: new Date('2026-10-19T12:00:00Z') });
+    const info = jest.spyOn(feedbackLog, 'info').mockImplementation(() => {});
+    const { reports, windowMs } = FEEDBACK_RATE_LIMIT;
+    for (let i = 0; i < reports; i += 1) {
+      expect((await callAs('user-token-a', REPORT)).isError).toBeUndefined();
+    }
+    const refused = await callAs('user-token-a', REPORT);
+    expect(refused.isError).toBe(true);
+    expect(refused.content[0]?.text).toContain('Report not recorded');
+    // Another person is counted apart.
+    expect((await callAs('user-token-b', REPORT)).isError).toBeUndefined();
+    expect(info).toHaveBeenCalledTimes(reports + 1);
+
+    jest.setSystemTime(Date.now() + windowMs + 1);
+    expect((await callAs('user-token-a', REPORT)).isError).toBeUndefined();
   });
 
   it('says whether a reported operation is in the catalog', async () => {
@@ -190,5 +249,47 @@ describe('feedback_submit on the served surface', () => {
       client_name: 'feedback-test',
       client_version: '2.1.0',
     });
+  });
+});
+
+describe('the unexpected-error note behind the feedback nudge', () => {
+  const observed = async (thrown: unknown) => {
+    const observation = createToolCallObservation();
+    const result = await runObservingToolCall(observation, () =>
+      withErrorHandling('some_tool', async () => {
+        throw thrown;
+      })
+    );
+    return { result, unexpected: observation.unexpectedError === true };
+  };
+
+  it('marks an error no typed class describes', async () => {
+    const { result, unexpected } = await observed(new TypeError('boom'));
+    expect(result.isError).toBe(true);
+    expect(unexpected).toBe(true);
+  });
+
+  it('leaves a typed API error unmarked', async () => {
+    const { unexpected } = await observed(
+      new AltegioApiError('Not found', 404)
+    );
+    expect(unexpected).toBe(false);
+  });
+});
+
+describe('the missing-operation nudge', () => {
+  const search = (args: unknown) =>
+    searchOperationsTool.createHandler({} as never)(args);
+
+  it('ends a search that matched nothing with a pointer to feedback_submit', async () => {
+    const result = await search({ query: 'zzqx teleport wombat' });
+    expect(result.content[0]?.text).toContain('feedback_submit');
+  });
+
+  it('adds nothing to a search that found operations', async () => {
+    const result = await search({ query: 'appointments' });
+    expect(result.content.map((block) => block.text).join(' ')).not.toContain(
+      'feedback_submit'
+    );
   });
 });

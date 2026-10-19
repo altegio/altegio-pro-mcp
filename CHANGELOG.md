@@ -6,6 +6,24 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — agents are pointed at `feedback_submit` when it matters
+
+- **A nudge where the defect shows.** A failed call whose cause looks like a
+  defect — an API 5xx answer or an error no typed class describes — ends with
+  one sentence pointing at `feedback_submit`, and so does an operation search
+  that matches nothing. Validation, access, 4xx and transient failures (a
+  timeout, an unreachable API) do not, so agents are not prompted to report
+  their own mistakes. The `tool_call` line carries `feedback_nudge: true` when
+  it was added.
+- **No approval round-trip.** The description is under half its former length
+  and tells the agent not to ask the user first, only to mention the report.
+- **Who reported.** The event adds `principal` (the same non-reversible
+  per-user key the server uses for stored state) and `model`, the optional
+  model name the agent gives, reduced to a log-safe token.
+- **A report limit.** 5 reports per 10 minutes per signed-in user, else per
+  session; a refused report is an `isError` result and a `tool_call` line with
+  `error_class: "rate_limited"`.
+
 ### Added — `feedback_submit`: agents report bugs and missing capabilities
 
 - **`feedback_submit`** records a report from the agent: `kind` (`bug` or

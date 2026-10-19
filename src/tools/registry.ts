@@ -51,6 +51,10 @@ import {
 } from './legacy-aliases.js';
 import { getOperation } from './executor/catalog.js';
 import {
+  FEEDBACK_NUDGE,
+  submitFeedbackTool,
+} from './definitions/feedback.tools.js';
+import {
   AltegioApiError,
   AuthenticationError,
   ExecutorRefusalError,
@@ -189,6 +193,7 @@ export type ToolErrorClass =
   | 'confirmation_required'
   | 'unknown_tool'
   | 'timeout'
+  | 'rate_limited'
   | 'internal';
 
 /** A name a reply or a log line may repeat: nothing else a caller sent is. */
@@ -269,6 +274,27 @@ function legacyArgumentsResult(
   return { content: [{ type: 'text', text }], isError: true };
 }
 
+/**
+ * Whether a failed call should point the agent at `feedback_submit`: the API
+ * answered 5xx, or an error no typed class describes ended it — the failures
+ * that look like a defect. Validation, access and transient failures do not:
+ * the agent recovers from those itself, and a nudge on every error would
+ * flood the reports with its own mistakes.
+ */
+function invitesFeedback(
+  tool: string,
+  observation: ToolCallObservation,
+  failed: { error_class: ToolErrorClass; upstream_status?: number }
+): boolean {
+  if (tool === submitFeedbackTool.meta.name) return false;
+  if (failed.error_class === 'upstream_5xx') {
+    return failed.upstream_status !== undefined;
+  }
+  return (
+    failed.error_class === 'internal' && observation.unexpectedError === true
+  );
+}
+
 /** UTF-8 bytes of what a result carries: text blocks plus structured content. */
 function resultBytes(result: ToolResult): number {
   let bytes = 0;
@@ -301,6 +327,7 @@ function classifyFailure(
   argsInvalid: () => boolean,
   unauthenticated: () => boolean
 ): { error_class: ToolErrorClass; upstream_status?: number } {
+  if (observation.rateLimited) return { error_class: 'rate_limited' };
   const cause = thrown ?? observation.lastError;
   const status = observation.upstreamErrorStatus;
   if (observation.upstreamFailure === 'timeout' || isTimeout(cause)) {
@@ -645,14 +672,25 @@ export function registerTools(
       };
       const log = createLogger('tool-calls');
       try {
-        const result = await runObservingToolCall(observation, () =>
+        const completed = await runObservingToolCall(observation, () =>
           runOnView(servingView, execute)
         );
         const outcome = call.confirmation
           ? 'confirmation_required'
-          : result.isError
+          : completed.isError
             ? 'error'
             : 'success';
+        const failed = outcome === 'error' ? failure() : undefined;
+        const result =
+          failed && invitesFeedback(call.tool, observation, failed)
+            ? {
+                ...completed,
+                content: [
+                  ...completed.content,
+                  { type: 'text' as const, text: FEEDBACK_NUDGE },
+                ],
+              }
+            : completed;
         log.info(
           {
             ...fields(),
@@ -660,9 +698,8 @@ export function registerTools(
             ...(outcome === 'confirmation_required'
               ? { error_class: 'confirmation_required' }
               : {}),
-            ...(outcome === 'error'
-              ? { error_type: 'tool_result', ...failure() }
-              : {}),
+            ...(failed ? { error_type: 'tool_result', ...failed } : {}),
+            ...(result !== completed ? { feedback_nudge: true } : {}),
             response_bytes: resultBytes(result),
             latency_ms: Math.round(performance.now() - started),
           },
