@@ -10,7 +10,8 @@
  *   alone reads as logins or bank accounts, and none of these is a fiscal
  *   device).
  * - `financial_transactions_*` — individual money movements in and out:
- *   cash operations, expenses, income outside a visit.
+ *   cash operations, expenses, income outside a visit. Their Suppliers and
+ *   Partners come from `suppliers_list` (the inventory pack, also on finance).
  * - `payroll_get_calculation` — a team member's payroll for a period and the
  *   settlements with them.
  *
@@ -278,7 +279,9 @@ const transactionFieldInputs = {
     .int()
     .positive()
     .optional()
-    .describe('Supplier or partner the money is paid to or received from.'),
+    .describe(
+      'Supplier or partner the money is paid to or received from, from suppliers_list.'
+    ),
   comment: z
     .string()
     .max(255)
@@ -360,7 +363,7 @@ export const financialTransactionsListTool = defineTool({
       .int()
       .positive()
       .optional()
-      .describe('Supplier id.'),
+      .describe('Supplier or partner id (suppliers_list).'),
     page: pageArg,
     page_size: pageSizeArg(100),
   }),

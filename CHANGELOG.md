@@ -6,6 +6,15 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — financial transactions point at `suppliers_list`
+
+- `supplier_id` on `financial_transactions_create`, `_update` and `_list`
+  now names `suppliers_list` as its source, and so does the hint of a refused
+  transaction write. `suppliers_list` describes Suppliers and Partners as the
+  counterparties a location pays or is paid by and says its id is the
+  `supplier_id` of a financial transaction as well as of a product receipt.
+  No new tool: `suppliers_list` is already served on `/mcp/finance`.
+
 ### Added — inventory, products and appointment consumables
 
 - **Reads.** `inventory_list` (a location's inventories, with the default ones

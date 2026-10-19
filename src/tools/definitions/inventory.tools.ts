@@ -446,7 +446,7 @@ export const suppliersListTool = defineTool({
   name: 'suppliers_list',
   category: 'Inventory',
   description:
-    'The Suppliers and Partners of a location — the counterparties it receives products from — optionally filtered by part of the name: id, name and type (legal entity, sole proprietor, individual). Use the id as supplier_id of a product receipt. Needs the Finances access rights. Paged: follow pagination.next_page.',
+    'The Suppliers and Partners of a location — the counterparties it pays or is paid by, such as those it receives products from — optionally filtered by part of the name: id, name and type (legal entity, sole proprietor, individual). Use the id as supplier_id in financial_transactions_create, financial_transactions_update and financial_transactions_list, or of a product receipt (inventory_create_operation). Needs the Finances access rights. Paged: follow pagination.next_page.',
   annotations: {
     title: 'Inventory: list Suppliers and Partners',
     ...READ_ONLY,
