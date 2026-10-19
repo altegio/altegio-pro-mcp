@@ -576,16 +576,28 @@ export function registerTools(
     const onView = async () => {
       const started = performance.now();
       const observation = createToolCallObservation();
+      // `clientInfo` from initialize; a stateless request has none.
+      const clientInfo =
+        typeof server.getClientVersion === 'function'
+          ? server.getClientVersion()
+          : undefined;
+      const agent = clientInfo ? {} : userAgentProduct(headers?.['user-agent']);
+      // What ties this call's log lines together, and to the proxy's: also
+      // handed to a tool that writes an event of its own (`feedback_submit`).
+      observation.correlation = {
+        request_id: headers?.['x-request-id'],
+        route: `/mcp${facet === DEFAULT_FACET ? '' : '/' + facet}`,
+        transport: headers
+          ? extra.sessionId
+            ? 'session'
+            : 'stateless'
+          : 'stdio',
+        ...(extra.sessionId ? { session: sessionLogId(extra.sessionId) } : {}),
+        client_name: logSafeToken(clientInfo?.name) ?? agent.name,
+        client_version: logSafeToken(clientInfo?.version) ?? agent.version,
+      };
       // Counts, classes and validated names only: never arguments or text.
       const fields = () => {
-        // `clientInfo` from initialize; a stateless request has none.
-        const clientInfo =
-          typeof server.getClientVersion === 'function'
-            ? server.getClientVersion()
-            : undefined;
-        const agent = clientInfo
-          ? {}
-          : userAgentProduct(headers?.['user-agent']);
         const operationId =
           call.tool === 'api_call_operation' &&
           callArgs &&
@@ -595,8 +607,7 @@ export function registerTools(
             : undefined;
         return {
           event: 'tool_call',
-          request_id: headers?.['x-request-id'],
-          route: `/mcp${facet === DEFAULT_FACET ? '' : '/' + facet}`,
+          ...observation.correlation,
           rpc_method: 'tools/call',
           tool: call.tool,
           ...(call.alias ? { alias: call.alias } : {}),
@@ -606,16 +617,6 @@ export function registerTools(
             ? { requested_tool: requested }
             : {}),
           ...(operationId ? { operation_id: operationId } : {}),
-          transport: headers
-            ? extra.sessionId
-              ? 'session'
-              : 'stateless'
-            : 'stdio',
-          ...(extra.sessionId
-            ? { session: sessionLogId(extra.sessionId) }
-            : {}),
-          client_name: logSafeToken(clientInfo?.name) ?? agent.name,
-          client_version: logSafeToken(clientInfo?.version) ?? agent.version,
         };
       };
       const inputIssues = () => inputIssuesOf.get(call.tool)?.(callArgs);

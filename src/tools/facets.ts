@@ -121,13 +121,16 @@ export function facetToolsFromSpecs(
 /**
  * Tools every facet carries unconditionally. Location discovery, because
  * nearly every tool needs a `location_id`, so a facet without it is unusable;
- * and the signed-in person's own profile, because a host that speaks the
- * user's Altegio language needs it whichever facet it mounted. Password login
- * is admitted per deployment instead — see `PASSWORD_LOGIN_TOOLS`.
+ * the signed-in person's own profile, because a host that speaks the user's
+ * Altegio language needs it whichever facet it mounted; and the feedback
+ * report, because a missing capability shows up on whichever facet lacks it.
+ * Password login is admitted per deployment instead — see
+ * `PASSWORD_LOGIN_TOOLS`.
  */
 export const FACET_BASE_TOOLS: readonly string[] = [
   'locations_list',
   'users_get_current',
+  'feedback_submit',
 ];
 
 /**

@@ -6,7 +6,7 @@ A TypeScript [Model Context Protocol](https://modelcontextprotocol.io) server fo
 Altegio business owners, administrators, and team members. It provides
 administrative B2B operations, client workflows, onboarding, and analytics.
 
-**129 tools served (135 defined, 6 withheld from every view)** — see the generated
+**130 tools served (136 defined, 6 withheld from every view)** — see the generated
 [tool surface](docs/architecture/tool-surface.md) for exact membership and gates.
 The surface includes a 28-tool analytics pack, a 15-tool group events pack, a
 13-tool memberships pack, a 3-tool API explorer, and 12 onboarding wizard tools. The API explorer executes reads only; administrative
@@ -134,6 +134,14 @@ must repeat the identical call with it after the user agrees. A read-only
 annotation alone is not an authorization boundary. Report download links are
 temporary, process-local, and bound to their creating principal and permitted
 location.
+
+`feedback_submit` lets an agent report a bug (a tool or operation failed or
+answered wrongly) or a feature request (a capability the task needs is missing)
+to the team that runs the server. Every view serves it, the read-only one
+included, and no token scope gates it: it changes nothing in the location. The
+report is one `agent_feedback` event in the server log, carrying the same
+request, route, session and client fields as the call's `tool_call` line, with
+bounded free text in which contact details and secrets are masked.
 
 ## Resources and prompts
 

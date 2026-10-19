@@ -1054,6 +1054,10 @@ const NO_FREE_TEXT: Record<string, string> = {
     'two fixed sentences; the API’s own wording on a failure goes through upstreamDetail',
   auth_logout: 'one fixed sentence',
 
+  // --- agent feedback ---
+  feedback_submit:
+    'a report id and a count of masked values; the submitted text is not echoed',
+
   // --- the catalog half of the executor ---
   api_search_operations:
     'summaries and paths from src/generated/catalog.json — a committed build artifact reviewed in PRs, not business data',

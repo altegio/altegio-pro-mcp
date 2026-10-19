@@ -517,9 +517,11 @@ describe('Spec Compliance', () => {
       const executor = new Set(executorTools);
       for (const tool of unmappedTools) {
         if (executor.has(tool)) continue;
-        expect(tool === 'auth_logout' || tool.startsWith('onboarding_')).toBe(
-          true
-        );
+        expect(
+          tool === 'auth_logout' ||
+            tool === 'feedback_submit' ||
+            tool.startsWith('onboarding_')
+        ).toBe(true);
       }
     });
 
