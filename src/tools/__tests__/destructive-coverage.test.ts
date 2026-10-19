@@ -118,8 +118,8 @@ describe('destructive tools are gated', () => {
   /**
    * Recording money or stock is additive — nothing is overwritten, so
    * `destructiveHint` stays false — but a payment, a client account deposit, a
-   * cash operation or an inventory operation moves money or stock a person has
-   * to stand behind, so these ask first too. The list is explicit so the gate
+   * cash operation, an inventory operation or a product sold on a visit moves
+   * money or stock a person has to stand behind, so these ask first too. The list is explicit so the gate
    * does not spread to ordinary creates.
    */
   const CONFIRMED_ADDITIVE = [
@@ -127,6 +127,7 @@ describe('destructive tools are gated', () => {
     'financial_transactions_create',
     'inventory_create_operation',
     'visits_add_payment',
+    'visits_add_product',
   ];
 
   it('gates nothing that is not destructive, except recording money or stock', () => {

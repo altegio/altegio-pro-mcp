@@ -41,6 +41,7 @@ const RECEPTION_MONEY_TOOLS = [
   'client_accounts_deposit',
   'client_accounts_list_for_client',
   'visits_add_payment',
+  'visits_add_product',
   'visits_cancel_payment',
   'visits_get',
 ];

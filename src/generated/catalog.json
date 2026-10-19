@@ -14,7 +14,7 @@
       "spec": "docs/en/b2b-v2/openapi.yaml",
       "title": "Business Management",
       "version": "2.0.0",
-      "operations": 51
+      "operations": 52
     },
     {
       "source": "v3",
@@ -34,8 +34,8 @@
     "salon_id": "location_id",
     "staff_id": "team_member_id"
   },
-  "operationCount": 361,
-  "curatedCount": 105,
+  "operationCount": 362,
+  "curatedCount": 107,
   "domains": [
     {
       "domain": "analytics",
@@ -43,7 +43,7 @@
     },
     {
       "domain": "appointments",
-      "operations": 34
+      "operations": 33
     },
     {
       "domain": "auth",
@@ -155,7 +155,7 @@
     },
     {
       "domain": "visits",
-      "operations": 6
+      "operations": 8
     }
   ],
   "supersededCount": 33,
@@ -40157,6 +40157,7 @@
       "path": "/visits/{visit_id}/{record_id}",
       "displayPath": "/visits/{visit_id}/{appointment_id}",
       "summary": "Edit Visit",
+      "description": "Update the attendance status, bill comment, Services, Product Items, and\npayments of a visit.\n\n> **This is a replace operation for the whole visit.** `services` and\n> `goods_transactions` replace every Service line and every Product Item of\n> the visit, not only those of `record_id`. A list that is omitted\n> defaults to `[]` and deletes all its lines. There is no append. Read the\n> visit first and echo every line exactly.\n\n### How to work with this operation\n\n- `comment` is required and overwrites the visit's bill (document)\n  comment, not the Appointment comment. Echo the current bill comment.\n- `attendance` is required. When the Business User has the right to sell\n  Products in Appointments, a status other than arrived (`1`) or confirmed\n  (`2`) deletes every Product Item of the visit and cancels all its\n  payments.\n- `services` must list every Service line of every Appointment of the\n  visit, each with its `record_id`; a line without `record_id` returns\n  `422`. An Appointment whose lines are missing loses them, and a changed\n  set of Services sends the Booking User a \"record changed\" message.\n- `goods_transactions` must list every Product Item of the visit. A line\n  with `id` updates that line, a line without `id` is created, and an\n  existing line that is not sent is deleted together with any gift card or\n  membership it issued.\n- Without the right to sell Products in Appointments,\n  `goods_transactions` is ignored and the request still returns `200`.\n  Read the visit back to confirm the change. This operation does not\n  check the finer Product rights (create, edit, price, discount, and their\n  day limits) that\n  [Save Visit Appointments](../b2b-v2/openapi.yaml#tag/Appointments/operation/save_attendance_appointments)\n  enforces.\n- A printed sale bill refuses Product Item changes (`400`), and refuses\n  `deleted_transaction_ids` (`422`).\n- When the Location forbids negative stock, a line that would take an\n  Inventory below zero returns `406`. Otherwise stock may go negative.\n- A gift card line needs `good_special_number` unless its type allows an\n  empty code. A membership whose type expires on a specific date needs\n  `good_planned_activation_date`. Echo both for existing gift card and\n  membership lines; otherwise the save fails or re-issues them.\n- Product Item changes re-apply the Booking User's loyalty discount\n  programs to the visit. Send `cost` from the read's `manual_cost`, never\n  from the read's `cost`, which already includes loyalty discounts and\n  would be discounted twice. Read the lines back after the save.\n- Every save sends the partner webhook \"record update\" for the\n  Appointments of the visit.",
       "tags": [
         "Appointments"
       ],
@@ -40201,9 +40202,9 @@
               "type": "string"
             },
             "deleted_transaction_ids": {
-              "description": "Array of instance IDs",
+              "description": "IDs of visit payments (financial transactions) to delete. Applied only with the Appointment finances right and without `fast_payment`.",
               "items": {
-                "type": "object"
+                "type": "integer"
               },
               "type": "array"
             },
@@ -40212,71 +40213,86 @@
               "type": "number"
             },
             "goods_transactions": {
-              "description": "Array of commodity transactions objects",
+              "description": "Every Product Item of the visit. The list replaces the visit's Product Items: send each existing line with its `id`, add a line without `id` to create it, and leave a line out to delete it.",
               "items": {
                 "properties": {
                   "amount": {
-                    "description": "Sum",
-                    "type": "string",
+                    "description": "Quantity in sale units, as a positive number. The read returns it as a negative number; send its absolute value.",
+                    "type": "number",
                     "x-truncated": true
                   },
                   "article": {
-                    "description": "vendor code",
+                    "description": "Ignored",
                     "type": "string",
                     "x-truncated": true
                   },
                   "barcode": {
-                    "description": "Barcode",
+                    "description": "Ignored",
                     "type": "string",
                     "x-truncated": true
                   },
                   "cost": {
-                    "description": "Selling price",
-                    "type": "string",
+                    "description": "Line total after `discount` and before loyalty programs: `round(price × amount × (100 − discount) / 100, 2)`. Echo the read's `manual_cost`.",
+                    "type": "number",
                     "x-truncated": true
                   },
                   "cost_per_unit": {
-                    "description": "Unit price",
-                    "type": "string",
+                    "description": "Ignored; send the unit price in `price`",
+                    "type": "number",
                     "x-truncated": true
                   },
                   "discount": {
-                    "description": "Discount",
-                    "type": "string",
+                    "description": "Discount in percent",
+                    "type": "number",
                     "x-truncated": true
                   },
                   "good_id": {
-                    "description": "Item ID",
+                    "description": "Product ID",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "good_planned_activation_date": {
+                    "description": "Planned membership activation date (`YYYY-MM-DD`). Required when the membership type expires on a specific date; echo it for existing membership lines.",
                     "type": "string",
+                    "x-truncated": true
+                  },
+                  "good_special_number": {
+                    "description": "Gift card or membership number. Echo it for existing gift card and membership lines.",
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "goods_marks": {
+                    "description": "Goods marking codes of the line. Echo them for marked Products.",
+                    "type": "array",
                     "x-truncated": true
                   },
                   "id": {
-                    "description": "Inventory transaction ID",
-                    "type": "number",
+                    "description": "Product Item (inventory transaction) ID. Required to keep an existing line; omit it to create a line.",
+                    "type": "integer",
                     "x-truncated": true
                   },
                   "master_id": {
-                    "description": "team member ID",
-                    "type": "string",
+                    "description": "Team Member ID credited with the sale",
+                    "type": "integer",
                     "x-truncated": true
                   },
                   "operation_unit_type": {
-                    "description": "Unit type: 1 - for sale, 2 - for write-off",
-                    "type": "number",
+                    "description": "1 - sold to the Booking User (sale unit), 2 - written off as a Service consumable (consumption unit)",
+                    "type": "integer",
                     "x-truncated": true
                   },
                   "price": {
-                    "description": "Price",
-                    "type": "string",
+                    "description": "Unit price before discount. Echo the read's `cost_per_unit`; for a new line, use the Product's sale price.",
+                    "type": "number",
                     "x-truncated": true
                   },
                   "storage_id": {
-                    "description": "Inventory ID",
-                    "type": "string",
+                    "description": "Inventory ID the Product is written off from",
+                    "type": "integer",
                     "x-truncated": true
                   },
                   "title": {
-                    "description": "Barcode",
+                    "description": "Ignored",
                     "type": "string",
                     "x-truncated": true
                   }
@@ -40310,26 +40326,31 @@
               "type": "array"
             },
             "services": {
-              "description": "Array of objects with services",
+              "description": "Every Service line of every Appointment of the visit. The list replaces the visit's Service lines; an Appointment whose lines are missing loses them.",
               "items": {
                 "properties": {
+                  "amount": {
+                    "description": "Number of Service units",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
                   "cost": {
-                    "description": "The total cost of the service",
+                    "description": "Line total after discount. Echo the read's `manual_cost`.",
                     "type": "number",
                     "x-truncated": true
                   },
                   "cost_per_unit": {
-                    "description": "Unit price",
+                    "description": "Ignored; send the unit price in `first_cost`",
                     "type": "number",
                     "x-truncated": true
                   },
                   "discount": {
-                    "description": "Discount",
+                    "description": "Discount in percent",
                     "type": "number",
                     "x-truncated": true
                   },
                   "first_cost": {
-                    "description": "Initial cost of the service",
+                    "description": "Unit price before discount. Echo the read's `cost_per_unit`.",
                     "type": "number",
                     "x-truncated": true
                   },
@@ -40339,16 +40360,20 @@
                     "x-truncated": true
                   },
                   "record_id": {
-                    "description": "Appointment ID",
+                    "description": "Appointment ID the line belongs to",
                     "type": "number",
                     "x-truncated": true
                   },
                   "title": {
-                    "description": "Service name",
+                    "description": "Ignored",
                     "type": "string",
                     "x-truncated": true
                   }
                 },
+                "required": [
+                  "id",
+                  "record_id"
+                ],
                 "type": "object"
               },
               "type": "array"
@@ -42681,6 +42706,864 @@
     },
     {
       "source": "v2",
+      "operationId": "save_attendance_appointments",
+      "method": "POST",
+      "path": "/locations/{location_id}/attendance/appointments",
+      "displayPath": "/locations/{location_id}/attendance/appointments",
+      "summary": "Save Visit Appointments",
+      "description": "Save one or more Appointments of one visit together with their Service\nlines and Product Items. The web app calls this operation when a Business\nUser clicks **Save** in the appointment window.\n\n> **This is a replace operation.** Each object in `records` replaces the\n> whole Appointment it identifies: date, Team Member, duration, resources,\n> Tags, color, comment, walk-in visitor, Custom Fields, reminder settings,\n> assistants, Service lines, and Product Items. There is no append or\n> partial update. Read the visit first and send every key back exactly as\n> read, changing only what you mean to change.\n\nThe legacy path `POST /companies/{company_id}/attendance/records` reaches\nthe same handler. It is deprecated since 2026-07-01 and sunsets on\n2027-03-01; use the canonical path. The v3 operation\n[`addVisitItem`](../b2b-v3/openapi.yaml#tag/Visits/operation/addVisitItem)\nis planned as the append-only contract for adding one Product Item to a\nvisit. It is not served yet.\n\n### Read, modify, write\n\n1. Read the visit with\n   [List Attendance Appointments](#tag/Appointments/operation/list_attendance_appointments),\n   using `attendance_id` = `record_{appointment_id}` and these includes:\n   `attendance_service_items`, `attendance_service_items.assistants`,\n   `attendance_service_items.attendance_service_composite.composite_service`,\n   `attendance_good_items`, `attendance_good_items.marks`,\n   `attendance_good_items.loyalty_abonement`,\n   `attendance_good_items.loyalty_certificate`, `resource_instances`,\n   `labels`, `comer`, `custom_field_values`, `client_notification_settings`,\n   and `duration_details`.\n2. Build one record for each Appointment you change, using the mapping\n   below. Leave the other Appointments of the visit out.\n3. To add a Product Item, append a line with `id: null`. Keep every existing\n   line with its `id` and its values unchanged.\n4. Send `is_instant_sms_notification_required: false` and\n   `ignore_conflicts: false`.\n5. Request `include: [\"attendance_good_items\"]` and read the Product Items\n   back from the response: loyalty programs may change their totals after\n   the save.\n\n| Request key | Source in the read |\n|---|---|\n| `id`, `external_id`, `staff_id`, `date`, `duration`, `comment`, `custom_color`, `clients_count`, `attendance_status_slug` | Appointment attributes with the same names |\n| `client_id` | Appointment `client_id`; `null` when it is `0` |\n| `technical_break_duration` | `duration_details.technical_break_duration` |\n| `resource_instance_ids`, `label_ids` | IDs of the included `resource_instances` and `labels` |\n| `comer` | Included `comer` (`id`, `title`) plus `slug` and `type`; `null` when absent |\n| `custom_field_values` | Included `custom_field_values` as `code` and `value` |\n| `client_notification_settings` | Included `client_notification_settings` |\n| `assistants` | `attendance_service_items.assistants`, with the line's `service_id` |\n| `attendance_service_items[]` | `id`, `service_id`, `quantity`, `cost_per_unit`, `manual_cost`, `discount_percent`; `composite_service_id` from the composite include |\n| `attendance_good_items[]` | `id`, `good_id`, `unit_id`, `storage_id`, `staff_id`, `quantity`, `cost_per_unit`, `manual_cost`, `discount_percent`; `operation_unit_type` from `operation_type_slug`; `number` and `planned_activation_date` from the loyalty includes; `marks` |\n\n`date` is Location wall-clock time without an offset. Echo it exactly;\nnever derive it from `timestamp`.\n\n### Product Item fields\n\n- `quantity` is in sale units and positive.\n- `cost_per_unit` is the unit price before discount. For a new line, use\n  the Product's sale price.\n- `discount_percent` is the line discount in percent.\n- `manual_cost` is the line total after `discount_percent` and before\n  loyalty programs: `round(cost_per_unit × quantity × (100 − discount_percent) / 100, 2)`.\n  Echo the read's `manual_cost`, never its `cost`, which already includes\n  loyalty discounts.\n- `operation_unit_type` is `sale` (sold to the Booking User) or\n  `consumable` (written off as a Service consumable).\n- `storage_id` is the Inventory the Product is written off from, and\n  `staff_id` is the Team Member credited with the sale. The web app uses\n  the Appointment's Team Member.\n\n### What a save changes\n\n- Expect every record you send to be re-saved in full, even when you echo\n  it exactly. The change detection treats an Appointment without a walk-in\n  visitor or without a color as changed, so most exact echoes still\n  re-save the Appointment. Only a record that passes every check is\n  skipped, and then only its Product Items are synchronized.\n- A Service or Product Item line without `id` is created. An existing line\n  that is missing from the request is deleted, together with any gift card\n  or membership it issued. `attendance_good_items: []` deletes every\n  Product Item of the Appointment.\n- Omitting `assistants` removes the Appointment's assistants, and\n  `comer: null` removes its walk-in visitor. `custom_field_values: null`\n  and `custom_color: null` keep the stored values.\n- The visit's Product Items are saved as one list. Product Items of other\n  Appointments in the visit are kept, but they are re-saved and go through\n  the loyalty recalculation again; read them back too. *Inferred from the\n  code, not verified:* the re-save sends each kept line's after-loyalty\n  total as its new pre-loyalty total, so a loyalty discount on those lines\n  may be applied twice, and it does not carry a membership's planned\n  activation date, so a visit with a specific-date membership on another\n  Appointment may fail to save. Prefer visits with a single Appointment\n  when loyalty programs discount Products.\n\n### Preconditions and refusals\n\n- **Status.** Product Items require the visit status arrived (`1`) or\n  confirmed (`2`). Any other status normally returns `403` with a message\n  that product sales are restricted for this status. If no record in the\n  request counts as changed, the request instead returns `200`, saves\n  none of the Product Items, and deletes every Product Item of the visit.\n  Check the status before you send.\n- **Arrived side effects.** Changing the status to arrived (`1`) runs\n  loyalty auto-programs, writes off Service consumables, and reschedules\n  the Booking User's repeat-visit reminders. Changing it to no-show (`-1`)\n  sends the cancellation notice.\n- **Printed bill.** When the visit's sale bill is printed, including a\n  pending fiscal pre-save, Product Item changes return `400`.\n- **Stock.** When the Location forbids negative stock, a line that would\n  take an Inventory below zero returns `406`. Otherwise stock may go\n  negative.\n- **Gift cards and memberships.** A gift card needs `number` unless its\n  type allows an empty code; a used number, a number outside the type's\n  list, or an archived type is refused. A membership whose type expires on\n  a specific date needs `planned_activation_date`. Existing gift card and\n  membership lines must be echoed with the same `number` and\n  `planned_activation_date`; otherwise the save fails or re-issues the\n  gift card or membership.\n- **Marks.** Each goods marking code in `marks` is at most 256 characters.\n- **Group Events.** An Event Appointment is accepted only with exactly one\n  unchanged Service line and a `clients_count` within the Event capacity;\n  otherwise `400`. Use\n  [Update Event Appointment](#tag/Events/operation/update_event_appointment)\n  for Event Appointments.\n- **One visit per request.** All records must belong to one visit and one\n  Booking User and must not set different new statuses; otherwise `400`.\n  A deleted Appointment returns `404`. An Appointment waiting for an\n  online prepayment cannot be changed.\n- **Conflicts.** Unless `ignore_conflicts` is `true`, a busy time slot, a\n  Team Member who does not provide the Services, a busy resource, a deleted\n  Team Member, or removal of a prepaid Service returns `409`.\n\n### Side effects\n\n- Every save sends the partner webhook \"record update\" for every\n  Appointment of the visit and a push to the Team Member apps, even when\n  only Product Items changed.\n- A changed date (beyond the Location's threshold), Team Member, or set of\n  Services sends the Booking User a \"record changed\" message. Adding a\n  Product Item alone sends no message.\n- A Product Item change re-applies the Booking User's loyalty card discount\n  programs to the visit. The saved `discount_percent`, `manual_cost`, and\n  `cost` may differ from the request.\n\n### Permissions\n\nThe Business User needs the right to create or edit Appointments. Product\nItems also check the following rights, each returning `403`:\n\n- creating Product sales in Appointments, with its day limit, for a new\n  line;\n- editing Product sales, their price, and their discount, with the edit\n  day limit, for a changed line;\n- editing arrived Appointments, and editing fully paid arrived or\n  confirmed Appointments.\n\nChanges to the date or Team Member, Services, the comment, Service prices\nor discounts, and penalty decisions check their own rights.",
+      "tags": [
+        "Appointments"
+      ],
+      "domain": "visits",
+      "deprecated": false,
+      "security": {
+        "required": true,
+        "schemes": [
+          "BearerPartnerUser"
+        ]
+      },
+      "parameters": [
+        {
+          "description": "Location ID",
+          "name": "location_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "$defs": {
+            "client": {
+              "additionalProperties": false,
+              "description": "Booking User contacts. Send it only to create a Booking User or to attach one found by these contacts; every record must then have `client_id: null`. Omit it when you edit an existing Appointment.",
+              "properties": {
+                "agreements": {
+                  "description": "Consent flags, when the Location uses Booking User agreements",
+                  "x-truncated": true
+                },
+                "birthday": {
+                  "description": "Date of birth (`YYYY-MM-DD`)",
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "x-truncated": true
+                },
+                "comment": {
+                  "description": "Booking User comment",
+                  "type": "string",
+                  "x-truncated": true
+                },
+                "custom_field_values": {
+                  "description": "Booking User Custom Field values",
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "x-truncated": true
+                },
+                "email": {
+                  "description": "Email address",
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "x-truncated": true
+                },
+                "gender": {
+                  "description": "`0` not specified, `1` male, `2` female",
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "x-truncated": true
+                },
+                "id": {
+                  "description": "Booking User ID, when known",
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "x-truncated": true
+                },
+                "name": {
+                  "description": "First name",
+                  "type": "string",
+                  "x-truncated": true
+                },
+                "national_id": {
+                  "description": "National identification number",
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "x-truncated": true
+                },
+                "patronymic": {
+                  "description": "Middle name",
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "x-truncated": true
+                },
+                "phone": {
+                  "description": "Phone number in international format, digits only, or an empty string",
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "x-truncated": true
+                },
+                "surname": {
+                  "description": "Last name",
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "x-truncated": true
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "phone",
+                "email",
+                "surname",
+                "patronymic",
+                "gender",
+                "birthday",
+                "custom_field_values",
+                "agreements"
+              ],
+              "type": "object"
+            },
+            "productItem": {
+              "additionalProperties": false,
+              "properties": {
+                "cost_per_unit": {
+                  "description": "Unit price before discount. For a new line, the Product's sale price.",
+                  "type": "number",
+                  "x-truncated": true
+                },
+                "discount_percent": {
+                  "description": "Discount in percent",
+                  "type": "number",
+                  "x-truncated": true
+                },
+                "good_id": {
+                  "description": "Product ID; `good_id` is the literal wire field.",
+                  "type": "integer",
+                  "x-truncated": true
+                },
+                "id": {
+                  "description": "Appointment Product Item ID. `null` creates a line. An ID that does not belong to this Appointment returns `422`.",
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "x-truncated": true
+                },
+                "manual_cost": {
+                  "description": "Line total after `discount_percent` and before loyalty programs: `round(cost_per_unit × quantity × (100 − discount_percent) / 100, 2)`. Echo the read's `manual_cost`, never its `cost`; `cost` already…",
+                  "type": "number",
+                  "x-truncated": true
+                },
+                "marks": {
+                  "description": "Goods marking codes for the line. Echo the read's `marks`; send `[]` when the Product is not marked.",
+                  "type": "array",
+                  "x-truncated": true
+                },
+                "number": {
+                  "description": "Gift card or membership number. Required for a gift card unless its type allows an empty code, and for an existing gift card or membership line, where it must equal the read's `loyalty_certificate.nu…",
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "x-truncated": true
+                },
+                "operation_unit_type": {
+                  "description": "`sale` sells the Product to the Booking User; `consumable` writes it off as a Service consumable. Echo the read's `operation_type_slug`.",
+                  "type": "string",
+                  "x-truncated": true
+                },
+                "planned_activation_date": {
+                  "description": "Planned membership activation date (`YYYY-MM-DD`). Required when the membership type expires on a specific date. Echo the read's `loyalty_abonement.planned_activation_date`; `null` for other lines.",
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "x-truncated": true
+                },
+                "quantity": {
+                  "description": "Quantity in sale units, as a positive number. Echo the read's `quantity`.",
+                  "type": "number",
+                  "x-truncated": true
+                },
+                "staff_id": {
+                  "description": "Team Member ID credited with the sale; `staff_id` is the literal wire field. The web app uses the Appointment's Team Member.",
+                  "type": "integer",
+                  "x-truncated": true
+                },
+                "storage_id": {
+                  "description": "Inventory ID to write the Product off from; `storage_id` is the literal wire field.",
+                  "type": "integer",
+                  "x-truncated": true
+                },
+                "unit_id": {
+                  "description": "Unit ID. Echo the read's `unit_id`; for a new line send the Product's sale unit. The stored unit always comes from the Product.",
+                  "type": "integer",
+                  "x-truncated": true
+                }
+              },
+              "required": [
+                "id",
+                "good_id",
+                "unit_id",
+                "storage_id",
+                "staff_id",
+                "operation_unit_type",
+                "number",
+                "planned_activation_date",
+                "marks",
+                "quantity",
+                "cost_per_unit",
+                "manual_cost",
+                "discount_percent"
+              ],
+              "type": "object"
+            },
+            "record": {
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "attendance_status"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "attendance_status_slug"
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "anyOf": [
+                {
+                  "required": [
+                    "length"
+                  ]
+                },
+                {
+                  "required": [
+                    "duration"
+                  ]
+                }
+              ],
+              "properties": {
+                "assistants": {
+                  "description": "Assistants per Service line. The list replaces the Appointment's assistants, and omitting the key removes them all. Echo every assistant from `attendance_service_items.assistants`.",
+                  "type": "array",
+                  "x-truncated": true
+                },
+                "attendance_good_items": {
+                  "description": "Product Item lines of the Appointment; `attendance_good_items` is the literal wire field. The list replaces the Appointment's Product Items: a line with `id: null` is created and an existing line tha…",
+                  "type": "array",
+                  "x-truncated": true
+                },
+                "attendance_service_items": {
+                  "description": "Service lines of the Appointment. The list replaces the Appointment's Services: a line without `id` is created and an existing line that is not sent is deleted.",
+                  "type": "array",
+                  "x-truncated": true
+                },
+                "attendance_status": {
+                  "description": "Attendance status: `-1` no-show, `0` waiting, `1` arrived, `2` confirmed. Send this or `attendance_status_slug`.",
+                  "type": "integer",
+                  "x-truncated": true
+                },
+                "attendance_status_slug": {
+                  "description": "Attendance status slug. Takes precedence over `attendance_status`.",
+                  "type": "string",
+                  "x-truncated": true
+                },
+                "client_id": {
+                  "description": "Booking User ID; `client_id` is the literal wire field. Must be `null` when the top-level `client` object is sent.",
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "x-truncated": true
+                },
+                "client_notification_settings": {
+                  "description": "Booking User reminder settings. Echo the read's `client_notification_settings`.",
+                  "type": "object",
+                  "x-truncated": true
+                },
+                "clients_count": {
+                  "description": "Number of places reserved by the Appointment",
+                  "type": "integer",
+                  "x-truncated": true
+                },
+                "comer": {
+                  "description": "Walk-in visitor of the Appointment. `null` removes the visitor.",
+                  "x-truncated": true
+                },
+                "comment": {
+                  "description": "Appointment comment. Send an empty string when there is none.",
+                  "type": "string",
+                  "x-truncated": true
+                },
+                "custom_color": {
+                  "description": "Appointment color without `#`; an empty string or `null` keeps the current color",
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "x-truncated": true
+                },
+                "custom_field_values": {
+                  "description": "Appointment Custom Field values. Echo the read's `custom_field_values` (`code`, `value`). `null` or `[]` leaves the stored values unchanged, but when the visit is or becomes arrived, the Custom Field…",
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "x-truncated": true
+                },
+                "date": {
+                  "description": "Appointment start as Location wall-clock time without an offset. Echo the read's `date` exactly; do not derive it from `timestamp`.",
+                  "type": "string",
+                  "x-truncated": true
+                },
+                "duration": {
+                  "description": "Appointment duration in seconds",
+                  "type": "integer",
+                  "x-truncated": true
+                },
+                "external_id": {
+                  "description": "External Appointment ID. Echo the read's `external_id`.",
+                  "type": "string",
+                  "x-truncated": true
+                },
+                "id": {
+                  "description": "Appointment ID. `null` creates an Appointment.",
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "x-truncated": true
+                },
+                "is_instant_sms_notification_required": {
+                  "description": "Send the Booking User an immediate SMS about the Appointment. Send `false` when you only edit Services or Product Items.",
+                  "type": "boolean",
+                  "x-truncated": true
+                },
+                "label_ids": {
+                  "description": "Tag IDs. The list replaces the Appointment's Tags.",
+                  "type": "array",
+                  "x-truncated": true
+                },
+                "length": {
+                  "description": "Deprecated alias of `duration`",
+                  "type": "integer",
+                  "x-truncated": true
+                },
+                "penalty_charge_decision": {
+                  "description": "Decision on a payment-policy penalty that this save triggers. Omit it unless you change the date or set a no-show. Requires the Appointment finances right.",
+                  "x-truncated": true
+                },
+                "resource_instance_ids": {
+                  "description": "Resource instance IDs. The list replaces the Appointment's resources.",
+                  "type": "array",
+                  "x-truncated": true
+                },
+                "staff_id": {
+                  "description": "Team Member ID; `staff_id` is the literal wire field.",
+                  "type": "integer",
+                  "x-truncated": true
+                },
+                "technical_break_duration": {
+                  "description": "Technical break after the Appointment, in seconds. Echo `duration_details.technical_break_duration` from the read.",
+                  "type": "integer",
+                  "x-truncated": true
+                }
+              },
+              "required": [
+                "id",
+                "external_id",
+                "client_id",
+                "staff_id",
+                "date",
+                "resource_instance_ids",
+                "comment",
+                "custom_color",
+                "label_ids",
+                "custom_field_values",
+                "comer",
+                "client_notification_settings",
+                "is_instant_sms_notification_required",
+                "attendance_service_items",
+                "attendance_good_items",
+                "clients_count"
+              ],
+              "type": "object"
+            },
+            "serviceItem": {
+              "additionalProperties": false,
+              "properties": {
+                "composite_service_id": {
+                  "description": "Composite Service ID when the line belongs to a composite Service. Read it from `attendance_service_items.attendance_service_composite.composite_service`.",
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "x-truncated": true
+                },
+                "cost_per_unit": {
+                  "description": "Unit price before discount",
+                  "type": "number",
+                  "x-truncated": true
+                },
+                "discount_percent": {
+                  "description": "Discount in percent",
+                  "type": "number",
+                  "x-truncated": true
+                },
+                "id": {
+                  "description": "Appointment Service line ID; `null` creates a line",
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "x-truncated": true
+                },
+                "manual_cost": {
+                  "description": "Line total after `discount_percent`. It must match `cost_per_unit × quantity × (100 − discount_percent) / 100`; otherwise the request returns `400`.",
+                  "type": "number",
+                  "x-truncated": true
+                },
+                "quantity": {
+                  "description": "Number of Service units",
+                  "type": "integer",
+                  "x-truncated": true
+                },
+                "service_id": {
+                  "description": "Service ID",
+                  "type": "integer",
+                  "x-truncated": true
+                }
+              },
+              "required": [
+                "id",
+                "service_id",
+                "quantity",
+                "cost_per_unit",
+                "manual_cost",
+                "discount_percent"
+              ],
+              "type": "object"
+            }
+          },
+          "description": "Every key listed as required must be present, including keys whose value is `null` or an empty array. Records, Service lines, and Product Item lines reject unknown keys. Nested field names are litera…",
+          "properties": {
+            "client": {
+              "description": "Booking User contacts. Send it only to create a Booking User or to attach one found by these contacts; every record must then have `client_id: null`. Omit it when you edit an existing Appointment.",
+              "type": "object",
+              "x-truncated": true
+            },
+            "ignore_conflicts": {
+              "description": "Skip the scheduling conflict checks (time slot, Team Member services, resources, deleted Team Member, prepaid Service removal, Booking User contact changes). Permission checks still apply.",
+              "type": "boolean",
+              "x-truncated": true
+            },
+            "include": {
+              "description": "Related resources to include in the response. The web app sends `include` in the request body.",
+              "type": "array",
+              "x-truncated": true
+            },
+            "records": {
+              "description": "Appointments to save. All records must belong to the same visit and the same Booking User. Each record replaces the whole Appointment it identifies.",
+              "type": "array",
+              "x-truncated": true
+            }
+          },
+          "required": [
+            "records"
+          ],
+          "type": "object",
+          "x-depth-limited": 1
+        }
+      },
+      "response": {
+        "contentType": "application/json",
+        "statusCode": "200",
+        "envelope": "jsonapi",
+        "schema": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "attributes": {
+                "additionalProperties": false,
+                "properties": {
+                  "activity_id": {
+                    "description": "Event ID, or `0` when the Appointment is not part of an Event",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "attendance": {
+                    "description": "Deprecated attendance wire value; use `attendance_status_slug`",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "attendance_status": {
+                    "description": "Deprecated attendance status; use `attendance_status_slug`",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "attendance_status_slug": {
+                    "description": "Appointment attendance status",
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "bookform_id": {
+                    "description": "Booking form ID, or `0`",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "booking_user_id": {
+                    "description": "Booking User account ID, or `0`",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "client_fictive_email": {
+                    "description": "Fallback Booking User email stored on the Appointment",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "client_fictive_name": {
+                    "description": "Fallback Booking User name stored on the Appointment",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "client_fictive_phone": {
+                    "description": "Fallback Booking User phone stored on the Appointment",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "client_id": {
+                    "description": "Booking User profile ID, or `0` when absent",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "clients_count": {
+                    "description": "Number of Booking Users in the Appointment",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "comer_id": {
+                    "description": "Walk-in visitor ID",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "comment": {
+                    "description": "Appointment comment",
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "company_id": {
+                    "description": "Location ID",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "created_datetime": {
+                    "description": "Creation date and time in the Location timezone, without an offset",
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "custom_color": {
+                    "description": "Appointment background color without `#`, or an empty string",
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "custom_font_color": {
+                    "description": "Appointment text color without `#`, or an empty string",
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "date": {
+                    "description": "Appointment start in the Location timezone, without an offset",
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "duration": {
+                    "description": "Appointment duration in seconds",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "external_id": {
+                    "description": "External Appointment ID",
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "from_url": {
+                    "description": "Source URL, or an empty string",
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "is_client_notification_sent": {
+                    "description": "Whether a Booking User notification was sent",
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "is_mobile": {
+                    "description": "Mobile-origin wire status",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "is_overpaid": {
+                    "description": "Whether the Appointment is overpaid",
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "is_paid": {
+                    "description": "Whether the Appointment is fully paid",
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "is_sale_bill_printed": {
+                    "description": "Whether the sale bill is printed, when available",
+                    "type": [
+                      "boolean",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "length": {
+                    "description": "Deprecated duration in seconds; use `duration`",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "master_id": {
+                    "description": "Deprecated wire field for Team Member ID; use `staff_id`",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "paid_full": {
+                    "description": "Deprecated payment wire value; use `is_paid` and `is_overpaid`",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "payment_status": {
+                    "description": "Membership auto-payment status, when available",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "prepaid_status": {
+                    "description": "Prepayment status wire value",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "record_from": {
+                    "description": "Human-readable Appointment source, or an empty string",
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "source": {
+                    "description": "Appointment source wire value",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "staff_id": {
+                    "description": "Team Member ID",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "timestamp": {
+                    "description": "Appointment start as a Unix timestamp",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "visit_id": {
+                    "description": "Linked visit ID, or `0` when not linked",
+                    "type": "integer",
+                    "x-truncated": true
+                  }
+                },
+                "required": [
+                  "company_id",
+                  "external_id",
+                  "visit_id",
+                  "booking_user_id",
+                  "bookform_id",
+                  "master_id",
+                  "staff_id",
+                  "client_id",
+                  "comer_id",
+                  "source",
+                  "attendance",
+                  "attendance_status",
+                  "attendance_status_slug",
+                  "client_fictive_name",
+                  "client_fictive_phone",
+                  "client_fictive_email",
+                  "clients_count",
+                  "activity_id",
+                  "custom_color",
+                  "custom_font_color",
+                  "length",
+                  "duration",
+                  "paid_full",
+                  "is_paid",
+                  "is_overpaid",
+                  "timestamp",
+                  "date",
+                  "created_datetime",
+                  "from_url",
+                  "is_mobile",
+                  "comment",
+                  "prepaid_status",
+                  "record_from",
+                  "payment_status",
+                  "is_sale_bill_printed",
+                  "is_client_notification_sent"
+                ],
+                "type": "object"
+              },
+              "id": {
+                "description": "Appointment ID",
+                "type": "string"
+              },
+              "relationships": {
+                "additionalProperties": false,
+                "description": "Present when related data is requested through `include`",
+                "properties": {
+                  "acceptance_free": {
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "attendance_document": {
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "attendance_good_items": {
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "attendance_service_items": {
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "client": {
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "client_notification_settings": {
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "client_schedule": {
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "comer": {
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "custom_field_values": {
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "duration_details": {
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "fast_payment_settings": {
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "goods": {
+                    "description": "Product relationships. `goods` is the literal wire relationship name.",
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "labels": {
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "resource_instances": {
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "services": {
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "staff": {
+                    "description": "Team Member relationship. `staff` is the literal wire relationship name.",
+                    "type": "object",
+                    "x-truncated": true
+                  },
+                  "transactions": {
+                    "type": "object",
+                    "x-truncated": true
+                  }
+                },
+                "type": "object"
+              },
+              "type": {
+                "const": "record",
+                "description": "Literal JSON:API resource type",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "id",
+              "attributes"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "curation": {
+        "domain": "visits",
+        "tier": "core",
+        "facets": [
+          "ops",
+          "finance"
+        ],
+        "tool_name": "visits_add_product",
+        "write_allowed": false,
+        "notes": "Replaces the whole appointment, so the tool reads it with every include (list_attendance_appointments), refuses to save over a change made since that read, sends every key back with one product line added or raised, and reads it back. Moves to V3 addVisitItem once that is served.\n"
+      }
+    },
+    {
+      "source": "v2",
       "operationId": "get_attendance_booking_user",
       "method": "GET",
       "path": "/locations/{location_id}/attendance/clients/{client_id}",
@@ -42955,11 +43838,11 @@
       "path": "/locations/{location_id}/attendances/{attendance_id}/appointments",
       "displayPath": "/locations/{location_id}/attendances/{attendance_id}/appointments",
       "summary": "List Attendance Appointments",
-      "description": "Retrieve Appointments grouped under one attendance identifier as JSON:API\nresource objects.\n\nUse `record_{appointment_id}` to retrieve the group containing one\nAppointment, or `visit_{visit_id}` to retrieve all Appointments linked to\none visit. The `attendance_id` path parameter and both prefixes are literal\nwire values.\n\nRelated data can be requested by repeating the `include` parameter. Wire\nvalues remain literal API keys: `client` identifies Booking User data,\n`staff` identifies Team Member data, and `goods` identifies Products.\nCustom Field Value includes require the corresponding Business User\npermissions.",
+      "description": "Retrieve Appointments grouped under one attendance identifier as JSON:API\nresource objects.\n\nUse `record_{appointment_id}` to retrieve the group containing one\nAppointment, or `visit_{visit_id}` to retrieve all Appointments linked to\none visit. The `attendance_id` path parameter and both prefixes are literal\nwire values.\n\nRelated data can be requested by repeating the `include` parameter. Wire\nvalues remain literal API keys: `client` identifies Booking User data,\n`staff` identifies Team Member data, and `goods` identifies Products.\nCustom Field Value includes require the corresponding Business User\npermissions.\n\nThis is the read for\n[Save Visit Appointments](#tag/Appointments/operation/save_attendance_appointments),\nwhich replaces whole Appointments. Nested includes such as\n`attendance_good_items.marks`, `attendance_good_items.loyalty_abonement`,\n`attendance_good_items.loyalty_certificate`, and\n`attendance_service_items.assistants` return the keys that operation\nrequires you to echo.",
       "tags": [
         "Appointments"
       ],
-      "domain": "appointments",
+      "domain": "visits",
       "deprecated": false,
       "security": {
         "required": true,
@@ -42993,6 +43876,7 @@
           "in": "query",
           "required": false,
           "schema": {
+            "description": "Includes accepted by the attendance operations. They extend the Appointment includes with the nested includes needed to read back every key that [Save Visit Appointments](#tag/Appointments/operation/…",
             "items": {
               "enum": [
                 "client",
@@ -43003,7 +43887,14 @@
                 "resource_instances",
                 "labels",
                 "attendance_service_items",
+                "attendance_service_items.assistants",
+                "attendance_service_items.attendance_service_composite.composite_service",
                 "attendance_good_items",
+                "attendance_good_items.good",
+                "attendance_good_items.staff",
+                "attendance_good_items.marks",
+                "attendance_good_items.loyalty_abonement",
+                "attendance_good_items.loyalty_certificate",
                 "attendance_document",
                 "transactions",
                 "fast_payment_settings",
@@ -43367,6 +44258,16 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "visits",
+        "tier": "core",
+        "facets": [
+          "ops",
+          "finance"
+        ],
+        "tool_name": "visits_add_product",
+        "notes": "With attendance_id record_{appointment_id} and the includes the save needs back: service lines with assistants and composite services, product lines with products, marks and issued gift cards or memberships, resources, tags, walk-in visitor, reminder settings, duration and client.\n"
       }
     },
     {

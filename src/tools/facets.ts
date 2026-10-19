@@ -192,6 +192,7 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
       'memberships_unfreeze',
       'visits_get',
       'visits_add_payment',
+      'visits_add_product',
       'visits_cancel_payment',
       'client_accounts_list_for_client',
       'client_accounts_deposit',
@@ -251,9 +252,8 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
    * Partners and sold or used up — the money side of products, next to the
    * product-sales and reorder-risk analytics. The `inventory_` and `products_`
    * packs join by prefix, Suppliers and the appointment consumables by name.
-   * Still partial: product sales on a visit (V3 `addVisitItem` is not served
-   * yet), payroll payouts (no operation in the catalog) and fiscalization are
-   * not built.
+   * Still partial: payroll payouts (no operation in the catalog) and
+   * fiscalization are not built.
    */
   finance: {
     tools: [

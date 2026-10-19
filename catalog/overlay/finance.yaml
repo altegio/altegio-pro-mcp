@@ -1,10 +1,12 @@
 # Finance — the operations behind the curated visit, payment, client account,
 # accounts and cash registers, financial transaction and payroll tools.
 #
-# Format: catalog/overlay/_schema.yaml. V2 has no visit, payment or finance
-# operation and the V3 visit and payment operations are still `planned`, so
-# the packs run on V1 (src/api/v1/finance-adapter.ts). A visit's bill is the
-# sale state of the appointment's visit document.
+# Format: catalog/overlay/_schema.yaml. V2 has no visit bill, payment or
+# finance operation and the V3 visit and payment operations are still
+# `planned`, so the packs run on V1 (src/api/v1/finance-adapter.ts). A visit's
+# bill is the sale state of the appointment's visit document. Products are sold
+# on a visit through the V2 appointment save the web app uses
+# (src/api/v2/visit-products-adapter.ts) until V3 `addVisitItem` is served.
 
 version: 1
 
@@ -28,6 +30,27 @@ operations:
     notes: >
       The tool refuses when the amount due differs from the one the caller read,
       so a repeated confirmed call cannot record the payment twice.
+  save_attendance_appointments:
+    domain: visits
+    tier: core
+    facets: [ops, finance]
+    tool_name: visits_add_product
+    write_allowed: false
+    notes: >
+      Replaces the whole appointment, so the tool reads it with every include
+      (list_attendance_appointments), refuses to save over a change made since
+      that read, sends every key back with one product line added or raised,
+      and reads it back. Moves to V3 addVisitItem once that is served.
+  list_attendance_appointments:
+    domain: visits
+    tier: core
+    facets: [ops, finance]
+    tool_name: visits_add_product
+    notes: >
+      With attendance_id record_{appointment_id} and the includes the save
+      needs back: service lines with assistants and composite services, product
+      lines with products, marks and issued gift cards or memberships,
+      resources, tags, walk-in visitor, reminder settings, duration and client.
   delete_location_account_payment:
     domain: visits
     tier: core
