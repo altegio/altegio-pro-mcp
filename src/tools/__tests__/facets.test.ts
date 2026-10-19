@@ -55,6 +55,19 @@ const BACK_OFFICE_MONEY_TOOLS = [
   'payroll_get_calculation',
 ];
 
+/** The inventory pack: finance, and the default view. */
+const INVENTORY_TOOLS = [
+  'appointments_get_consumables',
+  'appointments_set_consumables',
+  'inventory_create_operation',
+  'inventory_delete_document',
+  'inventory_list',
+  'inventory_list_bills_of_materials',
+  'inventory_list_operations',
+  'products_search',
+  'suppliers_list',
+];
+
 const allNames = () => orderedToolEntries().map((entry) => entry.spec.name);
 const allTools = (): FacetTool[] =>
   facetToolsFromSpecs(orderedToolEntries().map((entry) => entry.spec));
@@ -131,6 +144,8 @@ describe('static views', () => {
       [
         'appointments_apply_attendance',
         'appointments_create_tag',
+        'appointments_get_consumables',
+        'appointments_set_consumables',
         'appointments_list_tags',
         'appointments_preview_attendance',
         'clients_add_comment',
@@ -169,6 +184,7 @@ describe('static views', () => {
         'memberships_freeze',
         'memberships_list_for_client',
         'memberships_unfreeze',
+        'products_search',
         'users_get_current',
         'appointments_update',
         ...RECEPTION_MONEY_TOOLS,
@@ -415,11 +431,16 @@ describe('static views', () => {
           analyticsCount +
           1 +
           RECEPTION_MONEY_TOOLS.length +
-          BACK_OFFICE_MONEY_TOOLS.length
+          BACK_OFFICE_MONEY_TOOLS.length +
+          INVENTORY_TOOLS.length
       );
       expect(
         index.includes('finance', 'clients_get_membership_purchases')
       ).toBe(true);
+      for (const name of INVENTORY_TOOLS) {
+        expect(index.includes('finance', name)).toBe(true);
+        expect(index.includes(DEFAULT_FACET, name)).toBe(true);
+      }
       expect(index.includes('ops', 'analytics_get_overview')).toBe(false);
     });
 

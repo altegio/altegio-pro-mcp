@@ -14,6 +14,7 @@ export * from './events.tools.js';
 export * from './memberships.tools.js';
 export * from './visits.tools.js';
 export * from './finance.tools.js';
+export * from './inventory.tools.js';
 export * from './settings.tools.js';
 export * from './resources.tools.js';
 export * from './executor.tools.js';

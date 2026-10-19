@@ -6,11 +6,11 @@ A TypeScript [Model Context Protocol](https://modelcontextprotocol.io) server fo
 Altegio business owners, administrators, and team members. It provides
 administrative B2B operations, client workflows, onboarding, and analytics.
 
-**142 tools served (148 defined, 6 withheld from every view)** — see the generated
+**151 tools served (157 defined, 6 withheld from every view)** — see the generated
 [tool surface](docs/architecture/tool-surface.md) for exact membership and gates.
 The surface includes a 28-tool analytics pack, a 15-tool group events pack, a
-13-tool memberships pack, 12 visit payment and finance tools, a 3-tool API
-explorer, and 12 onboarding wizard tools. The API explorer executes reads only; administrative
+13-tool memberships pack, 12 visit payment and finance tools, a 9-tool inventory
+pack, a 3-tool API explorer, and 12 onboarding wizard tools. The API explorer executes reads only; administrative
 writes use curated tools. The six unavailable report-builder tools are withheld
 because their upstream report-data service is not usable.
 
@@ -127,6 +127,19 @@ received. Back-office money is on `/mcp/finance` only: `financial_transactions_l
 period). Amounts are in major units next to the location's ISO currency code,
 and every write that records, moves or deletes money asks for confirmation.
 
+Inventory is the `inventory_*` pack with `products_search`, `suppliers_list`
+and the appointment consumables pair: `inventory_list` (a location's
+inventories), `products_search` (by name, article number or barcode, with the
+quantity in each inventory on request), `inventory_list_operations` (product
+lines by date or document), `inventory_create_operation` (a sale, consumption,
+product receipt or write-off as one document), `inventory_delete_document`,
+`inventory_list_bills_of_materials`, `appointments_get_consumables` and
+`appointments_set_consumables` (read-modify-write of one service's
+consumables, with the change shown before it is applied). Quantities carry
+their unit and money carries the location's ISO currency code. Recording an
+operation records no payment; consumables move stock only once the appointment
+is marked arrived.
+
 Every collection result uses one pagination contract. Inputs are `page`
 (1-based) and `page_size` (default 25, maximum 300 unless a tool documents a
 lower cap). Output carries the rows in `items` and a `pagination` object with
@@ -140,7 +153,8 @@ request reads current data, so concurrent changes can shift page boundaries.
 
 Client contacts are opt-in where supported: pass `include_contacts: true` when
 contact details are needed. Business names and comments are untrusted data.
-Destructive tools request confirmation through MCP form elicitation. The prompt
+Destructive tools, and `inventory_create_operation`, which moves stock,
+request confirmation through MCP form elicitation. The prompt
 names the target and consequences; the standard `accept` action approves it,
 while `decline` or `cancel` leaves everything unchanged. No extra form field is
 required. Clients without form elicitation receive a `confirmation_token` and

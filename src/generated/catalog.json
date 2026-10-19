@@ -35,7 +35,7 @@
     "staff_id": "team_member_id"
   },
   "operationCount": 361,
-  "curatedCount": 93,
+  "curatedCount": 105,
   "domains": [
     {
       "domain": "analytics",
@@ -30107,6 +30107,13 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "tier": "core",
+        "facets": [
+          "finance"
+        ],
+        "tool_name": "suppliers_list"
       }
     },
     {
@@ -32661,6 +32668,15 @@
           },
           "type": "object"
         }
+      },
+      "curation": {
+        "domain": "inventory",
+        "tier": "core",
+        "facets": [
+          "finance"
+        ],
+        "tool_name": "inventory_delete_document",
+        "notes": "Read for the delete confirmation and result."
       }
     },
     {
@@ -32966,6 +32982,15 @@
       ],
       "response": {
         "statusCode": "202"
+      },
+      "curation": {
+        "domain": "inventory",
+        "tier": "core",
+        "facets": [
+          "finance"
+        ],
+        "tool_name": "inventory_delete_document",
+        "write_allowed": false
       }
     },
     {
@@ -35225,6 +35250,16 @@
           },
           "type": "object"
         }
+      },
+      "curation": {
+        "domain": "inventory",
+        "tier": "core",
+        "facets": [
+          "finance"
+        ],
+        "tool_name": "inventory_create_operation",
+        "write_allowed": false,
+        "notes": "Spec drift (backend checked 2026-10-19): the body field is `date` (Y-m-d H:i:s, location time), not `create_date`; the comment is `document.comment`; the lines are `goods_transactions`, in the request and in the answer. Type 5 (transfer) is refused by this endpoint.\n"
       }
     },
     {
@@ -35294,6 +35329,15 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "inventory",
+        "tier": "core",
+        "facets": [
+          "finance"
+        ],
+        "tool_name": "inventory_list",
+        "notes": "Also read by products_search (inventory titles), inventory_create_operation and appointments_set_consumables (the default inventory).\n"
       }
     },
     {
@@ -35567,6 +35611,15 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "inventory",
+        "tier": "core",
+        "facets": [
+          "finance"
+        ],
+        "tool_name": "inventory_list_operations",
+        "notes": "Also read by inventory_delete_document (the document's lines). Lists product lines, not documents; filters only by dates and document_id.\n"
       }
     },
     {
@@ -35654,6 +35707,14 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "inventory",
+        "tier": "core",
+        "facets": [
+          "finance"
+        ],
+        "tool_name": "inventory_list_bills_of_materials"
       }
     },
     {
@@ -35732,6 +35793,14 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "inventory",
+        "tier": "core",
+        "facets": [
+          "finance"
+        ],
+        "tool_name": "inventory_list_bills_of_materials"
       }
     },
     {
@@ -35808,6 +35877,16 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "inventory",
+        "tier": "core",
+        "facets": [
+          "ops",
+          "finance"
+        ],
+        "tool_name": "appointments_get_consumables",
+        "notes": "Returns every appointment of the visit; also read by appointments_set_consumables before it replaces a service's list.\n"
       }
     },
     {
@@ -35955,6 +36034,17 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "inventory",
+        "tier": "core",
+        "facets": [
+          "ops",
+          "finance"
+        ],
+        "tool_name": "appointments_set_consumables",
+        "write_allowed": false,
+        "notes": "Replaces the service's whole list (new line ids, omitted lines deleted), ignores `price`, and matches by service across the visit.\n"
       }
     },
     {
@@ -48982,6 +49072,12 @@
       },
       "curation": {
         "domain": "products",
+        "tier": "core",
+        "facets": [
+          "ops",
+          "finance"
+        ],
+        "tool_name": "products_search",
         "supersedes": [
           "get_products_list"
         ]
@@ -49193,6 +49289,16 @@
           ],
           "type": "object"
         }
+      },
+      "curation": {
+        "domain": "products",
+        "tier": "core",
+        "facets": [
+          "ops",
+          "finance"
+        ],
+        "tool_name": "products_search",
+        "notes": "One read per listed product, with include[]=storage_amounts and include[]=actual_cost, for its stock and cost price. Also read by inventory_create_operation and appointments_set_consumables.\n"
       }
     },
     {
@@ -49533,6 +49639,12 @@
       },
       "curation": {
         "domain": "products",
+        "tier": "core",
+        "facets": [
+          "ops",
+          "finance"
+        ],
+        "tool_name": "products_search",
         "supersedes": [
           "search_product"
         ]
@@ -51135,6 +51247,16 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "products",
+        "tier": "core",
+        "facets": [
+          "ops",
+          "finance"
+        ],
+        "tool_name": "products_search",
+        "notes": "Unit names for products_search and the two write tools."
       }
     },
     {

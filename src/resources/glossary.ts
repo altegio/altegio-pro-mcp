@@ -84,6 +84,17 @@ Decide by audience, not by mechanical replacement: an internal team record is a
 | Canonical term | What it is | Never use |
 |---|---|---|
 | **Inventory** | Stock of products held by a location | Warehouse, Stock, Storage |
+| **Inventory operations** | Movements of products into and out of an inventory: product sale, consumption, product receipt, write-off | Warehouse operations |
+| **Documents** | The record of one inventory operation, one line per product; deleting it reverses the stock its lines moved | — |
+| **Product receipt** | The operation that brings products into an inventory, optionally from a Supplier | — |
+| **Consumable** | A product a service uses up; the consumables of an appointment move stock once it is marked arrived | — |
+| **Bills of Materials** | A service's consumption recipe: the consumables and quantities one service uses | Technical card, Flow chart |
+| **Sale price** | What a client pays for one unit of a product | — |
+| **Cost price** | What one unit of a product costs the location | Purchase price |
+| **Barcode** | The code printed on a product, searchable like its name | — |
+
+A product counts in its sale unit (pcs, bottle) or its consumable unit (ml, g);
+every quantity names its unit, and money names the location's currency.
 
 ## Working surfaces
 
@@ -96,6 +107,8 @@ Decide by audience, not by mechanical replacement: an internal team record is a
 ## Legacy names still on the wire
 
 Backend API fields such as \`salon_id\`, \`record_id\`, \`deposit_id\`,
-\`expense_id\` and \`master_id\` remain inside adapters. The MCP boundary uses
-locations, team members, appointments, client accounts and payment items.
+\`expense_id\`, \`master_id\`, \`storage_id\`, \`good_id\` and
+\`technological_card\` remain inside adapters. The MCP boundary uses
+locations, team members, appointments, client accounts, payment items,
+inventories, products and Bills of Materials.
 `;

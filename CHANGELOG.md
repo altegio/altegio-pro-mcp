@@ -6,6 +6,45 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — inventory, products and appointment consumables
+
+- **Reads.** `inventory_list` (a location's inventories, with the default ones
+  for sales and for consumables), `products_search` (by name, article number
+  or barcode, or by id; sale price, cost price, units and stock per inventory),
+  `inventory_list_operations` (product lines of inventory operations by date
+  or document), `suppliers_list` (Suppliers and Partners, filtered by name)
+  and `inventory_list_bills_of_materials` (each service's consumption recipe,
+  or the one a team member applies to a service).
+- **`inventory_create_operation`** records a product sale, consumption,
+  product receipt or write-off as one document in one call. Products are
+  named by id or by text that must match exactly one product; units, prices
+  and the inventory default sensibly, and every line total is quantity ×
+  price minus the discount, computed before the confirmation shows it. No
+  payment is recorded; transfers between inventories are not offered.
+- **`inventory_delete_document`** deletes an inventory operation document and
+  reverses its stock; the confirmation lists what comes back. A payment
+  recorded for it stays.
+- **`appointments_get_consumables` / `appointments_set_consumables`.** The
+  read keeps only the asked appointment (the API returns the whole visit) and
+  says whether the consumables have moved stock yet (only once the
+  appointment is marked arrived). The write is read-modify-write: it changes
+  the products given, keeps the rest unless `replace` is set, shows before →
+  after in the confirmation, and refuses when another appointment of the visit
+  has the same service, because Altegio would store the lines on both.
+- **Confirmations can show detail.** A confirmation may carry lines read from
+  the API under the consequence (the priced lines of an operation, the lines a
+  deletion reverses, the before → after of a list), and a call that would be
+  refused anyway is refused before anyone is asked.
+- **Where they are served.** All nine on the default view; the inventory pack,
+  `products_search` and `suppliers_list` on `/mcp/finance`; the consumables
+  pair and `products_search` on `/mcp/ops`. Scopes: `inventory:read` for
+  the reads, `inventory:operate` plus `inventory:sell` for
+  `inventory_create_operation` (one tool records sales and the other kinds),
+  `inventory:operate` for deleting a document, `finance:read` for Suppliers,
+  and the appointment scopes plus the inventory ones for consumables.
+- **Glossary.** An Inventory section: inventory operations, documents,
+  product receipt, consumable, Bills of Materials, sale price, cost price.
+
 ### Added — visit payments, client accounts, financial transactions and payroll
 
 - **A visit's bill and its payments.** `visits_get` reads the bill of an

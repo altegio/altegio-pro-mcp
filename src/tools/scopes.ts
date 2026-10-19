@@ -49,10 +49,10 @@ import type { ToolResult } from './tool-result.js';
  * Scope names taken verbatim from the API team's v3 P0 scope catalog (a draft
  * dated 2026-09-01, explicitly not final). Only the ones this server's tools
  * actually need are listed; the catalog carries more (`availability:read`,
- * `locations:create`, `inventory:*`, the other `chain_*` names) and they are
- * deliberately absent until a tool needs one. The checkout, client account,
- * finance and payroll names below are the ones the V3 preview spec declares
- * on its visit and payment operations.
+ * `locations:create`, the other `chain_*` names) and they are deliberately
+ * absent until a tool needs one. The checkout, client account, finance and
+ * payroll names below are the ones the V3 preview spec declares on its visit
+ * and payment operations.
  */
 const V3_CATALOG_SCOPES = [
   'locations:read',
@@ -69,6 +69,9 @@ const V3_CATALOG_SCOPES = [
   'appointments:write',
   'loyalty:read',
   'products:read',
+  'inventory:read',
+  'inventory:operate',
+  'inventory:sell',
   'chain_loyalty:read',
   'chain_loyalty:configure',
   'chain_loyalty:transact',
@@ -337,6 +340,23 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   memberships_unfreeze: 'chain_loyalty:transact',
   memberships_set_balance: 'chain_loyalty:transact',
   memberships_set_validity: 'chain_loyalty:transact',
+  // --- Inventory --------------------------------------------------------------
+  // The catalog splits `inventory:read` (products, stock, movements),
+  // `inventory:operate` (receipt, write-off, transfer, stock audit) and
+  // `inventory:sell` (a product line in a sale; stock is written off).
+  // `products:read` excludes stock and cost price, which products_search
+  // returns, so it needs `inventory:read`. One operation tool records sales
+  // and the other kinds, so it needs both write scopes.
+  inventory_list: 'inventory:read',
+  products_search: 'inventory:read',
+  inventory_list_operations: 'inventory:read',
+  inventory_list_bills_of_materials: 'inventory:read',
+  inventory_create_operation: ['inventory:operate', 'inventory:sell'],
+  inventory_delete_document: 'inventory:operate',
+  // Suppliers and Partners are finance reference data in the catalog.
+  suppliers_list: 'finance:read',
+  appointments_get_consumables: ['appointments:read', 'inventory:read'],
+  appointments_set_consumables: ['appointments:write', 'inventory:operate'],
 
   // --- Visits, payments and finance -------------------------------------------
   // Named as the V3 preview spec names them on its visit and payment

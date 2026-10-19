@@ -36,12 +36,14 @@ describe('destructive tools are gated', () => {
       'analytics_delete_assistant_report',
       'appointments_apply_attendance',
       'appointments_delete',
+      'appointments_set_consumables',
       'booking_forms_delete',
       'clients_delete',
       'events_delete',
       'events_delete_duplication_strategy',
       'financial_transactions_delete',
       'financial_transactions_update',
+      'inventory_delete_document',
       'locations_remove_user',
       'memberships_delete_type',
       'memberships_set_balance',
@@ -114,18 +116,20 @@ describe('destructive tools are gated', () => {
   });
 
   /**
-   * Recording money is additive — nothing is overwritten, so `destructiveHint`
-   * stays false — but a payment, a client account deposit or a cash operation
-   * moves money a person has to stand behind, so these ask first too. The list
-   * is explicit so the gate does not spread to ordinary creates.
+   * Recording money or stock is additive — nothing is overwritten, so
+   * `destructiveHint` stays false — but a payment, a client account deposit, a
+   * cash operation or an inventory operation moves money or stock a person has
+   * to stand behind, so these ask first too. The list is explicit so the gate
+   * does not spread to ordinary creates.
    */
-  const MONEY_RECORDING = [
+  const CONFIRMED_ADDITIVE = [
     'client_accounts_deposit',
     'financial_transactions_create',
+    'inventory_create_operation',
     'visits_add_payment',
   ];
 
-  it('gates nothing that is not destructive, except recording money', () => {
+  it('gates nothing that is not destructive, except recording money or stock', () => {
     const confirmedButNotDestructive = factoryTools.filter(
       (tool) =>
         tool.meta.confirm !== undefined &&
@@ -133,6 +137,6 @@ describe('destructive tools are gated', () => {
     );
     expect(
       confirmedButNotDestructive.map((tool) => tool.meta.name).sort()
-    ).toEqual(MONEY_RECORDING);
+    ).toEqual(CONFIRMED_ADDITIVE);
   });
 });

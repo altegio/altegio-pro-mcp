@@ -80,6 +80,30 @@ export interface ConfirmationSpec<TInput> {
   ) => Promise<string | undefined>;
   /** What the operation destroys and what survives it. */
   readonly consequence: string | ((input: TInput) => string);
+  /**
+   * Optional API read that spells out exactly what changes — the lines a
+   * document holds, the before/after of a list the call replaces — under the
+   * consequence. It is read back from the API, so every line is cleaned
+   * like a resolved label. A failure leaves it out, with one exception: a
+   * `ConfirmationRefusal` says the call would be refused anyway, and the gate
+   * then answers that refusal instead of asking a person to approve it.
+   */
+  readonly detail?: (
+    input: TInput,
+    client: AltegioClient
+  ) => Promise<string | undefined>;
+}
+
+/**
+ * Thrown by `ConfirmationSpec.detail` when the call cannot succeed (a
+ * duplicate, an unknown id, an impossible change), so nobody is asked to
+ * approve it. Nothing is performed either way; the message is the refusal.
+ */
+export class ConfirmationRefusal extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConfirmationRefusal';
+  }
 }
 
 /** A `ConfirmationSpec` bound to one set of arguments, with the generic erased. */
@@ -88,6 +112,7 @@ export interface PreparedConfirmation {
   readonly target: string;
   readonly consequence: string;
   readonly resolve?: (client: AltegioClient) => Promise<string | undefined>;
+  readonly detail?: (client: AltegioClient) => Promise<string | undefined>;
   /**
    * What the token binds: the parsed input in canonical form. Absent only for
    * a hand-built preparation, which then binds the raw arguments.
@@ -119,6 +144,9 @@ export function prepareConfirmation<TInput>(
           : spec.consequence,
       ...(spec.resolve
         ? { resolve: (client: AltegioClient) => spec.resolve!(input, client) }
+        : {}),
+      ...(spec.detail
+        ? { detail: (client: AltegioClient) => spec.detail!(input, client) }
         : {}),
     };
   };
@@ -255,11 +283,21 @@ export async function requireConfirmation(options: {
 
   const target = await resolveTarget(prepared, client);
   const headline = subjectLine(prepared, target);
+  let detail: string | undefined;
+  try {
+    detail = await resolveDetail(prepared, client);
+  } catch (error) {
+    if (!(error instanceof ConfirmationRefusal)) throw error;
+    return refusal(`Nothing was changed: ${error.message}`);
+  }
+  const consequence = detail
+    ? `${prepared.consequence}\n\n${detail}`
+    : prepared.consequence;
 
   if (runtime.supportsElicitation()) {
     let answer: ConfirmationAnswer;
     try {
-      answer = await runtime.elicit(`${headline}\n\n${prepared.consequence}`);
+      answer = await runtime.elicit(`${headline}\n\n${consequence}`);
     } catch (error) {
       // The host advertised elicitation and then failed to deliver it. Fail
       // closed: minting a token here would let the caller route around the
@@ -292,7 +330,7 @@ export async function requireConfirmation(options: {
           `Confirmation required — nothing was changed.`,
           ``,
           headline,
-          prepared.consequence,
+          consequence,
           ``,
           `Show this to the person you act for. Only if they agree, call ${toolName} again with the same arguments plus ${CONFIRMATION_TOKEN_ARG}="${token}" (valid until ${expiresAt}, for this call only). Do not retry without asking.`,
         ].join('\n'),
@@ -302,12 +340,48 @@ export async function requireConfirmation(options: {
       status: 'confirmation_required',
       changed: false,
       tool: toolName,
-      summary: `${headline} ${prepared.consequence}`,
+      summary: `${headline} ${consequence}`,
       [CONFIRMATION_TOKEN_ARG]: token,
       expires_at: expiresAt,
       next_step: `Ask the user. Only if they agree, call ${toolName} again with the same arguments plus ${CONFIRMATION_TOKEN_ARG}.`,
     },
   };
+}
+
+/** Lines of a detail block: cleaned one by one, capped in count and width. */
+const DETAIL_MAX_LINES = 40;
+const DETAIL_LINE_MAX_CHARS = 240;
+
+/**
+ * The optional detail under the consequence. Like a resolved label it is read
+ * back from the API and holds names other people typed, so each line is
+ * cleaned in place (`sanitizeUntrusted`) and the block is capped. Only a
+ * `ConfirmationRefusal` escapes; any other failure leaves the detail out,
+ * because a lookup failure must not decide whether the operator is asked.
+ */
+async function resolveDetail(
+  prepared: PreparedConfirmation,
+  client: AltegioClient
+): Promise<string | undefined> {
+  if (!prepared.detail) return undefined;
+  let raw: string | undefined;
+  try {
+    raw = await prepared.detail(client);
+  } catch (error) {
+    if (error instanceof ConfirmationRefusal) throw error;
+    return undefined;
+  }
+  if (!raw) return undefined;
+  const lines = raw
+    .split('\n')
+    .map((line) => sanitizeUntrusted(line, { maxChars: DETAIL_LINE_MAX_CHARS }))
+    .filter((line): line is string => line !== null);
+  if (lines.length === 0) return undefined;
+  const kept = lines.slice(0, DETAIL_MAX_LINES);
+  if (lines.length > kept.length) {
+    kept.push(`… and ${lines.length - kept.length} more line(s).`);
+  }
+  return kept.join('\n');
 }
 
 async function resolveTarget(
