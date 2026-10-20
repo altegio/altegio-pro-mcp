@@ -1,10 +1,10 @@
 /**
  * `FinanceApi` — the port the finance capability layer talks to (ADR-001 D5).
  *
- * It covers the money side of a location: the bill of a visit and the payments
- * recorded against it, client accounts and the `deposit` operation that tops
- * one up, accounts and cash registers, financial transactions, and a team
- * member's payroll for a period.
+ * It covers the money side of a location: a visit — its items, amount due and
+ * the payments recorded on it — client accounts and the `deposit` operation
+ * that tops one up, accounts and cash registers, financial transactions, and a
+ * team member's payroll for a period.
  *
  * Method names and DTOs use the product glossary — visit, payment, amount due,
  * client account, accounts and cash registers, payment item, payroll,
@@ -23,16 +23,16 @@
 
 import type { WriteOptions } from './write-options.js';
 
-// ========== visit bill ==========
+// ========== visit: items and payments ==========
 
-/** What one bill line sells. */
-export type BillLineKind = 'service' | 'product' | 'other';
+/** What one visit item sells. */
+export type VisitItemKind = 'service' | 'product' | 'other';
 
-/** One line of a visit's bill. */
-export interface BillLine {
+/** One visit item: a service or product line of the visit. */
+export interface VisitItem {
   id: number;
   appointment_id: number | null;
-  kind: BillLineKind;
+  kind: VisitItemKind;
   service_id: number | null;
   product_id: number | null;
   title: string | null;
@@ -67,7 +67,7 @@ export type PaymentMethod =
   | 'advance_payment_hold'
   | 'other';
 
-/** One payment recorded against the bill. */
+/** One payment recorded on the visit. */
 export interface VisitPayment {
   /**
    * Stable payment id: `t<number>` for money into an account or cash
@@ -77,8 +77,8 @@ export interface VisitPayment {
   id: string;
   method: PaymentMethod;
   amount: number;
-  /** The bill line it pays, when the API attributes it to one. */
-  bill_line_id: number | null;
+  /** The visit item it pays, when the API attributes it to one. */
+  visit_item_id: number | null;
   account_id: number | null;
   account_title: string | null;
   /** Payment method configured for the location, e.g. "Cash", "Card". */
@@ -99,7 +99,7 @@ export interface AdvancePaymentHold {
   status: string | null;
 }
 
-/** One way the bill can be paid right now, with what it would accept. */
+/** One way the visit can be paid right now, with what it would accept. */
 export interface PaymentOption {
   method: PaymentMethod;
   applicable: boolean;
@@ -129,17 +129,17 @@ export interface PaymentOption {
   chain_id: number | null;
 }
 
-/** The bill of one appointment's visit. */
-export interface VisitBill {
+/** The visit an appointment belongs to: what it sells and how it is paid. */
+export interface Visit {
   location_id: number;
   appointment_id: number;
   visit_id: number | null;
   client_id: number | null;
-  lines: BillLine[];
+  items: VisitItem[];
   payments: VisitPayment[];
   advance_payment_holds: AdvancePaymentHold[];
   payment_options: PaymentOption[];
-  /** Sum of the line amounts. */
+  /** Sum of the visit item amounts. */
   total_amount: number;
   /** Sum of the recorded payments. */
   paid_amount: number;
@@ -273,16 +273,17 @@ export interface FinancialTransactionFields {
 
 /**
  * The income or expense category a payment item belongs to — the section of
- * the finance reports it is counted in. `income` is the only income category.
+ * the finance reports it is counted in, named as the Altegio UI labels it.
+ * `revenue` is the only income category.
  */
 export type IncomeExpenseCategory =
   | 'prime_cost'
   | 'commercial'
   | 'personnel'
-  | 'administrative'
+  | 'operational'
   | 'taxes_and_fees'
-  | 'miscellaneous'
-  | 'income'
+  | 'other_expenses'
+  | 'revenue'
   | 'unknown';
 
 /** What a financial transaction is for: rent, product purchase, services. */
@@ -343,22 +344,22 @@ export interface PayrollReport {
 // ========== the port ==========
 
 export interface FinanceApi {
-  /** The bill of the visit an appointment belongs to. */
-  getVisitBill(locationId: number, appointmentId: number): Promise<VisitBill>;
-  /** Record a payment and return the bill after it. */
+  /** The visit an appointment belongs to. */
+  getVisit(locationId: number, appointmentId: number): Promise<Visit>;
+  /** Record a payment and return the visit after it. */
   addPayment(
     locationId: number,
     appointmentId: number,
     payment: PaymentRequest,
     options?: WriteOptions
-  ): Promise<VisitBill>;
-  /** Cancel one recorded payment and return the bill after it. */
+  ): Promise<Visit>;
+  /** Cancel one recorded payment and return the visit after it. */
   cancelPayment(
     locationId: number,
     appointmentId: number,
     paymentId: string,
     options?: WriteOptions
-  ): Promise<VisitBill>;
+  ): Promise<Visit>;
 
   listClientAccounts(
     locationId: number,

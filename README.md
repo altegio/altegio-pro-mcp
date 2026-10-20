@@ -115,7 +115,7 @@ are the `events_*` pack: `events_list`, `events_get` (with the bookings),
 client), `events_update_appointment` and `events_reschedule_appointment`.
 
 Money at the reception desk is on `/mcp` and `/mcp/ops`: `visits_get` reads a
-visit's bill (lines, payments, amount due and the ways it can be paid),
+visit (its visit items, payments, amount due and the ways it can be paid),
 `visits_add_payment` and `visits_cancel_payment` record and cancel a payment,
 `client_accounts_list_for_client` and `client_accounts_deposit` read and top up
 a client account, and `accounts_and_cash_registers_list` lists where money is
@@ -127,7 +127,7 @@ received. Back-office money is on `/mcp/finance` only: `financial_transactions_l
 period). Amounts are in major units next to the location's ISO currency code,
 and every write that records, moves or deletes money asks for confirmation.
 
-Inventory is the `inventory_*` pack with `products_search`, `suppliers_list`
+Inventory is the `inventory_*` pack with `products_search`, `suppliers_and_partners_list`
 and the appointment consumables pair: `inventory_list` (a location's
 inventories), `products_search` (by name, article number or barcode, with the
 quantity in each inventory on request), `inventory_list_operations` (product

@@ -40,11 +40,12 @@ Decide by audience, not by mechanical replacement: an internal team record is a
 | **Location** | One business unit with its own address, team and schedule | Branch, Company, Salon, Spot |
 | **Chain** | Several locations under one brand, sharing settings and clients | Network, Internet |
 | **Appointment** | One booked slot: client, professional, service, time | Visit, Record, Entry, Booking |
-| **Visit** | The appointment as delivered and paid for | — |
+| **Visit** | The appointment as delivered and paid for — the object a client pays: its visit items, amount due and payments | Bill |
+| **Visitor** | The person, pet or vehicle an appointment is for; often the client, but a client may book for a pet or a car | Walk-in, Comer |
 | **Group event** | One slot with many clients | Session |
 | **Service** | What the business sells and delivers in a slot | Work, Job |
 | **Service category** | Grouping of services | — |
-| **Package** | Bundled or four-hands services sold as one item | Complex |
+| **Combined service** | One service made of work by several professionals, four-hands services included | Package, Complex, Composite service |
 | **Resource** | Equipment or a room an appointment occupies | — |
 | **Tag** | Colored mark on an appointment, client or group event that groups and highlights them | Label, Category (for a tag) |
 | **Products** | Retail items and consumables the location sells or uses | Goods, Items |
@@ -63,9 +64,11 @@ Decide by audience, not by mechanical replacement: an internal team record is a
 
 | Canonical term | What it is | Never use |
 |---|---|---|
+| **Visit item** | One line of a visit: a service from the appointment or a product sold with it | Bill line, Line item |
 | **Payment** | One recorded act of paying against a visit | — |
-| **Amount due** | Money the client still has to pay on a visit's bill | Total |
-| **Total amount** | Monetary sum of a bill or list | Total, Amount |
+| **Amount due** | Money the client still has to pay on a visit | Total |
+| **Total amount** | Monetary sum of a visit's items or of a list | Total, Amount |
+| **Printed receipt** | What is printed for a visit at checkout; once it is printed, Altegio refuses product changes on the visit | Bill, Printed bill |
 | **Advance payment** | A payment recorded before the visit, for part of the amount due | Prepayment |
 | **deposit** | The operation that tops up a **Client account**; never a name for the account or its balance | — |
 | **Accounts and cash registers** | Internal tills and payment accounts where a location records money; each is a **cash settlement** or a **non-cash settlement** | Accounts (alone), Cash drawers, Cashless |
@@ -73,11 +76,16 @@ Decide by audience, not by mechanical replacement: an internal team record is a
 | **Fiscal cash-register device** | The physical device that issues fiscal receipts — not an internal till | Payment terminal, KKM |
 | **Financial transactions** | Individual money movements in and out | — |
 | **Payment item** | What a financial transaction is for (rent, product purchase, services rendered); it decides income or expense | Expense (for an income item) |
-| **Income and expense categories** | Categories that classify payment items | Income and Expenses, Earnings and Expenditure |
+| **Income and expense categories** | Categories that classify payment items: prime cost, commercial, personnel, operational, taxes and regulatory fees, other expenses (expense), revenue (income) | Income and Expenses, Earnings and Expenditure, Administrative, Miscellaneous |
 | **Suppliers and Partners** | Counterparties the location pays or is paid by | Providers, Contractors, Vendors |
 | **refund** | Money returned to the client; cancelling a recorded payment is not one | — |
 | **Payroll** | What the team is paid and how it is calculated | Salary, Wage register |
 | **Settlements** | What is accrued to a team member, what is paid out, and the balance owed | Disbursements |
+
+The visit is the billing object; there is no separate bill. Its lines are
+**visit items**, its money is the **amount due** and the **payments**, and what
+is printed for it is its **printed receipt**. Never write "bill" for any of
+them — **Bills of Materials**, an inventory term, is unrelated.
 
 ## Inventory
 
@@ -91,6 +99,7 @@ Decide by audience, not by mechanical replacement: an internal team record is a
 | **Bills of Materials** | A service's consumption recipe: the consumables and quantities one service uses | Technical card, Flow chart |
 | **Sale price** | What a client pays for one unit of a product | — |
 | **Cost price** | What one unit of a product costs the location | Purchase price |
+| **Product marking** | Codes that identify each unit of a marked product, where marking is enforced | Goods marking |
 | **Barcode** | The code printed on a product, searchable like its name | — |
 
 A product counts in its sale unit (pcs, bottle) or its consumable unit (ml, g);
@@ -107,8 +116,8 @@ every quantity names its unit, and money names the location's currency.
 ## Legacy names still on the wire
 
 Backend API fields such as \`salon_id\`, \`record_id\`, \`deposit_id\`,
-\`expense_id\`, \`master_id\`, \`storage_id\`, \`good_id\` and
+\`expense_id\`, \`master_id\`, \`storage_id\`, \`good_id\`, \`comer\` and
 \`technological_card\` remain inside adapters. The MCP boundary uses
-locations, team members, appointments, client accounts, payment items,
-inventories, products and Bills of Materials.
+locations, team members, appointments, visitors, visit items, client
+accounts, payment items, inventories, products and Bills of Materials.
 `;

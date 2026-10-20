@@ -6,7 +6,7 @@
  * (`autoload/init.php` in biz.erp), which has no daylight saving, so the offset
  * is +04:00 all year; the transaction list renders it explicitly
  * (`2026-10-15T13:00:00+0400` for an 11:00 Prague payment), while the single
- * transaction read and the visit bill give the same wall time with no offset.
+ * transaction read and the visit read give the same wall time with no offset.
  *
  * The write side is not symmetric (verified live on 2026-10-19 and in
  * `TransactionController`): creating a transaction stores the `date` it is sent

@@ -41,7 +41,7 @@ import type {
   PaymentMethod,
   PaymentOption,
   PaymentRequest,
-  VisitBill,
+  Visit,
   VisitPayment,
 } from '../../api/finance-api.js';
 import { writeOptions } from '../../api/write-options.js';
@@ -132,7 +132,7 @@ function checkPeriod(from: string, to: string): void {
   }
 }
 
-// ========== visit bill ==========
+// ========== visit: items, payments, amount due ==========
 
 const METHOD_ID_FIELD: Record<PaymentMethod, keyof PaymentOption | null> = {
   account: 'account_id',
@@ -196,16 +196,16 @@ function paymentLine(p: VisitPayment, currency: string | null): string {
               : p.method === 'loyalty_card'
                 ? `loyalty card ${p.loyalty_card_id}`
                 : p.method;
-  return `- payment ${p.id}: ${amountText(p.amount, currency)} by ${via}${p.bill_line_id ? ` for line ${p.bill_line_id}` : ''}`;
+  return `- payment ${p.id}: ${amountText(p.amount, currency)} by ${via}${p.visit_item_id ? ` for visit item ${p.visit_item_id}` : ''}`;
 }
 
-function billUntrusted(bill: VisitBill): UntrustedField[] {
+function visitUntrusted(visit: Visit): UntrustedField[] {
   const fields: UntrustedField[] = [];
-  for (const line of bill.lines) {
-    fields.push({ label: `line ${line.id} title`, value: line.title });
+  for (const item of visit.items) {
+    fields.push({ label: `visit item ${item.id} title`, value: item.title });
   }
   const accounts = new Map<number, string | null>();
-  for (const p of bill.payments) {
+  for (const p of visit.payments) {
     if (p.account_id !== null) accounts.set(p.account_id, p.account_title);
     if (p.payment_method_name) {
       fields.push({
@@ -214,7 +214,7 @@ function billUntrusted(bill: VisitBill): UntrustedField[] {
       });
     }
   }
-  for (const o of bill.payment_options) {
+  for (const o of visit.payment_options) {
     if (o.applicable && o.account_id !== null) {
       accounts.set(o.account_id, o.account_title);
     }
@@ -235,100 +235,101 @@ function billUntrusted(bill: VisitBill): UntrustedField[] {
   return fields;
 }
 
-function billStructured(bill: VisitBill, currency: string | null) {
-  const available = bill.payment_options.filter((o) => o.applicable);
+function visitStructured(visit: Visit, currency: string | null) {
+  const available = visit.payment_options.filter((o) => o.applicable);
   return {
-    location_id: bill.location_id,
-    appointment_id: bill.appointment_id,
-    visit_id: bill.visit_id,
-    client_id: bill.client_id,
+    location_id: visit.location_id,
+    appointment_id: visit.appointment_id,
+    visit_id: visit.visit_id,
+    client_id: visit.client_id,
     currency,
-    total_amount: bill.total_amount,
-    paid_amount: bill.paid_amount,
-    amount_due: bill.amount_due,
-    lines: bill.lines,
-    payments: bill.payments,
-    advance_payment_holds: bill.advance_payment_holds,
+    total_amount: visit.total_amount,
+    paid_amount: visit.paid_amount,
+    amount_due: visit.amount_due,
+    items: visit.items,
+    payments: visit.payments,
+    advance_payment_holds: visit.advance_payment_holds,
     payment_options: available,
-    unavailable_payment_options: bill.payment_options.length - available.length,
+    unavailable_payment_options:
+      visit.payment_options.length - available.length,
   };
 }
 
-function billText(
-  bill: VisitBill,
+function visitText(
+  visit: Visit,
   currency: string | null,
   head: string
 ): string {
-  const available = bill.payment_options.filter((o) => o.applicable);
-  const hidden = bill.payment_options.length - available.length;
+  const available = visit.payment_options.filter((o) => o.applicable);
+  const hidden = visit.payment_options.length - available.length;
   const summary = lines(
     head,
-    `Total amount ${amountText(bill.total_amount, currency)} · paid ${amountText(bill.paid_amount, currency)} · amount due ${amountText(bill.amount_due, currency)}.`,
-    'Lines:',
-    ...(bill.lines.length > 0
-      ? bill.lines.map(
+    `Total amount ${amountText(visit.total_amount, currency)} · paid ${amountText(visit.paid_amount, currency)} · amount due ${amountText(visit.amount_due, currency)}.`,
+    'Visit items:',
+    ...(visit.items.length > 0
+      ? visit.items.map(
           (l) =>
-            `- line ${l.id}: ${l.kind}${l.kind === 'service' ? ` ${l.service_id}` : l.kind === 'product' ? ` ${l.product_id}` : ''} ×${l.quantity ?? '?'} · ${amountText(l.amount, currency)}${l.amount_before_discount !== null && l.amount !== null && !sameMoney(l.amount_before_discount, l.amount) ? ` (before discount ${amountText(l.amount_before_discount, currency)})` : ''}`
+            `- item ${l.id}: ${l.kind}${l.kind === 'service' ? ` ${l.service_id}` : l.kind === 'product' ? ` ${l.product_id}` : ''} ×${l.quantity ?? '?'} · ${amountText(l.amount, currency)}${l.amount_before_discount !== null && l.amount !== null && !sameMoney(l.amount_before_discount, l.amount) ? ` (before discount ${amountText(l.amount_before_discount, currency)})` : ''}`
         )
       : ['- none']),
-    `Payments: ${bill.payments.length === 0 ? 'none.' : ''}`,
-    ...bill.payments.map((p) => paymentLine(p, currency)),
-    bill.advance_payment_holds.length > 0 &&
-      `Advance payment holds: ${bill.advance_payment_holds
+    `Payments: ${visit.payments.length === 0 ? 'none.' : ''}`,
+    ...visit.payments.map((p) => paymentLine(p, currency)),
+    visit.advance_payment_holds.length > 0 &&
+      `Advance payment holds: ${visit.advance_payment_holds
         .map(
           (h) =>
             `${h.id} (${amountText(h.amount, currency)}, ${h.status ?? 'status not reported'})`
         )
         .join('; ')}.`,
-    bill.amount_due > 0 && available.length > 0
-      ? `Can pay now${hidden > 0 ? ` (${hidden} more method(s) not applicable to this bill)` : ''}:`
-      : bill.amount_due > 0
-        ? 'No payment method applies to this bill now.'
+    visit.amount_due > 0 && available.length > 0
+      ? `Can pay now${hidden > 0 ? ` (${hidden} more method(s) not applicable to this visit)` : ''}:`
+      : visit.amount_due > 0
+        ? 'No payment method applies to this visit now.'
         : 'Nothing is due.',
-    ...(bill.amount_due > 0
+    ...(visit.amount_due > 0
       ? available.map((o) => optionLine(o, currency))
       : []),
     ...currencyNote(currency)
   );
-  return withUntrustedBlock(summary, billUntrusted(bill), {
+  return withUntrustedBlock(summary, visitUntrusted(visit), {
     maxChars: FIELD_MAX_CHARS,
   });
 }
 
-function billHead(bill: VisitBill, verb = 'Bill'): string {
-  return `${verb} of appointment ${bill.appointment_id}${bill.visit_id ? ` (visit ${bill.visit_id}` : ' ('}${bill.client_id ? `, client ${bill.client_id})` : bill.visit_id ? ')' : 'no client)'} at location ${bill.location_id}.`;
+function visitHead(visit: Visit, after = false): string {
+  return `${after ? 'The visit now: visit' : 'Visit'}${visit.visit_id ? ` ${visit.visit_id}` : ''} of appointment ${visit.appointment_id} (${visit.client_id ? `client ${visit.client_id}` : 'no client'}) at location ${visit.location_id}.`;
 }
 
-export async function getVisitBill(
+export async function getVisit(
   client: AltegioClient,
   input: { location_id: number; appointment_id: number }
 ): Promise<FinanceResult> {
-  const [bill, currency] = await Promise.all([
-    api(client).getVisitBill(input.location_id, input.appointment_id),
+  const [visit, currency] = await Promise.all([
+    api(client).getVisit(input.location_id, input.appointment_id),
     resolveLocationCurrency(client, input.location_id),
   ]);
   const next =
-    bill.amount_due > 0
+    visit.amount_due > 0
       ? 'Record a payment with visits_add_payment: a method and its id from the list above, and amount_due as expected_amount_due.'
-      : bill.payments.length > 0
+      : visit.payments.length > 0
         ? 'Cancel a payment with visits_cancel_payment and its payment id.'
         : '';
   return {
-    text: lines(billText(bill, currency, billHead(bill)), next),
-    structuredContent: billStructured(bill, currency),
+    text: lines(visitText(visit, currency, visitHead(visit)), next),
+    structuredContent: visitStructured(visit, currency),
   };
 }
 
-/** Name the bill for a confirmation prompt; never decides whether it runs. */
-export async function describeBill(
+/** Name the visit for a confirmation prompt; never decides whether it runs. */
+export async function describeVisit(
   client: AltegioClient,
   input: { location_id: number; appointment_id: number }
 ): Promise<string | undefined> {
-  const [bill, currency] = await Promise.all([
-    api(client).getVisitBill(input.location_id, input.appointment_id),
+  const [visit, currency] = await Promise.all([
+    api(client).getVisit(input.location_id, input.appointment_id),
     resolveLocationCurrency(client, input.location_id),
   ]);
-  return `the bill of appointment ${bill.appointment_id} at location ${bill.location_id}${bill.client_id ? ` (client ${bill.client_id})` : ''}: total amount ${amountText(bill.total_amount, currency)}, amount due ${amountText(bill.amount_due, currency)}`;
+  return `the visit of appointment ${visit.appointment_id} at location ${visit.location_id}${visit.client_id ? ` (client ${visit.client_id})` : ''}: total amount ${amountText(visit.total_amount, currency)}, amount due ${amountText(visit.amount_due, currency)}`;
 }
 
 export interface AddPaymentInput {
@@ -459,13 +460,13 @@ export async function addPayment(
   const request = paymentRequest(input);
   const finance = api(client);
   const [before, currency] = await Promise.all([
-    finance.getVisitBill(input.location_id, input.appointment_id),
+    finance.getVisit(input.location_id, input.appointment_id),
     resolveLocationCurrency(client, input.location_id),
   ]);
 
   if (!sameMoney(before.amount_due, input.expected_amount_due)) {
     throw new FinanceInputError(
-      `Nothing was recorded: the amount due on appointment ${input.appointment_id} is ${amountText(before.amount_due, currency)}, not the ${amountText(input.expected_amount_due, currency)} this payment was confirmed for — the bill changed, or this payment was already recorded. Read it again with visits_get before paying.`
+      `Nothing was recorded: the amount due on appointment ${input.appointment_id} is ${amountText(before.amount_due, currency)}, not the ${amountText(input.expected_amount_due, currency)} this payment was confirmed for — the visit changed, or this payment was already recorded. Read it again with visits_get before paying.`
     );
   }
   if (before.amount_due <= 0) {
@@ -478,7 +479,7 @@ export async function addPayment(
   );
   if (!option) {
     throw new FinanceInputError(
-      `Nothing was recorded: ${paymentSummary(input)} cannot pay this bill now. Pick a method and id from payment_options in visits_get.`
+      `Nothing was recorded: ${paymentSummary(input)} cannot pay this visit now. Pick a method and id from payment_options in visits_get.`
     );
   }
   if ('amount' in request) {
@@ -506,15 +507,15 @@ export async function addPayment(
   const head =
     added.length > 0
       ? `Recorded ${added.map((p) => `payment ${p.id} (${amountText(p.amount, currency)}, ${p.method})`).join(', ')} on appointment ${after.appointment_id}. Amount due is now ${amountText(after.amount_due, currency)}.`
-      : `The payment was sent, but the bill shows no new payment; amount due is ${amountText(after.amount_due, currency)}. Read the bill with visits_get before trying again.`;
+      : `The payment was sent, but the visit shows no new payment; amount due is ${amountText(after.amount_due, currency)}. Read the visit with visits_get before trying again.`;
   return {
     text: lines(
       head,
-      billText(after, currency, billHead(after, 'Bill now')),
+      visitText(after, currency, visitHead(after, true)),
       'Undo a payment with visits_cancel_payment.'
     ),
     structuredContent: {
-      ...billStructured(after, currency),
+      ...visitStructured(after, currency),
       added_payment_ids: added.map((p) => p.id),
     },
     ...(added.length === 0 ? { isError: true } : {}),
@@ -525,11 +526,11 @@ export async function describePayment(
   client: AltegioClient,
   input: { location_id: number; appointment_id: number; payment_id: string }
 ): Promise<string | undefined> {
-  const [bill, currency] = await Promise.all([
-    api(client).getVisitBill(input.location_id, input.appointment_id),
+  const [visit, currency] = await Promise.all([
+    api(client).getVisit(input.location_id, input.appointment_id),
     resolveLocationCurrency(client, input.location_id),
   ]);
-  const payment = bill.payments.find((p) => p.id === input.payment_id);
+  const payment = visit.payments.find((p) => p.id === input.payment_id);
   if (!payment) return undefined;
   return `payment ${payment.id} of ${amountText(payment.amount, currency)} (${payment.method}${payment.account_id ? `, account ${payment.account_id}` : ''}) on appointment ${input.appointment_id}`;
 }
@@ -541,13 +542,13 @@ export async function cancelPayment(
 ): Promise<FinanceResult> {
   const finance = api(client);
   const [before, currency] = await Promise.all([
-    finance.getVisitBill(input.location_id, input.appointment_id),
+    finance.getVisit(input.location_id, input.appointment_id),
     resolveLocationCurrency(client, input.location_id),
   ]);
   const payment = before.payments.find((p) => p.id === input.payment_id);
   if (!payment) {
     throw new FinanceNotFoundError(
-      `Nothing was cancelled: payment ${input.payment_id.slice(0, 40)} is not on the bill of appointment ${input.appointment_id} — it may already be cancelled. The bill lists ${before.payments.map((p) => p.id).join(', ') || 'no payments'}.`
+      `Nothing was cancelled: payment ${input.payment_id.slice(0, 40)} is not on the visit of appointment ${input.appointment_id} — it may already be cancelled. The visit lists ${before.payments.map((p) => p.id).join(', ') || 'no payments'}.`
     );
   }
   const after = await finance.cancelPayment(
@@ -561,14 +562,14 @@ export async function cancelPayment(
     text: lines(
       gone
         ? `Cancelled payment ${payment.id} (${amountText(payment.amount, currency)}, ${payment.method}) on appointment ${after.appointment_id}. Amount due is now ${amountText(after.amount_due, currency)}.`
-        : `The cancellation was sent, but payment ${payment.id} is still on the bill.`,
+        : `The cancellation was sent, but payment ${payment.id} is still on the visit.`,
       payment.method === 'account'
         ? 'This reverses the record in Altegio only: money taken by card or online acquiring is not returned to the client by this call.'
         : 'The amount goes back to the client account or loyalty instrument it was paid from.',
-      billText(after, currency, billHead(after, 'Bill now'))
+      visitText(after, currency, visitHead(after, true))
     ),
     structuredContent: {
-      ...billStructured(after, currency),
+      ...visitStructured(after, currency),
       cancelled_payment_id: gone ? payment.id : null,
     },
     ...(gone ? {} : { isError: true }),

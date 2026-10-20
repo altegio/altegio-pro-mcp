@@ -67,7 +67,7 @@ const INVENTORY_TOOLS = [
   'inventory_list_bills_of_materials',
   'inventory_list_operations',
   'products_search',
-  'suppliers_list',
+  'suppliers_and_partners_list',
 ];
 
 const allNames = () => orderedToolEntries().map((entry) => entry.spec.name);

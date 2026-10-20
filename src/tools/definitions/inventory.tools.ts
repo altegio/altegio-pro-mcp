@@ -192,7 +192,7 @@ const consumableLineSchema = {
   required: ['product_id', 'inventory_id', 'quantity', 'unit', 'cost'],
 };
 
-const billSchema = {
+const bomSchema = {
   type: 'object' as const,
   properties: {
     id: integer,
@@ -276,7 +276,7 @@ export const inventoryListOperationsTool = defineTool({
   name: 'inventory_list_operations',
   category: 'Inventory',
   description:
-    'Inventory history of a location, newest first: one row per product line of an inventory operation — product sales (on a visit bill too), consumption and appointment consumables, product receipts, write-offs, transfers — with its document_id, product, quantity with unit and direction, inventory, prices and total in the location currency, and the client, Supplier and appointment ids where Altegio reports them. Filter by date_from/date_to or by document_id (every line of one operation); there is no filter by product or kind. Paged: follow pagination.next_page.',
+    'Inventory history of a location, newest first: one row per product line of an inventory operation — product sales (on a visit too), consumption and appointment consumables, product receipts, write-offs, transfers — with its document_id, product, quantity with unit and direction, inventory, prices and total in the location currency, and the client, Supplier and appointment ids where Altegio reports them. Filter by date_from/date_to or by document_id (every line of one operation); there is no filter by product or kind. Paged: follow pagination.next_page.',
   annotations: { title: 'Inventory: list inventory operations', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -322,7 +322,7 @@ const operationLine = z
       .max(100_000_000)
       .optional()
       .describe(
-        'Price per unit in the location currency. Default: the sale price for a sale, the cost price otherwise; a receipt should give the purchase price.'
+        'Price per unit in the location currency. Default: the sale price for a sale, the cost price otherwise; a receipt should give the cost price it was bought at.'
       ),
     discount_percent: z
       .number()
@@ -383,7 +383,9 @@ export const inventoryCreateOperationTool = defineTool({
       .int()
       .positive()
       .optional()
-      .describe('Receipt only: the Supplier it comes from (suppliers_list).'),
+      .describe(
+        'Receipt only: the Supplier it comes from (suppliers_and_partners_list).'
+      ),
     date: z
       .string()
       .optional()
@@ -412,7 +414,7 @@ export const inventoryDeleteDocumentTool = defineTool({
   name: 'inventory_delete_document',
   category: 'Inventory',
   description:
-    'Delete the document of an inventory operation (document_id from inventory_list_operations) with all its product lines; the stock they moved is reversed. A payment recorded for it is not deleted. A product sale on a visit bill and an appointment’s consumables are not inventory operation documents and cannot be deleted here. Asks for confirmation first.',
+    'Delete the document of an inventory operation (document_id from inventory_list_operations) with all its product lines; the stock they moved is reversed. A payment recorded for it is not deleted. A product sale on a visit and an appointment’s consumables are not inventory operation documents and cannot be deleted here. Asks for confirmation first.',
   annotations: {
     title: 'Inventory: delete an inventory operation document',
     destructiveHint: true,
@@ -442,8 +444,8 @@ export const inventoryDeleteDocumentTool = defineTool({
 
 // ========== suppliers ==========
 
-export const suppliersListTool = defineTool({
-  name: 'suppliers_list',
+export const suppliersAndPartnersListTool = defineTool({
+  name: 'suppliers_and_partners_list',
   category: 'Inventory',
   description:
     'The Suppliers and Partners of a location — the counterparties it pays or is paid by, such as those it receives products from — optionally filtered by part of the name: id, name and type (legal entity, sole proprietor, individual). Use the id as supplier_id in financial_transactions_create, financial_transactions_update and financial_transactions_list, or of a product receipt (inventory_create_operation). Needs the Finances access rights. Paged: follow pagination.next_page.',
@@ -487,7 +489,7 @@ export const inventoryListBillsOfMaterialsTool = defineTool({
     page: pageArg,
     page_size: pageSizeArg(50, 20),
   }),
-  outputSchema: collectionSchema(billSchema, locationAndCurrency),
+  outputSchema: collectionSchema(bomSchema, locationAndCurrency),
   handler: async ({ input, client }) =>
     inventory.listBillsOfMaterials(client, input),
 });

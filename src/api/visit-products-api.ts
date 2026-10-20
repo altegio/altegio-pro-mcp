@@ -9,7 +9,7 @@
  * saved, so the amount the client pays is read back, never predicted.
  *
  * Method names and DTOs use the product glossary (visit, appointment,
- * product, inventory, team member, bill); the wire names (`record`,
+ * product, inventory, team member, visit item); the wire names (`record`,
  * `attendance`, `staff_id`, `good_id`, `storage_id`, `attendance_good_items`,
  * `manual_cost`, `comer`, `activity`, `custom_field_values`) stop inside the
  * adapter.
@@ -50,7 +50,7 @@ export interface VisitProductLine {
   marks: string[];
 }
 
-/** One service line of the appointment, as the bill counts it. */
+/** One service line of the appointment, as the visit counts it. */
 export interface VisitServiceLine {
   id: number;
   service_id: number;
@@ -72,8 +72,8 @@ export interface AppointmentSale {
   attendance: AppointmentAttendance;
   /** The appointment is a client's place in a group event. */
   group_event: boolean;
-  /** The visit's bill is printed (or a fiscal receipt is being prepared). */
-  bill_printed: boolean;
+  /** The visit's receipt is printed (or a fiscal receipt is being prepared). */
+  receipt_printed: boolean;
   /** Wall-clock start at the location, `YYYY-MM-DDTHH:MM:SS`. */
   start_local: string;
   duration_seconds: number;

@@ -11,7 +11,8 @@
  *   device).
  * - `financial_transactions_*` — individual money movements in and out:
  *   cash operations, expenses, income outside a visit. Their Suppliers and
- *   Partners come from `suppliers_list` (the inventory pack, also on finance).
+ *   Partners come from `suppliers_and_partners_list` (the inventory pack,
+ *   also on finance).
  * - `payroll_get_calculation` — a team member's payroll for a period and the
  *   settlements with them.
  *
@@ -281,7 +282,7 @@ const transactionFieldInputs = {
     .positive()
     .optional()
     .describe(
-      'Supplier or partner the money is paid to or received from, from suppliers_list.'
+      'Supplier or partner the money is paid to or received from, from suppliers_and_partners_list.'
     ),
   comment: z
     .string()
@@ -294,7 +295,7 @@ export const financialTransactionsListPaymentItemsTool = defineTool({
   name: 'financial_transactions_list_payment_items',
   category: 'Finance',
   description:
-    'The location’s payment items — what a financial transaction is for (rent, product purchase, team payroll, services rendered, custom items) — each with its income or expense category (prime_cost, commercial, personnel, administrative, taxes_and_fees, miscellaneous, income). The id is the payment_item_id for financial_transactions_create. Filter by direction.',
+    'The location’s payment items — what a financial transaction is for (rent, product purchase, team payroll, services rendered, custom items) — each with its income or expense category (prime_cost, commercial, personnel, operational, taxes_and_fees, other_expenses, revenue). The id is the payment_item_id for financial_transactions_create. Filter by direction.',
   annotations: { title: 'Finance: payment items', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -322,10 +323,10 @@ export const financialTransactionsListPaymentItemsTool = defineTool({
                 'prime_cost',
                 'commercial',
                 'personnel',
-                'administrative',
+                'operational',
                 'taxes_and_fees',
-                'miscellaneous',
-                'income',
+                'other_expenses',
+                'revenue',
                 'unknown',
               ],
             },
@@ -364,7 +365,7 @@ export const financialTransactionsListTool = defineTool({
       .int()
       .positive()
       .optional()
-      .describe('Supplier or partner id (suppliers_list).'),
+      .describe('Supplier or partner id (suppliers_and_partners_list).'),
     page: pageArg,
     page_size: pageSizeArg(100),
   }),

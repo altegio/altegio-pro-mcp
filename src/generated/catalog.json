@@ -30113,7 +30113,7 @@
         "facets": [
           "finance"
         ],
-        "tool_name": "suppliers_list"
+        "tool_name": "suppliers_and_partners_list"
       }
     },
     {
@@ -52544,6 +52544,10 @@
             "authorization_endpoint": {
               "type": "string"
             },
+            "authorization_response_iss_parameter_supported": {
+              "description": "Every authorization response, success or error, carries `iss` equal to `issuer` (RFC 9207). Clients compare it with the recorded `issuer` before redeeming the code.",
+              "type": "boolean"
+            },
             "client_id_metadata_document_supported": {
               "description": "Whether a `client_id` may be an HTTPS URL pointing to a client metadata document (CIMD). Clients that support the URL form only attempt it when this is `true`.",
               "type": "boolean"
@@ -63488,7 +63492,7 @@
       "path": "/oauth/token",
       "displayPath": "/oauth/token",
       "summary": "Issue an access token",
-      "description": "OAuth 2.0 token endpoint (RFC 6749). Supports three grants:\n\n- `authorization_code` — exchange a code obtained from the browser\n  `GET /oauth/authorize` flow (PKCE `code_verifier` required). Returns an access\n  token and a rotating refresh token.\n- `client_credentials` — machine-to-machine token for a marketplace installation.\n  Always requires the explicit `location_id`; the installation is resolved from the\n  authenticated OAuth client plus that Location. No refresh token is returned.\n- `refresh_token` — rotate a refresh token from the Authorization Code flow.\n  The previous refresh token is invalidated; replaying it revokes the token family.\n\nConfidential clients authenticate with HTTP Basic (`client_secret_basic`) or send\n`client_id` and `client_secret` in the form body (`client_secret_post`); public clients\n(PKCE-only) send their `client_id` in the form body. There is **no password grant**.\n\nErrors from this endpoint use the standard OAuth 2.0 error object\n(`{\"error\": \"...\", \"error_description\": \"...\"}`), not `application/problem+json`.",
+      "description": "OAuth 2.0 token endpoint (RFC 6749). Supports three grants:\n\n- `authorization_code` — exchange a code obtained from the browser\n  `GET /oauth/authorize` flow (PKCE `code_verifier` required). Returns an access\n  token and a rotating refresh token.\n- `client_credentials` — machine-to-machine token for a marketplace installation.\n  Always requires the explicit `location_id`; the installation is resolved from the\n  authenticated OAuth client plus that Location. No refresh token is returned.\n- `refresh_token` — rotate a refresh token from the Authorization Code flow.\n  The previous refresh token is invalidated; replaying it revokes the token family.\n  The new access token never exceeds the scopes of the original consent: `scope` may\n  narrow it, unknown codes are ignored, and `invalid_scope` is returned when every known\n  scope in `scope` is outside the consent (the refresh token is not rotated then). The\n  same rule applies to `scope` on the code exchange. A refresh token lives 30 days from\n  its issue, the family 90 days from the code exchange; after that the user approves\n  access again.\n\nConfidential clients authenticate with HTTP Basic (`client_secret_basic`) or send\n`client_id` and `client_secret` in the form body (`client_secret_post`); public clients\n(PKCE-only) send their `client_id` in the form body. There is **no password grant**.\n\nErrors from this endpoint use the standard OAuth 2.0 error object\n(`{\"error\": \"...\", \"error_description\": \"...\"}`), not `application/problem+json`.",
       "tags": [
         "Authorization"
       ],
@@ -63529,6 +63533,7 @@
                   "type": "string"
                 },
                 "redirect_uri": {
+                  "description": "Optional (OAuth 2.1 §10.2): PKCE already binds the code to the client. If sent, it must equal the `redirect_uri` of the authorization request byte for byte.",
                   "type": "string"
                 },
                 "resource": {
@@ -63543,7 +63548,6 @@
               "required": [
                 "grant_type",
                 "code",
-                "redirect_uri",
                 "code_verifier",
                 "client_id"
               ],
@@ -63569,11 +63573,12 @@
                   "type": "string"
                 },
                 "resource": {
-                  "description": "RFC 8707 resource indicator: `https://api.alteg.io/api/v3` or an Altegio MCP address under `https://mcp.alteg.io/pro` (an address ending in `/readonly` caps the scopes at read-only). Compared case-in…",
+                  "description": "RFC 8707 resource indicator: `https://api.alteg.io/api/v3` or an Altegio MCP address under `https://mcp.alteg.io/pro`. Compared case-insensitively on scheme and host and without a trailing slash. Eve…",
                   "format": "uri",
                   "type": "string"
                 },
                 "scope": {
+                  "description": "Optional. Narrows the new access token within the scopes of the original consent. Unknown codes (such as `openid`) are ignored; known scopes outside the consent are dropped, and if none of the known…",
                   "type": "string"
                 }
               },

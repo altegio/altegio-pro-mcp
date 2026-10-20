@@ -262,7 +262,7 @@ function consumableLineFromWire(row: Row, lineId: unknown): ConsumableLine {
   };
 }
 
-function billFromWire(row: Row): BillOfMaterials {
+function bomFromWire(row: Row): BillOfMaterials {
   return {
     id: id(row.id) ?? 0,
     title: text(row.title),
@@ -273,12 +273,12 @@ function billFromWire(row: Row): BillOfMaterials {
 }
 
 function consumablesFromWire(row: Row): AppointmentServiceConsumables {
-  const bill = rows(row.technological_cards)[0];
+  const bom = rows(row.technological_cards)[0];
   return {
     appointment_id: id(row.record_id) ?? 0,
     service_id: id(row.service_id) ?? 0,
-    bill_of_materials: bill
-      ? { id: id(bill.id) ?? 0, title: text(bill.title) }
+    bill_of_materials: bom
+      ? { id: id(bom.id) ?? 0, title: text(bom.title) }
       : null,
     lines: rows(row.consumables).map((line) =>
       consumableLineFromWire(line, line.goods_transaction_id)
@@ -376,7 +376,7 @@ export class InventoryAdapter implements InventoryApi {
       {
         hints: {
           notFound:
-            'Take the document id from inventory_list_operations. Only inventory operation documents are found here: a product sale on a visit bill and the consumables of an appointment are not, and a deleted document is gone.',
+            'Take the document id from inventory_list_operations. Only inventory operation documents are found here: a product sale on a visit and the consumables of an appointment are not, and a deleted document is gone.',
         },
       }
     );
@@ -393,7 +393,7 @@ export class InventoryAdapter implements InventoryApi {
           forbidden:
             'Deleting inventory operations is a separate access right at the location; ask the location owner for it.',
           notFound:
-            'Take the document id from inventory_list_operations; a product sale on a visit bill and the consumables of an appointment cannot be deleted here.',
+            'Take the document id from inventory_list_operations; a product sale on a visit and the consumables of an appointment cannot be deleted here.',
         },
       }
     );
@@ -474,7 +474,7 @@ export class InventoryAdapter implements InventoryApi {
         },
       }
     );
-    return rows(data).map(billFromWire);
+    return rows(data).map(bomFromWire);
   }
 
   async getTeamMemberServiceBillOfMaterials(
@@ -493,7 +493,7 @@ export class InventoryAdapter implements InventoryApi {
       }
     );
     const row = asRow(data);
-    return id(row.id) === null ? null : billFromWire(row);
+    return id(row.id) === null ? null : bomFromWire(row);
   }
 
   async getAppointment(

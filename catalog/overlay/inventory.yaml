@@ -1,5 +1,5 @@
 # Inventory — the operations behind the curated `inventory_*`, `products_search`,
-# `suppliers_list` and `appointments_*_consumables` tools.
+# `suppliers_and_partners_list` and `appointments_*_consumables` tools.
 #
 # Format: catalog/overlay/_schema.yaml. Products are read on V2
 # (src/api/v2/products-adapter.ts; `list_products` and `autocomplete_products`
@@ -72,7 +72,7 @@ operations:
   list_location_suppliers:
     tier: core
     facets: [finance]
-    tool_name: suppliers_list
+    tool_name: suppliers_and_partners_list
 
   # --- Bills of Materials and appointment consumables -------------------------
   get_bill_of_materials_list:

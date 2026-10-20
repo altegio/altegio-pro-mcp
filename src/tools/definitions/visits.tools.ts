@@ -1,11 +1,12 @@
 /**
- * `[Visits]` tool pack — the bill of an appointment's visit, the products sold
- * on it (and taken off again) and the payments recorded against it.
+ * `[Visits]` tool pack — an appointment's visit, the products sold on it (and
+ * taken off again) and the payments recorded on it.
  *
- * A visit's bill lists what the client pays for (service lines from the
- * appointment, product lines sold with it), the payments already recorded, the
- * amount due, and the payment methods that can pay it now. A payment records
- * money received — cash or non-cash into one of the accounts and cash
+ * The visit is what the client pays: its visit items (services from the
+ * appointment, products sold with it), the payments already recorded, the
+ * amount due, and the payment methods that can pay it now. The visit itself is
+ * the billing object; what is printed for it is its printed receipt. A payment
+ * records money received — cash or non-cash into one of the accounts and cash
  * registers, or from a client account, loyalty card, loyalty program, gift
  * card, membership or advance payment hold. An advance payment is a payment
  * recorded before the visit, for part of the amount due.
@@ -52,7 +53,7 @@ export const moneyAmount = (what: string) =>
       `${what} In the location's currency, major units (550.5, not cents).`
     );
 
-const lineSchema = {
+const itemSchema = {
   type: 'object' as const,
   properties: {
     id: { type: 'integer' as const },
@@ -88,7 +89,7 @@ const paymentSchema = {
     id: { type: 'string' as const },
     method: { type: 'string' as const, enum: [...METHODS] },
     amount: { type: 'number' as const },
-    bill_line_id: int,
+    visit_item_id: int,
     account_id: int,
     account_title: str,
     payment_method_name: str,
@@ -127,7 +128,7 @@ const optionSchema = {
   required: ['method', 'applicable', 'partial_allowed'],
 };
 
-const billSchema = {
+const visitSchema = {
   type: 'object' as const,
   properties: {
     location_id: { type: 'integer' as const },
@@ -138,7 +139,7 @@ const billSchema = {
     total_amount: { type: 'number' as const },
     paid_amount: { type: 'number' as const },
     amount_due: { type: 'number' as const },
-    lines: { type: 'array' as const, items: lineSchema },
+    items: { type: 'array' as const, items: itemSchema },
     payments: { type: 'array' as const, items: paymentSchema },
     advance_payment_holds: {
       type: 'array' as const,
@@ -168,7 +169,7 @@ const billSchema = {
     'total_amount',
     'paid_amount',
     'amount_due',
-    'lines',
+    'items',
     'payments',
     'payment_options',
   ],
@@ -178,11 +179,11 @@ export const visitsGetTool = defineTool({
   name: 'visits_get',
   category: 'Visits',
   description:
-    'The bill of an appointment’s visit: service and product lines with amounts, payments recorded, total amount, amount paid and amount due, and the payment methods that can pay it now (accounts and cash registers, client account, loyalty card or program, gift card, membership, advance payment hold) with what each accepts. Read it before visits_add_payment or visits_cancel_payment.',
-  annotations: { title: 'Visits: read the bill', ...READ_ONLY },
+    'The visit an appointment belongs to: its visit items (services and products) with amounts, payments recorded, total amount, amount paid and amount due, and the payment methods that can pay it now (accounts and cash registers, client account, loyalty card or program, gift card, membership, advance payment hold) with what each accepts. Read it before visits_add_payment or visits_cancel_payment.',
+  annotations: { title: 'Visits: read a visit', ...READ_ONLY },
   input: z.object({ location_id: locationId, appointment_id: appointmentId }),
-  outputSchema: billSchema,
-  handler: async ({ input, client }) => finance.getVisitBill(client, input),
+  outputSchema: visitSchema,
+  handler: async ({ input, client }) => finance.getVisit(client, input),
 });
 
 const optionalId = (what: string) =>
@@ -192,7 +193,7 @@ export const visitsAddPaymentTool = defineTool({
   name: 'visits_add_payment',
   category: 'Visits',
   description:
-    'Record a payment or an advance payment on an appointment’s bill: money received into an account or cash register (method account + account_id), or paid from a client account, loyalty card, loyalty program, gift card, membership or advance payment hold — method and its id from payment_options in visits_get. Pass amount_due from visits_get as expected_amount_due; the call is refused if the bill changed. Records money received; charges no card. Asks for confirmation first.',
+    'Record a payment or an advance payment on an appointment’s visit: money received into an account or cash register (method account + account_id), or paid from a client account, loyalty card, loyalty program, gift card, membership or advance payment hold — method and its id from payment_options in visits_get. Pass amount_due from visits_get as expected_amount_due; the call is refused if the visit changed. Records money received; charges no card. Asks for confirmation first.',
   annotations: {
     title: 'Visits: record a payment',
     destructiveHint: false,
@@ -246,11 +247,11 @@ export const visitsAddPaymentTool = defineTool({
     action: 'Record a payment',
     target: (input) =>
       `appointment ${input.appointment_id} at location ${input.location_id}`,
-    resolve: (input, client) => finance.describeBill(client, input),
+    resolve: (input, client) => finance.describeVisit(client, input),
     consequence: (input) =>
       `Records ${finance.paymentSummary(input)} against the visit: the amount due drops by it and the location's finances and reports include it. No card is charged — this records money already received. It can be undone with visits_cancel_payment.`,
   },
-  outputSchema: billSchema,
+  outputSchema: visitSchema,
   handler: async ({ input, client }) => finance.addPayment(client, input),
 });
 
@@ -258,7 +259,7 @@ export const visitsCancelPaymentTool = defineTool({
   name: 'visits_cancel_payment',
   category: 'Visits',
   description:
-    'Cancel one payment recorded on an appointment’s bill, by its payment id from visits_get (t… or l…). The amount becomes due again; a client account or loyalty payment goes back to its balance. This reverses the record in Altegio only — it is not a refund through a card terminal or online acquiring. Asks for confirmation first.',
+    'Cancel one payment recorded on an appointment’s visit, by its payment id from visits_get (t… or l…). The amount becomes due again; a client account or loyalty payment goes back to its balance. This reverses the record in Altegio only — it is not a refund through a card terminal or online acquiring. Asks for confirmation first.',
   annotations: {
     title: 'Visits: cancel a payment',
     destructiveHint: true,
@@ -279,13 +280,13 @@ export const visitsCancelPaymentTool = defineTool({
       `payment ${input.payment_id} on appointment ${input.appointment_id}`,
     resolve: (input, client) => finance.describePayment(client, input),
     consequence:
-      'The payment is removed from the visit’s bill and from the location’s finances, and its amount becomes due again. Money taken by card or online acquiring is not returned to the client by this — refund it in the terminal or acquiring service. A payment applied from an advance payment hold cannot be cancelled.',
+      'The payment is removed from the visit and from the location’s finances, and its amount becomes due again. Money taken by card or online acquiring is not returned to the client by this — refund it in the terminal or acquiring service. A payment applied from an advance payment hold cannot be cancelled.',
   },
-  outputSchema: billSchema,
+  outputSchema: visitSchema,
   handler: async ({ input, client }) => finance.cancelPayment(client, input),
 });
 
-const productLineSchema = {
+const productItemSchema = {
   type: 'object' as const,
   properties: {
     id: { type: 'integer' as const },
@@ -316,7 +317,7 @@ const quantity = z
     }
   );
 
-const billSummarySchema = {
+const visitAmountsSchema = {
   anyOf: [
     {
       type: 'object' as const,
@@ -335,7 +336,7 @@ export const visitsAddProductTool = defineTool({
   name: 'visits_add_product',
   category: 'Visits',
   description:
-    'Sell a product on an appointment’s visit bill, as the appointment window in Altegio does: a product already on the appointment gets its quantity raised, otherwise a line is added at the product’s sale price in its sale unit, sold by the appointment’s team member, with the client’s personal discount, from the inventory Altegio would pick (override with inventory_id, team_member_id, discount_percent). Stock is written off at once; loyalty programs may take more off the line, and the result shows the line and bill as saved. The appointment must be arrived or confirmed — for a waiting one pass mark_arrived: true once the client is there. Pass the quantity of this product already on the bill (visits_get; 0 if none) as expected_current_quantity; the call is refused if it differs. Refused for group event appointments, a printed bill, gift cards and memberships, and a visit whose other appointments sell products. Altegio saves the whole appointment again from a fresh read and the call is refused if it changed meanwhile; a change made in the same instant can still be overwritten. visits_remove_product undoes a sale. Asks for confirmation first.',
+    'Sell a product on an appointment’s visit, as the appointment window in Altegio does: a product already on the appointment gets its quantity raised, otherwise a visit item is added at the product’s sale price in its sale unit, sold by the appointment’s team member, with the client’s personal discount, from the inventory Altegio would pick (override with inventory_id, team_member_id, discount_percent). Stock is written off at once; loyalty programs may take more off the item, and the result shows the item and the visit’s amounts as saved. The appointment must be arrived or confirmed — for a waiting one pass mark_arrived: true once the client is there. Pass the quantity of this product already on the visit (visits_get; 0 if none) as expected_current_quantity; the call is refused if it differs. Refused for group event appointments, a printed receipt, gift cards and memberships, and a visit whose other appointments sell products. Altegio saves the whole appointment again from a fresh read and the call is refused if it changed meanwhile; a change made in the same instant can still be overwritten. visits_remove_product undoes a sale. Asks for confirmation first.',
   annotations: {
     title: 'Visits: sell a product',
     destructiveHint: false,
@@ -357,7 +358,7 @@ export const visitsAddProductTool = defineTool({
       .number()
       .min(0)
       .describe(
-        'Quantity of this product already on the bill, from visits_get (0 if none).'
+        'Quantity of this product already on the visit, from visits_get (0 if none).'
       ),
     inventory_id: optionalId(
       'Inventory to take it from (inventory_list). Default: as Altegio picks.'
@@ -371,7 +372,7 @@ export const visitsAddProductTool = defineTool({
       .max(100)
       .optional()
       .describe(
-        'Line discount in percent. Default: the client’s personal discount.'
+        'Item discount in percent. Default: the client’s personal discount.'
       ),
     marks: z
       .array(z.string().min(1).max(256))
@@ -390,7 +391,7 @@ export const visitsAddProductTool = defineTool({
     target: (input) =>
       `product ${input.product_id} ×${input.quantity} on appointment ${input.appointment_id} at location ${input.location_id}`,
     consequence: (input) =>
-      `Altegio saves the appointment again exactly as it reads now, with the product line added or its quantity raised. The product is written off the inventory at once, and the visit’s amount due grows by the line total after loyalty programs. Integrations receive an appointment update; the client gets no message.${input.mark_arrived ? ' If the appointment is waiting, it is marked arrived.' : ''} Where the client’s personal discount follows what the client spends, a large sale can raise it for good: those levels only rise. visits_remove_product can take the line off again, but does not lower that discount.`,
+      `Altegio saves the appointment again exactly as it reads now, with the product’s visit item added or its quantity raised. The product is written off the inventory at once, and the visit’s amount due grows by the item total after loyalty programs. Integrations receive an appointment update; the client gets no message.${input.mark_arrived ? ' If the appointment is waiting, it is marked arrived.' : ''} Where the client’s personal discount follows what the client spends, a large sale can raise it for good: those levels only rise. visits_remove_product can take the item off again, but does not lower that discount.`,
     detail: (input, client) => visitProducts.describeSale(client, input),
   },
   outputSchema: {
@@ -400,13 +401,13 @@ export const visitsAddProductTool = defineTool({
       appointment_id: { type: 'integer' as const },
       visit_id: int,
       currency: str,
-      added_line: { type: 'boolean' as const },
+      added_item: { type: 'boolean' as const },
       previous_quantity: { type: 'number' as const },
-      line: { anyOf: [productLineSchema, { type: 'null' as const }] },
+      item: { anyOf: [productItemSchema, { type: 'null' as const }] },
       attendance_before: { type: 'string' as const, enum: ATTENDANCE },
       attendance: { type: 'string' as const, enum: ATTENDANCE },
-      bill: billSummarySchema,
-      product_lines: { type: 'array' as const, items: productLineSchema },
+      visit_amounts: visitAmountsSchema,
+      product_items: { type: 'array' as const, items: productItemSchema },
       unexpected_changes: {
         type: 'array' as const,
         items: { type: 'string' as const },
@@ -416,9 +417,9 @@ export const visitsAddProductTool = defineTool({
       'location_id',
       'appointment_id',
       'currency',
-      'line',
-      'bill',
-      'product_lines',
+      'item',
+      'visit_amounts',
+      'product_items',
       'unexpected_changes',
     ],
   },
@@ -429,7 +430,7 @@ export const visitsRemoveProductTool = defineTool({
   name: 'visits_remove_product',
   category: 'Visits',
   description:
-    'Take a product line off an appointment’s visit, or lower its quantity — the undo of visits_add_product. The product returns to the line’s inventory at once and the visit’s amount due falls by the line total after loyalty programs; payments already recorded are not changed. Pass line_id (visits_get or the visits_add_product result) and the line’s current quantity as expected_current_quantity; the call is refused if it differs, so a repeated call cannot take off twice. Omit quantity to take off the whole line. Lines sold in the sale unit only; a line with product marking codes is taken off whole. The appointment must be arrived or confirmed. Refused for group event appointments, a printed receipt, gift cards and memberships, and a visit whose other appointments sell products. Altegio saves the whole appointment again from a fresh read and the call is refused if it changed meanwhile; a change made in the same instant can still be overwritten. Asks for confirmation first.',
+    'Take a product off an appointment’s visit, or lower its quantity — the undo of visits_add_product. The product returns to the item’s inventory at once and the visit’s amount due falls by the item total after loyalty programs; payments already recorded are not changed. Pass visit_item_id (visits_get or the visits_add_product result) and the item’s current quantity as expected_current_quantity; the call is refused if it differs, so a repeated call cannot take off twice. Omit quantity to take off the whole item. Items sold in the sale unit only; an item with product marking codes is taken off whole. The appointment must be arrived or confirmed. Refused for group event appointments, a printed receipt, gift cards and memberships, and a visit whose other appointments sell products. Altegio saves the whole appointment again from a fresh read and the call is refused if it changed meanwhile; a change made in the same instant can still be overwritten. Asks for confirmation first.',
   annotations: {
     title: 'Visits: take a product off',
     destructiveHint: true,
@@ -441,29 +442,29 @@ export const visitsRemoveProductTool = defineTool({
   input: z.object({
     location_id: locationId,
     appointment_id: appointmentId,
-    line_id: z
+    visit_item_id: z
       .number()
       .int()
       .positive()
       .describe(
-        'Product line id, from visits_get or the visits_add_product result.'
+        'The product’s visit item id, from visits_get or the visits_add_product result.'
       ),
     quantity: quantity
       .optional()
       .describe(
-        'How much to take off, in the product’s sale unit. Default: the whole line.'
+        'How much to take off, in the product’s sale unit. Default: the whole item.'
       ),
     expected_current_quantity: z
       .number()
       .positive()
-      .describe('Quantity the line holds now, from visits_get.'),
+      .describe('Quantity the item holds now, from visits_get.'),
   }),
   confirm: {
     action: 'Take a product off a visit',
     target: (input) =>
-      `${input.quantity === undefined ? 'the whole of' : `×${input.quantity} of`} product line ${input.line_id} on appointment ${input.appointment_id} at location ${input.location_id}`,
+      `${input.quantity === undefined ? 'the whole of' : `×${input.quantity} of`} visit item ${input.visit_item_id} on appointment ${input.appointment_id} at location ${input.location_id}`,
     consequence: () =>
-      'Altegio saves the appointment again exactly as it reads now, with the product line taken off or its quantity lowered. The product returns to the inventory at once and the visit’s amount due falls by the line total after loyalty programs; payments already recorded are not changed, so a fully paid visit becomes overpaid. A personal discount the sale raised stays raised. Integrations receive an appointment update; the client gets no message.',
+      'Altegio saves the appointment again exactly as it reads now, with the product’s visit item taken off or its quantity lowered. The product returns to the inventory at once and the visit’s amount due falls by the item total after loyalty programs; payments already recorded are not changed, so a fully paid visit becomes overpaid. A personal discount the sale raised stays raised. Integrations receive an appointment update; the client gets no message.',
     detail: (input, client) => visitProducts.describeRemoval(client, input),
   },
   outputSchema: {
@@ -473,10 +474,10 @@ export const visitsRemoveProductTool = defineTool({
       appointment_id: { type: 'integer' as const },
       visit_id: int,
       currency: str,
-      removed_line: { type: 'boolean' as const },
+      removed_item: { type: 'boolean' as const },
       removed_quantity: { type: 'number' as const },
-      line_before: productLineSchema,
-      line: { anyOf: [productLineSchema, { type: 'null' as const }] },
+      item_before: productItemSchema,
+      item: { anyOf: [productItemSchema, { type: 'null' as const }] },
       stock: {
         type: 'object' as const,
         properties: {
@@ -486,8 +487,8 @@ export const visitsRemoveProductTool = defineTool({
         },
         required: ['inventory_id', 'before', 'after'],
       },
-      bill: billSummarySchema,
-      product_lines: { type: 'array' as const, items: productLineSchema },
+      visit_amounts: visitAmountsSchema,
+      product_items: { type: 'array' as const, items: productItemSchema },
       unexpected_changes: {
         type: 'array' as const,
         items: { type: 'string' as const },
@@ -497,11 +498,11 @@ export const visitsRemoveProductTool = defineTool({
       'location_id',
       'appointment_id',
       'currency',
-      'line_before',
-      'line',
+      'item_before',
+      'item',
       'stock',
-      'bill',
-      'product_lines',
+      'visit_amounts',
+      'product_items',
       'unexpected_changes',
     ],
   },

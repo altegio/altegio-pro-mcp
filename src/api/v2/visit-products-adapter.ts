@@ -224,7 +224,7 @@ interface WireAppointment {
   attendance_status: number;
   clients_count: number;
   activity_id: number;
-  bill_printed: boolean;
+  receipt_printed: boolean;
   resource_instance_ids: number[];
   label_ids: number[];
   comer: WireVisitor | null;
@@ -373,7 +373,7 @@ function appointmentFromWire(
     attendance_status: num(a.attendance_status) ?? num(a.attendance) ?? 0,
     clients_count: num(a.clients_count) ?? 1,
     activity_id: num(a.activity_id) ?? 0,
-    bill_printed: a.is_sale_bill_printed === true,
+    receipt_printed: a.is_sale_bill_printed === true,
     resource_instance_ids: relationshipRefs(record, 'resource_instances')
       .map((ref) => id(ref.id))
       .filter((v): v is number => v !== null),
@@ -513,8 +513,8 @@ function snapshot(
       team_member_id: target.staff_id,
       attendance: ATTENDANCE[target.attendance_status] ?? 'unknown',
       group_event: target.activity_id > 0,
-      bill_printed:
-        target.bill_printed || others.some((other) => other.bill_printed),
+      receipt_printed:
+        target.receipt_printed || others.some((other) => other.receipt_printed),
       start_local: target.date,
       duration_seconds: target.length,
       client_discount_percent: target.client_discount_percent,
@@ -764,7 +764,7 @@ function unexpectedChanges(
   ];
   const untouched = (g: WireGood) => g.id !== savedLineId;
   check(
-    'other product lines (a loyalty program may have re-priced them)',
+    'other product visit items (a loyalty program may have re-priced them)',
     before.goods.filter(untouched).map(goodKey),
     after.goods
       .filter((g) => untouched(g) && before.goods.some((b) => b.id === g.id))
@@ -775,7 +775,7 @@ function unexpectedChanges(
       (g) => g.id !== savedLineId && !before.goods.some((b) => b.id === g.id)
     ).length > 0
   ) {
-    changes.push('extra product lines');
+    changes.push('extra product visit items');
   }
   return changes;
 }
@@ -810,7 +810,7 @@ const KNOWN_REFUSALS: Array<{
   {
     pattern: /\bonly one service\b|possible_one_service/i,
     cause: () =>
-      'Altegio saves a group event appointment only with exactly one service line.',
+      'Altegio saves a group event appointment only with exactly one service.',
   },
   {
     pattern: /related.to.events|service.change.forbidden/i,
@@ -825,7 +825,7 @@ const KNOWN_REFUSALS: Array<{
   {
     pattern: /gift.card|membership/i,
     cause: () =>
-      'Altegio refused a gift card or membership line of the visit: a missing or used number, a missing activation date, or an archived type (the Altegio message quoted at the end says which). Change the line in Altegio.',
+      'Altegio refused a gift card or membership sold on the visit: a missing or used number, a missing activation date, or an archived type (the Altegio message quoted at the end says which). Change it in Altegio.',
   },
   {
     pattern: /receipt has been printed|printed.check/i,
@@ -866,7 +866,7 @@ function saveErrorFor(kind: 'add' | 'reduce', customFieldsRead: boolean) {
   const elsewhere =
     kind === 'add'
       ? 'add the product in Altegio'
-      : 'change the product line in Altegio';
+      : 'make the change in Altegio';
   return (status: number, body: unknown, context: string): AltegioApiError => {
     if (status === 406 && kind === 'add') {
       return new FinanceInputError(
@@ -1068,7 +1068,7 @@ export class VisitProductsV2Adapter implements VisitProductsApi {
     const elsewhere =
       plan.kind === 'add'
         ? 'Add the product in Altegio.'
-        : 'Change the product line in Altegio.';
+        : 'Make the change in Altegio.';
     if (before.sale.version !== plan.expected_version) {
       throw new FinanceInputError(
         `Nothing was changed: appointment ${appointmentId} changed while the ${plan.kind === 'add' ? 'sale' : 'change'} was being prepared (its schedule, services, products or status). Read it again with visits_get and retry.`
@@ -1084,7 +1084,7 @@ export class VisitProductsV2Adapter implements VisitProductsApi {
       !before.target.goods.some((g) => g.id === plan.line_id)
     ) {
       throw new FinanceInputError(
-        `Nothing was changed: product line ${plan.line_id} is no longer on appointment ${appointmentId}.`
+        `Nothing was changed: visit item ${plan.line_id} is no longer on appointment ${appointmentId}.`
       );
     }
 
@@ -1092,7 +1092,7 @@ export class VisitProductsV2Adapter implements VisitProductsApi {
       this.http,
       `/locations/${locationId}/attendance/appointments`,
       {
-        context: `save the product line on appointment ${appointmentId}`,
+        context: `save the product sale on appointment ${appointmentId}`,
         method: 'POST',
         headers: { 'Accept-Language': SAVE_LANGUAGE },
         body: plan.body(before.target),

@@ -256,7 +256,7 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | `inventory_list_bills_of_materials` | `all` | `dflt` | `ro` | `-` | `-` | `pfx` | `-` | `-` | `-` | inventory:read |
 | `inventory_list_operations` | `all` | `dflt` | `ro` | `-` | `-` | `pfx` | `-` | `-` | `-` | inventory:read |
 | `products_search` | `all` | `dflt` | `ro` | `rule` | `-` | `pfx` | `-` | `-` | `-` | inventory:read |
-| `suppliers_list` | `all` | `dflt` | `ro` | `-` | `-` | `rule` | `-` | `-` | `-` | finance:read |
+| `suppliers_and_partners_list` | `all` | `dflt` | `ro` | `-` | `-` | `rule` | `-` | `-` | `-` | finance:read |
 
 ### Location
 
