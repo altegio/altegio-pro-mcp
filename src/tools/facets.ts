@@ -253,8 +253,8 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
    * Partners and sold or used up — the money side of products, next to the
    * product-sales and reorder-risk analytics. The `inventory_` and `products_`
    * packs join by prefix, Suppliers and the appointment consumables by name.
-   * Still partial: payroll payouts (no operation in the catalog) and
-   * fiscalization are not built.
+   * Still partial: fund transfers between accounts and cash registers (no
+   * documented operation) and fiscalization are not built.
    */
   finance: {
     tools: [

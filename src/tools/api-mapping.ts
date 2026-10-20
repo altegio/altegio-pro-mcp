@@ -1237,6 +1237,44 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       pathParams: ['location_id', 'transaction_id'],
     },
   ],
+  // The personnel payment item, the replay check, the payout itself, then the
+  // settlements it changes.
+  payroll_record_payout: [
+    {
+      path: '/references/expenses/{location_id}',
+      method: 'get',
+      operationId: 'list_location_payment_items',
+      pathParams: ['location_id'],
+    },
+    {
+      path: '/transactions/{location_id}',
+      method: 'get',
+      operationId: 'get_transactions',
+      pathParams: ['location_id'],
+      queryParams: ['start_date', 'end_date', 'account_id', 'page', 'count'],
+    },
+    {
+      path: '/finance_transactions/{location_id}',
+      method: 'post',
+      operationId: 'create_financial_transaction',
+      pathParams: ['location_id'],
+      bodyParams: [
+        'expense_id',
+        'account_id',
+        'amount',
+        'date',
+        'comment',
+        'team_member_id',
+      ],
+    },
+    {
+      path: '/locations/{location_id}/salary/calculation/team_members/{team_member_id}',
+      method: 'get',
+      operationId: 'search_team_member_calculation_salary',
+      pathParams: ['location_id', 'team_member_id'],
+      queryParams: ['date_from', 'date_to'],
+    },
+  ],
   payroll_get_calculation: [
     {
       path: '/locations/{location_id}/salary/period/team_members/{team_member_id}',

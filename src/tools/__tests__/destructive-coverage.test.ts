@@ -119,7 +119,7 @@ describe('destructive tools are gated', () => {
   /**
    * Recording money or stock is additive — nothing is overwritten, so
    * `destructiveHint` stays false — but a payment, a client account deposit, a
-   * cash operation, an inventory operation or a product sold on a visit moves
+   * cash operation, a payroll payout, an inventory operation or a product sold on a visit moves
    * money or stock a person has to stand behind, so these ask first too. The list is explicit so the gate
    * does not spread to ordinary creates.
    */
@@ -127,6 +127,7 @@ describe('destructive tools are gated', () => {
     'client_accounts_deposit',
     'financial_transactions_create',
     'inventory_create_operation',
+    'payroll_record_payout',
     'visits_add_payment',
     'visits_add_product',
   ];

@@ -6,6 +6,26 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — `payroll_record_payout`
+
+- **Record a payout to a team member.** A payout is a financial transaction
+  paid from an account or cash register under the location's personnel
+  payment item, naming the team member — what Altegio counts as paid in the
+  settlements with them (`payroll_get_calculation`). Served on `/mcp` (hosted
+  `https://mcp.alteg.io/pro`) and `/mcp/finance`; scope `finance:write`.
+- The personnel payment item is chosen when the location has exactly one;
+  with several, the call asks for `payment_item_id`, and a payment item of
+  another category is refused, since it would not count in settlements.
+- It asks for confirmation first, showing the payment item and the
+  settlements of the payout's month so far, and refuses before asking anyone
+  when no single personnel payment item fits. Like
+  `financial_transactions_create`, it refuses an identical transaction
+  recorded within the last ten minutes. The result shows the settlements after
+  the payout; `financial_transactions_delete` undoes it.
+- Fund transfers between accounts and cash registers are not built: no
+  documented operation records one (a financial transaction names a single
+  account or cash register).
+
 ### Changed — a lighter `tools/list` on every view
 
 `/mcp` goes from 125,389 to 119,604 bytes (−5.8 KB) with the same 95 tools,

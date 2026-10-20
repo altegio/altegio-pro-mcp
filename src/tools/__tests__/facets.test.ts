@@ -59,6 +59,7 @@ const BACK_OFFICE_MONEY_TOOLS = [
   'financial_transactions_list_payment_items',
   'financial_transactions_update',
   'payroll_get_calculation',
+  'payroll_record_payout',
 ];
 
 /** The inventory pack: finance, and the default view. */
