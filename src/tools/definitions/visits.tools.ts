@@ -17,6 +17,7 @@
  * `src/api/v1/finance-adapter.ts` and `src/api/v2/visit-products-adapter.ts`.
  */
 import { z } from 'zod';
+import { decimalsOf, STORED_DECIMALS } from '../../api/money.js';
 import { defineTool } from '../factory.js';
 import * as finance from '../../capabilities/finance/use-cases.js';
 import * as visitProducts from '../../capabilities/finance/visit-products.js';
@@ -40,13 +41,16 @@ const appointmentId = z
   .positive()
   .describe('Appointment id, from appointments_list.');
 
-/** Major units, positive, at most two decimals. */
+/**
+ * Major units, positive, at most the two decimals Altegio stores; the use case
+ * checks the location currency's own exponent (`../../api/money.ts`).
+ */
 export const moneyAmount = (what: string) =>
   z
     .number()
     .positive()
     .max(1_000_000_000)
-    .refine((v) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-6, {
+    .refine((v) => decimalsOf(v) <= STORED_DECIMALS, {
       message: 'Use at most two decimals.',
     })
     .describe(
@@ -248,6 +252,7 @@ export const visitsAddPaymentTool = defineTool({
     target: (input) =>
       `appointment ${input.appointment_id} at location ${input.location_id}`,
     resolve: (input, client) => finance.describeVisit(client, input),
+    detail: (input, client) => finance.checkPaymentMoney(client, input),
     consequence: (input) =>
       `Records ${finance.paymentSummary(input)} against the visit: the amount due drops by it and the location's finances and reports include it. No card is charged — this records money already received. It can be undone with visits_cancel_payment.`,
   },

@@ -49,6 +49,7 @@
  * - V1 has no idempotency header, so the write methods ignore the
  *   `idempotency_key` of their `WriteOptions` (`../write-options.ts`).
  */
+import { majorOf } from '../money.js';
 import {
   httpFromClient,
   queryString,
@@ -414,9 +415,9 @@ export class InventoryAdapter implements InventoryApi {
         good_id: line.product_id,
         amount: line.quantity,
         unit_id: line.unit_id,
-        cost_per_unit: line.unit_price,
+        cost_per_unit: majorOf(line.unit_price),
         discount: line.discount_percent,
-        cost: line.total,
+        cost: majorOf(line.total),
         ...(operation.supplier_id
           ? { supplier_id: operation.supplier_id }
           : {}),

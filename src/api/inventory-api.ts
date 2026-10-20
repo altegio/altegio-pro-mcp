@@ -24,6 +24,7 @@
  * `Idempotency-Key` (see `./write-options.ts`).
  */
 
+import type { Money } from './money.js';
 import type { WriteOptions } from './write-options.js';
 
 /**
@@ -137,9 +138,10 @@ export interface OperationLineWrite {
   quantity: number;
   /** The unit the quantity is counted in: the product's sale or consumable unit. */
   unit_id: number;
-  unit_price: number;
+  unit_price: Money;
   discount_percent: number;
-  total: number;
+  /** quantity × unit_price less the discount. */
+  total: Money;
 }
 
 export interface OperationWrite {

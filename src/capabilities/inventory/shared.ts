@@ -8,6 +8,7 @@
  * (`withUntrustedBlock`). Unit labels ("ml", "pcs") are short and part of a
  * quantity, so they stay in our lines, cleaned and capped (`unitLabel`).
  */
+import { roundMajor } from '../../api/money.js';
 import type { AltegioClient } from '../../providers/altegio-client.js';
 import { InventoryAdapter } from '../../api/v1/inventory-adapter.js';
 import { ProductsAdapter } from '../../api/v2/products-adapter.js';
@@ -58,7 +59,7 @@ export function round2(value: number): number {
 /** `30 CZK`, or `30 (currency not reported)`. */
 export function money(value: number | null, currency: string | null): string {
   if (value === null) return 'not reported';
-  return `${round2(value)} ${currency ?? '(currency not reported)'}`;
+  return `${roundMajor(value)} ${currency ?? '(currency not reported)'}`;
 }
 
 /** A unit label as it may appear inside our own sentence. */
