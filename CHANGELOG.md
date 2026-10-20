@@ -98,12 +98,13 @@ is declared stable.
   or document), `suppliers_list` (Suppliers and Partners, filtered by name)
   and `inventory_list_bills_of_materials` (each service's consumption recipe,
   or the one a team member applies to a service).
-- **`inventory_create_operation`** records a product sale, consumption,
-  product receipt or write-off as one document in one call. Products are
-  named by id or by text that must match exactly one product; units, prices
-  and the inventory default sensibly, and every line total is quantity ×
-  price minus the discount, computed before the confirmation shows it. No
-  payment is recorded; transfers between inventories are not offered.
+- **`inventory_create_operation`** records a product sale, product receipt or
+  write-off as one document in one call. Products are named by id or by text
+  that must match exactly one product; units, prices and the inventory default
+  sensibly, and every line total is quantity × price minus the discount,
+  computed before the confirmation shows it. No payment is recorded.
+  Consumption outside an appointment and transfers between inventories are not
+  offered: the operation endpoint refuses both.
 - **`inventory_delete_document`** deletes an inventory operation document and
   reverses its stock; the confirmation lists what comes back. A payment
   recorded for it stays.
