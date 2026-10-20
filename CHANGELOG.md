@@ -6,6 +6,27 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — `visits_add_product` and `visits_remove_product` lift three refusals
+
+- **Group event places.** A client's place in a group event takes a product
+  sale and its undo. Only that appointment is saved, with its service and seats
+  as they are; the event and its other clients do not change. An event
+  appointment with more than one service line is still refused, since Altegio
+  saves one only with exactly one.
+- **Visits that already hold a gift card or membership.** Those visit items are
+  sent back with their numbers and activation dates, unchanged, instead of
+  refusing the save. Selling a gift card or membership, and taking off the item
+  that issued one, stay refused.
+- **Visits with other appointments.** Altegio saves the product items of the
+  visit's other appointments again from their stored amounts. The save goes
+  ahead when none of them carries a loyalty discount, which that re-save would
+  apply a second time, and refuses only then. The result reports any of their
+  product items that changed.
+- The confirmation says which of these the save involves. Group event places
+  and memberships were checked live on a test location; the other-appointment
+  case and gift cards are covered by unit tests only, since the test location
+  keeps each appointment in a visit of its own.
+
 ### Added — `payroll_record_payout`
 
 - **Record a payout to a team member.** A payout is a financial transaction
@@ -25,6 +46,7 @@ is declared stable.
 - Fund transfers between accounts and cash registers are not built: no
   documented operation records one (a financial transaction names a single
   account or cash register).
+
 
 ### Changed — a lighter `tools/list` on every view
 
@@ -47,6 +69,7 @@ with them. Nothing a tool accepts or refuses changes.
 - `appointments_list_tags`, `appointments_create_tag` and the
   `appointments_update` `color` are shorter; `api_search_operations`
   `include_preview` no longer names a backend version.
+
 
 ### Changed — exact money, checked against the location currency
 

@@ -48,6 +48,12 @@ interface Good {
   op: 'sale' | 'consumable';
   marks: string[];
   membership?: boolean;
+  giftCard?: boolean;
+  /** The issued card's number and a membership's activation date. */
+  number?: string | null;
+  activation?: string | null;
+  /** The issued card does not side-load. */
+  instrumentMissing?: boolean;
 }
 
 interface State {
@@ -66,6 +72,8 @@ interface State {
   /** A read that asks for custom field values is refused (403). */
   customFieldsForbidden?: boolean;
   composite: boolean;
+  /** A second service line on the appointment. */
+  extraService?: boolean;
   clientDiscount: number;
   goods: Good[];
   others: Array<{ id: number; goods: Good[] }>;
@@ -138,9 +146,15 @@ function goodItem(g: Good) {
         })),
       },
       loyalty_abonement: {
-        data: g.membership ? { type: 'loyalty_abonement', id: '9' } : null,
+        data: g.membership
+          ? { type: 'loyalty_abonement', id: `card-${g.id}` }
+          : null,
       },
-      loyalty_certificate: { data: null },
+      loyalty_certificate: {
+        data: g.giftCard
+          ? { type: 'loyalty_certificate', id: `card-${g.id}` }
+          : null,
+      },
     },
   };
 }
@@ -180,7 +194,12 @@ function record(
       attendance_service_items: {
         data:
           id === APPOINTMENT
-            ? [{ type: 'attendance_service_item', id: '898868874' }]
+            ? [
+                { type: 'attendance_service_item', id: '898868874' },
+                ...(s.extraService
+                  ? [{ type: 'attendance_service_item', id: '898868875' }]
+                  : []),
+              ]
             : [],
       },
       attendance_good_items: {
@@ -268,7 +287,41 @@ function attendanceDoc(s: State, withCustomFields = true) {
             },
           ]
         : []),
+      ...(s.extraService
+        ? [
+            {
+              type: 'attendance_service_item',
+              id: '898868875',
+              attributes: {
+                record_id: APPOINTMENT,
+                quantity: 1,
+                manual_cost: 100,
+                cost_per_unit: 100,
+                discount_percent: 0,
+                cost: 100,
+                service_id: 13833135,
+                attendance_service_composite_id: null,
+              },
+              relationships: {
+                assistants: { data: [] },
+                attendance_service_composite: { data: null },
+              },
+            },
+          ]
+        : []),
       ...allGoods.map(goodItem),
+      ...allGoods
+        .filter((g) => (g.membership || g.giftCard) && !g.instrumentMissing)
+        .map((g) => ({
+          type: g.membership ? 'loyalty_abonement' : 'loyalty_certificate',
+          id: `card-${g.id}`,
+          attributes: {
+            number: g.number ?? null,
+            ...(g.membership
+              ? { planned_activation_date: g.activation ?? null }
+              : { balance: 500 }),
+          },
+        })),
       ...allGoods.flatMap((g) =>
         g.marks.map((mark, i) => ({
           type: 'good_mark',
@@ -481,7 +534,12 @@ function fakeClient(
           sent.attendance_good_items as Array<Record<string, unknown>>
         ).map((g) => {
           const manual = g.manual_cost as number;
+          const before = state.goods.find((b) => b.id === g.id);
           return {
+            membership: before?.membership,
+            giftCard: before?.giftCard,
+            number: g.number as string | null,
+            activation: g.planned_activation_date as string | null,
             id: (g.id as number | null) ?? state.nextId++,
             good_id: g.good_id as number,
             quantity: g.quantity as number,
@@ -846,8 +904,12 @@ describe('visits_add_product: refusals before any save', () => {
     expect(saves(calls)).toHaveLength(0);
   };
 
-  it('refuses a group event appointment', () =>
-    refused(freshState({ activity: 10827797 }), {}, /group event/));
+  it('refuses a group event appointment with two service lines', () =>
+    refused(
+      freshState({ activity: 10827797, extraService: true }),
+      {},
+      /group event and holds 2 service lines; Altegio saves a group event appointment only with exactly one/
+    ));
   it('refuses a printed receipt', () =>
     refused(freshState({ printed: true }), {}, /visit has a printed receipt/));
   it('refuses a no-show appointment', () =>
@@ -856,13 +918,19 @@ describe('visits_add_product: refusals before any save', () => {
     refused(freshState(), {}, /sells a membership/, {
       product: productDoc({ loyalty: 'membership' }),
     }));
-  it('refuses an appointment that already sells a membership', () =>
+  it('refuses a membership item whose card does not read back', () =>
     refused(
       freshState({
-        goods: [existingLine({ good_id: OTHER_PRODUCT, membership: true })],
+        goods: [
+          existingLine({
+            good_id: OTHER_PRODUCT,
+            membership: true,
+            instrumentMissing: true,
+          }),
+        ],
       }),
       {},
-      /gift card or membership \(visit item 649590969\)/
+      /a gift card or membership sold on it did not read back with its number/
     ));
   it('refuses a visit whose other appointments sell products', () =>
     refused(
@@ -870,7 +938,7 @@ describe('visits_add_product: refusals before any save', () => {
         others: [{ id: 678202999, goods: [existingLine({ id: 1 })] }],
       }),
       {},
-      /other appointments of the same visit \(678202999\).*twice/
+      /other appointments of the same visit \(678202999\) sell products at a loyalty discount.*twice/
     ));
   it('refuses a visitor whose type does not read back', () =>
     refused(
@@ -1389,8 +1457,12 @@ describe('visits_remove_product: refusals before any save', () => {
   const withLine = (overrides: Partial<State> = {}) =>
     freshState({ goods: [existingLine()], ...overrides });
 
-  it('refuses a group event appointment', () =>
-    refused(withLine({ activity: 10827797 }), {}, /group event/));
+  it('refuses a group event appointment with two service lines', () =>
+    refused(
+      withLine({ activity: 10827797, extraService: true }),
+      {},
+      /group event and holds 2 service lines/
+    ));
   it('refuses a printed receipt', () =>
     refused(withLine({ printed: true }), {}, /visit has a printed receipt/));
   it('refuses a waiting appointment', () =>
@@ -1413,24 +1485,13 @@ describe('visits_remove_product: refusals before any save', () => {
         others: [{ id: 678202999, goods: [existingLine({ id: 1 })] }],
       }),
       {},
-      /other appointments of the same visit \(678202999\).*twice/
+      /other appointments of the same visit \(678202999\) sell products at a loyalty discount.*twice/
     ));
   it('refuses a line that issued a membership', () =>
     refused(
       freshState({ goods: [existingLine({ membership: true })] }),
       {},
       /visit item 649590969 issued a membership/
-    ));
-  it('refuses while another line issued a membership', () =>
-    refused(
-      freshState({
-        goods: [
-          existingLine(),
-          existingLine({ id: 649590970, membership: true }),
-        ],
-      }),
-      {},
-      /also sells a gift card or membership \(visit item 649590970\)/
     ));
   it('refuses a line the appointment does not have', () =>
     refused(
@@ -1701,4 +1762,166 @@ describe('visit product tools: the confirmed call', () => {
       }
     }
   );
+});
+
+describe('visit products: group events, gift cards and memberships, other appointments', () => {
+  it('sells on a group event appointment, saving it as read', async () => {
+    const state = freshState({ activity: 10827797 });
+    const detail = await describeSale(fakeClient(state, []), input());
+    expect(detail).toContain(
+      "Appointment 678202164 is one client's place in a group event: only this appointment is saved, with its service and seats as they are; the event and its other clients do not change."
+    );
+    const result = await addProduct(fakeClient(state, []), input());
+    expect(result.isError).toBeUndefined();
+    const record = (
+      state.saveBody as { records: Array<Record<string, unknown>> }
+    ).records[0]!;
+    expect(record.clients_count).toBe(1);
+    expect(record.attendance_service_items).toHaveLength(1);
+    expect(result.structuredContent).toMatchObject({ unexpected_changes: [] });
+  });
+
+  it('takes a product off a group event appointment', async () => {
+    const state = freshState({ activity: 10827797, goods: [existingLine()] });
+    const result = await removeProduct(fakeClient(state, []), removal());
+    expect(result.isError).toBeUndefined();
+    expect(sentGoods(state)).toEqual([]);
+  });
+
+  it('sells next to a membership and a gift card, sending their numbers back', async () => {
+    const membership = existingLine({
+      id: 649590971,
+      good_id: OTHER_PRODUCT,
+      membership: true,
+      number: 'M-2026-1',
+      activation: '2026-10-20',
+      marks: [],
+    });
+    const giftCard = existingLine({
+      id: 649590972,
+      good_id: OTHER_PRODUCT,
+      giftCard: true,
+      number: 'G-77',
+      marks: [],
+    });
+    const state = freshState({ goods: [membership, giftCard] });
+    const detail = await describeSale(fakeClient(state, []), input());
+    expect(detail).toContain(
+      'Gift card and membership visit items 649590971, 649590972 are sent back with their numbers and activation dates, unchanged.'
+    );
+    // Card numbers are not repeated in the confirmation.
+    expect(detail).not.toContain('M-2026-1');
+    const result = await addProduct(fakeClient(state, []), input());
+    expect(result.isError).toBeUndefined();
+    const sent = sentGoods(state);
+    expect(sent.find((g) => g.id === 649590971)).toMatchObject({
+      number: 'M-2026-1',
+      planned_activation_date: '2026-10-20',
+    });
+    expect(sent.find((g) => g.id === 649590972)).toMatchObject({
+      number: 'G-77',
+      planned_activation_date: null,
+    });
+    expect(sent.find((g) => g.id === null)).toMatchObject({
+      number: null,
+      planned_activation_date: null,
+    });
+    expect(result.structuredContent).toMatchObject({ unexpected_changes: [] });
+  });
+
+  it('takes a product off next to a membership, keeping it', async () => {
+    const membership = existingLine({
+      id: 649590971,
+      good_id: OTHER_PRODUCT,
+      membership: true,
+      number: 'M-2026-1',
+      activation: null,
+      marks: [],
+    });
+    const state = freshState({ goods: [existingLine(), membership] });
+    const result = await removeProduct(fakeClient(state, []), removal());
+    expect(result.isError).toBeUndefined();
+    expect(sentGoods(state)).toEqual([
+      expect.objectContaining({ id: 649590971, number: 'M-2026-1' }),
+    ]);
+  });
+
+  it('names a membership whose number a save changed', async () => {
+    const membership = existingLine({
+      id: 649590971,
+      good_id: OTHER_PRODUCT,
+      membership: true,
+      number: 'M-2026-1',
+      marks: [],
+    });
+    const state = freshState({
+      goods: [membership],
+      afterSave: (s) => {
+        s.goods = s.goods.map((g) =>
+          g.id === 649590971 ? { ...g, number: 'M-OTHER' } : g
+        );
+      },
+    });
+    const result = await addProduct(fakeClient(state, []), input());
+    expect(result.isError).toBe(true);
+    expect(
+      (result.structuredContent as { unexpected_changes: string[] })
+        .unexpected_changes
+    ).toContain(
+      'other product visit items (a loyalty program may have re-priced them)'
+    );
+  });
+
+  describe('a visit whose other appointments sell products', () => {
+    const plain = existingLine({ id: 1, cost: 18.09, marks: [] });
+
+    it('sells when no other item carries a loyalty discount, and says so', async () => {
+      const state = freshState({ others: [{ id: 678202999, goods: [plain] }] });
+      const detail = await describeSale(fakeClient(state, []), input());
+      expect(detail).toContain(
+        'Altegio also saves the product items of appointment 678202999 of the same visit again from their stored amounts; none carries a loyalty discount, so they keep their values.'
+      );
+      const result = await addProduct(fakeClient(state, []), input());
+      expect(result.isError).toBeUndefined();
+      // Only this appointment is sent.
+      expect((state.saveBody as { records: unknown[] }).records).toHaveLength(
+        1
+      );
+    });
+
+    it('names another appointment whose items the save changed', async () => {
+      const state = freshState({
+        others: [{ id: 678202999, goods: [plain] }],
+        afterSave: (s) => {
+          s.others = [
+            { id: 678202999, goods: [{ ...plain, manual_cost: 10.85 }] },
+          ];
+        },
+      });
+      const result = await addProduct(fakeClient(state, []), input());
+      expect(result.isError).toBe(true);
+      expect(
+        (result.structuredContent as { unexpected_changes: string[] })
+          .unexpected_changes
+      ).toContain('product visit items of appointment 678202999 of the visit');
+    });
+
+    it('refuses an item whose amount after loyalty does not read back', () =>
+      expect(
+        addProduct(
+          fakeClient(
+            freshState({
+              others: [
+                {
+                  id: 678202999,
+                  goods: [{ ...plain, cost: null as unknown as number }],
+                },
+              ],
+            }),
+            []
+          ),
+          input()
+        )
+      ).rejects.toThrow(/sell products at a loyalty discount/));
+  });
 });

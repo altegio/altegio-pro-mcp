@@ -33,7 +33,16 @@
  * - A line left out of the echo is soft-deleted and its product returns to the
  *   line's inventory; a lowered line keeps its id and returns the difference.
  * - Product lines of the visit's other appointments are re-sent by the backend
- *   from their post-loyalty totals; the use case refuses such visits.
+ *   from their post-loyalty totals. That keeps a line without a loyalty
+ *   discount as it is and discounts one with a discount twice, so the read
+ *   counts those lines per appointment, the use case refuses when there are
+ *   any, and the read-back names any other appointment whose lines changed.
+ * - A gift card or membership line is echoed with the number and the planned
+ *   activation date its issued card reads back with, which keeps it as it is;
+ *   one whose card does not read back cannot be echoed.
+ * - A group event appointment is checked against its stored event: exactly
+ *   one service line, the same service, the seat limits. The exact echo,
+ *   seats included, passes them.
  * - Custom fields: every save of an appointment that is or becomes arrived is
  *   checked against the custom fields the location requires on arrival, and
  *   only the values in the request count, not the stored ones. So the echo
@@ -69,6 +78,7 @@ import {
 import { upstreamDetail } from '../../tools/tool-result.js';
 import { V1_SERVER_TIMEZONE, wallTime } from '../v1/server-time.js';
 import { asPositiveId, asRecord, asText } from '../v1/wire-values.js';
+import { sameMajor } from '../money.js';
 import type {
   AddProductLineRequest,
   ProductLineSaveResult,
@@ -207,6 +217,12 @@ interface WireGood {
   cost: number | null;
   marks: string[];
   loyalty_kind: 'gift_card' | 'membership' | null;
+  /** The issued gift card's or membership's number, as read. */
+  number: string | null;
+  /** A membership's planned activation date, `YYYY-MM-DD`, as read. */
+  planned_activation_date: string | null;
+  /** A gift card or membership line whose issued instrument read back. */
+  loyalty_readable: boolean;
 }
 
 /** One appointment exactly as read: everything the echo sends back. */
@@ -291,6 +307,12 @@ function goodFromWire(
   const product = relationshipRefs(item, 'good')[0];
   const p = product ? attrs(included.get(product.type, product.id)) : {};
   const issued = (name: string) => relationshipRefs(item, name).length > 0;
+  const instrument = (name: string) => {
+    const ref = relationshipRefs(item, name)[0];
+    return ref ? included.get(ref.type, ref.id) : undefined;
+  };
+  const membership = instrument('loyalty_abonement');
+  const held = membership ?? instrument('loyalty_certificate');
   const loyalty: WireGood['loyalty_kind'] =
     issued('loyalty_abonement') || id(p.loyalty_abonement_type_id) !== null
       ? 'membership'
@@ -315,6 +337,11 @@ function goodFromWire(
       .map((ref) => str(attrs(included.get(ref.type, ref.id)).mark))
       .filter((mark) => mark !== ''),
     loyalty_kind: loyalty,
+    number: held ? str(attrs(held).number) || null : null,
+    planned_activation_date: membership
+      ? str(attrs(membership).planned_activation_date) || null
+      : null,
+    loyalty_readable: loyalty === null || held !== undefined,
   };
 }
 
@@ -409,6 +436,9 @@ function unsupportedReason(w: WireAppointment): string | null {
     (w.comer.id === null || w.comer.title === '' || !visitorType(w.comer.slug))
   ) {
     return 'its visitor (the person, pet or vehicle the appointment is for) did not read back with its type';
+  }
+  if (w.goods.some((g) => !g.loyalty_readable)) {
+    return 'a gift card or membership sold on it did not read back with its number';
   }
   if (w.services.some((s) => s.composite_unresolved)) {
     return 'one of its services is part of a combined service whose id does not read back';
@@ -525,6 +555,9 @@ function snapshot(
       other_appointments: others.map((o) => ({
         appointment_id: o.id,
         product_lines: o.goods.length,
+        loyalty_priced_lines: o.goods.filter(
+          (g) => g.cost === null || !sameMajor(g.cost, g.manual_cost)
+        ).length,
       })),
       unsupported: unsupportedReason(target),
       version: versionOf(target, others),
@@ -542,8 +575,8 @@ function goodToWire(g: WireGood): Record<string, unknown> {
     storage_id: g.storage_id,
     staff_id: g.staff_id,
     operation_unit_type: g.operation_unit_type,
-    number: null,
-    planned_activation_date: null,
+    number: g.number,
+    planned_activation_date: g.planned_activation_date,
     marks: g.marks,
     quantity: g.quantity,
     cost_per_unit: g.cost_per_unit,
@@ -684,6 +717,43 @@ function echoBody(
   };
 }
 
+/** What a product line must keep through a save of the appointment. */
+function goodKey(g: WireGood): unknown[] {
+  return [
+    g.id,
+    g.good_id,
+    g.quantity,
+    g.cost_per_unit,
+    g.manual_cost,
+    g.discount_percent,
+    g.storage_id,
+    g.staff_id,
+    g.number,
+    g.planned_activation_date,
+  ];
+}
+
+/**
+ * The other appointments of the visit whose product lines a save changed:
+ * Altegio re-saves them from their amounts after loyalty, which keeps them
+ * only where no loyalty discount applies.
+ */
+function otherAppointmentChanges(
+  before: WireAppointment[],
+  after: WireAppointment[]
+): string[] {
+  return before
+    .filter((o) => {
+      const now = after.find((a) => a.id === o.id);
+      return (
+        now !== undefined &&
+        JSON.stringify(o.goods.map(goodKey)) !==
+          JSON.stringify(now.goods.map(goodKey))
+      );
+    })
+    .map((o) => `product visit items of appointment ${o.id} of the visit`);
+}
+
 /** What changed besides the product line and the requested status. */
 function unexpectedChanges(
   before: WireAppointment,
@@ -753,16 +823,6 @@ function unexpectedChanges(
   check('assistants', before.assistants, after.assistants);
   // The other product lines must keep their values; loyalty may change only
   // what the client pays (`cost`), which is not compared.
-  const goodKey = (g: WireGood) => [
-    g.id,
-    g.good_id,
-    g.quantity,
-    g.cost_per_unit,
-    g.manual_cost,
-    g.discount_percent,
-    g.storage_id,
-    g.staff_id,
-  ];
   const untouched = (g: WireGood) => g.id !== savedLineId;
   check(
     'other product visit items (a loyalty program may have re-priced them)',
@@ -1131,12 +1191,15 @@ export class VisitProductsV2Adapter implements VisitProductsApi {
       null;
     return {
       appointment: after.sale,
-      unexpected_changes: unexpectedChanges(
-        before.target,
-        after.target,
-        status(before.target),
-        savedLineId
-      ),
+      unexpected_changes: [
+        ...unexpectedChanges(
+          before.target,
+          after.target,
+          status(before.target),
+          savedLineId
+        ),
+        ...otherAppointmentChanges(before.others, after.others),
+      ],
     };
   }
 
@@ -1157,12 +1220,15 @@ export class VisitProductsV2Adapter implements VisitProductsApi {
     );
     return {
       appointment: after.sale,
-      unexpected_changes: unexpectedChanges(
-        before.target,
-        after.target,
-        before.target.attendance_status,
-        request.line_id
-      ),
+      unexpected_changes: [
+        ...unexpectedChanges(
+          before.target,
+          after.target,
+          before.target.attendance_status,
+          request.line_id
+        ),
+        ...otherAppointmentChanges(before.others, after.others),
+      ],
     };
   }
 }
