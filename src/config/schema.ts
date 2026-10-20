@@ -135,11 +135,6 @@ export const EnvSchema = z.object({
     .default(DEFAULT_PUBLIC_BASE_URL)
     .transform((value) => value.replace(/\/+$/, '')),
 
-  // Serve the onboarding walkthrough only on /mcp/onboarding, keeping the
-  // default /mcp view under a host's active-tool cap. Off by default: turning
-  // it on is a visible change for current users of the default endpoint.
-  MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING: BooleanFlagSchema,
-
   // Where the markdown documents served as `altegio://docs/*` resources live.
   // Defaults to the `docs/` folder of the installed package (see
   // src/resources/doc-loader.ts).
@@ -278,8 +273,6 @@ export class ConfigLoader {
         CREDENTIALS_DIR: env.CREDENTIALS_DIR,
         MCP_SERVER_INSTRUCTIONS: env.MCP_SERVER_INSTRUCTIONS,
         MCP_PUBLIC_BASE_URL: env.MCP_PUBLIC_BASE_URL,
-        MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING:
-          env.MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING,
         ALTEGIO_DOCS_DIR: env.ALTEGIO_DOCS_DIR,
         REQUIRE_DELEGATED_IDENTITY: env.REQUIRE_DELEGATED_IDENTITY,
         ALTEGIO_EXPOSE_PASSWORD_LOGIN: env.ALTEGIO_EXPOSE_PASSWORD_LOGIN,

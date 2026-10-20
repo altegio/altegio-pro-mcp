@@ -12,6 +12,8 @@
 import {
   ALL_TOOLS_FACET,
   DEFAULT_FACET,
+  DEFAULT_FACET_DEMOTED_GROUPS,
+  demotedGroupOf,
   type FacetIndexOptions,
   type FacetKey,
 } from './facets.js';
@@ -68,7 +70,7 @@ const REASON_CODES: Readonly<Record<SurfaceReason, string>> = {
   'password-login-not-exposed': '-pwd',
   'default-view-excluded-tool': '-name',
   'default-view-excluded-prefix': '-pack',
-  'onboarding-excluded-from-default': '-onb',
+  'default-view-demoted': '-low',
   'not-in-facet-rule': '-',
   'not-read-only': '-write',
   'disabled-everywhere': '-off',
@@ -132,9 +134,9 @@ const REASON_LEGEND: readonly (readonly [SurfaceReason, string, string])[] = [
     '`DEFAULT_FACET_EXCLUDED_PREFIXES`',
   ],
   [
-    'onboarding-excluded-from-default',
-    'the onboarding config switch is on',
-    '`MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING`',
+    'default-view-demoted',
+    'a low-use group served on its facet only',
+    '`DEFAULT_FACET_DEMOTED_GROUPS`',
   ],
   [
     'not-in-facet-rule',
@@ -382,6 +384,31 @@ export function renderSurfaceDoc(
   out.push('`readonly` is not a seventh facet (ADR-001 D3 addendum).');
   out.push('');
 
+  // ---- demoted groups ----------------------------------------------------
+  out.push('## Demoted from `/mcp`');
+  out.push('');
+  out.push(
+    'Low-use groups served on their facet only (`-low` in the `/mcp` column).'
+  );
+  out.push(
+    'The default view’s `initialize` instructions name each group and its address.'
+  );
+  out.push('');
+  out.push(
+    table(
+      ['Group', 'Served on', 'Tools'],
+      DEFAULT_FACET_DEMOTED_GROUPS.map((group) => [
+        group.summary,
+        viewAddress(group.facet),
+        entries
+          .filter((entry) => demotedGroupOf(entry.name) === group)
+          .map((entry) => `\`${entry.name}\``)
+          .join(', '),
+      ])
+    )
+  );
+  out.push('');
+
   // ---- legend ------------------------------------------------------------
   out.push('## Legend');
   out.push('');
@@ -473,19 +500,15 @@ export function renderSurfaceDoc(
   out.push('## Deployment switches');
   out.push('');
   out.push(
-    'The table above describes the default configuration: password login off,'
+    'The table above describes the default configuration, password login off.'
   );
-  out.push('onboarding on `/mcp`. Two environment switches change it.');
+  out.push('One environment switch changes it.');
   out.push('');
   out.push(
     '`ALTEGIO_EXPOSE_PASSWORD_LOGIN=true` (the closed staff deployment):'
   );
   out.push('');
   out.push(...switchDelta(entries, { exposePasswordLogin: true }));
-  out.push('');
-  out.push('`MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING=true`:');
-  out.push('');
-  out.push(...switchDelta(entries, { excludeOnboardingFromDefault: true }));
   out.push('');
 
   return `${out.join('\n')}\n`;

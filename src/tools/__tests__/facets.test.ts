@@ -2,12 +2,16 @@ import { describe, it, expect } from '@jest/globals';
 import {
   ALL_TOOLS_FACET,
   buildFacetIndex,
+  decideView,
   DEFAULT_FACET,
+  DEFAULT_FACET_DEMOTED_GROUPS,
   DEFAULT_FACET_EXCLUDED_PREFIXES,
   DEFAULT_FACET_EXCLUDED_TOOLS,
   DEFAULT_FACET_EXTRA_TOOLS,
   FACET_BASE_TOOLS,
   FACET_NAMES,
+  demotedGroupsInstruction,
+  demotedGroupOf,
   facetToolsFromSpecs,
   isFacetName,
   PASSWORD_LOGIN_TOOLS,
@@ -55,6 +59,7 @@ const BACK_OFFICE_MONEY_TOOLS = [
   'financial_transactions_list_payment_items',
   'financial_transactions_update',
   'payroll_get_calculation',
+  'payroll_record_payout',
 ];
 
 /** The inventory pack: finance, and the default view. */
@@ -107,6 +112,8 @@ describe('tools/list ordering', () => {
 describe('static views', () => {
   const names = allNames();
   const tools = allTools();
+  const toolOf = (name: string): FacetTool =>
+    tools.find((tool) => tool.name === name)!;
 
   it('recognizes only the published facet names', () => {
     for (const facet of FACET_NAMES) {
@@ -123,6 +130,7 @@ describe('static views', () => {
       (name) =>
         !PASSWORD_LOGIN_TOOLS.includes(name) &&
         !DEFAULT_FACET_EXCLUDED_TOOLS.includes(name) &&
+        !demotedGroupOf(name) &&
         (!DEFAULT_FACET_EXCLUDED_PREFIXES.some((prefix) =>
           name.startsWith(prefix)
         ) ||
@@ -331,11 +339,7 @@ describe('static views', () => {
     });
 
     it('stays excluded whatever the other switches say', () => {
-      for (const options of [
-        {},
-        { exposePasswordLogin: true },
-        { excludeOnboardingFromDefault: true },
-      ]) {
+      for (const options of [{}, { exposePasswordLogin: true }]) {
         const index = buildFacetIndex(tools, options);
         for (const name of DEFAULT_FACET_EXCLUDED_TOOLS) {
           expect(index.includes(DEFAULT_FACET, name)).toBe(false);
@@ -346,11 +350,7 @@ describe('static views', () => {
 
   describe('determinism (ADR-001 D7)', () => {
     it('gives the same list for the same inputs, every build', () => {
-      for (const options of [
-        {},
-        { exposePasswordLogin: true },
-        { excludeOnboardingFromDefault: true },
-      ]) {
+      for (const options of [{}, { exposePasswordLogin: true }]) {
         const first = buildFacetIndex(tools, options);
         const second = buildFacetIndex(tools, options);
         for (const key of first.keys) {
@@ -360,21 +360,50 @@ describe('static views', () => {
     });
   });
 
-  describe('the onboarding config switch', () => {
-    it('removes the wizard from the default view only when on', () => {
-      const off = buildFacetIndex(tools);
-      const on = buildFacetIndex(tools, {
-        excludeOnboardingFromDefault: true,
-      });
+  describe('the groups demoted from the default view', () => {
+    const index = buildFacetIndex(tools);
+    const demoted = names.filter((name) => demotedGroupOf(name));
 
-      expect(
-        off.members(DEFAULT_FACET).filter((n) => n.startsWith('onboarding_'))
-      ).toHaveLength(12);
-      expect(
-        on.members(DEFAULT_FACET).filter((n) => n.startsWith('onboarding_'))
-      ).toHaveLength(0);
-      // The dedicated facet is unaffected.
-      expect(on.members('onboarding')).toEqual(off.members('onboarding'));
+    it('takes 26 tools off /mcp', () => {
+      expect(demoted).toHaveLength(26);
+      for (const name of demoted) {
+        expect(index.includes(DEFAULT_FACET, name)).toBe(false);
+        expect(decideView(DEFAULT_FACET, toolOf(name)).reason).toBe(
+          'default-view-demoted'
+        );
+      }
+    });
+
+    it('keeps every group whole on the facet it names, and on stdio', () => {
+      for (const name of demoted) {
+        const group = demotedGroupOf(name)!;
+        expect(index.includes(group.facet, name)).toBe(true);
+        expect(index.includes(ALL_TOOLS_FACET, name)).toBe(true);
+      }
+    });
+
+    it('names only tools that exist, so a rename cannot demote nothing', () => {
+      for (const group of DEFAULT_FACET_DEMOTED_GROUPS) {
+        for (const name of group.tools) expect(names).toContain(name);
+        for (const prefix of group.prefixes) {
+          expect(names.some((name) => name.startsWith(prefix))).toBe(true);
+        }
+      }
+    });
+
+    it('leaves the read-only view alone', () => {
+      for (const name of demoted.filter((n) => toolOf(n).readOnly)) {
+        expect(index.includes(READONLY_VIEW, name)).toBe(true);
+      }
+    });
+
+    it('names each group and its address in one instruction sentence', () => {
+      const sentence = demotedGroupsInstruction();
+      for (const group of DEFAULT_FACET_DEMOTED_GROUPS) {
+        expect(sentence).toContain(group.summary);
+        expect(sentence).toContain(`(/${group.facet})`);
+      }
+      expect(sentence).not.toContain('/mcp');
     });
   });
 
@@ -408,7 +437,8 @@ describe('static views', () => {
           analyticsCount +
           DEFAULT_FACET_EXTRA_TOOLS.length -
           PASSWORD_LOGIN_TOOLS.length -
-          DEFAULT_FACET_EXCLUDED_TOOLS.length
+          DEFAULT_FACET_EXCLUDED_TOOLS.length -
+          names.filter((name) => demotedGroupOf(name)).length
       );
       for (const name of BACK_OFFICE_MONEY_TOOLS) {
         expect(index.includes(DEFAULT_FACET, name)).toBe(true);
@@ -609,10 +639,7 @@ describe('the read-only view', () => {
   });
 
   it('is unaffected by the switches that shape the default view', () => {
-    for (const options of [
-      { exposePasswordLogin: true },
-      { excludeOnboardingFromDefault: true },
-    ]) {
+    for (const options of [{ exposePasswordLogin: true }]) {
       expect(buildFacetIndex(tools, options).members(READONLY_VIEW)).toEqual(
         members
       );

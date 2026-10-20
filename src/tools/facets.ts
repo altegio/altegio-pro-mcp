@@ -253,8 +253,8 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
    * Partners and sold or used up — the money side of products, next to the
    * product-sales and reorder-risk analytics. The `inventory_` and `products_`
    * packs join by prefix, Suppliers and the appointment consumables by name.
-   * Still partial: payroll payouts (no operation in the catalog) and
-   * fiscalization are not built.
+   * Still partial: fund transfers between accounts and cash registers (no
+   * documented operation) and fiscalization are not built.
    */
   finance: {
     tools: [
@@ -313,7 +313,8 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
  * `/mcp`: owners are the default view's first audience (ADR-001 D2), and
  * withholding the expense and payroll tools while serving payments and stock
  * writes left an owner no way to record an expense from the default address.
- * What `/mcp` may cost is a byte budget (`./listing-budget.ts`), not a list.
+ * What `/mcp` may cost is a byte budget (`./listing-budget.ts`), not a list;
+ * single low-use groups leave it through `DEFAULT_FACET_DEMOTED_GROUPS`.
  */
 export const DEFAULT_FACET_EXCLUDED_PREFIXES: readonly string[] = [
   'analytics_',
@@ -346,17 +347,110 @@ export const DEFAULT_FACET_EXTRA_TOOLS: readonly string[] = [
   'analytics_get_overview',
 ];
 
-/** Prefix removed from the default view by the onboarding config switch. */
-const ONBOARDING_PREFIX = 'onboarding_';
+/**
+ * A low-use group served only on its facet, not on `/mcp`.
+ *
+ * Unlike `DEFAULT_FACET_EXCLUDED_TOOLS` this is about the default view's byte
+ * budget, not about a right: the read-only view and every facet are
+ * unaffected.
+ */
+export interface DemotedGroup {
+  /** What the group does, as the default view's instructions name it. */
+  readonly summary: string;
+  /** The facet that keeps serving the whole group. */
+  readonly facet: FacetName;
+  /** Tools named one by one. */
+  readonly tools: readonly string[];
+  /** Tool-name prefixes; one entry demotes a whole pack. */
+  readonly prefixes: readonly string[];
+}
+
+/**
+ * Groups demoted from `/mcp` to their facet by measured use. On 2026-10-20
+ * these 26 tools carried 442 of about 164,600 calls to the hosted default
+ * view over 22 days (0.27 %) and 23 KB of its listing. A call to one on `/mcp`
+ * is refused with the address that serves it, and the default view's
+ * `initialize` instructions name each group and its facet
+ * (`demotedGroupsInstruction`), so a model can still tell the user where to
+ * find it. Promote a group back by removing it here, as a reviewed change to
+ * the listing budget.
+ */
+export const DEFAULT_FACET_DEMOTED_GROUPS: readonly DemotedGroup[] = [
+  {
+    summary: 'the first-time setup wizard',
+    facet: 'onboarding',
+    tools: [],
+    prefixes: ['onboarding_'],
+  },
+  {
+    summary: 'event duplication patterns',
+    facet: 'ops',
+    tools: [
+      'events_list_duplication_strategies',
+      'events_create_duplication_strategy',
+      'events_update_duplication_strategy',
+      'events_delete_duplication_strategy',
+    ],
+    prefixes: [],
+  },
+  {
+    summary: 'client files',
+    facet: 'ops',
+    tools: ['clients_list_files', 'clients_upload_file'],
+    prefixes: [],
+  },
+  {
+    summary: 'membership freeze, balance and validity changes',
+    facet: 'marketing',
+    tools: [
+      'memberships_freeze',
+      'memberships_unfreeze',
+      'memberships_set_balance',
+      'memberships_set_validity',
+    ],
+    prefixes: [],
+  },
+  {
+    summary: 'archiving or deleting a membership type',
+    facet: 'marketing',
+    tools: ['memberships_archive_type', 'memberships_delete_type'],
+    prefixes: [],
+  },
+  {
+    summary: 'creating or deleting a booking form',
+    facet: 'catalog',
+    tools: ['booking_forms_create', 'booking_forms_delete'],
+    prefixes: [],
+  },
+];
+
+/** The demoted group a tool belongs to, if any. */
+export function demotedGroupOf(name: string): DemotedGroup | undefined {
+  return DEFAULT_FACET_DEMOTED_GROUPS.find(
+    (group) => group.tools.includes(name) || matchesPrefix(name, group.prefixes)
+  );
+}
+
+/**
+ * One sentence for the default view's `initialize` instructions: each demoted
+ * group and the address that serves it, relative to the server's own address
+ * like the rest of the instructions.
+ */
+export function demotedGroupsInstruction(): string {
+  const byFacet = new Map<FacetName, string[]>();
+  for (const group of DEFAULT_FACET_DEMOTED_GROUPS) {
+    byFacet.set(group.facet, [
+      ...(byFacet.get(group.facet) ?? []),
+      group.summary,
+    ]);
+  }
+  const parts = [...byFacet].map(
+    ([facet, summaries]) => `${summaries.join(', ')} (/${facet})`
+  );
+  return `Served only on a narrower address, not here: ${parts.join('; ')}.`;
+}
 
 export interface FacetIndexOptions {
-  /**
-   * Drop the onboarding walkthrough from `/mcp`, leaving it on
-   * `/mcp/onboarding`. Off by default: turning it on is a visible change for
-   * current users of the default endpoint.
-   */
-  readonly excludeOnboardingFromDefault?: boolean;
-
   /**
    * Admit `PASSWORD_LOGIN_TOOLS` to the default view and to every named facet.
    * Off by default, which is the safe posture for a public HTTP endpoint. The
@@ -413,8 +507,8 @@ export type ViewWithholdReason =
   | 'default-view-excluded-tool'
   /** Matched by `DEFAULT_FACET_EXCLUDED_PREFIXES` and not re-admitted. */
   | 'default-view-excluded-prefix'
-  /** The `excludeOnboardingFromDefault` config switch is on. */
-  | 'onboarding-excluded-from-default'
+  /** In `DEFAULT_FACET_DEMOTED_GROUPS`: low use, served on its facet only. */
+  | 'default-view-demoted'
   /** This facet's rule names neither the tool nor a prefix matching it. */
   | 'not-in-facet-rule'
   /** Not annotated `readOnlyHint: true`, so `/mcp/readonly` will not serve it. */
@@ -493,12 +587,7 @@ export function decideView(
     if (matchesPrefix(name, DEFAULT_FACET_EXCLUDED_PREFIXES)) {
       return withhold('default-view-excluded-prefix');
     }
-    if (
-      options.excludeOnboardingFromDefault &&
-      name.startsWith(ONBOARDING_PREFIX)
-    ) {
-      return withhold('onboarding-excluded-from-default');
-    }
+    if (demotedGroupOf(name)) return withhold('default-view-demoted');
     return admit('default-view-not-excluded');
   }
 

@@ -31,6 +31,7 @@
  * - Deleting a type is a soft delete: it leaves the list, but the read by id
  *   still answers with it.
  */
+import { majorOf } from '../money.js';
 import { httpFromClient, type AltegioHttp } from '../altegio-http.js';
 import type { AltegioClient } from '../../providers/altegio-client.js';
 import {
@@ -336,7 +337,7 @@ export function toWireFields(
     ...passthrough,
     chain_id: chainId,
     title: fields.title,
-    cost: fields.price,
+    cost: majorOf(fields.price),
     location_ids: fields.location_ids,
     ...wireDuration(fields.validity, 'period', 'period_unit_id'),
     expiration_type_id: ACTIVATION_TO_WIRE[fields.activation],
@@ -362,7 +363,7 @@ export function toWireFields(
     balance_edit_type_id: BALANCE_EDIT_TO_WIRE[fields.balance_edit],
     is_online_sale_enabled: fields.online_sale_enabled,
     online_sale_title: fields.online_sale_title,
-    online_sale_price: fields.online_sale_price,
+    online_sale_price: majorOf(fields.online_sale_price),
     online_sale_description: fields.online_sale_description,
     category_id: fields.type_category_id,
   };

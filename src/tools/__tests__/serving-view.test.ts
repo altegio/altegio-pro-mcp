@@ -53,7 +53,7 @@ describe('serving view', () => {
     ).toEqual(spec);
   });
 
-  it('lists no output schema, no default hints and no top-level additionalProperties', () => {
+  it('lists no output schema, no default hints and no additionalProperties', () => {
     const spec = {
       name: 'x_list',
       description: 'Lists x.',
@@ -76,9 +76,60 @@ describe('serving view', () => {
     expect(listed.annotations).toEqual({ title: 'X', readOnlyHint: true });
     expect(listed.inputSchema).toEqual({
       type: 'object',
-      properties: { nested: { type: 'object', additionalProperties: false } },
+      properties: { nested: { type: 'object' } },
     });
     expect(spec.outputSchema).toEqual({ type: 'object' });
+    // The definition itself is untouched.
+    expect(spec.inputSchema.properties.nested).toEqual({
+      type: 'object',
+      additionalProperties: false,
+    });
+  });
+
+  it('drops minimum 1 from integer ids and pages only, at any depth', () => {
+    const int1 = { type: 'integer', minimum: 1 };
+    const spec = {
+      name: 'x_list',
+      description: 'Lists x.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          location_id: int1,
+          page: int1,
+          page_size: { ...int1, maximum: 100 },
+          tag_ids: { type: 'array', items: int1 },
+          seats: int1,
+          amount: { type: 'number', minimum: 1 },
+          lines: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: { id: int1, quantity: int1 },
+            },
+          },
+          client_id: { anyOf: [int1, { type: 'null' }] },
+        },
+      },
+    };
+    expect(listedOnView(spec, viewServing(), ['x_list']).inputSchema).toEqual({
+      type: 'object',
+      properties: {
+        location_id: { type: 'integer' },
+        page: { type: 'integer' },
+        page_size: { type: 'integer', maximum: 100 },
+        tag_ids: { type: 'array', items: { type: 'integer' } },
+        seats: int1,
+        amount: { type: 'number', minimum: 1 },
+        lines: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: { id: { type: 'integer' }, quantity: int1 },
+          },
+        },
+        client_id: { anyOf: [{ type: 'integer' }, { type: 'null' }] },
+      },
+    });
   });
 
   it('appends where each withheld tool is served, grouped by address', () => {

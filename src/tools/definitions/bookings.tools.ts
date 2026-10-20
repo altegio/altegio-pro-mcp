@@ -35,9 +35,7 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD');
 const appointmentStatusArg = z
   .enum(['waiting', 'confirmed', 'arrived', 'no_show'])
   .optional()
-  .describe(
-    'Visit status to record: waiting (default for a new appointment), confirmed, arrived or no_show.'
-  );
+  .describe('Visit status; a new appointment is waiting by default.');
 
 /**
  * When the appointment starts. V1 sends both `datetime` (ISO 8601 with the
@@ -381,19 +379,14 @@ export const createAppointmentTool = defineTool({
   input: z.object({
     location_id: z.number().int().positive().describe('Location ID'),
     team_member_id: z.number().int().positive().describe('Team member ID'),
-    services: z
-      .array(serviceItemSchema)
-      .min(1)
-      .describe('Array of service objects'),
+    services: z.array(serviceItemSchema).min(1),
     datetime: z
       .string()
       .describe('Appointment datetime (ISO format: YYYY-MM-DDTHH:MM:SS)'),
     session_length: z
       .number()
       .positive()
-      .describe(
-        'Session length in seconds (REQUIRED by the API for a standard appointment; a missing value is rejected with HTTP 422)'
-      ),
+      .describe('Session length in seconds.'),
     client: z
       .object({
         name: z.string().min(1).describe('Client name'),
@@ -542,9 +535,7 @@ export const updateAppointmentTool = defineTool({
     color: appointmentColorArg
       .nullable()
       .optional()
-      .describe(
-        'Color of the appointment in the digital schedule, from the palette listed for appointments_create; null removes it.'
-      ),
+      .describe('From the appointments_create palette; null removes it.'),
   }),
   outputSchema: bookingEntityOutput,
   handler: async ({ input, client }) => {
@@ -676,7 +667,7 @@ export const listAppointmentTagsTool = defineTool({
   name: 'appointments_list_tags',
   category: 'Appointments',
   description:
-    'List the appointment tags of a location — the colored marks the team puts on appointments in the digital schedule (for example "new client" or "VIP") — with their ids and colors. Pass query to find tags whose title contains it. Use the ids as tag_ids in appointments_create and appointments_update; create a missing tag with appointments_create_tag. Paged: 25 per page by default; follow pagination.next_page until it is null.',
+    'Appointment tags of a location — colored marks on appointments in the digital schedule ("new client", "VIP") — with ids and colors; query matches the title. Use the ids as tag_ids in appointments_create and appointments_update; create a missing tag with appointments_create_tag. Paged: follow pagination.next_page.',
   annotations: {
     title: 'Appointments: list tags',
     readOnlyHint: true,
@@ -730,7 +721,7 @@ export const createAppointmentTagTool = defineTool({
   name: 'appointments_create_tag',
   category: 'Appointments',
   description:
-    'Create an appointment tag in a location: a title and a color the digital schedule shows on every appointment that carries it. Titles are not unique, so check appointments_list_tags with query first and reuse an existing tag. Put the tag on appointments with tag_ids in appointments_create or appointments_update.',
+    'Create an appointment tag: a title and a color shown on every appointment that carries it. Titles are not unique: check appointments_list_tags with query first and reuse a match. Put it on appointments with tag_ids in appointments_create or appointments_update.',
   annotations: {
     title: 'Appointments: create a tag',
     destructiveHint: false,

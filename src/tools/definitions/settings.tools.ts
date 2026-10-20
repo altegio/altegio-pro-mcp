@@ -219,7 +219,7 @@ export const getBookingFormsTool = defineTool({
   name: 'booking_forms_list',
   category: 'Settings',
   description:
-    'Get the list of online booking (appointment) forms/widgets for a location.',
+    'Get the list of online booking (appointment) forms/widgets for a location. Create or delete one with booking_forms_create / booking_forms_delete.',
   annotations: {
     title: 'Get Booking Forms',
     readOnlyHint: true,

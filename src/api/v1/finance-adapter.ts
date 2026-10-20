@@ -25,6 +25,8 @@
  *   location's; see `./server-time.ts`.
  * - The payroll period read answers 416 when no payroll scheme applies to the
  *   team member; that is reported as "no calculation", not as a failure.
+ * - V1 reads and writes money as decimal major units; a write's `Money` is sent
+ *   as `majorOf(money)`, and visit totals are summed in minor units.
  * - V1 has no idempotency header, so the write methods ignore the
  *   `idempotency_key` of their `WriteOptions` (`../write-options.ts`).
  */
@@ -34,6 +36,7 @@ import {
   type AltegioHttp,
 } from '../altegio-http.js';
 import type { AltegioClient } from '../../providers/altegio-client.js';
+import { majorOf, roundMajor, sumMajor } from '../money.js';
 import {
   FinanceInputError,
   FinanceNotFoundError,
@@ -117,11 +120,6 @@ function flag(value: unknown): boolean | null {
   if (typeof value === 'boolean') return value;
   const n = num(value);
   return n === null ? null : n !== 0;
-}
-
-/** Round a sum of money to cents, so float noise never reaches the model. */
-export function roundMoney(value: number): number {
-  return Math.round(value * 100) / 100;
 }
 
 async function safeJson(response: Response): Promise<unknown> {
@@ -307,12 +305,8 @@ export function visitFromWire(
     ...rows(state.loyalty_transactions).map(loyaltyPaymentFromWire),
   ];
   const options = rows(sale.payment_methods).map(optionFromWire);
-  const total = roundMoney(
-    items.reduce((sum, item) => sum + (item.amount ?? 0), 0)
-  );
-  const paid = roundMoney(
-    payments.reduce((sum, payment) => sum + payment.amount, 0)
-  );
+  const total = sumMajor(items.map((item) => item.amount ?? 0));
+  const paid = sumMajor(payments.map((payment) => payment.amount));
   // The account methods carry the backend's own amount due; without any,
   // fall back to the difference.
   const accountDue = options
@@ -320,8 +314,8 @@ export function visitFromWire(
     .map((o) => o.applicable_amount ?? 0);
   const due =
     accountDue.length > 0
-      ? roundMoney(Math.max(...accountDue))
-      : roundMoney(Math.max(0, total - paid));
+      ? roundMajor(Math.max(...accountDue))
+      : Math.max(0, sumMajor([total, -paid]));
   return {
     ...context,
     items,
@@ -341,14 +335,14 @@ export function paymentBody(payment: PaymentRequest): Row {
       return {
         payment: {
           method: { slug: 'account', account_id: payment.account_id },
-          amount: payment.amount,
+          amount: majorOf(payment.amount),
         },
       };
     case 'client_account':
       return {
         payment: {
           method: { slug: 'deposit', deposit_id: payment.client_account_id },
-          amount: payment.amount,
+          amount: majorOf(payment.amount),
         },
       };
     case 'loyalty_card':
@@ -358,7 +352,7 @@ export function paymentBody(payment: PaymentRequest): Row {
             slug: 'loyalty_card',
             loyalty_card_id: payment.loyalty_card_id,
           },
-          amount: payment.amount,
+          amount: majorOf(payment.amount),
         },
       };
     case 'loyalty_program':
@@ -378,7 +372,7 @@ export function paymentBody(payment: PaymentRequest): Row {
             slug: 'loyalty_certificate',
             loyalty_certificate_id: payment.gift_card_id,
           },
-          amount: payment.amount,
+          amount: majorOf(payment.amount),
           ...(payment.number ? { number: payment.number } : {}),
         },
       };
@@ -399,7 +393,7 @@ export function paymentBody(payment: PaymentRequest): Row {
             slug: 'prepay_hold',
             hold_id: payment.advance_payment_hold_id,
           },
-          amount: payment.amount,
+          amount: majorOf(payment.amount),
         },
       };
   }
@@ -496,7 +490,7 @@ function transactionBody(
   return {
     expense_id: fields.payment_item_id,
     account_id: fields.account_id,
-    amount: fields.amount,
+    amount: majorOf(fields.amount),
     date,
     comment: fields.comment,
     client_id: fields.client_id ?? 0,
@@ -787,7 +781,7 @@ export class FinanceAdapter implements FinanceApi {
         body: {
           client_id: request.client_id,
           deposit_id: request.client_account_id,
-          amount: request.amount,
+          amount: majorOf(request.amount),
           account_id: request.account_id,
           ...(request.team_member_id !== undefined
             ? { team_member_id: request.team_member_id }
@@ -807,7 +801,7 @@ export class FinanceAdapter implements FinanceApi {
     const money = rows(body.payment_transactions)[0];
     return {
       client_account_id: request.client_account_id,
-      amount: num(movement?.amount) ?? request.amount,
+      amount: num(movement?.amount) ?? majorOf(request.amount),
       balance_after: num(movement?.balance_after),
       reserved_balance_after: num(movement?.reserved_balance_after),
       financial_transaction_id: money ? id(money.id) : null,

@@ -24,7 +24,19 @@
  * idempotency key (`../../api/write-options.ts`).
  */
 import type { AltegioClient } from '../../providers/altegio-client.js';
-import { FinanceAdapter, roundMoney } from '../../api/v1/finance-adapter.js';
+import { FinanceAdapter } from '../../api/v1/finance-adapter.js';
+import {
+  decimalsOf,
+  currencyExponent,
+  majorOf,
+  moneyInput,
+  MoneyInputError,
+  moneyOf,
+  roundMajor,
+  sameMajor,
+  sumMajor,
+  type Money,
+} from '../../api/money.js';
 import { resolveLocationCurrency } from '../../api/v1/location-currency.js';
 import { knownLocationTimezone } from '../analytics/location-timezone.js';
 import {
@@ -81,7 +93,7 @@ export const MAX_PERIOD_DAYS = 366;
 
 function amountText(value: number | null, currency: string | null): string {
   if (value === null) return 'not reported';
-  const rounded = String(roundMoney(value));
+  const rounded = String(roundMajor(value));
   return currency
     ? `${rounded} ${currency}`
     : `${rounded} (currency not reported)`;
@@ -91,8 +103,52 @@ function signed(value: number, currency: string | null): string {
   return `${value > 0 ? '+' : ''}${amountText(value, currency)}`;
 }
 
-function sameMoney(a: number, b: number): boolean {
-  return Math.abs(roundMoney(a) - roundMoney(b)) < 0.005;
+const sameMoney = sameMajor;
+
+/**
+ * Money a caller wrote, refused as `Nothing was <verb>` when the location's
+ * currency cannot carry it; `reported` lists amounts Altegio itself gave.
+ */
+function moneyArg(
+  major: number,
+  currency: string | null,
+  field: string,
+  verb: string,
+  reported: readonly (number | null)[] = []
+): Money {
+  try {
+    return moneyInput(major, currency, field, reported);
+  } catch (error) {
+    if (error instanceof MoneyInputError) {
+      throw new FinanceInputError(`Nothing was ${verb}: ${error.message}`);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Refuse before anyone is asked when `major` has more decimals than the
+ * location's currency takes, unless `reported` (read only then) gives it.
+ */
+async function refuseMoneyArg(
+  client: AltegioClient,
+  input: { location_id: number },
+  major: number | undefined,
+  field: string,
+  reported: () => Promise<readonly (number | null)[]> = async () => []
+): Promise<undefined> {
+  if (major === undefined) return undefined;
+  const currency = await resolveLocationCurrency(client, input.location_id);
+  if (decimalsOf(major) <= currencyExponent(currency)) return undefined;
+  try {
+    moneyInput(major, currency, field, await reported());
+  } catch (error) {
+    if (error instanceof MoneyInputError) {
+      throw new ConfirmationRefusal(error.message);
+    }
+    throw error;
+  }
+  return undefined;
 }
 
 function currencyNote(currency: string | null): string[] {
@@ -332,6 +388,35 @@ export async function describeVisit(
   return `the visit of appointment ${visit.appointment_id} at location ${visit.location_id}${visit.client_id ? ` (client ${visit.client_id})` : ''}: total amount ${amountText(visit.total_amount, currency)}, amount due ${amountText(visit.amount_due, currency)}`;
 }
 
+/**
+ * Refuse a payment amount the location's currency cannot carry before anyone
+ * is asked; one Altegio reported for the visit (the amount due, a method's
+ * payable amount) is allowed at the stored precision.
+ */
+export async function checkPaymentMoney(
+  client: AltegioClient,
+  input: { location_id: number; appointment_id: number; amount?: number }
+): Promise<undefined> {
+  return refuseMoneyArg(client, input, input.amount, 'amount', async () => {
+    const visit = await api(client).getVisit(
+      input.location_id,
+      input.appointment_id
+    );
+    return [
+      visit.amount_due,
+      ...visit.payment_options.map((o) => o.applicable_amount),
+    ];
+  });
+}
+
+/** Refuse an amount the location's currency cannot carry before anyone is asked. */
+export async function checkMoneyArg(
+  client: AltegioClient,
+  input: { location_id: number; amount?: number }
+): Promise<undefined> {
+  return refuseMoneyArg(client, input, input.amount, 'amount');
+}
+
 export interface AddPaymentInput {
   location_id: number;
   appointment_id: number;
@@ -348,8 +433,15 @@ export interface AddPaymentInput {
   expected_amount_due: number;
 }
 
-/** Turn the flat tool input into one payment, refusing a missing id or amount. */
-export function paymentRequest(input: AddPaymentInput): PaymentRequest {
+/**
+ * Turn the flat tool input into one payment, refusing a missing id or amount,
+ * or an amount the currency cannot carry unless Altegio `reported` it.
+ */
+export function paymentRequest(
+  input: AddPaymentInput,
+  currency: string | null = null,
+  reported: readonly (number | null)[] = []
+): PaymentRequest {
   const need = (field: keyof AddPaymentInput): number => {
     const value = input[field];
     if (typeof value !== 'number') {
@@ -359,13 +451,13 @@ export function paymentRequest(input: AddPaymentInput): PaymentRequest {
     }
     return value;
   };
-  const amount = (): number => {
+  const amount = (): Money => {
     if (input.amount === undefined) {
       throw new FinanceInputError(
         `method ${input.method} needs an amount above zero, at most the option's applicable_amount.`
       );
     }
-    return input.amount;
+    return moneyArg(input.amount, currency, 'amount', 'recorded', reported);
   };
   switch (input.method) {
     case 'account':
@@ -457,11 +549,16 @@ export async function addPayment(
   input: AddPaymentInput,
   confirmation?: ConfirmedCall
 ): Promise<FinanceResult> {
-  const request = paymentRequest(input);
+  // A missing id or amount is refused before anything is read.
+  paymentRequest(input);
   const finance = api(client);
   const [before, currency] = await Promise.all([
     finance.getVisit(input.location_id, input.appointment_id),
     resolveLocationCurrency(client, input.location_id),
+  ]);
+  const request = paymentRequest(input, currency, [
+    before.amount_due,
+    ...before.payment_options.map((o) => o.applicable_amount),
   ]);
 
   if (!sameMoney(before.amount_due, input.expected_amount_due)) {
@@ -483,13 +580,14 @@ export async function addPayment(
     );
   }
   if ('amount' in request) {
-    const cap = option.applicable_amount ?? before.amount_due;
-    if (request.amount - cap > 0.005) {
+    const amount = majorOf(request.amount);
+    const cap = roundMajor(option.applicable_amount ?? before.amount_due);
+    if (amount > cap) {
       throw new FinanceInputError(
-        `Nothing was recorded: ${amountText(request.amount, currency)} is more than this method can pay now (${amountText(cap, currency)}).`
+        `Nothing was recorded: ${amountText(amount, currency)} is more than this method can pay now (${amountText(cap, currency)}).`
       );
     }
-    if (!option.partial_allowed && !sameMoney(request.amount, cap)) {
+    if (!option.partial_allowed && !sameMoney(amount, cap)) {
       throw new FinanceInputError(
         `Nothing was recorded: this method pays only its full applicable amount, ${amountText(cap, currency)}, in one payment.`
       );
@@ -676,7 +774,7 @@ export async function deposit(
     {
       client_id: input.client_id,
       client_account_id: input.client_account_id,
-      amount: input.amount,
+      amount: moneyArg(input.amount, currency, 'amount', 'deposited'),
       account_id: input.account_id,
       ...(input.team_member_id !== undefined
         ? { team_member_id: input.team_member_id }
@@ -844,11 +942,11 @@ export async function listFinancialTransactions(
     input,
     items,
     render: ({ items: page, pagination }) => {
-      const income = roundMoney(
-        page.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0)
+      const income = sumMajor(
+        page.filter((t) => t.amount > 0).map((t) => t.amount)
       );
-      const expense = roundMoney(
-        page.filter((t) => t.amount < 0).reduce((s, t) => s + t.amount, 0)
+      const expense = sumMajor(
+        page.filter((t) => t.amount < 0).map((t) => t.amount)
       );
       const summary = lines(
         `Financial transactions at location ${input.location_id}, ${input.date_from}..${input.date_to}, page ${pagination.page}: ${page.length} transaction(s)${page.length > 0 ? `, income ${amountText(income, currency)} and expenses ${amountText(expense, currency)} on this page` : ''}.`,
@@ -955,7 +1053,7 @@ export async function createFinancialTransaction(
   const fields: FinancialTransactionFields = {
     payment_item_id: input.payment_item_id,
     account_id: input.account_id,
-    amount: input.amount,
+    amount: moneyArg(input.amount, currency, 'amount', 'recorded'),
     local_date: local,
     client_id: input.client_id ?? null,
     team_member_id: input.team_member_id ?? null,
@@ -974,7 +1072,7 @@ export async function createFinancialTransaction(
   const duplicate = sameDay.find((t) => {
     if (
       t.payment_item_id !== fields.payment_item_id ||
-      !sameMoney(Math.abs(t.amount), fields.amount) ||
+      !sameMoney(Math.abs(t.amount), majorOf(fields.amount)) ||
       (t.comment ?? '') !== fields.comment ||
       t.client_id !== fields.client_id ||
       t.team_member_id !== fields.team_member_id ||
@@ -1086,7 +1184,10 @@ async function planTransactionUpdate(
   const fields: FinancialTransactionFields = {
     payment_item_id: input.payment_item_id ?? before.payment_item_id ?? 0,
     account_id: input.account_id ?? before.account_id ?? 0,
-    amount: input.amount ?? Math.abs(before.amount),
+    amount:
+      input.amount !== undefined
+        ? moneyArg(input.amount, currency, 'amount', 'changed')
+        : moneyOf(Math.abs(before.amount), currency),
     local_date: local,
     client_id: clear.has('client')
       ? null
@@ -1114,7 +1215,7 @@ async function planTransactionUpdate(
     version: stateVersion({
       payment_item_id: before.payment_item_id,
       account_id: before.account_id,
-      amount: roundMoney(before.amount),
+      amount: roundMajor(before.amount),
       date: before.date,
       client_id: before.client_id,
       team_member_id: before.team_member_id,
@@ -1143,8 +1244,8 @@ export async function describeTransactionChange(
   const { before, fields, beforeLocal, currency } = plan;
   const none = (id: number | null) => (id === null ? 'none' : String(id));
   const changes = [
-    !sameMoney(Math.abs(before.amount), fields.amount) &&
-      `amount ${amountText(Math.abs(before.amount), currency)} → ${amountText(fields.amount, currency)}`,
+    !sameMoney(Math.abs(before.amount), majorOf(fields.amount)) &&
+      `amount ${amountText(Math.abs(before.amount), currency)} → ${amountText(majorOf(fields.amount), currency)}`,
     before.payment_item_id !== fields.payment_item_id &&
       `payment item ${none(before.payment_item_id)} → ${fields.payment_item_id}`,
     before.account_id !== fields.account_id &&

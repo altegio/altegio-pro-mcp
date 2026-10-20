@@ -40,14 +40,12 @@ const membershipId = z
     'Membership id, not its number (memberships_list_for_client, memberships_list).'
   );
 
-const unit = z
-  .enum(['day', 'week', 'month', 'year'])
-  .describe('day, week, month or year.');
+const unit = z.enum(['day', 'week', 'month', 'year']);
 
 const duration = (what: string) =>
   z
     .object({
-      length: z.number().int().min(1).max(3650).describe('How many units.'),
+      length: z.number().int().min(1).max(3650),
       unit,
     })
     .strict()
@@ -333,7 +331,7 @@ export const membershipsListTypesTool = defineTool({
   name: 'memberships_list_types',
   category: 'Memberships',
   description:
-    'Membership types of a chain (the templates memberships are sold from): price, covered services, balance, validity and activation, freezing, sold count. Active by default, archived=true for archived; filter by title. Paged: follow pagination.next_page. Selling locations: memberships_get_type.',
+    'Membership types of a chain (the templates memberships are sold from): price, covered services, balance, validity and activation, freezing, sold count. Active by default, archived=true for archived; filter by title. Paged: follow pagination.next_page. Selling locations: memberships_get_type. Archive or delete a type: memberships_archive_type, memberships_delete_type.',
   annotations: { title: 'Memberships: list membership types', ...READ_ONLY },
   input: z.object({
     chain_id: chainId,

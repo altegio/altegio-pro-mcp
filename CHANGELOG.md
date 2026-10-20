@@ -6,6 +6,109 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — `payroll_record_payout`
+
+- **Record a payout to a team member.** A payout is a financial transaction
+  paid from an account or cash register under the location's personnel
+  payment item, naming the team member — what Altegio counts as paid in the
+  settlements with them (`payroll_get_calculation`). Served on `/mcp` (hosted
+  `https://mcp.alteg.io/pro`) and `/mcp/finance`; scope `finance:write`.
+- The personnel payment item is chosen when the location has exactly one;
+  with several, the call asks for `payment_item_id`, and a payment item of
+  another category is refused, since it would not count in settlements.
+- It asks for confirmation first, showing the payment item and the
+  settlements of the payout's month so far, and refuses before asking anyone
+  when no single personnel payment item fits. Like
+  `financial_transactions_create`, it refuses an identical transaction
+  recorded within the last ten minutes. The result shows the settlements after
+  the payout; `financial_transactions_delete` undoes it.
+- Fund transfers between accounts and cash registers are not built: no
+  documented operation records one (a financial transaction names a single
+  account or cash register).
+
+### Changed — a lighter `tools/list` on every view
+
+`/mcp` goes from 125,389 to 119,604 bytes (−5.8 KB) with the same 95 tools,
+and every other view shrinks too (`/mcp/readonly` −3.5 KB, `/mcp/ops` −3.1 KB,
+`/mcp/finance` −3.0 KB). The budgets in `src/tools/listing-budget.ts` drop
+with them. Nothing a tool accepts or refuses changes.
+
+- The listing no longer repeats two rules the server enforces anyway:
+  `additionalProperties: false` is dropped at every depth (it was already
+  dropped at the top), and `minimum: 1` on integer ids, `*_ids` items, `page`
+  and `page_size`. A zero id or an unknown key is still refused, with the rule
+  named. The definitions keep both.
+- `confirmation_token` is described as "From confirmation_required, after the
+  user agreed."
+- Descriptions that only restated an enum lose that part: the membership
+  validity `unit`, the appointment `status`, the attendance `target_status`
+  and the client-search `match`. `appointments_create` no longer repeats in
+  prose that `session_length` is required.
+- `appointments_list_tags`, `appointments_create_tag` and the
+  `appointments_update` `color` are shorter; `api_search_operations`
+  `include_preview` no longer names a backend version.
+
+### Changed — exact money, checked against the location currency
+
+ADR-001 §5 rule 4 is amended: money stays in major units of the location's
+currency at the tool surface, and the conversion to V3 minor units belongs to
+the V3 adapter. No argument or result shape changes.
+
+- **Money arguments follow the currency's exponent.** `visits_add_payment`,
+  `client_accounts_deposit`, `financial_transactions_create` and `_update`,
+  `inventory_create_operation` (`unit_price`), `memberships_create_type` and
+  `_update_type` (`price`, `online_sale_price`) and `services_create` and
+  `_update` (`price_min`, `price_max`) refuse more decimals than the location's
+  currency takes: whole numbers for JPY or ISK, two decimals for CZK or EUR,
+  and two for three-decimal currencies such as KWD, since Altegio stores two
+  decimals for every currency. They said "at most two decimals" or nothing
+  before. A payment of the amount due Altegio reported is accepted at its two
+  stored decimals in any currency. The finance tools refuse before anyone is
+  asked to confirm.
+- **Exact money at the ports.** Finance, inventory and membership port writes
+  carry a `Money` value (integer minor units, exponent, currency) instead of a
+  JS number; the V1 adapters send the major amount. Visit totals, page sums,
+  inventory and visit-product line totals are computed in minor units, so
+  float drift no longer decides a rounding (3 × 0.35 less 50 % is 0.53, not
+  0.52; 1.005 rounds to 1.01).
+
+### Changed — six low-use groups leave the default view
+
+`/mcp` (hosted `https://mcp.alteg.io/pro`) no longer lists 26 tools that
+carried 0.27 % of its calls over 22 days (442 of about 164,600). They are not
+removed: each group is still served on its view, and on stdio.
+
+| Group                                           | Tools                                                                                                                                                  | Now on                                                                    |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| Onboarding wizard                               | all 12 `onboarding_*`                                                                                                                                  | `https://mcp.alteg.io/pro/onboarding`                                     |
+| Event duplication patterns                      | `events_list_duplication_strategies`, `events_create_duplication_strategy`, `events_update_duplication_strategy`, `events_delete_duplication_strategy` | `https://mcp.alteg.io/pro/ops`                                            |
+| Client files                                    | `clients_list_files`, `clients_upload_file`                                                                                                            | `https://mcp.alteg.io/pro/ops`                                            |
+| Membership freeze, balance and validity changes | `memberships_freeze`, `memberships_unfreeze`, `memberships_set_balance`, `memberships_set_validity`                                                    | `https://mcp.alteg.io/pro/marketing` (freeze and unfreeze also on `/ops`) |
+| Membership type archive/delete                  | `memberships_archive_type`, `memberships_delete_type`                                                                                                  | `https://mcp.alteg.io/pro/marketing`                                      |
+| Booking form create/delete                      | `booking_forms_create`, `booking_forms_delete`                                                                                                         | `https://mcp.alteg.io/pro/catalog`                                        |
+
+- `/mcp` goes from 121 tools and 148,185 bytes of `tools/list` to 95 tools and
+  125,389 bytes; its budget drops from 155,500 to 132,000.
+- A model on `/mcp` is pointed at them: the default view's `initialize`
+  instructions name each group and its address; `booking_forms_list`,
+  `memberships_list_types`, `events_duplicate` and `clients_add_comment` name
+  the tools with a "served on" address; a call to one on `/mcp` is refused with
+  the address that serves it; the `onboarding_walkthrough` prompt says where its
+  tools are.
+- `/mcp/readonly` and every facet are unchanged.
+- **Removed: `MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING`.** The onboarding wizard is
+  now off `/mcp` in every deployment, so the switch has nothing left to do.
+
+### Fixed — visit payments and visit products carry the confirmation's key
+
+- `visits_add_payment` and `visits_cancel_payment` now hand the confirmed
+  call to their use cases, so the idempotency key derived from the
+  confirmation reaches the finance port, as `financial_transactions_*` and
+  `client_accounts_deposit` already did.
+- `visits_add_product` and `visits_remove_product` do the same: the visit
+  product port's writes take the optional `idempotency_key` too. The V2
+  adapter ignores it; a V3 adapter sends it as `Idempotency-Key`.
+
 ### Breaking changes — visit, finance and inventory tools follow the product glossary
 
 The owner decided on 2026-10-20 that there is no "bill": the visit itself is
@@ -101,9 +204,7 @@ Text the model reads changes with them:
   ports takes an optional `idempotency_key`, derived from the confirmation (a
   hash of the tool name, the canonical arguments and the token's expiry), so a
   repeat of one confirmed call carries the same key. The V1 adapters ignore it;
-  a V3 adapter sends it as `Idempotency-Key`. `visits_add_payment` and
-  `visits_cancel_payment` accept it in their use cases and are wired at the
-  tool once the concurrent visits work lands.
+  a V3 adapter sends it as `Idempotency-Key`.
 - The consumables result no longer prints "every line has a new line id:" when
   no line remains.
 - An opt-in live suite (`replay-guards-live`) drives both guards through the

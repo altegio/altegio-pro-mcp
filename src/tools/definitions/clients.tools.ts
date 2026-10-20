@@ -57,7 +57,7 @@ export const clientsSearchTool = defineTool({
     match: z
       .enum(['all', 'any'])
       .optional()
-      .describe('Combine the filters with all (AND, default) or any (OR).'),
+      .describe('all = AND (default), any = OR.'),
     order_by: z
       .enum([
         'id',

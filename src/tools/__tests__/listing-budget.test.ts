@@ -104,7 +104,6 @@ describe('the measured listing is the served listing', () => {
     const expected = listView(
       view,
       {
-        excludeOnboardingFromDefault: env.MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING,
         exposePasswordLogin: env.ALTEGIO_EXPOSE_PASSWORD_LOGIN,
         publicBaseUrl: env.MCP_PUBLIC_BASE_URL,
       },

@@ -94,8 +94,7 @@ export const searchOperationsTool = defineTool({
       .boolean()
       .optional()
       .describe(
-        'Include V3 preview operations. They document the future contract but are not ' +
-          'served by the live API yet, so they cannot be called. Default false.'
+        'Include preview operations: documented, not callable yet. Default false.'
       ),
     page: pageArg,
     page_size: pageSizeArg(MAX_SEARCH_RESULTS, MAX_SEARCH_RESULTS),

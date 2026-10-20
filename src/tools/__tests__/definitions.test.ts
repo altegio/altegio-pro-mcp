@@ -10,7 +10,7 @@ describe('factory tool definitions', () => {
   // Includes the temporary legacy reports, five decision-ready analytics tools
   // the nine inventory tools, visits_add_product and visits_remove_product.
   it('exposes all factory-defined tools', () => {
-    expect(tools.length).toBe(147);
+    expect(tools.length).toBe(148);
   });
 
   it('every tool produces a valid MCP spec', () => {

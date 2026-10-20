@@ -39,6 +39,15 @@ import {
   type UntrustedField,
 } from '../../tools/tool-result.js';
 import { writeOptions } from '../../api/write-options.js';
+import {
+  lineTotal,
+  majorOf,
+  moneyInput,
+  MoneyInputError,
+  moneyOf,
+  sumMajor,
+  type Money,
+} from '../../api/money.js';
 import { instantOfWallTime, wallTime } from '../../api/v1/server-time.js';
 import { knownLocationTimezone } from '../analytics/location-timezone.js';
 import {
@@ -444,6 +453,22 @@ export async function listOperations(
 
 // ========== inventory operations: create ==========
 
+/** A price the caller gave, refused when the location's currency cannot carry it. */
+function moneyArg(
+  major: number,
+  currency: string | null,
+  field: string
+): Money {
+  try {
+    return moneyInput(major, currency, field);
+  } catch (error) {
+    if (error instanceof MoneyInputError) {
+      throw new InventoryInputError(`Nothing was recorded: ${error.message}`);
+    }
+    throw error;
+  }
+}
+
 export interface OperationLineInput extends ProductRef {
   quantity: number;
   unit?: 'sale' | 'consumable';
@@ -463,7 +488,12 @@ export interface CreateOperationInput {
   comment?: string;
 }
 
-interface PlannedLine extends OperationLineWrite {
+interface PlannedLine extends Omit<OperationLineWrite, 'unit_price' | 'total'> {
+  /** Major units, for the text. */
+  unit_price: number;
+  total: number;
+  price: Money;
+  line_total: Money;
   product: Product;
   unit_kind: 'sale' | 'consumable';
   unit_name: string | null;
@@ -574,7 +604,11 @@ async function planOperation(
       );
     }
     const discount = line.discount_percent ?? 0;
-    const roundedPrice = round2(unitPrice);
+    const price =
+      line.unit_price === undefined
+        ? moneyOf(unitPrice, currency)
+        : moneyArg(line.unit_price, currency, `${where} unit_price`);
+    const total = lineTotal(line.quantity, price, discount);
     return {
       product,
       product_id: product.id,
@@ -582,9 +616,11 @@ async function planOperation(
       unit_id: unitId,
       unit_kind: unitKind,
       unit_name: unitNames.get(unitId) ?? null,
-      unit_price: roundedPrice,
+      unit_price: majorOf(price),
       discount_percent: discount,
-      total: round2(line.quantity * roundedPrice * (1 - discount / 100)),
+      total: majorOf(total),
+      price,
+      line_total: total,
       price_source: line.unit_price === undefined ? defaultSource : 'given',
     };
   });
@@ -615,9 +651,9 @@ async function planOperation(
         product_id: l.product_id,
         quantity: l.quantity,
         unit_id: l.unit_id,
-        unit_price: l.unit_price,
+        unit_price: l.price,
         discount_percent: l.discount_percent,
-        total: l.total,
+        total: l.line_total,
       })),
     },
   };
@@ -816,7 +852,7 @@ export async function describeOperation(
       );
     throw error;
   }
-  const sum = round2(plan.lines.reduce((s, l) => s + l.total, 0));
+  const sum = sumMajor(plan.lines.map((l) => l.total));
   return [
     `It ${stockEffect(input.kind)} inventory ${plan.inventory.id} ${plan.inventory.title ?? ''}:`,
     ...plan.lines.map((l) => `- ${plannedLineText(l, plan.currency)}`),
@@ -850,7 +886,7 @@ export async function createOperation(
     ...m,
     currency: plan.currency,
   }));
-  const sum = round2(lines.reduce((s, l) => s + (l.total ?? 0), 0));
+  const sum = sumMajor(lines.map((l) => l.total ?? 0));
   const text = [
     `Recorded ${documentLine(created.document)} with ${lines.length} line(s), total ${money(sum, plan.currency)}:`,
     ...lines.map(movementLine),

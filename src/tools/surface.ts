@@ -151,7 +151,7 @@ function gatesFor(
  *
  * `options` are the same switches `buildFacetIndex` takes, so a deployment can
  * render the table it actually serves. The defaults describe the public HTTP
- * deployment: password login off, onboarding on `/mcp`.
+ * deployment: password login off.
  */
 export function buildSurfaceTable(
   entries: readonly ToolInventoryEntry[] = allToolEntries(),

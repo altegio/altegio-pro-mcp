@@ -84,9 +84,7 @@ const selectionInput = z.object({
     ),
   target_status: z
     .enum(STATUSES)
-    .describe(
-      'Status to set: arrived (the client came), no_show, confirmed or waiting.'
-    ),
+    .describe('Status to set; arrived means the client came.'),
 });
 type Selection = z.infer<typeof selectionInput>;
 

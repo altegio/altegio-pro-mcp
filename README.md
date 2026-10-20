@@ -6,10 +6,10 @@ A TypeScript [Model Context Protocol](https://modelcontextprotocol.io) server fo
 Altegio business owners, administrators, and team members. It provides
 administrative B2B operations, client workflows, onboarding, and analytics.
 
-**153 tools served (159 defined, 6 withheld from every view)** — see the generated
+**154 tools served (160 defined, 6 withheld from every view)** — see the generated
 [tool surface](docs/architecture/tool-surface.md) for exact membership and gates.
 The surface includes a 28-tool analytics pack, a 15-tool group events pack, a
-13-tool memberships pack, 14 visit, payment and finance tools, a 9-tool inventory
+13-tool memberships pack, 15 visit, payment, finance and payroll tools, a 9-tool inventory
 pack, a 3-tool API explorer, and 12 onboarding wizard tools. The API explorer executes reads only; administrative
 writes use curated tools. The six unavailable report-builder tools are withheld
 because their upstream report-data service is not usable.
@@ -24,6 +24,10 @@ on HTTP by default. The read-only endpoint is
 Named views are available at `https://mcp.alteg.io/pro/<facet>`:
 `ops`, `catalog`, `finance`, `marketing`, `analytics`, and `onboarding`.
 Views reduce the advertised tool set; they do not grant additional permissions.
+A few low-use groups are served only on their view, not on the default address:
+the onboarding wizard (`onboarding`), event duplication patterns and client files
+(`ops`), membership freeze, balance and validity changes and membership type
+archive/delete (`marketing`), and booking form create/delete (`catalog`).
 A call to a tool outside its view is refused. Token scopes and upstream access
 rights are enforced independently of view membership.
 

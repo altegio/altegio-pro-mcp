@@ -720,6 +720,47 @@ describe('createOperation — a repeated call', () => {
   });
 });
 
+describe('createOperation: money', () => {
+  const jpyRoute: Route = [
+    'GET',
+    /\/locations\/1\/analytics\/overall$/,
+    200,
+    ok({ income_total_stats: { currency: { iso: 'JPY' } } }),
+  ];
+  const RECEIPT: CreateOperationInput = {
+    location_id: 1,
+    kind: 'receipt',
+    team_member_id: 7,
+    inventory_id: 3,
+    lines: [
+      { product_id: 5, quantity: 3, unit_price: 0.35, discount_percent: 50 },
+    ],
+  };
+
+  it('computes the line total in integers, not floats', async () => {
+    const { client, calls } = setup(operationRoutes([createdRoute()]));
+    await createOperation(client, RECEIPT);
+    // 3 × 0.35 × 0.5 is 0.5249999999999999 in floats.
+    expect(calls.find((c) => c.method === 'POST')!.body).toMatchObject({
+      goods_transactions: [{ cost_per_unit: 0.35, discount: 50, cost: 0.53 }],
+    });
+  });
+
+  it('refuses a price the currency cannot carry, before anyone is asked', async () => {
+    const jpy = (): Route[] => [jpyRoute, ...operationRoutes([createdRoute()])];
+    const { client, calls } = setup(jpy());
+    await expect(createOperation(client, RECEIPT)).rejects.toThrow(
+      'Nothing was recorded: lines[0] (product 5) unit_price 0.35 has 2 decimals, but JPY amounts are written in whole numbers; round it.'
+    );
+    expect(calls.some((c) => c.method === 'POST')).toBe(false);
+    clearCurrencyCache();
+    const refusal = await describeOperation(setup(jpy()).client, RECEIPT).catch(
+      (e) => e
+    );
+    expect(refusal).toBeInstanceOf(ConfirmationRefusal);
+  });
+});
+
 describe('describeOperation', () => {
   it('lists every priced line and the document total, computed like the write', async () => {
     const { client, calls } = setup(operationRoutes());

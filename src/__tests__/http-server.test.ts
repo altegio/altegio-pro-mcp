@@ -6,6 +6,7 @@ import { loadConfig } from '../config/schema.js';
 import {
   ALL_TOOLS_FACET,
   DEFAULT_FACET,
+  demotedGroupOf,
   FACET_NAMES,
   READONLY_VIEW,
 } from '../tools/facets.js';
@@ -403,12 +404,14 @@ describe('HTTP server facet wiring, end to end', () => {
 
       const all = await toolNamesOn(port, '/mcp');
       expect(all.length).toBeGreaterThan(ops.length);
+      // The default view serves every ops tool except the demoted groups,
+      // which stay on /mcp/ops, and none of the onboarding wizard.
       for (const name of ops) {
-        expect(all).toContain(name);
+        if (demotedGroupOf(name)) expect(all).not.toContain(name);
+        else expect(all).toContain(name);
       }
-      // The default view keeps the onboarding walkthrough (switch off).
       expect(all.filter((name) => name.startsWith('onboarding_'))).toHaveLength(
-        12
+        0
       );
     } finally {
       server.close();
