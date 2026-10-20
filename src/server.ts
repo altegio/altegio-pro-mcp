@@ -1,7 +1,12 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { registerTools } from './tools/registry.js';
-import { DEFAULT_FACET, READONLY_VIEW, type FacetKey } from './tools/facets.js';
+import {
+  DEFAULT_FACET,
+  READONLY_VIEW,
+  demotedGroupsInstruction,
+  type FacetKey,
+} from './tools/facets.js';
 import { registerResources, resourceModules } from './resources/index.js';
 import { registerPrompts, promptModules } from './prompts/index.js';
 import { AltegioClient } from './providers/altegio-client.js';
@@ -30,12 +35,16 @@ export function createServer(options: CreateServerOptions = {}): MCPServer {
   const publicBaseUrl = config.env.MCP_PUBLIC_BASE_URL;
 
   // The read-only view says so up front, before the product description invites
-  // the model to manage anything. Prefixed rather than replacing, so a
-  // deployment's `MCP_SERVER_INSTRUCTIONS` override still gets the notice.
+  // the model to manage anything. The default view names the groups it no
+  // longer lists and where they are served. Both are added around the product
+  // text rather than replacing it, so a deployment's `MCP_SERVER_INSTRUCTIONS`
+  // override still gets them.
   const instructions =
     facet === READONLY_VIEW
       ? `${readOnlyViewInstructions(publicBaseUrl)} ${config.server.instructions}`
-      : config.server.instructions;
+      : facet === DEFAULT_FACET
+        ? `${config.server.instructions} ${demotedGroupsInstruction()}`
+        : config.server.instructions;
 
   const server = new Server(
     {
@@ -67,8 +76,6 @@ export function createServer(options: CreateServerOptions = {}): MCPServer {
   // Register tools with client, filtered to this facet
   registerTools(server, altegioClient, {
     facet,
-    excludeOnboardingFromDefault:
-      config.env.MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING,
     exposePasswordLogin: config.env.ALTEGIO_EXPOSE_PASSWORD_LOGIN,
     publicBaseUrl,
   });

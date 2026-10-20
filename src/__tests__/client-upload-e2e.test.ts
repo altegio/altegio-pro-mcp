@@ -24,7 +24,7 @@ describe('hosted client-file upload over Streamable HTTP', () => {
     ConfigLoader.getInstance().reset();
     server = createApp().app.listen(0);
     await new Promise<void>((resolve) => server.once('listening', resolve));
-    url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/mcp`;
+    url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/mcp/ops`;
   });
   beforeEach(() => {
     upstream.length = 0;

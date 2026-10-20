@@ -33,8 +33,6 @@ const entries = allToolEntries();
 const CONFIGURATIONS: readonly FacetIndexOptions[] = [
   {},
   { exposePasswordLogin: true },
-  { excludeOnboardingFromDefault: true },
-  { exposePasswordLogin: true, excludeOnboardingFromDefault: true },
 ];
 
 describe('the surface table', () => {
@@ -140,16 +138,11 @@ describe('the reasons', () => {
     }
   });
 
-  it('shows the onboarding switch as its own reason, not as a pack exclusion', () => {
-    const withSwitch = buildSurfaceTable(entries, {
-      excludeOnboardingFromDefault: true,
-    });
-    expect(withSwitch.cell('onboarding_start', DEFAULT_FACET)?.reason).toBe(
-      'onboarding-excluded-from-default'
-    );
+  it('shows a demoted group as its own reason, not as a pack exclusion', () => {
     expect(surface.cell('onboarding_start', DEFAULT_FACET)?.reason).toBe(
-      'default-view-not-excluded'
+      'default-view-demoted'
     );
+    expect(surface.cell('onboarding_start', 'onboarding')?.served).toBe(true);
   });
 
   it('shows the password-login switch flipping the reason, not just the status', () => {

@@ -24,6 +24,10 @@ on HTTP by default. The read-only endpoint is
 Named views are available at `https://mcp.alteg.io/pro/<facet>`:
 `ops`, `catalog`, `finance`, `marketing`, `analytics`, and `onboarding`.
 Views reduce the advertised tool set; they do not grant additional permissions.
+A few low-use groups are served only on their view, not on the default address:
+the onboarding wizard (`onboarding`), event duplication patterns and client files
+(`ops`), membership freeze, balance and validity changes and membership type
+archive/delete (`marketing`), and booking form create/delete (`catalog`).
 A call to a tool outside its view is refused. Token scopes and upstream access
 rights are enforced independently of view membership.
 

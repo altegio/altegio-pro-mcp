@@ -14,8 +14,8 @@
  * a new tool. When a view shrinks — a demotion, a trimmed schema — lower its
  * budget in the same change, so the headroom stays about 5 %.
  *
- * The sizes are for the default deployment: password login withheld,
- * onboarding on `/mcp`, the published public address. stdio's unfiltered view
+ * The sizes are for the default deployment: password login withheld, the
+ * published public address. stdio's unfiltered view
  * has no budget; it is the complete surface by definition.
  */
 import {
@@ -40,9 +40,10 @@ export const DEFAULT_VIEW_TARGET_BYTES = 100_000;
 
 /** Bytes of `tools/list` result per view; see the module comment. */
 export const LISTING_BUDGETS: Readonly<Record<HttpViewKey, number>> = {
-  // 148,042 bytes, 121 tools on 2026-10-20, after back-office finance joined.
+  // 125,389 bytes, 95 tools on 2026-10-20, after six low-use groups moved to
+  // their facets (DEFAULT_FACET_DEMOTED_GROUPS); 148,042 bytes before.
   // Target: DEFAULT_VIEW_TARGET_BYTES.
-  [DEFAULT_FACET]: 155_500,
+  [DEFAULT_FACET]: 132_000,
   readonly: 126_000, // 119,808 bytes, 84 tools on 2026-10-20
   ops: 78_000, // 73,914 bytes, 53 tools
   catalog: 28_000, // 26,622 bytes, 34 tools

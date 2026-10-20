@@ -125,7 +125,10 @@ function wizardServer(stub: ReturnType<typeof altegioStub>): Server {
     { name: 'test-server', version: '0.0.0' },
     { capabilities: { tools: {} } }
   );
-  registerTools(server, stub as unknown as AltegioClient);
+  // The wizard is served on its own facet, not on the default view.
+  registerTools(server, stub as unknown as AltegioClient, {
+    facet: 'onboarding',
+  });
   return server;
 }
 

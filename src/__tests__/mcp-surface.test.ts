@@ -20,7 +20,11 @@ import {
   CLIENTS_SEGMENTATION_URI,
 } from '../resources/index.js';
 import { ONBOARDING_WALKTHROUGH_PROMPT } from '../prompts/index.js';
-import { DEFAULT_FACET_EXTRA_TOOLS } from '../tools/facets.js';
+import {
+  DEFAULT_FACET_EXTRA_TOOLS,
+  demotedGroupOf,
+  demotedGroupsInstruction,
+} from '../tools/facets.js';
 import {
   COVERAGE_URI as ANALYTICS_COVERAGE_URI,
   GLOSSARY_URI as ANALYTICS_GLOSSARY_URI,
@@ -97,6 +101,8 @@ describe('tools/list per facet', () => {
             // public HTTP surface; see src/tools/facets.ts.
             !PASSWORD_LOGIN_TOOLS.includes(name) &&
             !DEFAULT_FACET_EXCLUDED_TOOLS.includes(name) &&
+            // Low-use groups live on their facet only.
+            !demotedGroupOf(name) &&
             (!DEFAULT_FACET_EXCLUDED_PREFIXES.some((prefix) =>
               name.startsWith(prefix)
             ) ||
@@ -320,6 +326,19 @@ describe('tools/call outside the facet', () => {
     await client.close();
   });
 
+  it('refuses a demoted tool on the default view and names its facet', async () => {
+    const client = await connect();
+    await expect(
+      client.callTool({
+        name: 'memberships_set_balance',
+        arguments: { chain_id: 1, membership_id: 2, balance: 3 },
+      })
+    ).rejects.toThrow(
+      /not served by the "default" view.*https:\/\/mcp\.alteg\.io\/pro\/marketing/s
+    );
+    await client.close();
+  });
+
   it('serves password login and access management on the unfiltered view stdio uses', async () => {
     const client = await connect('all');
     const names = (await client.listTools()).tools.map((tool) => tool.name);
@@ -449,6 +468,20 @@ describe('server instructions', () => {
       expect(instructions).toContain(uri);
     }
     await client.close();
+  });
+
+  it('names the demoted groups and their addresses on the default view only', async () => {
+    const client = await connect();
+    expect(client.getInstructions()).toContain(demotedGroupsInstruction());
+    expect(client.getInstructions()).toContain(
+      'the first-time setup wizard (/onboarding)'
+    );
+    await client.close();
+    for (const view of ['ops', 'readonly', 'all'] as const) {
+      const other = await connect(view);
+      expect(other.getInstructions()).not.toContain('narrower address');
+      await other.close();
+    }
   });
 
   it('fits the host budget on every view, trust boundary first', async () => {
