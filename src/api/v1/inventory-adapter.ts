@@ -8,22 +8,22 @@
  * `goods_transactions`, `technological_card`, `record`, `master`, `type_id`,
  * `for_service` and `operation_unit_type` stop here.
  *
- * Contract details verified against the backend (biz.erp, 2026-10-19) where
- * the spec is silent or wrong:
+ * Contract details verified against the backend (biz.erp, 2026-10-19/20;
+ * the inventory operation spec was corrected to match in
+ * biz.erp.api.docs#149):
  *
  * - `POST /storage_operations/operation/{id}` reads `type_id`, `storage_id`,
- *   `master_id`, `client.id`, `date` (`Y-m-d H:i:s`, location time; any other
- *   format silently becomes "now"), `document.comment` and
- *   `goods_transactions[]`; the spec's `create_date`, `comment` and
- *   `transactions` are not read. Only types 1, 3 and 4 are accepted (2,
+ *   `master_id` (the spec's canonical `team_member_id` is aliased to it),
+ *   `client.id`, `date` (`Y-m-d H:i:s`, location time; any other format
+ *   silently becomes "now"), `document.comment` and `goods_transactions[]`.
+ *   Only types 1, 3 and 4 are accepted (2,
  *   consumption, and 5, transfer, are refused with 422: the document accepts
  *   1/3/4/5/6, the operation 1/2/3/4), a team member is mandatory, a date
  *   more than five minutes ahead is refused, and the document comment
  *   overwrites every line's comment. Only a sale keeps the team member and
  *   client on its lines; a receipt keeps the Supplier.
  *   Without `paid` + `account_id` no financial transaction is created. The
- *   answer lists the document and its lines as `goods_transactions` (the
- *   spec says `transactions`).
+ *   answer lists the document and its lines as `goods_transactions`.
  * - Inside `goods_transactions[]` the legacy `good_id` is what the DTO reads;
  *   a line counts in the sale unit unless `unit_id` names the consumable unit
  *   (the operation's unit type follows from it), and
