@@ -62,9 +62,9 @@ is declared stable.
   person. The refusal of "walk-in visitor" appointments, which also used the
   wrong term, is gone.
 - **Refusals name their cause.** A refused save is no longer always explained
-  as a printed bill or a pending advance payment. A required custom field, a
+  as a printed receipt or a pending advance payment. A required custom field, a
   group event's single service or capacity, a gift card or membership number,
-  activation date or archived type, a printed bill and a pending online
+  activation date or archived type, a printed receipt and a pending online
   advance payment each get their own message; anything else says Altegio
   refused, quotes its message and lists the common causes.
 - **The personal discount.** The sale confirmation says that a large sale can
