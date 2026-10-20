@@ -389,6 +389,25 @@ function groupedLines(rows: readonly MovementRow[]): string[] {
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * `renderPage` with `has_more` from the API's page: a page may keep fewer
+ * lines than it read (`MovementPage`) and still be followed by more.
+ */
+function renderMovementPage<R>(
+  more: boolean,
+  options: Parameters<typeof renderPage<MovementRow, R>>[0]
+): R {
+  const pagination = pageMetadata(options.input, options.items.length);
+  return options.render({
+    items: [...options.items],
+    pagination: {
+      ...pagination,
+      has_more: more,
+      next_page: more ? options.input.page + 1 : null,
+    },
+  });
+}
+
 export async function listOperations(
   client: AltegioClient,
   input: {
@@ -407,7 +426,7 @@ export async function listOperations(
   }
   if (input.date_from && input.date_to && input.date_from > input.date_to)
     throw new InventoryInputError('date_from must not be after date_to.');
-  const [movements, currency] = await Promise.all([
+  const [page, currency] = await Promise.all([
     inventoryApi(client).listMovements(input.location_id, {
       date_from: input.date_from,
       date_to: input.date_to,
@@ -417,8 +436,8 @@ export async function listOperations(
     }),
     locationCurrency(client, input.location_id),
   ]);
-  const rows: MovementRow[] = movements.map((m) => ({ ...m, currency }));
-  return renderPage({
+  const rows: MovementRow[] = page.lines.map((m) => ({ ...m, currency }));
+  return renderMovementPage(page.more, {
     input,
     items: rows,
     render: ({ items, pagination }) => {
@@ -706,10 +725,9 @@ const MAX_ZONE_OFFSET_MS = 14 * 60 * 60 * 1000;
 
 /**
  * Where a check for `now` has to look: the location days to read, and how
- * close to `now` a line's time must be. The list stores a line's date as the
- * location's wall time (and labels it with the server's offset, which is not
- * the location's), so only the wall time is read, placed in the location's
- * zone. When the zone is unknown, every day and every offset a location could
+ * close to `now` a line's time must be. A line's date is the location's wall
+ * time (`InventoryMovement.date`), so only the wall time is read, placed in
+ * the location's zone. When the zone is unknown, every day and every offset a location could
  * have is allowed: refusing a genuine call is cheap, a comment tells it apart.
  */
 async function repeatWindow(
@@ -780,7 +798,7 @@ async function findRepeat(
   const documents = new Map<number, InventoryMovement[]>();
   const api = inventoryApi(client);
   for (let page = 1; page <= REPEAT_PAGES_MAX; page += 1) {
-    const rows = await api.listMovements(input.location_id, {
+    const { lines: rows, more } = await api.listMovements(input.location_id, {
       ...range,
       page,
       page_size: REPEAT_PAGE_SIZE,
@@ -792,7 +810,7 @@ async function findRepeat(
         m,
       ]);
     }
-    if (rows.length < REPEAT_PAGE_SIZE) break;
+    if (!more) break;
   }
 
   const comment = input.comment ?? '';
@@ -942,11 +960,12 @@ async function documentLines(
   locationId: number,
   documentId: number
 ): Promise<InventoryMovement[]> {
-  return inventoryApi(client).listMovements(locationId, {
+  const { lines } = await inventoryApi(client).listMovements(locationId, {
     document_id: documentId,
     page: 1,
     page_size: DOCUMENT_LINES_MAX,
   });
+  return lines;
 }
 
 /** The confirmation detail: what the document moved, which comes back. */

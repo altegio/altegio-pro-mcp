@@ -222,6 +222,8 @@ describe('searchProducts', () => {
 // ===========================================================================
 
 describe('listOperations', () => {
+  afterEach(() => clearTimezoneCache());
+
   it('sends the date window and page, and renders lines by document', async () => {
     const { client, calls } = setup([
       [
@@ -245,6 +247,10 @@ describe('listOperations', () => {
       ],
       currencyRoute,
     ]);
+    clearTimezoneCache();
+    Object.assign(client, {
+      getCompanies: async () => [{ id: 1, timezone_name: 'Europe/Prague' }],
+    });
     const result = await listOperations(client, {
       location_id: 1,
       date_from: '2026-10-01',
@@ -253,8 +259,10 @@ describe('listOperations', () => {
       page_size: 25,
     });
     const read = calls.find((c) => c.path === '/storages/transactions/1')!;
+    // The list files lines by the UTC day: Prague's 1 October starts on
+    // 30 September in UTC.
     expect(Object.fromEntries(read.query)).toEqual({
-      start_date: '2026-10-01',
+      start_date: '2026-09-30',
       end_date: '2026-10-19',
       page: '2',
       count: '25',
@@ -285,6 +293,36 @@ describe('listOperations', () => {
     expect(ours).toContain('product 5 +6 pcs');
     expect(ours).toContain('total 540 CZK');
     expect(ours).not.toContain('System:');
+  });
+
+  it('keeps the location days asked for, in the location’s offset, and pages by what the API read', async () => {
+    const { client } = setup([
+      [
+        'GET',
+        /^\/storages\/transactions\/1$/,
+        200,
+        ok([
+          // Printed as Prague wall time with the server's offset.
+          movementRow({ id: 31, create_date: '2026-10-20 00:30:00+0400' }),
+          movementRow({ id: 32, create_date: '2026-10-19 23:30:00+0400' }),
+        ]),
+      ],
+      currencyRoute,
+    ]);
+    Object.assign(client, {
+      getCompanies: async () => [{ id: 1, timezone_name: 'Europe/Prague' }],
+    });
+    const result = await listOperations(client, {
+      location_id: 1,
+      date_from: '2026-10-19',
+      date_to: '2026-10-19',
+      page: 1,
+      page_size: 2,
+    });
+    expect(result.structuredContent).toMatchObject({
+      items: [{ id: 32, date: '2026-10-19T23:30:00+02:00' }],
+      pagination: { returned: 1, has_more: true, next_page: 2 },
+    });
   });
 
   it('refuses a malformed or inverted date window', async () => {
@@ -391,6 +429,29 @@ describe('createOperation', () => {
     expect(result.text).toContain('No payment was recorded');
     expect(result.text).toContain('inventory_delete_document');
   });
+
+  it.each([
+    ['sale', '−2 pcs'],
+    ['write_off', '−2 pcs'],
+    ['receipt', '+2 pcs'],
+  ] as const)(
+    'says which way a %s moved stock, though the answer’s amounts are unsigned',
+    async (kind, moved) => {
+      const { client } = setup(
+        operationRoutes([createdRoute({ line: { amount: 2 } })])
+      );
+      const result = await createOperation(client, {
+        ...SALE,
+        kind,
+        ...(kind === 'sale' ? {} : { client_id: undefined, inventory_id: 3 }),
+        lines: [{ product_id: 5, quantity: 2, unit_price: 300 }],
+      });
+      expect(result.structuredContent).toMatchObject({
+        lines: [{ direction: kind === 'receipt' ? 'in' : 'out' }],
+      });
+      expect(summary(result.text)).toContain(moved);
+    }
+  );
 
   it('prices a write-off per consumable unit from the cost price', async () => {
     const { client, calls } = setup(operationRoutes([createdRoute()]));
@@ -602,9 +663,10 @@ describe('createOperation — a repeated call', () => {
     expect(error.message).toContain('repeat of the same call');
     expect(error.message).toContain('a comment that tells the two apart');
     expect(calls.some((c) => c.method === 'POST')).toBe(false);
+    // The location's zone is not known here: a day more on each side.
     const read = calls.find((c) => c.path === '/storages/transactions/1')!;
-    expect(read.query.get('start_date')).toBe('2026-10-19');
-    expect(read.query.get('end_date')).toBe('2026-10-19');
+    expect(read.query.get('start_date')).toBe('2026-10-18');
+    expect(read.query.get('end_date')).toBe('2026-10-20');
   });
 
   it.each([
@@ -663,7 +725,7 @@ describe('createOperation — a repeated call', () => {
       const read = recent.calls.find(
         (c) => c.path === '/storages/transactions/1'
       )!;
-      expect(read.query.get('start_date')).toBe('2026-10-19');
+      expect(read.query.get('start_date')).toBe('2026-10-18');
       expect(read.query.get('end_date')).toBe('2026-10-19');
     });
 
@@ -681,8 +743,8 @@ describe('createOperation — a repeated call', () => {
       const read = unknown.calls.find(
         (c) => c.path === '/storages/transactions/1'
       )!;
-      expect(read.query.get('start_date')).toBe('2026-10-18');
-      expect(read.query.get('end_date')).toBe('2026-10-20');
+      expect(read.query.get('start_date')).toBe('2026-10-17');
+      expect(read.query.get('end_date')).toBe('2026-10-21');
     });
   });
 

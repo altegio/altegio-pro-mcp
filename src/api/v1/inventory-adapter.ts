@@ -47,11 +47,24 @@
  *   stop moving it when it changes away from arrived.
  * - V1 has no idempotency header, so the write methods ignore the
  *   `idempotency_key` of their `WriteOptions` (`../write-options.ts`).
+ *
+ * Verified live on the test location (2026-10-20):
+ *
+ * - `GET /storages/transactions/{id}` prints a line's `create_date` as the
+ *   location's wall time labelled with the server's offset (`+0400` for a
+ *   Prague location), and its `start_date`/`end_date` filter by the UTC day.
+ *   The adapter reads the UTC days that cover the location days asked for,
+ *   leaves out lines outside them, and places each line's wall time in the
+ *   location's zone.
+ * - The create answer's line amounts are unsigned; a write-off or sale line
+ *   moves stock out.
  */
 import { majorOf } from '../money.js';
 import { httpFromClient, type AltegioHttp } from '../altegio-http.js';
 import type { AltegioClient } from '../../providers/altegio-client.js';
 import { v1Read, type V1CallOptions, type V1Envelope } from './envelope.js';
+import { knownLocationTimezone } from '../../capabilities/analytics/location-timezone.js';
+import { instantOfWallTime, toZonedRfc3339 } from './server-time.js';
 import {
   mapInventoryHttpError,
   type InventoryErrorHints,
@@ -70,6 +83,7 @@ import type {
   InventoryMovement,
   InventoryMovementKind,
   InventoryOperationKind,
+  MovementPage,
   MovementQuery,
   OperationWrite,
   Supplier,
@@ -153,12 +167,6 @@ function flag(value: unknown): boolean {
  * create answer carries location time instead (`2026-12-05 16:30:00`), which
  * becomes `2026-12-05T16:30:00`, with no offset.
  */
-function rfc3339(value: unknown): string | null {
-  const raw = text(value);
-  if (!raw) return null;
-  return raw.replace(' ', 'T').replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
-}
-
 /** `2026-12-05 14:30:00` → `2026-12-05T14:30:00`. */
 function localDateTime(value: unknown): string | null {
   const raw = text(value);
@@ -183,7 +191,69 @@ function kindFromWire(value: unknown): InventoryMovementKind {
   return (n !== null && KIND_FROM_WIRE[n]) || 'other';
 }
 
-function movementFromWire(row: Row): InventoryMovement {
+/**
+ * A line's time: the list prints the location's wall time with the server's
+ * offset, so the offset is dropped and the wall time placed in the location's
+ * zone; without the zone it stays a wall time.
+ */
+function lineDate(value: unknown, zone: string | null): string | null {
+  const wall = localDateTime(value)?.slice(0, 19) ?? null;
+  if (!wall || !zone) return wall;
+  const at = instantOfWallTime(wall.replace('T', ' '), zone);
+  return at === null ? wall : toZonedRfc3339(at, zone);
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** The UTC day of an instant. */
+function utcDay(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+/**
+ * The UTC days the list must be read for to hold the location days `from` to
+ * `to`: those the location's first and last instant fall on, or one day more
+ * on each side when the zone is unknown.
+ */
+function utcDaysCovering(
+  query: MovementQuery,
+  zone: string | null
+): { start_date?: string; end_date?: string } {
+  const edge = (day: string | undefined, wall: string, shift: number) => {
+    if (!day) return undefined;
+    const at = zone ? instantOfWallTime(`${day} ${wall}`, zone) : null;
+    return at !== null
+      ? utcDay(at)
+      : utcDay(Date.parse(`${day}T00:00:00Z`) + shift * DAY_MS);
+  };
+  return {
+    start_date: edge(query.date_from, '00:00:00', -1),
+    end_date: edge(query.date_to, '23:59:59', 1),
+  };
+}
+
+/** Whether a line falls on the location days asked for, as far as is known. */
+function onDaysAsked(
+  line: InventoryMovement,
+  query: MovementQuery,
+  zone: string | null
+): boolean {
+  if (!zone || !line.date) return true;
+  const day = line.date.slice(0, 10);
+  return (
+    (!query.date_from || day >= query.date_from) &&
+    (!query.date_to || day <= query.date_to)
+  );
+}
+
+/** How a recorded operation moves stock. */
+const DIRECTION_OF: Record<InventoryOperationKind, 'in' | 'out'> = {
+  receipt: 'in',
+  write_off: 'out',
+  sale: 'out',
+};
+
+function movementFromWire(row: Row, zone: string | null): InventoryMovement {
   const amount = num(row.amount);
   const good = asRow(row.good);
   const storage = asRow(row.storage);
@@ -191,7 +261,7 @@ function movementFromWire(row: Row): InventoryMovement {
     id: id(row.id) ?? 0,
     document_id: id(row.document_id),
     kind: kindFromWire(row.type_id),
-    date: rfc3339(row.create_date),
+    date: lineDate(row.create_date, zone),
     product_id: id(good.id ?? row.good_id),
     product_title: text(good.title),
     quantity: amount === null ? null : Math.abs(amount),
@@ -273,11 +343,22 @@ function consumablesFromWire(row: Row): AppointmentServiceConsumables {
 
 // ========== the adapter ==========
 
+export type ZoneResolver = (locationId: number) => Promise<string | null>;
+
 export class InventoryAdapter implements InventoryApi {
-  constructor(private readonly http: AltegioHttp) {}
+  constructor(
+    private readonly http: AltegioHttp,
+    private readonly zoneOf: ZoneResolver = async () => null
+  ) {}
 
   static forClient(client: AltegioClient): InventoryAdapter {
-    return new InventoryAdapter(httpFromClient(client));
+    return new InventoryAdapter(httpFromClient(client), (locationId) =>
+      knownLocationTimezone(client, locationId)
+    );
+  }
+
+  private zone(locationId: number): Promise<string | null> {
+    return this.zoneOf(locationId).catch(() => null);
   }
 
   private async call(
@@ -299,21 +380,27 @@ export class InventoryAdapter implements InventoryApi {
   async listMovements(
     locationId: number,
     query: MovementQuery
-  ): Promise<InventoryMovement[]> {
+  ): Promise<MovementPage> {
+    const zone = await this.zone(locationId);
     const { data } = await this.call(
       `/storages/transactions/${locationId}`,
       `list the inventory operations of location ${locationId}`,
       {
         query: {
-          start_date: query.date_from,
-          end_date: query.date_to,
+          ...utcDaysCovering(query, zone),
           document_id: query.document_id,
           page: query.page,
           count: query.page_size,
         },
       }
     );
-    return rows(data).map(movementFromWire);
+    const page = rows(data);
+    return {
+      lines: page
+        .map((row) => movementFromWire(row, zone))
+        .filter((line) => onDaysAsked(line, query, zone)),
+      more: page.length >= query.page_size,
+    };
   }
 
   async getDocument(
@@ -387,10 +474,16 @@ export class InventoryAdapter implements InventoryApi {
       }
     );
     const created = asRow(data);
+    const zone = await this.zone(locationId);
     return {
       document: documentFromWire(asRow(created.document)),
       lines: rows(created.goods_transactions ?? created.transactions).map(
-        movementFromWire
+        (row) => {
+          const line = movementFromWire(row, zone);
+          return line.quantity
+            ? { ...line, direction: DIRECTION_OF[operation.kind] }
+            : line;
+        }
       ),
     };
   }

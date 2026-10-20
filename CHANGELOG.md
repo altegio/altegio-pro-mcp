@@ -6,6 +6,30 @@ is declared stable.
 
 ## [Unreleased]
 
+### Fixed — payments Altegio does not keep, inventory dates and directions
+
+Found by the live suites on a test location and checked there after the fix.
+
+- **`visits_add_payment` refuses a waiting or no-show appointment** before
+  anyone is asked to confirm. Altegio answered such a payment as recorded and
+  then kept nothing, so the tool reported a payment that did not exist and a
+  repeat went through. Paying a confirmed appointment whose time has passed
+  marks it arrived; the confirmation and the result now say so. The result is
+  what a fresh read of the visit shows, not the payment route's answer.
+- **`inventory_create_operation` refuses a repeat near midnight.** The
+  operations list files a line by its UTC day, so the guard missed a repeat
+  between the location's midnight and UTC's and recorded a second document.
+  The list is now read for the UTC days that cover the location's.
+- **`inventory_list_operations` keeps the location days asked for**, which it
+  missed or overshot near midnight, and gives each line's time in the
+  location's offset instead of the server's (`+04:00` on a Prague location
+  read two hours early). A page can hold fewer lines than `page_size` and
+  still say more follow.
+- **A write-off or sale result says the stock went out** (`direction: "out"`,
+  `−1 pcs`); it said `in`.
+- **`financial_transactions_delete` refuses a transaction that is not there**
+  (or that a payment or document recorded) before asking to confirm.
+
 ### Changed — one visit port, one failure mapping, one guarded write
 
 - **`visits_add_product` and `visits_remove_product` bind the confirmation to

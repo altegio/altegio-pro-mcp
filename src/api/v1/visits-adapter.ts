@@ -44,6 +44,7 @@ import {
 } from './envelope.js';
 import type {
   AdvancePaymentHold,
+  AppointmentAttendance,
   PaymentMethod,
   PaymentOption,
   PaymentRequest,
@@ -55,6 +56,23 @@ import type {
 
 /** The visit document type on an appointment's `documents[]`. */
 const VISIT_DOCUMENT_TYPE = 7;
+
+const ATTENDANCE_FROM_WIRE: Record<number, AppointmentAttendance> = {
+  [-1]: 'no_show',
+  0: 'waiting',
+  1: 'arrived',
+  2: 'confirmed',
+};
+
+/** The appointment as the visit read reports it. */
+interface VisitRecord {
+  location_id: number;
+  appointment_id: number;
+  visit_id: number | null;
+  client_id: number | null;
+  attendance: AppointmentAttendance;
+  starts_at: string | null;
+}
 
 // ========== visit: wire → port ==========
 
@@ -213,15 +231,7 @@ function optionFromWire(row: Row): PaymentOption {
 }
 
 /** Project the sale state of a visit document onto the visit. */
-export function visitFromWire(
-  sale: Row,
-  context: {
-    location_id: number;
-    appointment_id: number;
-    visit_id: number | null;
-    client_id: number | null;
-  }
-): Visit {
+export function visitFromWire(sale: Row, context: VisitRecord): Visit {
   const state = asRow(sale.state);
   const items = rows(state.items).map(itemFromWire);
   const payments = [
@@ -344,11 +354,7 @@ export class VisitsV1Adapter implements VisitPaymentsApi {
   private async visitDocument(
     locationId: number,
     appointmentId: number
-  ): Promise<{
-    document_id: number;
-    visit_id: number | null;
-    client_id: number | null;
-  }> {
+  ): Promise<{ document_id: number; record: VisitRecord }> {
     const { data } = await this.read(
       `/locations/${locationId}/appointments/${appointmentId}`,
       `read appointment ${appointmentId}`,
@@ -381,21 +387,26 @@ export class VisitsV1Adapter implements VisitPaymentsApi {
         `Appointment ${appointmentId} has nothing to pay yet: Altegio opens its visit for payment once the appointment has a client. Add a client with appointments_update, then read the visit again.`
       );
     }
+    const attendance = num(record.attendance);
     return {
       document_id: documentId,
-      visit_id: id(record.visit_id),
-      client_id: id(asRow(record.client).id) ?? id(record.client_id),
+      record: {
+        location_id: locationId,
+        appointment_id: appointmentId,
+        visit_id: id(record.visit_id),
+        client_id: id(asRow(record.client).id) ?? id(record.client_id),
+        attendance:
+          (attendance !== null
+            ? ATTENDANCE_FROM_WIRE[attendance]
+            : undefined) ?? 'unknown',
+        starts_at: text(record.datetime),
+      },
     };
   }
 
   private async saleVisit(
     locationId: number,
-    appointmentId: number,
-    doc: {
-      document_id: number;
-      visit_id: number | null;
-      client_id: number | null;
-    },
+    doc: { document_id: number; record: VisitRecord },
     request: {
       method?: Method;
       path?: string;
@@ -413,17 +424,12 @@ export class VisitsV1Adapter implements VisitPaymentsApi {
         ...(request.hints ? { hints: request.hints } : {}),
       }
     );
-    return visitFromWire(asRow(data), {
-      location_id: locationId,
-      appointment_id: appointmentId,
-      visit_id: doc.visit_id,
-      client_id: doc.client_id,
-    });
+    return visitFromWire(asRow(data), doc.record);
   }
 
   async getVisit(locationId: number, appointmentId: number): Promise<Visit> {
     const doc = await this.visitDocument(locationId, appointmentId);
-    return this.saleVisit(locationId, appointmentId, doc, {
+    return this.saleVisit(locationId, doc, {
       context: `read the visit of appointment ${appointmentId}`,
     });
   }
@@ -434,7 +440,7 @@ export class VisitsV1Adapter implements VisitPaymentsApi {
     payment: PaymentRequest
   ): Promise<Visit> {
     const doc = await this.visitDocument(locationId, appointmentId);
-    return this.saleVisit(locationId, appointmentId, doc, {
+    return this.saleVisit(locationId, doc, {
       method: 'POST',
       path: '/payment',
       body: paymentBody(payment),
@@ -462,7 +468,7 @@ export class VisitsV1Adapter implements VisitPaymentsApi {
     const kind =
       match[1] === 't' ? 'payment_transaction' : 'loyalty_transaction';
     const doc = await this.visitDocument(locationId, appointmentId);
-    return this.saleVisit(locationId, appointmentId, doc, {
+    return this.saleVisit(locationId, doc, {
       method: 'DELETE',
       path: `/payment/${kind}/${match[2]}`,
       context: `cancel payment ${paymentId} on the visit of appointment ${appointmentId}`,

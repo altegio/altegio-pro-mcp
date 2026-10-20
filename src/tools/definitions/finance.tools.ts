@@ -482,6 +482,8 @@ export const financialTransactionsDeleteTool = defineTool({
     target: (input) =>
       `financial transaction ${input.transaction_id} at location ${input.location_id}`,
     resolve: (input, client) => finance.describeTransaction(client, input),
+    detail: (input, client) =>
+      finance.describeTransactionDeletion(client, input),
     consequence:
       'The transaction is removed from the account or cash register and from every finance report; this server cannot restore it.',
   },

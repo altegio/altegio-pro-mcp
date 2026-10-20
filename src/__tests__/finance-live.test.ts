@@ -346,46 +346,86 @@ describeLive('finance tools against the test location', () => {
     expect(await isDeleted(altegio, ids.LOCATION_ID, appointment)).toBe(true);
   }, 120_000);
 
-  // Known defect: on a waiting appointment Altegio answers the payment with
-  // the payment in place, but does not keep it, and the tool reports it
-  // recorded. Passing here means the defect is gone — make it a plain `it`.
-  it.failing(
-    'records a payment on a waiting appointment, or refuses it',
-    async () => {
-      const appointment = await createAppointment(altegio, fixture(), {
-        day: isoDay(-9),
-        time: '12:00',
-        comment: 'finance-live: deleted by the suite',
+  // On a waiting appointment Altegio answers a payment as recorded and then
+  // does not keep it, so the tool refuses before anyone is asked.
+  it('refuses a payment on a waiting appointment before anything is asked', async () => {
+    const appointment = await createAppointment(altegio, fixture(), {
+      day: isoDay(-9),
+      time: '12:00',
+      comment: 'finance-live: deleted by the suite',
+    });
+    try {
+      const start = await host.read<Visit>('visits_get', {
+        ...at(),
+        appointment_id: appointment,
       });
-      try {
-        const start = await host.read<Visit>('visits_get', {
-          ...at(),
-          appointment_id: appointment,
-        });
-        const pay = await host.confirmed('visits_add_payment', {
-          ...at(),
-          appointment_id: appointment,
-          method: 'account',
-          account_id: ids.ACCOUNT_ID,
-          amount: 1,
-          expected_amount_due: start.amount_due,
-        });
-        const paid = await pay.run();
-        if (paid.isError) {
-          expect(textOf(paid)).toContain('Nothing was recorded');
-          return;
-        }
-        const added = (paid.structuredContent as unknown as Visit)
-          .added_payment_ids!;
-        const after = await host.read<Visit>('visits_get', {
-          ...at(),
-          appointment_id: appointment,
-        });
-        expect(after.payments.map((p) => p.id)).toContain(added[0]);
-      } finally {
-        await cleanUp(appointment, new Set());
-      }
-    },
-    120_000
-  );
+      const asked = await host.call('visits_add_payment', {
+        ...at(),
+        appointment_id: appointment,
+        method: 'account',
+        account_id: ids.ACCOUNT_ID,
+        amount: 1,
+        expected_amount_due: start.amount_due,
+      });
+      expect(asked.isError).toBe(true);
+      expect(textOf(asked)).toContain(
+        `appointment ${appointment} is still waiting for the client`
+      );
+      const after = await host.read<Visit>('visits_get', {
+        ...at(),
+        appointment_id: appointment,
+      });
+      expect(after.payments).toEqual(start.payments);
+      expect(after.amount_due).toBe(start.amount_due);
+    } finally {
+      await cleanUp(appointment, new Set());
+    }
+    expect(await isDeleted(altegio, ids.LOCATION_ID, appointment)).toBe(true);
+  }, 120_000);
+
+  // A payment on a confirmed appointment whose time has passed is kept, and
+  // Altegio marks the appointment arrived; the confirmation says so.
+  it('says a payment marks a past confirmed appointment arrived, and records it', async () => {
+    const appointment = await createAppointment(altegio, fixture(), {
+      day: isoDay(-10),
+      time: '13:00',
+      comment: 'finance-live: deleted by the suite',
+      attendance: 2,
+    });
+    let before = new Set<string>();
+    try {
+      const start = await host.read<Visit>('visits_get', {
+        ...at(),
+        appointment_id: appointment,
+      });
+      before = new Set(start.payments.map((p) => p.id));
+      const pay = await host.confirmed('visits_add_payment', {
+        ...at(),
+        appointment_id: appointment,
+        method: 'account',
+        account_id: ids.ACCOUNT_ID,
+        amount: 1,
+        expected_amount_due: start.amount_due,
+      });
+      expect(JSON.stringify(pay.asked.content)).toContain(
+        'Altegio marks it arrived when the payment is recorded'
+      );
+      const paid = await pay.run();
+      expect(paid.isError).toBeFalsy();
+      expect(textOf(paid)).toContain(
+        `Altegio marked appointment ${appointment} arrived with the payment.`
+      );
+      const added = (paid.structuredContent as unknown as Visit)
+        .added_payment_ids!;
+      expect(added).toHaveLength(1);
+      const after = await host.read<Visit>('visits_get', {
+        ...at(),
+        appointment_id: appointment,
+      });
+      expect(after.payments.map((p) => p.id)).toContain(added[0]);
+    } finally {
+      await cleanUp(appointment, before);
+    }
+    expect(await isDeleted(altegio, ids.LOCATION_ID, appointment)).toBe(true);
+  }, 120_000);
 });
