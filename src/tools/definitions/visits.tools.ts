@@ -252,7 +252,8 @@ export const visitsAddPaymentTool = defineTool({
       `Records ${finance.paymentSummary(input)} against the visit: the amount due drops by it and the location's finances and reports include it. No card is charged — this records money already received. It can be undone with visits_cancel_payment.`,
   },
   outputSchema: visitSchema,
-  handler: async ({ input, client }) => finance.addPayment(client, input),
+  handler: async ({ input, client, confirmation }) =>
+    finance.addPayment(client, input, confirmation),
 });
 
 export const visitsCancelPaymentTool = defineTool({
@@ -283,7 +284,8 @@ export const visitsCancelPaymentTool = defineTool({
       'The payment is removed from the visit and from the location’s finances, and its amount becomes due again. Money taken by card or online acquiring is not returned to the client by this — refund it in the terminal or acquiring service. A payment applied from an advance payment hold cannot be cancelled.',
   },
   outputSchema: visitSchema,
-  handler: async ({ input, client }) => finance.cancelPayment(client, input),
+  handler: async ({ input, client, confirmation }) =>
+    finance.cancelPayment(client, input, confirmation),
 });
 
 const productItemSchema = {
@@ -423,7 +425,8 @@ export const visitsAddProductTool = defineTool({
       'unexpected_changes',
     ],
   },
-  handler: async ({ input, client }) => visitProducts.addProduct(client, input),
+  handler: async ({ input, client, confirmation }) =>
+    visitProducts.addProduct(client, input, confirmation),
 });
 
 export const visitsRemoveProductTool = defineTool({
@@ -506,6 +509,6 @@ export const visitsRemoveProductTool = defineTool({
       'unexpected_changes',
     ],
   },
-  handler: async ({ input, client }) =>
-    visitProducts.removeProduct(client, input),
+  handler: async ({ input, client, confirmation }) =>
+    visitProducts.removeProduct(client, input, confirmation),
 });

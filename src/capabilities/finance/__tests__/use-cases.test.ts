@@ -26,6 +26,13 @@ import { FinanceAdapter } from '../../../api/v1/finance-adapter.js';
 import { ConfirmationRefusal } from '../../../tools/confirmation.js';
 import { clearCurrencyCache } from '../../../api/v1/location-currency.js';
 import { clearTimezoneCache } from '../../analytics/location-timezone.js';
+import {
+  visitsAddPaymentTool,
+  visitsCancelPaymentTool,
+} from '../../../tools/definitions/visits.tools.js';
+
+const KEY = '0f6b1c2d-3e4f-8a5b-9c6d-7e8f9a0b1c2d';
+const TOKEN = { confirmation_token: 'checked by the gate' };
 
 interface Call {
   method: string;
@@ -384,6 +391,32 @@ describe('visits_add_payment', () => {
     ).rejects.toThrow(message);
     expect(calls.some((c) => c.method === 'POST')).toBe(false);
   });
+
+  it('hands the confirmation’s key from the tool to the port', async () => {
+    const spy = jest.spyOn(FinanceAdapter.prototype, 'addPayment');
+    try {
+      const result = await visitsAddPaymentTool.createHandler(
+        fakeClient(routes(), [])
+      )(
+        {
+          location_id: LOCATION,
+          appointment_id: APPOINTMENT,
+          method: 'account',
+          account_id: 35501,
+          amount: 200,
+          expected_amount_due: 550,
+          ...TOKEN,
+        },
+        { idempotency_key: KEY }
+      );
+      expect(result.isError).toBeUndefined();
+      expect((spy.mock.calls[0] as unknown[])[3]).toEqual({
+        idempotency_key: KEY,
+      });
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
 
 describe('visits_cancel_payment', () => {
@@ -437,6 +470,35 @@ describe('visits_cancel_payment', () => {
       })
     ).rejects.toThrow(/may already be cancelled/);
     expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
+  });
+
+  it('hands the confirmation’s key from the tool to the port', async () => {
+    const spy = jest.spyOn(FinanceAdapter.prototype, 'cancelPayment');
+    try {
+      const client = fakeClient(
+        [
+          appointmentRoute,
+          saleRoute(paid),
+          ['DELETE', /\/payment\/payment_transaction\/\d+$/, 200, sale()],
+        ],
+        []
+      );
+      const result = await visitsCancelPaymentTool.createHandler(client)(
+        {
+          location_id: LOCATION,
+          appointment_id: APPOINTMENT,
+          payment_id: 't588834559',
+          ...TOKEN,
+        },
+        { idempotency_key: KEY }
+      );
+      expect(result.isError).toBeUndefined();
+      expect((spy.mock.calls[0] as unknown[])[3]).toEqual({
+        idempotency_key: KEY,
+      });
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 
@@ -912,7 +974,6 @@ describe('financial_transactions_update and _delete', () => {
   });
 
   describe('against the version the person was shown', () => {
-    const KEY = '0f6b1c2d-3e4f-8a5b-9c6d-7e8f9a0b1c2d';
     const putRoute: Route = [
       'PUT',
       /^\/finance_transactions\/4564\/589532167$/,

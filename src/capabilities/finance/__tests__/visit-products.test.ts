@@ -17,7 +17,10 @@ import { FinanceAccessError, FinanceInputError } from '../errors.js';
 import { ConfirmationRefusal } from '../../../tools/confirmation.js';
 import { clearCurrencyCache } from '../../../api/v1/location-currency.js';
 import { clearTimezoneCache } from '../../analytics/location-timezone.js';
-import { APPOINTMENT_INCLUDES } from '../../../api/v2/visit-products-adapter.js';
+import {
+  APPOINTMENT_INCLUDES,
+  VisitProductsV2Adapter,
+} from '../../../api/v2/visit-products-adapter.js';
 import {
   visitsAddProductTool,
   visitsRemoveProductTool,
@@ -1658,4 +1661,44 @@ describe('visits_remove_product: the confirmation detail', () => {
     expect(error).toBeInstanceOf(ConfirmationRefusal);
     expect((error as Error).message).not.toMatch(/^Nothing was changed/);
   });
+});
+
+describe('visit product tools: the confirmed call', () => {
+  const KEY = '0f6b1c2d-3e4f-8a5b-9c6d-7e8f9a0b1c2d';
+  const TOKEN = { confirmation_token: 'checked by the gate' };
+
+  it.each([
+    [
+      'visits_add_product',
+      'addProductLine' as const,
+      () => freshState(),
+      () => visitsAddProductTool,
+      () => input(),
+    ],
+    [
+      'visits_remove_product',
+      'reduceProductLine' as const,
+      () => freshState({ goods: [existingLine()] }),
+      () => visitsRemoveProductTool,
+      () => removal(),
+    ],
+  ])(
+    '%s hands the confirmation’s key to the port',
+    async (_name, method, state, tool, args) => {
+      const spy = jest.spyOn(VisitProductsV2Adapter.prototype, method);
+      try {
+        const result = await tool().createHandler(fakeClient(state(), []))(
+          { ...args(), ...TOKEN },
+          { idempotency_key: KEY }
+        );
+        expect(result.isError).toBeUndefined();
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect((spy.mock.calls[0] as unknown[])[3]).toEqual({
+          idempotency_key: KEY,
+        });
+      } finally {
+        spy.mockRestore();
+      }
+    }
+  );
 });
