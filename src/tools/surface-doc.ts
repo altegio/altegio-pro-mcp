@@ -17,6 +17,11 @@ import {
 } from './facets.js';
 import { allToolEntries, type ToolInventoryEntry } from './inventory.js';
 import {
+  DEFAULT_VIEW_TARGET_BYTES,
+  viewSizes,
+  type ViewSize,
+} from './listing-budget.js';
+import {
   buildSurfaceTable,
   toolCounts,
   toolCountSentence,
@@ -123,7 +128,7 @@ const REASON_LEGEND: readonly (readonly [SurfaceReason, string, string])[] = [
   ],
   [
     'default-view-excluded-prefix',
-    'a whole pack held back from `/mcp`’s tool budget',
+    'a whole pack held back from `/mcp`’s byte budget',
     '`DEFAULT_FACET_EXCLUDED_PREFIXES`',
   ],
   [
@@ -207,6 +212,22 @@ function switchDelta(
   return lines.length > 0 ? lines : ['- nothing moves'];
 }
 
+/** `147705` → `147,705`, without the host's locale. */
+function groupDigits(value: number): string {
+  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+/** The size cell: bytes, and the share of the budget when there is one. */
+function sizeCell(size: ViewSize | undefined): string {
+  return size ? groupDigits(size.bytes) : '—';
+}
+
+function budgetCell(size: ViewSize | undefined): string {
+  if (size?.budget === undefined) return '—';
+  const used = Math.round((size.bytes / size.budget) * 100);
+  return `${groupDigits(size.budget)} (${used} %)`;
+}
+
 function reasonBreakdown(cells: readonly SurfaceCell[]): string {
   const counts = new Map<SurfaceReason, number>();
   for (const cell of cells) {
@@ -231,6 +252,8 @@ export function renderSurfaceDoc(
   const surface = buildSurfaceTable(entries);
   const counts = toolCounts(entries);
   const views = surface.views;
+  const sizes = viewSizes(entries.filter((entry) => !entry.disabled));
+  const sizeOf = (view: FacetKey) => sizes.find((size) => size.view === view);
 
   const out: string[] = [];
 
@@ -315,14 +338,39 @@ export function renderSurfaceDoc(
   out.push('');
   out.push(
     table(
-      ['View', 'Address', `Serves (of ${counts.defined} defined)`, 'Reasons'],
+      [
+        'View',
+        'Address',
+        `Serves (of ${counts.defined} defined)`,
+        '`tools/list` bytes',
+        'Budget (used)',
+        'Reasons',
+      ],
       views.map((view) => [
         `\`${view}\``,
         viewAddress(view),
         String(surface.servedOn(view).length),
+        sizeCell(sizeOf(view)),
+        budgetCell(sizeOf(view)),
         reasonBreakdown(surface.forView(view)),
       ])
     )
+  );
+  out.push('');
+  out.push(
+    '`tools/list` bytes is the serialized result the view sends in the default'
+  );
+  out.push(
+    'deployment — what a host that loads the whole list pays on every connection,'
+  );
+  out.push(
+    'roughly 4 bytes per token. The budgets are in `src/tools/listing-budget.ts`;'
+  );
+  out.push(
+    `the tests and \`npm run surface:check\` fail above them. \`/mcp\` is headed for`
+  );
+  out.push(
+    `${groupDigits(DEFAULT_VIEW_TARGET_BYTES)} bytes or less by demotion and schema trims (ADR-001 D3).`
   );
   out.push('');
   out.push(

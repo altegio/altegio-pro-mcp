@@ -119,7 +119,7 @@ visit's bill (lines, payments, amount due and the ways it can be paid),
 `visits_add_payment` and `visits_cancel_payment` record and cancel a payment,
 `client_accounts_list_for_client` and `client_accounts_deposit` read and top up
 a client account, and `accounts_and_cash_registers_list` lists where money is
-received. Back-office money is on `/mcp/finance` only: `financial_transactions_list`,
+received. Back-office money is on `/mcp` and `/mcp/finance`: `financial_transactions_list`,
 `financial_transactions_create`, `financial_transactions_update`,
 `financial_transactions_delete`, `financial_transactions_list_payment_items`
 (payment items with their income or expense category) and

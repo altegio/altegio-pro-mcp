@@ -53,17 +53,23 @@ Served tools per category, in `tools/list` order:
 
 ## Views
 
-| View | Address | Serves (of 159 defined) | Reasons |
-| --- | --- | --- | --- |
-| `all` | stdio (no HTTP route) | 153 | all ×153, -off ×6 |
-| `default` | `/mcp` | 115 | dflt ×111, -pack ×35, -off ×6, base ×3, -pwd ×2, -name ×1, xtra ×1 |
-| `readonly` | `/mcp/readonly` | 84 | ro ×84, -write ×67, -off ×6, -pwd ×2 |
-| `ops` | `/mcp/ops` | 53 | - ×98, pfx ×27, rule ×23, -off ×6, base ×3, -pwd ×2 |
-| `catalog` | `/mcp/catalog` | 34 | - ×117, rule ×31, -off ×6, base ×3, -pwd ×2 |
-| `finance` | `/mcp/finance` | 57 | - ×94, pfx ×50, -off ×6, rule ×4, base ×3, -pwd ×2 |
-| `marketing` | `/mcp/marketing` | 17 | - ×134, pfx ×13, -off ×6, base ×3, -pwd ×2, rule ×1 |
-| `analytics` | `/mcp/analytics` | 33 | - ×118, pfx ×30, -off ×6, base ×3, -pwd ×2 |
-| `onboarding` | `/mcp/onboarding` | 15 | - ×136, pfx ×12, -off ×6, base ×3, -pwd ×2 |
+| View | Address | Serves (of 159 defined) | `tools/list` bytes | Budget (used) | Reasons |
+| --- | --- | --- | --- | --- | --- |
+| `all` | stdio (no HTTP route) | 153 | 208,249 | — | all ×153, -off ×6 |
+| `default` | `/mcp` | 121 | 147,705 | 155,500 (95 %) | dflt ×117, -pack ×29, -off ×6, base ×3, -pwd ×2, -name ×1, xtra ×1 |
+| `readonly` | `/mcp/readonly` | 84 | 119,808 | 126,000 (95 %) | ro ×84, -write ×67, -off ×6, -pwd ×2 |
+| `ops` | `/mcp/ops` | 53 | 73,816 | 78,000 (95 %) | - ×98, pfx ×27, rule ×23, -off ×6, base ×3, -pwd ×2 |
+| `catalog` | `/mcp/catalog` | 34 | 26,622 | 28,000 (95 %) | - ×117, rule ×31, -off ×6, base ×3, -pwd ×2 |
+| `finance` | `/mcp/finance` | 57 | 100,470 | 105,500 (95 %) | - ×94, pfx ×50, -off ×6, rule ×4, base ×3, -pwd ×2 |
+| `marketing` | `/mcp/marketing` | 17 | 24,235 | 25,500 (95 %) | - ×134, pfx ×13, -off ×6, base ×3, -pwd ×2, rule ×1 |
+| `analytics` | `/mcp/analytics` | 33 | 63,825 | 67,500 (95 %) | - ×118, pfx ×30, -off ×6, base ×3, -pwd ×2 |
+| `onboarding` | `/mcp/onboarding` | 15 | 12,463 | 13,500 (92 %) | - ×136, pfx ×12, -off ×6, base ×3, -pwd ×2 |
+
+`tools/list` bytes is the serialized result the view sends in the default
+deployment — what a host that loads the whole list pays on every connection,
+roughly 4 bytes per token. The budgets are in `src/tools/listing-budget.ts`;
+the tests and `npm run surface:check` fail above them. `/mcp` is headed for
+100,000 bytes or less by demotion and schema trims (ADR-001 D3).
 
 A facet answers *how many tools fit in this host’s context*; `readonly`
 answers *what may this agent do at all*. They are different kinds of view —
@@ -83,7 +89,7 @@ answers *what may this agent do at all*. They are different kinds of view —
 | `ro` | yes | declares `readOnlyHint: true` | the tool’s own annotations |
 | `-pwd` | no | a password prompt under an OAuth endpoint | `PASSWORD_LOGIN_TOOLS` + `ALTEGIO_EXPOSE_PASSWORD_LOGIN` |
 | `-name` | no | a dangerous right `/mcp` does not hand a generic agent | `DEFAULT_FACET_EXCLUDED_TOOLS` |
-| `-pack` | no | a whole pack held back from `/mcp`’s tool budget | `DEFAULT_FACET_EXCLUDED_PREFIXES` |
+| `-pack` | no | a whole pack held back from `/mcp`’s byte budget | `DEFAULT_FACET_EXCLUDED_PREFIXES` |
 | `-onb` | no | the onboarding config switch is on | `MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING` |
 | `-` | no | this facet’s rule does not name it | `FACET_RULES[<facet>]` |
 | `-write` | no | it changes data, so the read-only address will not serve it | the tool’s own annotations |
@@ -240,11 +246,11 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | `accounts_and_cash_registers_list` | `all` | `dflt` | `ro` | `rule` | `-` | `pfx` | `-` | `-` | `-` | finance:read |
 | `client_accounts_deposit` | `all` | `dflt` | `-write` | `rule` | `-` | `pfx` | `-` | `-` | `-` | client_accounts:write, confirm |
 | `client_accounts_list_for_client` | `all` | `dflt` | `ro` | `rule` | `-` | `pfx` | `-` | `-` | `-` | client_accounts:read |
-| `financial_transactions_create` | `all` | `-pack` | `-write` | `-` | `-` | `pfx` | `-` | `-` | `-` | finance:write, confirm |
-| `financial_transactions_delete` | `all` | `-pack` | `-write` | `-` | `-` | `pfx` | `-` | `-` | `-` | finance:write, confirm |
-| `financial_transactions_list` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `-` | `-` | finance:read |
-| `financial_transactions_list_payment_items` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `-` | `-` | finance:read |
-| `financial_transactions_update` | `all` | `-pack` | `-write` | `-` | `-` | `pfx` | `-` | `-` | `-` | finance:write, confirm |
+| `financial_transactions_create` | `all` | `dflt` | `-write` | `-` | `-` | `pfx` | `-` | `-` | `-` | finance:write, confirm |
+| `financial_transactions_delete` | `all` | `dflt` | `-write` | `-` | `-` | `pfx` | `-` | `-` | `-` | finance:write, confirm |
+| `financial_transactions_list` | `all` | `dflt` | `ro` | `-` | `-` | `pfx` | `-` | `-` | `-` | finance:read |
+| `financial_transactions_list_payment_items` | `all` | `dflt` | `ro` | `-` | `-` | `pfx` | `-` | `-` | `-` | finance:read |
+| `financial_transactions_update` | `all` | `dflt` | `-write` | `-` | `-` | `pfx` | `-` | `-` | `-` | finance:write, confirm |
 
 ### Inventory
 
@@ -305,7 +311,7 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 
 | Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `payroll_get_calculation` | `all` | `-pack` | `ro` | `-` | `-` | `pfx` | `-` | `-` | `-` | payroll:read |
+| `payroll_get_calculation` | `all` | `dflt` | `ro` | `-` | `-` | `pfx` | `-` | `-` | `-` | payroll:read |
 
 ### Positions
 

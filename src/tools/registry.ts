@@ -11,17 +11,15 @@ import {
 import { AltegioClient } from '../providers/altegio-client.js';
 import { OnboardingHandlers } from './onboarding-handlers.js';
 import { OnboardingStateManager } from '../providers/onboarding-state-manager.js';
-import { orderedToolEntries, servedDefinedTools } from './inventory.js';
+import { servedDefinedTools } from './inventory.js';
 import {
-  buildFacetIndex,
-  facetToolsFromSpecs,
   readOnlyRefusalMessage,
-  viewUrl,
   DEFAULT_FACET,
   READONLY_VIEW,
   type FacetKey,
   type FacetIndex,
 } from './facets.js';
+import { addressesServing, listView } from './listing.js';
 import type { ToolResult } from './tool-result.js';
 import {
   requireConfirmation,
@@ -44,7 +42,7 @@ import {
   requiredScopesFor,
   type ToolScope,
 } from './scopes.js';
-import { listedOnView, runOnView, type ServingView } from './serving-view.js';
+import { runOnView, type ServingView } from './serving-view.js';
 import {
   legacyAliasTargets,
   translateLegacyArguments,
@@ -98,28 +96,6 @@ export interface RegisterToolsOptions {
  * where callers have always imported it from.
  */
 export { orderedToolEntries, type ToolEntry } from './inventory.js';
-
-/**
- * Absolute addresses of this endpoint's views that serve a tool the current
- * view does not: the named facets first, then the complete surface. Absolute,
- * because a relative /mcp/<view> is wrong on the short customer address, where
- * /pro/mcp/… is the internal lane.
- */
-function addressesServing(
-  name: string,
-  index: FacetIndex,
-  publicBaseUrl: string
-): string[] {
-  return [
-    ...index.facetsProviding(name).map((f) => viewUrl(publicBaseUrl, f)),
-    // Only offer the complete surface when it actually serves the tool: a tool
-    // withheld from the default view (access management, password login) must
-    // not be advertised back to the caller as available one path up.
-    ...(index.includes(DEFAULT_FACET, name)
-      ? [viewUrl(publicBaseUrl, DEFAULT_FACET)]
-      : []),
-  ];
-}
 
 function outOfFacetError(
   name: string,
@@ -474,33 +450,21 @@ export function registerTools(
     onboarding_rollback_phase: (args) => onboarding.rollbackPhase(args),
   };
 
-  // One deterministic order for every view, computed once at startup.
-  const entries = orderedToolEntries();
-  const facetIndex = buildFacetIndex(
-    facetToolsFromSpecs(entries.map((entry) => entry.spec)),
-    {
-      excludeOnboardingFromDefault: options.excludeOnboardingFromDefault,
-      exposePasswordLogin: options.exposePasswordLogin,
-    }
-  );
+  // One deterministic list per view, computed once at startup
+  // (`./listing.ts`, which the byte budget measures too).
   const facet = options.facet ?? DEFAULT_FACET;
   const publicBaseUrl = options.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL;
+  const listing = listView(facet, {
+    excludeOnboardingFromDefault: options.excludeOnboardingFromDefault,
+    exposePasswordLogin: options.exposePasswordLogin,
+    publicBaseUrl,
+  });
+  const { facetIndex, servingView } = listing;
   const visible = new Set(facetIndex.members(facet));
-  // What a reply or a description may name as callable here
-  // (`./serving-view.ts`).
-  const servingView: ServingView = {
-    serves: (name) => visible.has(name),
-    addressesServing: (name) =>
-      addressesServing(name, facetIndex, publicBaseUrl),
-  };
-  const toolNames = entries.map((entry) => entry.spec.name);
-  const visibleToolDefs = entries
-    .filter((entry) => visible.has(entry.spec.name))
-    .map((entry) => listedOnView(entry.spec, servingView, toolNames));
 
   // list handler — the same list for every connection to this facet
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: visibleToolDefs,
+    tools: listing.tools,
   }));
 
   // Own keys only: a name such as `constructor` is not a tool.
@@ -725,5 +689,5 @@ export function registerTools(
       : onView();
   });
 
-  return visibleToolDefs.map((tool) => tool.name);
+  return listing.tools.map((tool) => tool.name);
 }
