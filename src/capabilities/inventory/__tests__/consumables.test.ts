@@ -48,12 +48,12 @@ function block(
   appointment: number,
   service: number,
   lines: LineFixture[],
-  bill: { id: number; title: string } | null = { id: 8, title: 'Colouring' }
+  bom: { id: number; title: string } | null = { id: 8, title: 'Colouring' }
 ): Record<string, unknown> {
   return {
     record_id: appointment,
     service_id: service,
-    technological_cards: bill ? [bill] : [],
+    technological_cards: bom ? [bom] : [],
     consumables: lines.map((l) => ({
       goods_transaction_id: l.line,
       good_id: l.product,

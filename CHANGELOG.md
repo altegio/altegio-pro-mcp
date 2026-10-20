@@ -6,6 +6,47 @@ is declared stable.
 
 ## [Unreleased]
 
+### Breaking changes — visit, finance and inventory tools follow the product glossary
+
+The owner decided on 2026-10-20 that there is no "bill": the visit itself is
+what the client pays, as in the V3 contract. Its lines are **visit items**, its
+money is the **amount due** and the **payments**, and what is printed for it is
+its **printed receipt**. The visit tools are a few days old, so their fields
+are renamed now rather than aliased.
+
+- **`visits_get`, `visits_add_payment`, `visits_cancel_payment` output:**
+  `lines` → `items`; `payments[].bill_line_id` → `payments[].visit_item_id`
+  (the V3 names).
+- **`visits_add_product` output:** `added_line` → `added_item`, `line` →
+  `item`, `bill` → `visit_amounts`, `product_lines` → `product_items`.
+- **`visits_remove_product`:** input `line_id` → `visit_item_id`; output
+  `removed_line` → `removed_item`, `line_before` → `item_before`, `line` →
+  `item`, `bill` → `visit_amounts`, `product_lines` → `product_items`.
+- **`financial_transactions_list_payment_items` `category`** now uses the
+  Altegio UI's names: `administrative` → `operational`, `miscellaneous` →
+  `other_expenses`, `income` → `revenue`. `prime_cost`, `commercial`,
+  `personnel`, `taxes_and_fees` and `unknown` are unchanged.
+- **`suppliers_list` → `suppliers_and_partners_list`**, like
+  `accounts_and_cash_registers_list`: Suppliers and Partners are one concept.
+  The former name still runs as a call alias (logged as `alias`) but is no
+  longer listed.
+
+Text the model reads changes with them:
+
+- Every visit tool, its results, refusals and confirmations speak of the visit,
+  its visit items, amount due, payments and printed receipt; "bill" is gone
+  from the server's own text, apart from Bills of Materials.
+- `inventory_create_operation` asks for the cost price of a receipt, not a
+  "purchase price"; the services tools' `prepaid` argument is described as an
+  online advance payment; the no-show playbook speaks of advance payments.
+- The `altegio://docs/glossary` resource adds the visit-as-billing-object rule
+  and **Visitor** (the person, pet or vehicle an appointment is for), **Visit
+  item**, **Printed receipt**, **Product marking** and the category names;
+  **Combined service** replaces "Package" (never Package, Complex or Composite
+  service).
+- `src/generated/catalog.json` is rebuilt against the current specification,
+  which also brings in its V3 OAuth wording.
+
 ### Changed — back-office finance on `/mcp`; a byte budget per view
 
 - **Back-office finance joins the default view.** `financial_transactions_list`,

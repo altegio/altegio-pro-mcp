@@ -71,7 +71,7 @@ interface State {
   loyaltyShare: number;
   /** Sale-unit stock of PRODUCT in inventory 38882; saves move it. */
   stock: number;
-  /** Money already paid on the bill. */
+  /** Money already paid on the visit. */
   paid: number;
   /** Runs on every appointment read; may change the state. */
   onRead?: (state: State, readNo: number) => void;
@@ -719,10 +719,10 @@ describe('visits_add_product: the save body', () => {
     });
     expect(result.isError).toBeUndefined();
     expect(result.structuredContent).toMatchObject({
-      added_line: true,
+      added_item: true,
       previous_quantity: 0,
       currency: 'CZK',
-      line: {
+      item: {
         product_id: PRODUCT,
         quantity: 2,
         amount: 36.18,
@@ -758,11 +758,11 @@ describe('visits_add_product: the save body', () => {
       }),
     ]);
     expect(result.structuredContent).toMatchObject({
-      added_line: false,
+      added_item: false,
       previous_quantity: 1,
-      line: { id: 649590969, quantity: 3 },
+      item: { id: 649590969, quantity: 3 },
     });
-    expect(summaryOf(result.text)).toContain('Raised line 649590969');
+    expect(summaryOf(result.text)).toContain('Raised visit item 649590969');
   });
 
   it('marks a waiting appointment arrived only when asked', async () => {
@@ -845,8 +845,8 @@ describe('visits_add_product: refusals before any save', () => {
 
   it('refuses a group event appointment', () =>
     refused(freshState({ activity: 10827797 }), {}, /group event/));
-  it('refuses a printed bill', () =>
-    refused(freshState({ printed: true }), {}, /bill .* is printed/));
+  it('refuses a printed receipt', () =>
+    refused(freshState({ printed: true }), {}, /visit has a printed receipt/));
   it('refuses a no-show appointment', () =>
     refused(freshState({ status: -1 }), { mark_arrived: true }, /no-show/));
   it('refuses gift card and membership products', () =>
@@ -859,7 +859,7 @@ describe('visits_add_product: refusals before any save', () => {
         goods: [existingLine({ good_id: OTHER_PRODUCT, membership: true })],
       }),
       {},
-      /gift card or membership \(line 649590969\)/
+      /gift card or membership \(visit item 649590969\)/
     ));
   it('refuses a visit whose other appointments sell products', () =>
     refused(
@@ -881,7 +881,7 @@ describe('visits_add_product: refusals before any save', () => {
       {},
       /start time reads back inconsistently/
     ));
-  it('refuses when the bill holds another quantity than the caller read', () =>
+  it('refuses when the visit holds another quantity than the caller read', () =>
     refused(
       freshState({ goods: [existingLine()] }),
       { expected_current_quantity: 0 },
@@ -891,7 +891,7 @@ describe('visits_add_product: refusals before any save', () => {
     refused(
       freshState({ goods: [existingLine()] }),
       { expected_current_quantity: 1, discount_percent: 0 },
-      /already on appointment 678202164 as line 649590969 \(discount 10%\)/
+      /already on appointment 678202164 as visit item 649590969 \(discount 10%\)/
     ));
   it('refuses an inventory the location does not have', () =>
     refused(
@@ -917,13 +917,13 @@ describe('visits_add_product: concurrency and read-back', () => {
     expect(saves(calls)).toHaveLength(0);
   });
 
-  it('reports the line as saved, after loyalty, with the bill total', async () => {
+  it('reports the visit item as saved, after loyalty, with the visit total', async () => {
     const state = freshState({ loyaltyShare: 0.4 });
     const calls: Call[] = [];
     const result = await addProduct(fakeClient(state, calls), input());
     expect(result.structuredContent).toMatchObject({
-      line: { amount: 20.1, amount_after_loyalty: 12.06 },
-      bill: { total_amount: 204.06 },
+      item: { amount: 20.1, amount_after_loyalty: 12.06 },
+      visit_amounts: { total_amount: 204.06 },
     });
     const text = summaryOf(result.text);
     expect(text).toContain('12.06 CZK after loyalty programs');
@@ -957,7 +957,7 @@ describe('visits_add_product: concurrency and read-back', () => {
     const result = await addProduct(fakeClient(state, []), input());
     expect(result.isError).toBe(true);
     expect(summaryOf(result.text)).toMatch(
-      /no line of product 232659 reads back/
+      /no visit item of product 232659 reads back/
     );
   });
 });
@@ -1000,7 +1000,7 @@ describe('visits_add_product: known refusals of the save', () => {
     ],
     [
       'Group bookings can include only one service.',
-      /^Nothing was changed: Altegio saves a group event appointment only with exactly one service line\./,
+      /^Nothing was changed: Altegio saves a group event appointment only with exactly one service\./,
     ],
     [
       'You cannot change the service of appointments related to events',
@@ -1012,11 +1012,11 @@ describe('visits_add_product: known refusals of the save', () => {
     ],
     [
       'Gift card number not specified',
-      /^Nothing was changed: Altegio refused a gift card or membership line of the visit/,
+      /^Nothing was changed: Altegio refused a gift card or membership sold on the visit/,
     ],
     [
       'It is impossible to sell a membership without specifying the planned activation date',
-      /^Nothing was changed: Altegio refused a gift card or membership line/,
+      /^Nothing was changed: Altegio refused a gift card or membership sold/,
     ],
     [
       'You can’t edit a booking after the receipt has been printed. Print a return receipt first to make changes.',
@@ -1194,7 +1194,7 @@ describe('visits_add_product: the confirmation detail', () => {
       input({ mark_arrived: true })
     );
     expect(detail).toContain(
-      'Adds product 232659 ×1 from inventory 38882, sold by team member 3100100: 20.1 CZK each, discount 0% → line total 20.1 CZK before loyalty programs.'
+      'Adds product 232659 ×1 from inventory 38882, sold by team member 3100100: 20.1 CZK each, discount 0% → item total 20.1 CZK before loyalty programs.'
     );
     expect(detail).toContain(
       'Stock of product 232659 in inventory 38882: 5 → 4.'
@@ -1218,7 +1218,7 @@ const removal = (
 ): RemoveProductInput => ({
   location_id: LOCATION,
   appointment_id: APPOINTMENT,
-  line_id: 649590969,
+  visit_item_id: 649590969,
   expected_current_quantity: 1,
   ...overrides,
 });
@@ -1289,20 +1289,20 @@ describe('visits_remove_product: the save body', () => {
     ]);
     expect(result.isError).toBeUndefined();
     expect(result.structuredContent).toMatchObject({
-      removed_line: true,
+      removed_item: true,
       removed_quantity: 1,
       currency: 'CZK',
-      line_before: { id: 649590969, product_id: PRODUCT, quantity: 1 },
-      line: null,
+      item_before: { id: 649590969, product_id: PRODUCT, quantity: 1 },
+      item: null,
       stock: { inventory_id: 38882, before: 5, after: 6 },
-      product_lines: [{ id: 649590970 }],
+      product_items: [{ id: 649590970 }],
       unexpected_changes: [],
     });
     const text = summaryOf(result.text);
     expect(text).toContain(
-      'Took line 649590969 (product 232659 ×1) off appointment 678202164.'
+      'Took visit item 649590969 (product 232659 ×1) off appointment 678202164.'
     );
-    expect(text).toContain('Line now: taken off.');
+    expect(text).toContain('Now: taken off.');
     expect(text).toContain(
       'Stock of product 232659 in inventory 38882: 5 → 6 (1 returned).'
     );
@@ -1335,14 +1335,14 @@ describe('visits_remove_product: the save body', () => {
       }),
     ]);
     expect(result.structuredContent).toMatchObject({
-      removed_line: false,
+      removed_item: false,
       removed_quantity: 2,
-      line_before: { quantity: 3, amount: 54.27 },
-      line: { id: 649590969, quantity: 1, amount: 18.09 },
+      item_before: { quantity: 3, amount: 54.27 },
+      item: { id: 649590969, quantity: 1, amount: 18.09 },
       stock: { before: 5, after: 7 },
     });
     expect(summaryOf(result.text)).toContain(
-      'Lowered line 649590969 of product 232659 on appointment 678202164 from 3 to 1.'
+      'Lowered visit item 649590969 of product 232659 on appointment 678202164 from 3 to 1.'
     );
   });
 
@@ -1353,7 +1353,7 @@ describe('visits_remove_product: the save body', () => {
       removal({ quantity: 1 })
     );
     expect(sentGoods(state)).toEqual([]);
-    expect(result.structuredContent).toMatchObject({ removed_line: true });
+    expect(result.structuredContent).toMatchObject({ removed_item: true });
   });
 
   it('keeps a confirmed appointment confirmed', async () => {
@@ -1388,13 +1388,13 @@ describe('visits_remove_product: refusals before any save', () => {
 
   it('refuses a group event appointment', () =>
     refused(withLine({ activity: 10827797 }), {}, /group event/));
-  it('refuses a printed bill', () =>
-    refused(withLine({ printed: true }), {}, /bill .* is printed/));
+  it('refuses a printed receipt', () =>
+    refused(withLine({ printed: true }), {}, /visit has a printed receipt/));
   it('refuses a waiting appointment', () =>
     refused(
       withLine({ status: 0 }),
       {},
-      /is waiting; .*can drop every product line/
+      /is waiting; .*can drop every product sold on the visit/
     ));
   it('refuses a no-show appointment', () =>
     refused(withLine({ status: -1 }), {}, /marked no-show/));
@@ -1416,7 +1416,7 @@ describe('visits_remove_product: refusals before any save', () => {
     refused(
       freshState({ goods: [existingLine({ membership: true })] }),
       {},
-      /line 649590969 issued a membership/
+      /visit item 649590969 issued a membership/
     ));
   it('refuses while another line issued a membership', () =>
     refused(
@@ -1427,13 +1427,13 @@ describe('visits_remove_product: refusals before any save', () => {
         ],
       }),
       {},
-      /also sells a gift card or membership \(line 649590970\)/
+      /also sells a gift card or membership \(visit item 649590970\)/
     ));
   it('refuses a line the appointment does not have', () =>
     refused(
       withLine(),
-      { line_id: 123 },
-      /no product line 123 \(its product lines: 649590969\)/
+      { visit_item_id: 123 },
+      /no visit item 123 that sells a product \(its product items: 649590969\)/
     ));
   it('refuses a line sold in the consumable unit', () =>
     refused(
@@ -1445,7 +1445,7 @@ describe('visits_remove_product: refusals before any save', () => {
     refused(
       withLine(),
       { expected_current_quantity: 2 },
-      /line 649590969 holds 1 of product 232659 now, not the 2.*already recorded/
+      /visit item 649590969 holds 1 of product 232659 now, not the 2.*already recorded/
     ));
   it('refuses to take off more than the line holds', () =>
     refused(withLine(), { quantity: 2 }, /less than the 2 to take off/));
@@ -1483,7 +1483,7 @@ describe('visits_remove_product: concurrency and read-back', () => {
     const result = await removeProduct(fakeClient(state, []), removal());
     expect(result.isError).toBe(true);
     expect(summaryOf(result.text)).toMatch(
-      /line 649590969 of product 232659 still holds ×1/
+      /visit item 649590969 of product 232659 still holds ×1/
     );
   });
 
@@ -1501,7 +1501,7 @@ describe('visits_remove_product: concurrency and read-back', () => {
     });
   });
 
-  it('says when the bill becomes overpaid and when the client has a discount', async () => {
+  it('says when the visit becomes overpaid and when the client has a discount', async () => {
     const state = freshState({
       goods: [existingLine()],
       paid: 202.85,
@@ -1510,9 +1510,9 @@ describe('visits_remove_product: concurrency and read-back', () => {
     const result = await removeProduct(fakeClient(state, []), removal());
     const text = summaryOf(result.text);
     expect(result.structuredContent).toMatchObject({
-      bill: { total_amount: 192, paid_amount: 202.85 },
+      visit_amounts: { total_amount: 192, paid_amount: 202.85 },
     });
-    expect(text).toContain('The bill is now overpaid by 10.85 CZK');
+    expect(text).toContain('The visit is now overpaid by 10.85 CZK');
     expect(text).toContain('personal discount is 10%');
   });
 
@@ -1565,7 +1565,7 @@ describe('visits_remove_product: visitor, custom fields and refusals', () => {
     );
     expect(error).toBeInstanceOf(FinanceInputError);
     expect((error as Error).message).toMatch(
-      /^Nothing was changed: Altegio saves a group event appointment only with exactly one service line\./
+      /^Nothing was changed: Altegio saves a group event appointment only with exactly one service\./
     );
   });
 
@@ -1606,7 +1606,7 @@ describe('visit product tools: wording', () => {
 
   it('warns that a large sale can raise the personal discount for good', () => {
     expect(consequenceOf(visitsAddProductTool)).toContain(
-      'a large sale can raise it for good: those levels only rise. visits_remove_product can take the line off again, but does not lower that discount.'
+      'a large sale can raise it for good: those levels only rise. visits_remove_product can take the item off again, but does not lower that discount.'
     );
     expect(consequenceOf(visitsRemoveProductTool)).toContain(
       'A personal discount the sale raised stays raised.'
@@ -1626,7 +1626,7 @@ describe('visits_remove_product: the confirmation detail', () => {
     const state = freshState({ goods: [existingLine()], loyaltyShare: 0.4 });
     const detail = await describeRemoval(fakeClient(state, []), removal());
     expect(detail).toContain(
-      'Takes off line 649590969 of product 232659 ×1 (inventory 38882, team member 3100100, 20.1 CZK each, discount 10%): line total 18.09 CZK before loyalty programs, 10.85 CZK after them, comes off the bill.'
+      'Takes off visit item 649590969 of product 232659 ×1 (inventory 38882, team member 3100100, 20.1 CZK each, discount 10%): item total 18.09 CZK before loyalty programs, 10.85 CZK after them, comes off the amount due.'
     );
     expect(detail).toContain(
       'Stock of product 232659 in inventory 38882: 5 → 6 (1 returned).'
@@ -1643,7 +1643,7 @@ describe('visits_remove_product: the confirmation detail', () => {
       removal({ quantity: 1.5, expected_current_quantity: 3 })
     );
     expect(detail).toContain(
-      'Lowers line 649590969 of product 232659 from 3 to 1.5 (20.1 CZK each, discount 10%): line total 54.27 CZK → 27.14 CZK before loyalty programs.'
+      'Lowers visit item 649590969 of product 232659 from 3 to 1.5 (20.1 CZK each, discount 10%): item total 54.27 CZK → 27.14 CZK before loyalty programs.'
     );
     expect(detail).toContain(
       'Stock of product 232659 in inventory 38882: 5 → 6.5 (1.5 returned).'

@@ -247,7 +247,7 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
   },
 
   /**
-   * Money: a visit's bill and its payments, client accounts, accounts and cash
+   * Money: a visit and its payments, client accounts, accounts and cash
    * registers, financial transactions, payroll, inventory, and the analytics
    * pack. Inventory is stock valued at cost price, bought from Suppliers and
    * Partners and sold or used up — the money side of products, next to the
@@ -259,7 +259,7 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
   finance: {
     tools: [
       'clients_get_membership_purchases',
-      'suppliers_list',
+      'suppliers_and_partners_list',
       'appointments_get_consumables',
       'appointments_set_consumables',
     ],

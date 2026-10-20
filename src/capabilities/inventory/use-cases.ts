@@ -1,6 +1,6 @@
 /**
  * Inventory use cases — everything the `inventory_*`, `products_search` and
- * `suppliers_list` tools do.
+ * `suppliers_and_partners_list` tools do.
  *
  * A use case takes the tool's parsed input plus an `AltegioClient`, calls the
  * `InventoryApi` / `ProductsApi` ports and returns the text summary next to
@@ -1019,7 +1019,7 @@ export async function listSuppliers(
 
 // ========== Bills of Materials ==========
 
-function billLines(b: BillOfMaterials, currency: string | null): string[] {
+function bomLines(b: BillOfMaterials, currency: string | null): string[] {
   return [
     `- ${b.id}: ${b.lines.length} consumable(s) per service`,
     ...b.lines.map(
@@ -1029,10 +1029,10 @@ function billLines(b: BillOfMaterials, currency: string | null): string[] {
   ];
 }
 
-function billUntrusted(bills: readonly BillOfMaterials[]): UntrustedField[] {
+function bomUntrusted(boms: readonly BillOfMaterials[]): UntrustedField[] {
   const fields: UntrustedField[] = [];
   const products = new Set<number>();
-  for (const b of bills) {
+  for (const b of boms) {
     fields.push({ label: `Bill of Materials ${b.id} title`, value: b.title });
     for (const l of b.lines) {
       if (products.has(l.product_id)) continue;
@@ -1062,12 +1062,12 @@ export async function listBillsOfMaterials(
   const api = inventoryApi(client);
   const currency = await locationCurrency(client, input.location_id);
   if (input.team_member_id !== undefined && input.service_id !== undefined) {
-    const bill = await api.getTeamMemberServiceBillOfMaterials(
+    const bom = await api.getTeamMemberServiceBillOfMaterials(
       input.location_id,
       input.team_member_id,
       input.service_id
     );
-    const items = bill ? [bill] : [];
+    const items = bom ? [bom] : [];
     const pagination = pageMetadata(
       { page: 1, page_size: 1 },
       items.length,
@@ -1076,12 +1076,12 @@ export async function listBillsOfMaterials(
     return {
       text: withUntrustedBlock(
         [
-          bill
+          bom
             ? `Bill of Materials applied when team member ${input.team_member_id} provides service ${input.service_id} (quantities per one service, cost at cost price):`
             : `Team member ${input.team_member_id} has no Bill of Materials for service ${input.service_id}.`,
-          ...(bill ? billLines(bill, currency) : []),
+          ...(bom ? bomLines(bom, currency) : []),
         ].join('\n'),
-        billUntrusted(items),
+        bomUntrusted(items),
         { maxChars: FIELD_MAX_CHARS }
       ),
       structuredContent: {
@@ -1092,18 +1092,18 @@ export async function listBillsOfMaterials(
       },
     };
   }
-  const bills = await api.listBillsOfMaterials(input.location_id, {
+  const boms = await api.listBillsOfMaterials(input.location_id, {
     title: input.query?.trim() || undefined,
     page: input.page,
     page_size: input.page_size,
   });
   return renderPage({
     input,
-    items: bills,
+    items: boms,
     render: ({ items, pagination }) => {
       const lines = [
         `Bills of Materials at location ${input.location_id}${input.query ? ' matching the query' : ''}; page ${pagination.page} shows ${items.length} (quantities per one service, cost at cost price):`,
-        ...items.flatMap((b) => billLines(b, currency)),
+        ...items.flatMap((b) => bomLines(b, currency)),
       ];
       if (items.length === 0) lines.push('No Bills of Materials match.');
       if (pagination.has_more)
@@ -1111,7 +1111,7 @@ export async function listBillsOfMaterials(
           `More may follow: request page ${pagination.next_page} with page_size ${pagination.page_size}.`
         );
       return {
-        text: withUntrustedBlock(lines.join('\n'), billUntrusted(items), {
+        text: withUntrustedBlock(lines.join('\n'), bomUntrusted(items), {
           maxChars: FIELD_MAX_CHARS,
         }),
         structuredContent: {

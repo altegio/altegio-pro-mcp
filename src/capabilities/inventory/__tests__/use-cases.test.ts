@@ -881,7 +881,7 @@ describe('listSuppliers', () => {
 // ===========================================================================
 
 describe('listBillsOfMaterials', () => {
-  const bill = {
+  const bom = {
     id: 8,
     title: 'Colouring',
     technological_card_items: [
@@ -897,7 +897,7 @@ describe('listBillsOfMaterials', () => {
 
   it('searches by title and pages', async () => {
     const { client, calls } = setup([
-      ['GET', /^\/technological_cards\/1$/, 200, ok([bill])],
+      ['GET', /^\/technological_cards\/1$/, 200, ok([bom])],
       currencyRoute,
     ]);
     const result = await listBillsOfMaterials(client, {
@@ -931,7 +931,7 @@ describe('listBillsOfMaterials', () => {
         'GET',
         /^\/technological_cards\/default_for_staff_and_service\/1\/7\/3$/,
         200,
-        ok(bill),
+        ok(bom),
       ],
       currencyRoute,
     ]);

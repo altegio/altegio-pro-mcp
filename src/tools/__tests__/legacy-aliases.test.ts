@@ -97,6 +97,7 @@ const FORMER_CALLS: Array<[alias: string, args: Record<string, unknown>]> = [
   ],
   ['delete_schedule', { company_id: 4564, staff_id: 7, dates: ['2026-10-12'] }],
   ['update_location', { company_id: 4564, zip: '01001', site: 'example.test' }],
+  ['suppliers_list', { location_id: 4564, query: 'Acme', page_size: 20 }],
 ];
 
 describe('legacy tool aliases', () => {

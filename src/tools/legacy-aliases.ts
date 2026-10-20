@@ -68,6 +68,9 @@ export const LEGACY_TOOL_ALIASES: Readonly<Record<string, readonly string[]>> =
     update_staff: ['team_members_update'],
     delete_staff: ['team_members_delete'],
 
+    // 2026-10-20: Suppliers and Partners are one glossary concept.
+    suppliers_list: ['suppliers_and_partners_list'],
+
     // Names hosts guessed (production logs, 2026-09-25..10-11).
     companies_list: ['locations_list'],
     team_members_get: ['team_members_list'],

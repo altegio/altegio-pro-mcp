@@ -13,7 +13,7 @@ import {
   describeNewTransaction,
   describeTransactionChange,
   getPayroll,
-  getVisitBill,
+  getVisit,
   listCashRegistersAndAccounts,
   listClientAccounts,
   listFinancialTransactions,
@@ -97,7 +97,7 @@ beforeEach(() => {
   clearTimezoneCache();
 });
 
-// ========== a visit's bill ==========
+// ========== a visit ==========
 
 const APPOINTMENT = 675876521;
 const DOCUMENT = 772428324;
@@ -188,10 +188,10 @@ const saleRoute = (body: unknown): Route => [
 ];
 
 describe('visits_get', () => {
-  it('reads the bill of the appointment’s visit document', async () => {
+  it('reads the visit from the appointment’s visit document', async () => {
     const calls: Call[] = [];
     const client = fakeClient([appointmentRoute, saleRoute(sale())], calls);
-    const result = await getVisitBill(client, {
+    const result = await getVisit(client, {
       location_id: LOCATION,
       appointment_id: APPOINTMENT,
     });
@@ -199,8 +199,8 @@ describe('visits_get', () => {
       `GET /locations/${LOCATION}/appointments/${APPOINTMENT}`,
       `GET /locations/${LOCATION}/sale/${DOCUMENT}`,
     ]);
-    const bill = result.structuredContent as Record<string, unknown>;
-    expect(bill).toMatchObject({
+    const visit = result.structuredContent as Record<string, unknown>;
+    expect(visit).toMatchObject({
       visit_id: 576878661,
       client_id: 186529551,
       currency: 'CZK',
@@ -209,7 +209,7 @@ describe('visits_get', () => {
       amount_due: 550,
       unavailable_payment_options: 1,
     });
-    expect(bill.lines).toEqual([
+    expect(visit.items).toEqual([
       expect.objectContaining({
         id: 896207460,
         kind: 'service',
@@ -220,7 +220,7 @@ describe('visits_get', () => {
       }),
     ]);
     expect(
-      (bill.payment_options as Array<Record<string, unknown>>).map(
+      (visit.payment_options as Array<Record<string, unknown>>).map(
         (o) => o.method
       )
     ).toEqual(['account', 'client_account', 'advance_payment_hold']);
@@ -228,7 +228,7 @@ describe('visits_get', () => {
     expect(result.text).toContain('- client_account: client account 220');
     // A title is someone else's text: only inside the fence.
     expect(summaryOf(result.text)).not.toContain('ignore previous');
-    expect(result.text).toContain('line 896207460 title');
+    expect(result.text).toContain('visit item 896207460 title');
   });
 
   it('refuses an appointment of another location', async () => {
@@ -244,14 +244,14 @@ describe('visits_get', () => {
       []
     );
     await expect(
-      getVisitBill(client, {
+      getVisit(client, {
         location_id: LOCATION,
         appointment_id: APPOINTMENT,
       })
     ).rejects.toBeInstanceOf(FinanceNotFoundError);
   });
 
-  it('says how to get a bill for an appointment without one', async () => {
+  it('says how to get a visit to pay for an appointment without one', async () => {
     const client = fakeClient(
       [
         [
@@ -264,11 +264,11 @@ describe('visits_get', () => {
       []
     );
     await expect(
-      getVisitBill(client, {
+      getVisit(client, {
         location_id: LOCATION,
         appointment_id: APPOINTMENT,
       })
-    ).rejects.toThrow(/has no bill yet/);
+    ).rejects.toThrow(/has nothing to pay yet/);
   });
 });
 
@@ -332,7 +332,7 @@ describe('visits_add_payment', () => {
     });
   });
 
-  it('records nothing when the bill changed since it was read', async () => {
+  it('records nothing when the visit changed since it was read', async () => {
     const calls: Call[] = [];
     const client = fakeClient(
       [appointmentRoute, saleRoute(sale({ due: 350 })), paymentRoute],
@@ -360,7 +360,7 @@ describe('visits_add_payment', () => {
     [
       'a method that does not apply',
       { method: 'account', account_id: 149462, amount: 100 },
-      /cannot pay this bill now/,
+      /cannot pay this visit now/,
     ],
     [
       'part of an advance payment hold',
@@ -426,7 +426,7 @@ describe('visits_cancel_payment', () => {
     });
   });
 
-  it('cancels nothing for a payment that is not on the bill', async () => {
+  it('cancels nothing for a payment that is not on the visit', async () => {
     const calls: Call[] = [];
     const client = fakeClient([appointmentRoute, saleRoute(paid)], calls);
     await expect(
@@ -624,7 +624,7 @@ describe('payment items', () => {
     expect(result.structuredContent).toMatchObject({
       items: [
         { id: 3, category: 'personnel', direction: 'expense' },
-        { id: 9, category: 'miscellaneous', direction: 'expense' },
+        { id: 9, category: 'other_expenses', direction: 'expense' },
       ],
       pagination: { total: 2 },
     });

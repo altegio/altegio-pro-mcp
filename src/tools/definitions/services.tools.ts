@@ -26,7 +26,7 @@ const durationSecondsArg = z
 const prepaidArg = z
   .enum(['forbidden', 'allowed', 'required'])
   .optional()
-  .describe('Online prepayment.');
+  .describe('Online advance payment.');
 
 /**
  * The service's price as a range. Altegio stores a fixed price as

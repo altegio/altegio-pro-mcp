@@ -125,7 +125,7 @@ export const DIAGNOSTIC_PLAYS: readonly DiagnosticPlay[] = [
       'analytics_get_daily_series with metric=occupancy — occupancy_no_show_percent shows how much scheduled time the no-shows burn.',
       'analytics_get_receptionist_performance — rebooked_after_no_show, whether the front desk wins those clients back.',
     ],
-    read: 'Quantify the leak as lost working time and lost revenue (no_show share × average_check × visits). No-shows are a reminder-and-prepayment problem; cancellations that get rebooked are far less costly than ones that do not.',
+    read: 'Quantify the leak as lost working time and lost revenue (no_show share × average_check × visits). No-shows are a reminder-and-advance-payment problem; cancellations that get rebooked are far less costly than ones that do not.',
   },
   {
     symptom: 'Where do bookings come from / is online booking growing',

@@ -11,10 +11,10 @@
  *
  * Contract details verified live on the test location (2026-10-19):
  *
- * - A visit's bill is the sale state of the appointment's visit document
- *   (`documents[]` with `type_id` 7 on the appointment). Its `payment_methods`
- *   say what can pay now; an account method's `applicable_amount` is the amount
- *   due (0 once the bill is paid).
+ * - A visit, as the tools read it, is the sale state of the appointment's
+ *   visit document (`documents[]` with `type_id` 7 on the appointment). Its
+ *   `payment_methods` say what can pay now; an account method's
+ *   `applicable_amount` is the amount due (0 once the visit is paid).
  * - A financial transaction's sign follows its payment item: an expense item
  *   stores a positive amount as negative, an income item stores any amount as
  *   positive. The tools therefore take a positive amount.
@@ -49,7 +49,7 @@ import {
 } from './server-time.js';
 import type {
   AdvancePaymentHold,
-  BillLine,
+  VisitItem,
   CashRegisterOrAccount,
   ClientAccount,
   ClientAccountDepositRequest,
@@ -67,7 +67,7 @@ import type {
   PayrollReport,
   PayrollSettlements,
   SavedPayrollCalculation,
-  VisitBill,
+  Visit,
   VisitPayment,
 } from '../finance-api.js';
 
@@ -134,11 +134,11 @@ async function safeJson(response: Response): Promise<unknown> {
   }
 }
 
-// ========== visit bill: wire → port ==========
+// ========== visit: wire → port ==========
 
-function lineFromWire(row: Row): BillLine {
+function itemFromWire(row: Row): VisitItem {
   const type = text(row.type);
-  const kind: BillLine['kind'] =
+  const kind: VisitItem['kind'] =
     type === 'service' ? 'service' : type === 'good' ? 'product' : 'other';
   return {
     id: id(row.id) ?? 0,
@@ -172,7 +172,7 @@ function moneyPaymentFromWire(row: Row): VisitPayment {
     id: `t${id(row.id) ?? 0}`,
     method: 'account',
     amount: num(row.amount) ?? 0,
-    bill_line_id: id(row.sale_item_id),
+    visit_item_id: id(row.sale_item_id),
     account_id: id(row.account_id) ?? id(account.id),
     account_title: text(account.title),
     payment_method_name: text(snapshot.payment_method_name),
@@ -204,7 +204,7 @@ function loyaltyPaymentFromWire(row: Row): VisitPayment {
     id: `l${id(row.id) ?? 0}`,
     method,
     amount: num(row.amount) ?? 0,
-    bill_line_id: id(row.sale_item_id),
+    visit_item_id: id(row.sale_item_id),
     account_id: null,
     account_title: null,
     payment_method_name: null,
@@ -290,8 +290,8 @@ function optionFromWire(row: Row): PaymentOption {
   };
 }
 
-/** Project the sale state of a visit document onto the bill. */
-export function billFromWire(
+/** Project the sale state of a visit document onto the visit. */
+export function visitFromWire(
   sale: Row,
   context: {
     location_id: number;
@@ -299,16 +299,16 @@ export function billFromWire(
     visit_id: number | null;
     client_id: number | null;
   }
-): VisitBill {
+): Visit {
   const state = asRow(sale.state);
-  const lines = rows(state.items).map(lineFromWire);
+  const items = rows(state.items).map(itemFromWire);
   const payments = [
     ...rows(state.payment_transactions).map(moneyPaymentFromWire),
     ...rows(state.loyalty_transactions).map(loyaltyPaymentFromWire),
   ];
   const options = rows(sale.payment_methods).map(optionFromWire);
   const total = roundMoney(
-    lines.reduce((sum, line) => sum + (line.amount ?? 0), 0)
+    items.reduce((sum, item) => sum + (item.amount ?? 0), 0)
   );
   const paid = roundMoney(
     payments.reduce((sum, payment) => sum + payment.amount, 0)
@@ -324,7 +324,7 @@ export function billFromWire(
       : roundMoney(Math.max(0, total - paid));
   return {
     ...context,
-    lines,
+    items,
     payments,
     advance_payment_holds: rows(state.deposit_holds).map(holdFromWire),
     payment_options: options,
@@ -441,10 +441,10 @@ const CATEGORY_FROM_WIRE: Record<number, IncomeExpenseCategory> = {
   1: 'prime_cost',
   2: 'commercial',
   3: 'personnel',
-  4: 'administrative',
+  4: 'operational',
   5: 'taxes_and_fees',
-  6: 'miscellaneous',
-  7: 'income',
+  6: 'other_expenses',
+  7: 'revenue',
 };
 
 function paymentItemFromWire(row: Row): PaymentItem {
@@ -453,7 +453,7 @@ function paymentItemFromWire(row: Row): PaymentItem {
     id: id(row.id) ?? 0,
     title: text(row.title),
     category,
-    direction: category === 'income' ? 'income' : 'expense',
+    direction: category === 'revenue' ? 'income' : 'expense',
   };
 }
 
@@ -618,9 +618,9 @@ export class FinanceAdapter implements FinanceApi {
     return result ?? { data: null, meta: {} };
   }
 
-  // ----- visit bill -----
+  // ----- visit -----
 
-  /** The appointment's visit document and the ids the bill reports. */
+  /** The appointment's visit document and the ids the visit reports. */
   private async visitDocument(
     locationId: number,
     appointmentId: number
@@ -658,7 +658,7 @@ export class FinanceAdapter implements FinanceApi {
     const documentId = document ? id(document.id) : null;
     if (documentId === null) {
       throw new FinanceInputError(
-        `Appointment ${appointmentId} has no bill yet: Altegio opens one when the appointment has a client. Add a client with appointments_update, then read the bill again.`
+        `Appointment ${appointmentId} has nothing to pay yet: Altegio opens its visit for payment once the appointment has a client. Add a client with appointments_update, then read the visit again.`
       );
     }
     return {
@@ -668,7 +668,7 @@ export class FinanceAdapter implements FinanceApi {
     };
   }
 
-  private async saleBill(
+  private async saleVisit(
     locationId: number,
     appointmentId: number,
     doc: {
@@ -683,7 +683,7 @@ export class FinanceAdapter implements FinanceApi {
       context: string;
       hints?: FinanceErrorHints;
     }
-  ): Promise<VisitBill> {
+  ): Promise<Visit> {
     const { data } = await this.read(
       `/locations/${locationId}/sale/${doc.document_id}${request.path ?? ''}`,
       request.context,
@@ -693,7 +693,7 @@ export class FinanceAdapter implements FinanceApi {
         ...(request.hints ? { hints: request.hints } : {}),
       }
     );
-    return billFromWire(asRow(data), {
+    return visitFromWire(asRow(data), {
       location_id: locationId,
       appointment_id: appointmentId,
       visit_id: doc.visit_id,
@@ -701,13 +701,10 @@ export class FinanceAdapter implements FinanceApi {
     });
   }
 
-  async getVisitBill(
-    locationId: number,
-    appointmentId: number
-  ): Promise<VisitBill> {
+  async getVisit(locationId: number, appointmentId: number): Promise<Visit> {
     const doc = await this.visitDocument(locationId, appointmentId);
-    return this.saleBill(locationId, appointmentId, doc, {
-      context: `read the bill of appointment ${appointmentId}`,
+    return this.saleVisit(locationId, appointmentId, doc, {
+      context: `read the visit of appointment ${appointmentId}`,
     });
   }
 
@@ -715,16 +712,16 @@ export class FinanceAdapter implements FinanceApi {
     locationId: number,
     appointmentId: number,
     payment: PaymentRequest
-  ): Promise<VisitBill> {
+  ): Promise<Visit> {
     const doc = await this.visitDocument(locationId, appointmentId);
-    return this.saleBill(locationId, appointmentId, doc, {
+    return this.saleVisit(locationId, appointmentId, doc, {
       method: 'POST',
       path: '/payment',
       body: paymentBody(payment),
-      context: `record a payment on the bill of appointment ${appointmentId}`,
+      context: `record a payment on the visit of appointment ${appointmentId}`,
       hints: {
         invalid:
-          'Read the bill with visits_get and take the method, its id and an amount no larger than its applicable_amount from payment_options.',
+          'Read the visit with visits_get and take the method, its id and an amount no larger than its applicable_amount from payment_options.',
         forbidden:
           'Recording payments needs the right to accept payments for visits at this location; ask the location owner for it.',
       },
@@ -735,7 +732,7 @@ export class FinanceAdapter implements FinanceApi {
     locationId: number,
     appointmentId: number,
     paymentId: string
-  ): Promise<VisitBill> {
+  ): Promise<Visit> {
     const match = /^([tl])(\d+)$/.exec(paymentId);
     if (!match) {
       throw new FinanceInputError(
@@ -745,14 +742,14 @@ export class FinanceAdapter implements FinanceApi {
     const kind =
       match[1] === 't' ? 'payment_transaction' : 'loyalty_transaction';
     const doc = await this.visitDocument(locationId, appointmentId);
-    return this.saleBill(locationId, appointmentId, doc, {
+    return this.saleVisit(locationId, appointmentId, doc, {
       method: 'DELETE',
       path: `/payment/${kind}/${match[2]}`,
-      context: `cancel payment ${paymentId} on the bill of appointment ${appointmentId}`,
+      context: `cancel payment ${paymentId} on the visit of appointment ${appointmentId}`,
       hints: {
         invalid:
           'A payment applied from an advance payment hold cannot be cancelled here.',
-        notFound: 'Read the bill with visits_get for the current payment ids.',
+        notFound: 'Read the visit with visits_get for the current payment ids.',
       },
     });
   }
@@ -996,5 +993,5 @@ export class FinanceAdapter implements FinanceApi {
 
 const TRANSACTION_WRITE_HINTS: FinanceErrorHints = {
   invalid:
-    'Take account_id from accounts_and_cash_registers_list, payment_item_id from financial_transactions_list_payment_items and supplier_id from suppliers_list; the amount must be above zero, and a user may be limited to some accounts, payment items or recent days.',
+    'Take account_id from accounts_and_cash_registers_list, payment_item_id from financial_transactions_list_payment_items and supplier_id from suppliers_and_partners_list; the amount must be above zero, and a user may be limited to some accounts, payment items or recent days.',
 };

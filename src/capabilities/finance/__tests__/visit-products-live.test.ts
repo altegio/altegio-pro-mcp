@@ -1,7 +1,7 @@
 /**
  * Opt-in live suite for visits_add_product and visits_remove_product: create
  * a waiting appointment, sell a product on it (marking it arrived), lower the
- * line, take it off, and check the stock and the bill come back — then delete
+ * visit item, take it off, and check the stock and the visit come back — then delete
  * the appointment. A second run does the same on an appointment for a pet
  * visitor with custom field values, and checks both read back unchanged.
  *
@@ -133,35 +133,35 @@ describeLive('visit products end-to-end against the test location', () => {
       });
       expect(sold.isError).toBeUndefined();
       const line = (
-        sold.structuredContent as { line: { id: number; quantity: number } }
-      ).line;
+        sold.structuredContent as { item: { id: number; quantity: number } }
+      ).item;
       expect(line.quantity).toBe(2);
       if (stockBefore !== null) expect(await stockNow()).toBe(stockBefore - 2);
 
-      // The id visits_get shows for the bill line is the product line's id.
-      const bill = await FinanceAdapter.forClient(client).getVisitBill(
+      // The visit item id visits_get shows is the product line's id.
+      const visit = await FinanceAdapter.forClient(client).getVisit(
         location,
         appointment
       );
       expect(
-        bill.lines.filter((l) => l.kind === 'product').map((l) => l.id)
+        visit.items.filter((l) => l.kind === 'product').map((l) => l.id)
       ).toEqual([line.id]);
 
       const lower = {
         location_id: location,
         appointment_id: appointment,
-        line_id: line.id,
+        visit_item_id: line.id,
         quantity: 1,
         expected_current_quantity: 2,
       };
       expect(await describeRemoval(client, lower)).toContain(
-        `Lowers line ${line.id} of product ${product} from 2 to 1`
+        `Lowers visit item ${line.id} of product ${product} from 2 to 1`
       );
       const lowered = await removeProduct(client, lower);
       expect(lowered.isError).toBeUndefined();
       expect(lowered.structuredContent).toMatchObject({
-        removed_line: false,
-        line: { id: line.id, quantity: 1 },
+        removed_item: false,
+        item: { id: line.id, quantity: 1 },
         unexpected_changes: [],
       });
       if (stockBefore !== null) expect(await stockNow()).toBe(stockBefore - 1);
@@ -174,14 +174,14 @@ describeLive('visit products end-to-end against the test location', () => {
       const removed = await removeProduct(client, {
         location_id: location,
         appointment_id: appointment,
-        line_id: line.id,
+        visit_item_id: line.id,
         expected_current_quantity: 1,
       });
       expect(removed.isError).toBeUndefined();
       expect(removed.structuredContent).toMatchObject({
-        removed_line: true,
-        line: null,
-        product_lines: [],
+        removed_item: true,
+        item: null,
+        product_items: [],
         unexpected_changes: [],
         stock: { before: stockBefore === null ? null : stockBefore - 1 },
       });
@@ -255,17 +255,17 @@ describeLive('visit products end-to-end against the test location', () => {
         attendance: 'arrived',
         unexpected_changes: [],
       });
-      const line = (sold.structuredContent as { line: { id: number } }).line;
+      const line = (sold.structuredContent as { item: { id: number } }).item;
 
       const removed = await removeProduct(client, {
         location_id: location,
         appointment_id: appointment,
-        line_id: line.id,
+        visit_item_id: line.id,
         expected_current_quantity: 1,
       });
       expect(removed.isError).toBeUndefined();
       expect(removed.structuredContent).toMatchObject({
-        removed_line: true,
+        removed_item: true,
         unexpected_changes: [],
       });
 

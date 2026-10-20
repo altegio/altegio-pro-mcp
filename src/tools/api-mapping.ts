@@ -941,7 +941,7 @@ export const apiMapping: Record<string, ApiMapping> = {
     pathParams: ['location_id'],
     queryParams: ['start_date', 'end_date', 'document_id', 'page', 'count'],
   },
-  suppliers_list: {
+  suppliers_and_partners_list: {
     path: '/references/suppliers/{location_id}',
     method: 'get',
     operationId: 'list_location_suppliers',
@@ -998,7 +998,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
   // Read-modify-write on the V2 appointment save the web app uses: the save
   // replaces the whole appointment, so it is read with every include, read
   // again right before the save and read back after it. The product read gives
-  // the sale price, the sale unit and the stock per inventory; the bill read
+  // the sale price, the sale unit and the stock per inventory; the visit read
   // after the save gives the total.
   visits_add_product: [
     {
@@ -1046,7 +1046,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
   ],
   // The undo of visits_add_product, on the same read-modify-write: the line is
   // left out of the echo (or sent with a lower quantity), the product read
-  // gives the stock before and after, and the bill read gives the total.
+  // gives the stock before and after, and the visit read gives the total.
   visits_remove_product: [
     {
       path: '/locations/{location_id}/attendances/{attendance_id}/appointments',

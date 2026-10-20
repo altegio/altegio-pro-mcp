@@ -1095,7 +1095,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       ],
     },
   },
-  suppliers_list: {
+  suppliers_and_partners_list: {
     what: 'Supplier and Partner names',
     canary: {
       args: { location_id: 1 },
@@ -1320,8 +1320,8 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
           'visits_get',
           'service and product titles, account titles, payment method names, loyalty program titles',
         ],
-        ['visits_add_payment', 'the bill read back after the payment'],
-        ['visits_cancel_payment', 'the bill read back after the cancellation'],
+        ['visits_add_payment', 'the visit read back after the payment'],
+        ['visits_cancel_payment', 'the visit read back after the cancellation'],
         ['client_accounts_list_for_client', 'client account type titles'],
         [
           'accounts_and_cash_registers_list',

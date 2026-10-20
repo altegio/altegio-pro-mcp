@@ -353,14 +353,17 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   inventory_list_bills_of_materials: 'inventory:read',
   inventory_create_operation: ['inventory:operate', 'inventory:sell'],
   inventory_delete_document: 'inventory:operate',
-  // Suppliers and Partners are finance reference data in the catalog.
-  suppliers_list: 'finance:read',
+  // Suppliers and Partners are finance reference data in the catalog: the
+  // counterparties of financial transactions. The tool sits in the inventory
+  // pack because a product receipt names its Supplier, but reading them needs
+  // the Finances rights, so the scope is `finance:read`.
+  suppliers_and_partners_list: 'finance:read',
   appointments_get_consumables: ['appointments:read', 'inventory:read'],
   appointments_set_consumables: ['appointments:write', 'inventory:operate'],
 
   // --- Visits, payments and finance -------------------------------------------
   // Named as the V3 preview spec names them on its visit and payment
-  // operations: reading a visit's bill is `checkout:read`, recording a payment
+  // operations: reading a visit is `checkout:read`, recording a payment
   // `checkout:capture`, cancelling one `checkout:cancel` (action-scopes, never
   // implied by a `:write`); client accounts and their `deposit` top-up are
   // `client_accounts:*`; accounts and cash registers and financial transactions
