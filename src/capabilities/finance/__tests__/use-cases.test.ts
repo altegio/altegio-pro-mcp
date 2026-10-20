@@ -11,6 +11,7 @@ import {
   deleteFinancialTransaction,
   deposit,
   describeNewTransaction,
+  describeTransactionChange,
   getPayroll,
   getVisitBill,
   listCashRegistersAndAccounts,
@@ -21,6 +22,8 @@ import {
   updateFinancialTransaction,
 } from '../use-cases.js';
 import { FinanceInputError, FinanceNotFoundError } from '../errors.js';
+import { FinanceAdapter } from '../../../api/v1/finance-adapter.js';
+import { ConfirmationRefusal } from '../../../tools/confirmation.js';
 import { clearCurrencyCache } from '../../../api/v1/location-currency.js';
 import { clearTimezoneCache } from '../../analytics/location-timezone.js';
 
@@ -906,6 +909,86 @@ describe('financial_transactions_update and _delete', () => {
           });
     await expect(run).rejects.toThrow(/Nothing was changed/);
     expect(calls.map((c) => c.method)).toEqual(['GET']);
+  });
+
+  describe('against the version the person was shown', () => {
+    const KEY = '0f6b1c2d-3e4f-8a5b-9c6d-7e8f9a0b1c2d';
+    const putRoute: Route = [
+      'PUT',
+      /^\/finance_transactions\/4564\/589532167$/,
+      200,
+      ok({ id: 589532167, expense_id: 9, account_id: 1330531, amount: -7 }),
+    ];
+    const CHANGE = {
+      location_id: LOCATION,
+      transaction_id: 589532167,
+      amount: 7,
+    };
+
+    it('shows the transaction now and the change, with a version', async () => {
+      const detail = await describeTransactionChange(
+        fakeClient([single({})], []),
+        CHANGE
+      );
+      expect(detail.text).toContain('Now: 589532167');
+      expect(detail.text).toContain('with a comment');
+      expect(detail.text).toContain('- amount 5 CZK → 7 CZK');
+      expect(detail.text).not.toContain('rent');
+      expect(detail.version).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    });
+
+    it('refuses before anyone is asked when nothing would change', async () => {
+      await expect(
+        describeTransactionChange(fakeClient([single({})], []), {
+          ...CHANGE,
+          amount: 5,
+        })
+      ).rejects.toThrow(ConfirmationRefusal);
+    });
+
+    it('writes when the transaction is as shown, handing the port the key', async () => {
+      const { version } = await describeTransactionChange(
+        fakeClient([single({})], []),
+        CHANGE
+      );
+      const spy = jest.spyOn(
+        FinanceAdapter.prototype,
+        'updateFinancialTransaction'
+      );
+      try {
+        const calls: Call[] = [];
+        await updateFinancialTransaction(
+          fakeClient([single({}), putRoute], calls),
+          CHANGE,
+          { version, idempotency_key: KEY }
+        );
+        expect(calls.map((c) => c.method)).toEqual(['GET', 'PUT']);
+        expect((spy.mock.calls[0] as unknown[])[3]).toEqual({
+          idempotency_key: KEY,
+        });
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('refuses when the transaction was changed after the confirmation', async () => {
+      const { version } = await describeTransactionChange(
+        fakeClient([single({})], []),
+        CHANGE
+      );
+      const calls: Call[] = [];
+      const error = await updateFinancialTransaction(
+        fakeClient([single({ comment: 'rent, October' }), putRoute], calls),
+        CHANGE,
+        { version, idempotency_key: KEY }
+      ).catch((e) => e);
+      expect(error).toBeInstanceOf(FinanceInputError);
+      expect(error.message).toContain(
+        'was changed after the confirmation was shown'
+      );
+      expect(error.message).toContain('without confirmation_token');
+      expect(calls.map((c) => c.method)).toEqual(['GET']);
+    });
   });
 
   it('deletes a standalone transaction', async () => {

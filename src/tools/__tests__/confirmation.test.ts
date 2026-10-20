@@ -1,9 +1,12 @@
 import {
   CONFIRMATION_TOKEN_ARG,
   ConfirmationRefusal,
+  confirmationIdempotencyKey,
   mintConfirmationToken,
   prepareConfirmation,
-  requireConfirmation,
+  readConfirmationToken,
+  requireConfirmation as runGate,
+  stateVersion,
   verifyConfirmationToken,
   type ConfirmationAnswer,
   type ConfirmationRuntime,
@@ -12,6 +15,12 @@ import {
 import type { AltegioClient } from '../../providers/altegio-client.js';
 
 const client = {} as AltegioClient;
+
+/** The gate as a stop/go answer: the result it stops with, or `undefined`. */
+async function requireConfirmation(options: Parameters<typeof runGate>[0]) {
+  const outcome = await runGate(options);
+  return 'stop' in outcome ? outcome.stop : undefined;
+}
 
 interface DemoInput {
   location_id: number;
@@ -486,5 +495,151 @@ describe('confirmation detail', () => {
     expect(result).toBeUndefined();
     expect(elicit.mock.calls[0]![0]).toContain('leaves the base');
     expect(elicit.mock.calls[0]![0]).not.toContain('502');
+  });
+});
+
+describe('a token is valid for its arguments until it expires', () => {
+  it('says so, instead of promising a single use', async () => {
+    const result = await gate(ARGS, runtime());
+    const text = result!.content[0]!.text!;
+    expect(text).toMatch(/valid for these arguments until \d{4}-\d{2}-\d{2}T/);
+    expect(text).not.toContain('for this call only');
+    expect(text).toContain('do not repeat a call that went through');
+  });
+
+  it('lets every repeat through, each with the same idempotency key', async () => {
+    const first = await gate(ARGS, runtime());
+    const token = tokenFrom(first!.content[0]!.text!);
+    const again = { ...ARGS, [CONFIRMATION_TOKEN_ARG]: token };
+    const one = await runGate({
+      toolName: 'clients_delete',
+      args: again,
+      prepared: prepare(again)!,
+      client,
+      runtime: runtime(),
+    });
+    const two = await runGate({
+      toolName: 'clients_delete',
+      args: again,
+      prepared: prepare(again)!,
+      client,
+      runtime: runtime(),
+    });
+    expect('proceed' in one && 'proceed' in two).toBe(true);
+    const keyOf = (o: typeof one) =>
+      'proceed' in o ? o.proceed.idempotency_key : undefined;
+    expect(keyOf(one)).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+    expect(keyOf(two)).toBe(keyOf(one));
+    // The key is derived from the tool, the arguments and the token's expiry.
+    const expiresAt = Number(token.split('.')[0]);
+    expect(keyOf(one)).toBe(
+      confirmationIdempotencyKey('clients_delete', ARGS, expiresAt)
+    );
+  });
+
+  it('gives a new confirmation a new key, and the same arguments the same key only per token', () => {
+    const now = Date.now();
+    expect(confirmationIdempotencyKey('clients_delete', ARGS, now)).not.toBe(
+      confirmationIdempotencyKey('clients_delete', ARGS, now + 1)
+    );
+    expect(confirmationIdempotencyKey('clients_delete', ARGS, now)).not.toBe(
+      confirmationIdempotencyKey(
+        'clients_delete',
+        { ...ARGS, client_id: 7 },
+        now
+      )
+    );
+  });
+
+  it('gives every elicitation accept a key of its own', async () => {
+    const accept = runtime({ supportsElicitation: () => true });
+    const run = () =>
+      runGate({
+        toolName: 'clients_delete',
+        args: ARGS,
+        prepared: prepare(ARGS)!,
+        client,
+        runtime: accept,
+      });
+    const [one, two] = [await run(), await run()];
+    if (!('proceed' in one) || !('proceed' in two)) throw new Error('stopped');
+    expect(one.proceed.idempotency_key).not.toBe(two.proceed.idempotency_key);
+  });
+});
+
+describe('a confirmation bound to a version', () => {
+  const versioned = (version: string) =>
+    prepareConfirmation<DemoInput>(
+      {
+        ...spec,
+        detail: async () => ({ text: '- line 1: 2 ml', version }),
+      },
+      (args) => (args && typeof args === 'object' ? ARGS : undefined)
+    );
+
+  it('carries the version of what was shown in the token, back to the handler', async () => {
+    const v = stateVersion({ lines: ['5:3:2'] });
+    const prepare = versioned(v);
+    const first = await runGate({
+      toolName: 'clients_delete',
+      args: ARGS,
+      prepared: prepare(ARGS)!,
+      client,
+      runtime: runtime(),
+    });
+    if (!('stop' in first)) throw new Error('proceeded');
+    const token = tokenFrom(first.stop.content[0]!.text!);
+    expect(readConfirmationToken(token, 'clients_delete', ARGS)).toMatchObject({
+      version: v,
+    });
+
+    const again = { ...ARGS, [CONFIRMATION_TOKEN_ARG]: token };
+    const outcome = await runGate({
+      toolName: 'clients_delete',
+      args: again,
+      prepared: prepare(again)!,
+      client,
+      runtime: runtime(),
+    });
+    expect(outcome).toMatchObject({ proceed: { version: v } });
+  });
+
+  it('hands the version to the handler on the elicitation path too', async () => {
+    const v = stateVersion('state');
+    const outcome = await runGate({
+      toolName: 'clients_delete',
+      args: ARGS,
+      prepared: versioned(v)(ARGS)!,
+      client,
+      runtime: runtime({ supportsElicitation: () => true }),
+    });
+    expect(outcome).toMatchObject({ proceed: { version: v } });
+  });
+
+  it('cannot have its version swapped without breaking the signature', () => {
+    const token = mintConfirmationToken(
+      'clients_delete',
+      ARGS,
+      Date.now(),
+      stateVersion('a')
+    );
+    const [expiry, , signature] = token.split('.');
+    const forged = `${expiry}.${stateVersion('b')}.${signature}`;
+    expect(verifyConfirmationToken(token, 'clients_delete', ARGS)).toBe(true);
+    expect(verifyConfirmationToken(forged, 'clients_delete', ARGS)).toBe(false);
+    // Nor dropped: a token without the version is a different signature.
+    expect(
+      verifyConfirmationToken(`${expiry}.${signature}`, 'clients_delete', ARGS)
+    ).toBe(false);
+  });
+
+  it('hashes state independently of key order', () => {
+    expect(stateVersion({ a: 1, b: [1, 2] })).toBe(
+      stateVersion({ b: [1, 2], a: 1 })
+    );
+    expect(stateVersion({ a: 1 })).not.toBe(stateVersion({ a: 2 }));
+    expect(stateVersion({ a: 1 })).toMatch(/^[A-Za-z0-9_-]{22}$/);
   });
 });

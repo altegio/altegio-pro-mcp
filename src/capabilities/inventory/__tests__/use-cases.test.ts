@@ -4,6 +4,7 @@
  * call reaches, the wire names it sends, and what comes back to the model.
  */
 import { clearCurrencyCache } from '../../../api/v1/location-currency.js';
+import { clearTimezoneCache } from '../../analytics/location-timezone.js';
 import { ConfirmationRefusal } from '../../../tools/confirmation.js';
 import {
   createOperation,
@@ -328,12 +329,21 @@ function createdRoute(body: Record<string, unknown> = {}): Route {
   ];
 }
 
+/** The lines already recorded on the operation's days: none by default. */
+const recordedRoute = (rows: Record<string, unknown>[] = []): Route => [
+  'GET',
+  /^\/storages\/transactions\/1$/,
+  200,
+  ok(rows),
+];
+
 const operationRoutes = (extra: Route[] = []): Route[] => [
   ...extra,
   productRoute(),
   unitsRoute,
   inventoriesRoute,
   currencyRoute,
+  recordedRoute(),
 ];
 
 const SALE: CreateOperationInput = {
@@ -570,6 +580,143 @@ describe('createOperation', () => {
     expect(error).toBeInstanceOf(InventoryInputError);
     expect(error.message).toContain('enough stock');
     expect(error.message).toContain('Not enough stock');
+  });
+});
+
+describe('createOperation — a repeated call', () => {
+  /** SALE as the API lists it back once recorded (location offset +02:00). */
+  const recordedSale = (overrides: Record<string, unknown> = {}) =>
+    movementRow({
+      client: { id: 31 },
+      comment: 'Counter sale',
+      ...overrides,
+    });
+
+  it('refuses an identical operation already recorded, naming its document and the way out', async () => {
+    const { client, calls } = setup(
+      operationRoutes([createdRoute(), recordedRoute([recordedSale()])])
+    );
+    const error = await createOperation(client, SALE).catch((e) => e);
+    expect(error).toBeInstanceOf(InventoryInputError);
+    expect(error.message).toContain('Nothing was recorded: document 21');
+    expect(error.message).toContain('repeat of the same call');
+    expect(error.message).toContain('a comment that tells the two apart');
+    expect(calls.some((c) => c.method === 'POST')).toBe(false);
+    const read = calls.find((c) => c.path === '/storages/transactions/1')!;
+    expect(read.query.get('start_date')).toBe('2026-10-19');
+    expect(read.query.get('end_date')).toBe('2026-10-19');
+  });
+
+  it.each([
+    ['another comment', { comment: 'Second sale' }],
+    ['another minute', { create_date: '2026-10-19T14:06:00+0200' }],
+    ['another quantity', { amount: -3 }],
+    ['another price', { cost_per_unit: 290 }],
+    ['another client', { client: { id: 32 } }],
+    ['another inventory', { storage: { id: 4 } }],
+    ['another kind', { type_id: 4 }],
+    ['a second line', {}],
+  ])('records it when the earlier one has %s', async (name, overrides) => {
+    const rows =
+      name === 'a second line'
+        ? [recordedSale(), recordedSale({ id: 12, good: { id: 6 } })]
+        : [recordedSale(overrides)];
+    const { client, calls } = setup(
+      operationRoutes([createdRoute(), recordedRoute(rows)])
+    );
+    await createOperation(client, SALE);
+    expect(calls.some((c) => c.method === 'POST')).toBe(true);
+  });
+
+  describe('undated', () => {
+    const undated: CreateOperationInput = {
+      ...SALE,
+      date: undefined,
+      comment: undefined,
+    };
+    // 14:10 in Prague.
+    const now = Date.parse('2026-10-19T12:10:00Z');
+    /**
+     * The list stores the location's wall time and labels it with the
+     * server's +04:00, so 14:02 here is 14:02 in Prague, eight minutes ago.
+     */
+    const at = (iso: string, zone: string | null = 'Europe/Prague') => {
+      const harness = setup(
+        operationRoutes([
+          createdRoute(),
+          recordedRoute([recordedSale({ comment: '', create_date: iso })]),
+        ])
+      );
+      Object.assign(harness.client, {
+        getCompanies: async () =>
+          zone ? [{ id: 1, timezone_name: zone }] : [],
+      });
+      return harness;
+    };
+    beforeEach(() => clearTimezoneCache());
+
+    it('is a repeat within the last ten minutes at the location', async () => {
+      const recent = at('2026-10-19T14:02:00+0400');
+      await expect(
+        createOperation(recent.client, undated, now)
+      ).rejects.toThrow('repeat of the same call');
+      const read = recent.calls.find(
+        (c) => c.path === '/storages/transactions/1'
+      )!;
+      expect(read.query.get('start_date')).toBe('2026-10-19');
+      expect(read.query.get('end_date')).toBe('2026-10-19');
+    });
+
+    it('is not a repeat once ten minutes have passed', async () => {
+      const older = at('2026-10-19T13:55:00+0400');
+      await createOperation(older.client, undated, now);
+      expect(older.calls.some((c) => c.method === 'POST')).toBe(true);
+    });
+
+    it('allows every offset a location could have when its zone is unknown', async () => {
+      const unknown = at('2026-10-19T13:55:00+0400', null);
+      await expect(
+        createOperation(unknown.client, undated, now)
+      ).rejects.toThrow('repeat of the same call');
+      const read = unknown.calls.find(
+        (c) => c.path === '/storages/transactions/1'
+      )!;
+      expect(read.query.get('start_date')).toBe('2026-10-18');
+      expect(read.query.get('end_date')).toBe('2026-10-20');
+    });
+  });
+
+  it('reads further pages while they are full', async () => {
+    const filler = Array.from({ length: 100 }, (_, i) =>
+      movementRow({ id: 100 + i, document_id: 500 + i, good: { id: 9 } })
+    );
+    const { client, calls } = setup(
+      operationRoutes([
+        createdRoute(),
+        [
+          'GET',
+          /^\/storages\/transactions\/1$/,
+          200,
+          (call: Call) =>
+            ok(call.query.get('page') === '1' ? filler : [recordedSale()]),
+        ],
+      ])
+    );
+    await expect(createOperation(client, SALE)).rejects.toThrow(
+      'Nothing was recorded: document 21'
+    );
+    expect(
+      calls.filter((c) => c.path === '/storages/transactions/1')
+    ).toHaveLength(2);
+  });
+
+  it('refuses the repeat at the confirmation, so nobody is asked to approve it', async () => {
+    const { client } = setup(
+      operationRoutes([recordedRoute([recordedSale()])])
+    );
+    const error = await describeOperation(client, SALE).catch((e) => e);
+    expect(error).toBeInstanceOf(ConfirmationRefusal);
+    expect(error.message).toMatch(/^document 21 — a product sale/);
   });
 });
 

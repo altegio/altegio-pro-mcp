@@ -15,6 +15,12 @@
  * - the write matches by service only, so two appointments of one visit with
  *   the same service would both receive the lines — that case is refused.
  *
+ * Because the write re-plans on a fresh read, the confirmation binds the
+ * version of what it showed (the list before and after, the Bill of Materials,
+ * the attendance), and the write is refused when that version has moved:
+ * otherwise a line added after the person approved would be kept or dropped
+ * unseen, and a confirmed `replace` would remove it.
+ *
  * Stock moves only while the appointment is marked arrived; the result says
  * which applies. Quantities are per one service, in the product's consumable
  * unit; the cost is Altegio's, at cost price.
@@ -33,7 +39,13 @@ import {
   withUntrustedBlock,
   type UntrustedField,
 } from '../../tools/tool-result.js';
-import { ConfirmationRefusal } from '../../tools/confirmation.js';
+import { writeOptions } from '../../api/write-options.js';
+import {
+  ConfirmationRefusal,
+  stateVersion,
+  type ConfirmationDetail,
+  type ConfirmedCall,
+} from '../../tools/confirmation.js';
 import { InventoryInputError } from './errors.js';
 import {
   FIELD_MAX_CHARS,
@@ -227,6 +239,8 @@ interface ConsumablesPlan {
   /** Lines kept with the same quantity. */
   unchanged: number;
   bill_of_materials: AppointmentServiceConsumables['bill_of_materials'];
+  /** `stateVersion` of what the confirmation shows; see the module note. */
+  version: string;
 }
 
 const key = (productId: number, inventoryId: number) =>
@@ -404,6 +418,15 @@ async function planConsumables(
         to: quantity(a.quantity, a.unit),
       });
   }
+  const shape = (
+    lines: readonly Pick<
+      ConsumableWrite,
+      'product_id' | 'inventory_id' | 'quantity'
+    >[]
+  ) =>
+    lines
+      .map((l) => `${key(l.product_id, l.inventory_id)}:${round2(l.quantity)}`)
+      .sort();
   return {
     appointment,
     before,
@@ -411,6 +434,12 @@ async function planConsumables(
     changes,
     unchanged,
     bill_of_materials: target.bill_of_materials,
+    version: stateVersion({
+      attendance: appointment.attendance,
+      bill_of_materials: target.bill_of_materials?.id ?? null,
+      before: shape(before),
+      after: shape(after),
+    }),
   };
 }
 
@@ -418,7 +447,7 @@ async function planConsumables(
 export async function describeConsumablesChange(
   client: AltegioClient,
   input: SetConsumablesInput
-): Promise<string> {
+): Promise<ConfirmationDetail> {
   let plan: ConsumablesPlan;
   try {
     plan = await planConsumables(client, input);
@@ -431,24 +460,36 @@ export async function describeConsumablesChange(
     throw new ConfirmationRefusal(
       `the consumables of service ${input.service_id} on appointment ${input.appointment_id} already match; there is nothing to change.`
     );
-  return [
-    'Changes (quantities per one service):',
-    ...plan.changes.map((c) => changeText(c, true)),
-    `${plan.unchanged} other line(s) stay as they are; ${plan.after.length} line(s) in all afterwards.`,
-    plan.bill_of_materials
-      ? `The lines were filled from Bill of Materials ${plan.bill_of_materials.id}; after this change they no longer follow it.`
-      : '',
-    stockNote(plan.appointment.attendance),
-  ]
-    .filter(Boolean)
-    .join('\n');
+  return {
+    text: [
+      'Changes (quantities per one service):',
+      ...plan.changes.map((c) => changeText(c, true)),
+      `${plan.unchanged} other line(s) stay as they are; ${plan.after.length} line(s) in all afterwards.`,
+      plan.bill_of_materials
+        ? `The lines were filled from Bill of Materials ${plan.bill_of_materials.id}; after this change they no longer follow it.`
+        : '',
+      stockNote(plan.appointment.attendance),
+    ]
+      .filter(Boolean)
+      .join('\n'),
+    version: plan.version,
+  };
 }
 
 export async function setConsumables(
   client: AltegioClient,
-  input: SetConsumablesInput
+  input: SetConsumablesInput,
+  confirmation?: ConfirmedCall
 ): Promise<InventoryResult> {
   const plan = await planConsumables(client, input);
+  if (
+    confirmation?.version !== undefined &&
+    confirmation.version !== plan.version
+  ) {
+    throw new InventoryInputError(
+      `Nothing was changed: the consumables of service ${input.service_id} on appointment ${input.appointment_id} (or its attendance) changed after the confirmation was shown, so this call would no longer make the change approved. Read them again with appointments_get_consumables, then repeat the call without confirmation_token to confirm the change against what they hold now.`
+    );
+  }
   const currency = await locationCurrency(client, input.location_id);
   if (plan.changes.length === 0) {
     return {
@@ -474,7 +515,8 @@ export async function setConsumables(
       product_id: a.product_id,
       inventory_id: a.inventory_id,
       quantity: a.quantity,
-    }))
+    })),
+    writeOptions(confirmation)
   );
   const saved = blocks.find(
     (b) =>
@@ -487,7 +529,9 @@ export async function setConsumables(
       [
         `Saved the consumables of service ${input.service_id} on appointment ${input.appointment_id} (quantities per one service, cost at cost price):`,
         ...plan.changes.map((c) => changeText(c, false)),
-        `Now ${lines.length} line(s); every line has a new line id:`,
+        lines.length > 0
+          ? `Now ${lines.length} line(s); every line has a new line id:`
+          : 'No consumables remain on this service.',
         ...lines.map(
           (l) => `  - line ${l.line_id ?? '?'}: ${lineText(l, currency)}`
         ),

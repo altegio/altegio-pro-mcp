@@ -343,7 +343,7 @@ export const inventoryCreateOperationTool = defineTool({
   name: 'inventory_create_operation',
   category: 'Inventory',
   description:
-    'Record an inventory operation as one document with one line per product: kind sale (sold over the counter), receipt (products arriving, optionally from a supplier_id) or write_off (damaged, expired, lost). Consumption outside an appointment and transfers between inventories are not available. Each line takes product_id or product (name, article number, barcode), a quantity in the sale or consumable unit, and optionally unit_price and discount_percent; a line total is quantity × price minus the discount. team_member_id is required. No payment is recorded. For an appointment’s consumables use appointments_set_consumables. Undo with inventory_delete_document. Asks for confirmation first.',
+    'Record an inventory operation as one document with one line per product: kind sale (sold over the counter), receipt (products arriving, optionally from a supplier_id) or write_off (damaged, expired, lost). Consumption outside an appointment and transfers between inventories are not available. Each line takes product_id or product (name, article number, barcode), a quantity in the sale or consumable unit, and optionally unit_price and discount_percent; a line total is quantity × price minus the discount. team_member_id is required. No payment is recorded. For an appointment’s consumables use appointments_set_consumables. Undo with inventory_delete_document. Asks for confirmation first. Refused when an identical operation (same kind, inventory, lines, prices, date and comment) was just recorded; to record a genuine second one, give it a different comment.',
   annotations: {
     title: 'Inventory: record an inventory operation',
     destructiveHint: false,
@@ -404,8 +404,8 @@ export const inventoryCreateOperationTool = defineTool({
       `A ${KIND_TEXT[input.kind] ?? 'inventory operation'} document is created and its lines ${input.kind === 'receipt' ? 'add the products to' : 'take the products from'} the inventory at once, at the prices and totals below. No payment is recorded. It stays until someone deletes the document with inventory_delete_document, which reverses the stock.`,
     detail: (input, client) => inventory.describeOperation(client, input),
   },
-  handler: async ({ input, client }) =>
-    inventory.createOperation(client, input),
+  handler: async ({ input, client, confirmation }) =>
+    inventory.createOperation(client, input, undefined, confirmation),
 });
 
 export const inventoryDeleteDocumentTool = defineTool({
@@ -436,7 +436,8 @@ export const inventoryDeleteDocumentTool = defineTool({
       'The document and every product line on it are deleted, and the stock they moved comes back: sold, used or written-off products return to the inventory, received ones leave it. A payment recorded for the document stays. A deleted document cannot be restored from here.',
     detail: (input, client) => inventory.describeDocumentLines(client, input),
   },
-  handler: async ({ input, client }) => inventory.deleteDocument(client, input),
+  handler: async ({ input, client, confirmation }) =>
+    inventory.deleteDocument(client, input, confirmation),
 });
 
 // ========== suppliers ==========
@@ -544,7 +545,7 @@ export const appointmentsSetConsumablesTool = defineTool({
   name: 'appointments_set_consumables',
   category: 'Appointments',
   description:
-    'Change the consumables recorded on one service of an appointment. Each entry sets a product’s quantity per one service in its consumable unit (ml, g); 0 removes it; products not listed stay unless replace is true. Altegio stores the service’s whole list again (new line ids), computes cost at cost price and stops following the Bill of Materials for it. Stock moves only once the appointment is marked arrived. Refused when another appointment of the visit has the same service. Asks for confirmation first, showing before → after.',
+    'Change the consumables recorded on one service of an appointment. Each entry sets a product’s quantity per one service in its consumable unit (ml, g); 0 removes it; products not listed stay unless replace is true. Altegio stores the service’s whole list again (new line ids), computes cost at cost price and stops following the Bill of Materials for it. Stock moves only once the appointment is marked arrived. Refused when another appointment of the visit has the same service. Asks for confirmation first, showing before → after; refused if the consumables change after that.',
   annotations: {
     title: 'Appointments: change consumables',
     destructiveHint: true,
@@ -599,6 +600,6 @@ export const appointmentsSetConsumablesTool = defineTool({
     detail: (input, client) =>
       consumables.describeConsumablesChange(client, input),
   },
-  handler: async ({ input, client }) =>
-    consumables.setConsumables(client, input),
+  handler: async ({ input, client, confirmation }) =>
+    consumables.setConsumables(client, input, confirmation),
 });

@@ -46,6 +46,8 @@
  * - Consumables stored on an appointment that is not marked arrived are held
  *   as pending lines; they move stock when the attendance becomes arrived and
  *   stop moving it when it changes away from arrived.
+ * - V1 has no idempotency header, so the write methods ignore the
+ *   `idempotency_key` of their `WriteOptions` (`../write-options.ts`).
  */
 import {
   httpFromClient,

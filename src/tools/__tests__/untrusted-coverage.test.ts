@@ -1073,6 +1073,8 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
         { match: /\/units/, body: ok(productUnits) },
         inventoriesRoute,
         currencyRoute,
+        // No identical operation recorded on these days.
+        { match: /\/storages\/transactions\/1(\?|$)/, body: ok([]) },
       ],
     },
   },

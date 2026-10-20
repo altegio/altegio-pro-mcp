@@ -177,7 +177,8 @@ export const clientAccountsDepositTool = defineTool({
     },
     required: ['client_account_id', 'amount', 'currency'],
   },
-  handler: async ({ input, client }) => finance.deposit(client, input),
+  handler: async ({ input, client, confirmation }) =>
+    finance.deposit(client, input, confirmation),
 });
 
 // ========== accounts and cash registers ==========
@@ -414,15 +415,15 @@ export const financialTransactionsCreateTool = defineTool({
       `Records ${input.amount ?? '?'} (location currency) under payment item ${input.payment_item_id ?? '?'} — income or expense as the payment item says — in account or cash register ${input.account_id ?? '?'}${input.date ? ` dated ${input.date}` : ', dated now'}. The account balance and the finance reports change. It can be undone with financial_transactions_delete.`,
   },
   outputSchema: transactionResultSchema,
-  handler: async ({ input, client }) =>
-    finance.createFinancialTransaction(client, input),
+  handler: async ({ input, client, confirmation }) =>
+    finance.createFinancialTransaction(client, input, undefined, confirmation),
 });
 
 export const financialTransactionsUpdateTool = defineTool({
   name: 'financial_transactions_update',
   category: 'Finance',
   description:
-    'Change a financial transaction recorded outside a visit: payment item, account or cash register, amount, date, client, team member, supplier, comment. Pass only what changes; clear removes a client, team member, supplier or comment. Transactions a visit payment, product sale or client account deposit recorded are refused — change them there. Asks for confirmation first.',
+    'Change a financial transaction recorded outside a visit: payment item, account or cash register, amount, date, client, team member, supplier, comment. Pass only what changes; clear removes a client, team member, supplier or comment. Transactions a visit payment, product sale or client account deposit recorded are refused — change them there. Asks for confirmation first, showing the change; refused if the transaction changes after that.',
   annotations: {
     title: 'Finance: change a financial transaction',
     destructiveHint: true,
@@ -454,10 +455,11 @@ export const financialTransactionsUpdateTool = defineTool({
     resolve: (input, client) => finance.describeTransaction(client, input),
     consequence:
       'The transaction’s fields are overwritten with the new values and the previous values are not kept; account balances and finance reports change with it.',
+    detail: (input, client) => finance.describeTransactionChange(client, input),
   },
   outputSchema: transactionResultSchema,
-  handler: async ({ input, client }) =>
-    finance.updateFinancialTransaction(client, input),
+  handler: async ({ input, client, confirmation }) =>
+    finance.updateFinancialTransaction(client, input, confirmation),
 });
 
 export const financialTransactionsDeleteTool = defineTool({
@@ -490,8 +492,8 @@ export const financialTransactionsDeleteTool = defineTool({
     },
     required: ['location_id', 'deleted', 'transaction'],
   },
-  handler: async ({ input, client }) =>
-    finance.deleteFinancialTransaction(client, input),
+  handler: async ({ input, client, confirmation }) =>
+    finance.deleteFinancialTransaction(client, input, confirmation),
 });
 
 // ========== payroll ==========
