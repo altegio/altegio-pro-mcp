@@ -40,13 +40,13 @@ export const DEFAULT_VIEW_TARGET_BYTES = 100_000;
 
 /** Bytes of `tools/list` result per view; see the module comment. */
 export const LISTING_BUDGETS: Readonly<Record<HttpViewKey, number>> = {
-  // 148,030 bytes, 121 tools on 2026-10-20, after back-office finance joined.
+  // 148,042 bytes, 121 tools on 2026-10-20, after back-office finance joined.
   // Target: DEFAULT_VIEW_TARGET_BYTES.
   [DEFAULT_FACET]: 155_500,
   readonly: 126_000, // 119,808 bytes, 84 tools on 2026-10-20
-  ops: 78_000, // 73,902 bytes, 53 tools
+  ops: 78_000, // 73,914 bytes, 53 tools
   catalog: 28_000, // 26,622 bytes, 34 tools
-  finance: 106_000, // 100,762 bytes, 57 tools
+  finance: 106_000, // 100,774 bytes, 57 tools
   marketing: 25_500, // 24,235 bytes, 17 tools
   analytics: 67_500, // 63,825 bytes, 33 tools
   onboarding: 13_500, // 12,463 bytes, 15 tools

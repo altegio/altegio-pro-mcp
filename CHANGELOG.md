@@ -20,7 +20,7 @@ is declared stable.
   view's `tools/list` has a budget in `src/tools/listing-budget.ts`: its
   measured size plus about 5 %. The tests and `npm run surface:check` fail
   when a view grows past it. `docs/architecture/tool-surface.md` now prints
-  every view's size and share of its budget. `/mcp` is 148,030 bytes for 121
+  every view's size and share of its budget. `/mcp` is 148,042 bytes for 121
   tools (budget 155,500) and is headed for 100,000 bytes or less. Which rarely
   used packs move to their facet is the product owner's decision.
 - ADR-001 §1.3 records the October 2026 host landscape: Claude Code and
@@ -84,9 +84,9 @@ is declared stable.
   person. The refusal of "walk-in visitor" appointments, which also used the
   wrong term, is gone.
 - **Refusals name their cause.** A refused save is no longer always explained
-  as a printed bill or a pending advance payment. A required custom field, a
+  as a printed receipt or a pending advance payment. A required custom field, a
   group event's single service or capacity, a gift card or membership number,
-  activation date or archived type, a printed bill and a pending online
+  activation date or archived type, a printed receipt and a pending online
   advance payment each get their own message; anything else says Altegio
   refused, quotes its message and lists the common causes.
 - **The personal discount.** The sale confirmation says that a large sale can
