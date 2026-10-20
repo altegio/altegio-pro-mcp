@@ -46,6 +46,33 @@ is declared stable.
 - An opt-in live suite (`replay-guards-live`) drives both guards through the
   token path on a disposable location and cleans up after itself.
 
+### Fixed — visit products: visitors, custom fields and refusal messages
+
+- **Arrival-required custom fields no longer block every sale and removal.**
+  Altegio checks each save of an arrived appointment against the custom
+  fields the location requires on arrival, counting only the values the save
+  sends. `visits_add_product` and `visits_remove_product` sent none, so at
+  such locations every call on an arrived appointment failed. They now read
+  the appointment's custom field values and send them back unchanged whenever
+  the appointment is or becomes arrived. When the user may not read them, the
+  confirmation says so, and a refusal names the missing right.
+- **Appointments for a visitor are supported.** The visitor — the person, pet
+  or vehicle the appointment is for — is sent back with its type and checked
+  after the save; an absent type would have turned a pet or a vehicle into a
+  person. The refusal of "walk-in visitor" appointments, which also used the
+  wrong term, is gone.
+- **Refusals name their cause.** A refused save is no longer always explained
+  as a printed bill or a pending advance payment. A required custom field, a
+  group event's single service or capacity, a gift card or membership number,
+  activation date or archived type, a printed bill and a pending online
+  advance payment each get their own message; anything else says Altegio
+  refused, quotes its message and lists the common causes.
+- **The personal discount.** The sale confirmation says that a large sale can
+  raise a spend-based personal discount for good, and that
+  `visits_remove_product` does not lower it again.
+- Wording follows the glossary: combined service, advance payment, product
+  marking codes, visitor.
+
 ### Added — `visits_remove_product`: take a product off a visit
 
 - **`visits_remove_product`** is the undo of `visits_add_product`: it takes a
@@ -59,9 +86,9 @@ is declared stable.
   twice. Refused before anyone is asked, like the sale: group event
   appointments, a printed bill, an appointment that is not arrived or
   confirmed, gift card and membership lines, a visit whose other appointments
-  sell products, appointments with a walk-in visitor or an unreadable
-  composite service. Lines in the consumable unit are refused, and a line with
-  goods marking codes is taken off whole.
+  sell products, appointments whose visitor or combined service does not read
+  back. Lines in the consumable unit are refused, and a line with product
+  marking codes is taken off whole.
 - **Confirmation and result.** `destructiveHint: true`; the confirmation shows
   the line before and after and the stock that returns to the inventory. The
   result reads the line, the stock and the bill back after the save, and
@@ -78,15 +105,15 @@ is declared stable.
   a line is added at the product's sale price in its sale unit, sold by the
   appointment's team member, with the client's personal discount, from the
   highest-ranked inventory for sale that holds the product. Inventory, team
-  member and discount can be overridden; goods marking codes are optional.
+  member and discount can be overridden; product marking codes are optional.
 - **Guards.** The caller states the quantity already on the bill
   (`expected_current_quantity`), so a repeated confirmed call cannot sell
   twice. A waiting appointment is marked arrived only with
   `mark_arrived: true`, and the confirmation says what that triggers. Refused
   before anyone is asked: group event appointments, a printed bill, a no-show,
   gift card and membership products or lines, a visit whose other appointments
-  sell products, appointments with a walk-in visitor or an unreadable
-  composite service.
+  sell products, appointments whose visitor or combined service does not read
+  back.
 - **How it saves.** It runs on the V2 appointment save the web app uses, which
   replaces the whole appointment: the appointment is read with every include,
   read again right before the save (refused if anything changed), sent back
@@ -116,12 +143,13 @@ is declared stable.
   or document), `suppliers_list` (Suppliers and Partners, filtered by name)
   and `inventory_list_bills_of_materials` (each service's consumption recipe,
   or the one a team member applies to a service).
-- **`inventory_create_operation`** records a product sale, consumption,
-  product receipt or write-off as one document in one call. Products are
-  named by id or by text that must match exactly one product; units, prices
-  and the inventory default sensibly, and every line total is quantity ×
-  price minus the discount, computed before the confirmation shows it. No
-  payment is recorded; transfers between inventories are not offered.
+- **`inventory_create_operation`** records a product sale, product receipt or
+  write-off as one document in one call. Products are named by id or by text
+  that must match exactly one product; units, prices and the inventory default
+  sensibly, and every line total is quantity × price minus the discount,
+  computed before the confirmation shows it. No payment is recorded.
+  Consumption outside an appointment and transfers between inventories are not
+  offered: the operation endpoint refuses both.
 - **`inventory_delete_document`** deletes an inventory operation document and
   reverses its stock; the confirmation lists what comes back. A payment
   recorded for it stays.

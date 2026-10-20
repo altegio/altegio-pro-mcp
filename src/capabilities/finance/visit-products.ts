@@ -331,6 +331,9 @@ const STATUS_TEXT: Record<AppointmentSale['attendance'], string> = {
 const ARRIVED_EFFECTS =
   'Marking it arrived runs the loyalty auto-programs (cashback and the like), writes off the consumables of its services and reschedules the client’s repeat-visit reminder.';
 
+const CUSTOM_FIELDS_UNREAD =
+  'Its custom field values could not be read (the user lacks the right to view appointment custom fields), so the save cannot send them back; where the location requires custom fields once the client has arrived, Altegio refuses the save and nothing changes.';
+
 function appointmentHeader(sale: AppointmentSale): string {
   return `Appointment ${sale.appointment_id}${sale.visit_id ? ` (visit ${sale.visit_id}` : ' ('}${sale.client_id ? `, client ${sale.client_id})` : sale.visit_id ? ')' : 'no client)'} with team member ${sale.team_member_id}, ${STATUS_TEXT[sale.attendance]}, starts ${sale.start_local.replace('T', ' ')} at the location.`;
 }
@@ -367,11 +370,17 @@ function planLines(plan: SalePlan, currency: string | null): string[] {
   }
   if (line.marks.length > (existing?.marks.length ?? 0)) {
     lines.push(
-      `Goods marking codes added: ${line.marks.length - (existing?.marks.length ?? 0)}.`
+      `Product marking codes added: ${line.marks.length - (existing?.marks.length ?? 0)}.`
     );
   }
   if (plan.marks_arrived) {
     lines.push(`Status: waiting → arrived. ${ARRIVED_EFFECTS}`);
+  }
+  if (
+    !sale.custom_fields_readable &&
+    (sale.attendance === 'arrived' || plan.marks_arrived)
+  ) {
+    lines.push(CUSTOM_FIELDS_UNREAD);
   }
   return lines;
 }
@@ -473,7 +482,7 @@ export async function addProduct(
     bill
       ? `Bill of the visit: total amount ${money(bill.total_amount, currency)}, paid ${money(bill.paid_amount, currency)}, amount due ${money(bill.amount_due, currency)}.`
       : 'The bill could not be read back; read it with visits_get.',
-    'The product is written off the inventory at once. Record the payment with visits_add_payment. To undo the sale, visits_remove_product takes the line off or lowers its quantity.',
+    'The product is written off the inventory at once. Record the payment with visits_add_payment. To undo the sale, visits_remove_product takes the line off or lowers its quantity; it does not lower a personal discount the sale raised.',
     ...(currency ? [] : ['Currency: not reported for this location.']),
   ].join('\n');
 
@@ -621,7 +630,7 @@ export async function planRemoval(
   const quantity = round3(current - removed);
   if (quantity > 0 && line.marks.length > 0) {
     refuseChange(
-      `line ${line.id} carries goods marking codes, and lowering its quantity would leave codes for units no longer sold. Take off the whole line (omit quantity) and sell the right quantity again with its codes, or change it in Altegio.`
+      `line ${line.id} carries product marking codes, and lowering its quantity would leave codes for units no longer sold. Take off the whole line (omit quantity) and sell the right quantity again with its codes, or change it in Altegio.`
     );
   }
 
@@ -655,7 +664,7 @@ function stockIn(
 function removalLines(plan: RemovalPlan, currency: string | null): string[] {
   const { line } = plan;
   const p = `product ${line.product_id}`;
-  return [
+  const lines = [
     appointmentHeader(plan.sale),
     plan.quantity === 0
       ? `Takes off line ${line.id} of ${p} ×${line.quantity} (inventory ${line.inventory_id}, team member ${line.team_member_id}, ${money(line.unit_price, currency)} each, discount ${line.discount_percent}%): line total ${money(line.amount, currency)} before loyalty programs${line.amount_after_loyalty !== null && round2(line.amount_after_loyalty) !== round2(line.amount) ? `, ${money(line.amount_after_loyalty, currency)} after them,` : ''} comes off the bill.`
@@ -664,6 +673,10 @@ function removalLines(plan: RemovalPlan, currency: string | null): string[] {
       ? `Stock of ${p} in inventory ${line.inventory_id}: ${round3(plan.stock_before)} → ${round3(plan.stock_before + plan.removed)} (${plan.removed} returned).`
       : `Altegio returns ${plan.removed} of ${p} to inventory ${line.inventory_id}; its stock there could not be read.`,
   ];
+  if (!plan.sale.custom_fields_readable && plan.sale.attendance === 'arrived') {
+    lines.push(CUSTOM_FIELDS_UNREAD);
+  }
+  return lines;
 }
 
 /** The confirmation detail: the line before and after and the stock returned. */
@@ -770,7 +783,7 @@ export async function removeProduct(
       : []),
     ...(discount > 0
       ? [
-          `The client’s personal discount is ${discount}%. Where discount levels follow what a client spends, Altegio raises it after a large sale and does not lower it when the sale is taken off; if this sale raised it, a person resets it in the client card.`,
+          `The client’s personal discount is ${discount}%. Where it follows what the client spends, a large sale can have raised it, and taking the sale off does not lower it: those levels only rise. If this sale raised it, a person resets it in the client card.`,
         ]
       : []),
     ...(currency ? [] : ['Currency: not reported for this location.']),

@@ -824,7 +824,7 @@ export const eventsRescheduleAppointmentTool = defineTool({
       .boolean()
       .optional()
       .describe(
-        'Keep the linked walk-in visitor on the booking. Default: the API keeps it.'
+        'Keep the visitor (the person, pet or vehicle the booking is for) on the booking. Default: the API keeps it.'
       ),
   }),
   outputSchema: bookingOutput,

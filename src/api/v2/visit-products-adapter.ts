@@ -4,11 +4,13 @@
  *
  * The write is `POST /locations/{id}/attendance/appointments`, a replace: each
  * record sent replaces the whole appointment — start, team member, length,
- * resources, tags, color, walk-in visitor, reminder settings, assistants,
- * services and products. So a sale, and its undo, is a read-modify-write:
+ * resources, tags, color, visitor, custom fields, reminder settings,
+ * assistants, services and products. So a sale, and its undo, is a
+ * read-modify-write:
  *
  * 1. read the appointment with every include the echo needs
- *    (`GET /locations/{id}/attendances/record_{appointment_id}/appointments`);
+ *    (`GET /locations/{id}/attendances/record_{appointment_id}/appointments`),
+ *    plus the V1 appointment for the visitor's type when it has a visitor;
  * 2. read it again right before the save and refuse when it changed since the
  *    read the sale was planned on (`version`, a hash of everything echoed);
  * 3. send the appointment back exactly as read, with the one product line
@@ -17,13 +19,12 @@
  * 4. read it back and name anything that changed besides the product line and
  *    the status the caller asked for.
  *
- * Facts verified live on location 4564 (2026-10-20) and in the backend
- * (`AttendanceRecordServiceLegacyAdapter`, `AttendanceChangesChecker`):
+ * Facts verified live on location 4564 (2026-10-20) and in the backend:
  *
  * - The backend re-saves the appointment itself whenever it judges it changed,
- *   and it judges almost every echo changed (an appointment without a walk-in
- *   visitor or without a color always compares as changed), so the echo must
- *   carry assistants too: an omitted list removes them.
+ *   and it judges almost every echo changed (an appointment without a visitor
+ *   or without a color always compares as changed), so the echo must carry
+ *   assistants too: an omitted list removes them.
  * - `date` is the stored wall time at the location; it equals the record's
  *   `timestamp` read as `Asia/Dubai` wall time, which is checked here.
  * - Product lines are echoed with `manual_cost` (after the line's discount,
@@ -33,13 +34,24 @@
  *   line's inventory; a lowered line keeps its id and returns the difference.
  * - Product lines of the visit's other appointments are re-sent by the backend
  *   from their post-loyalty totals; the use case refuses such visits.
- * - `custom_field_values: null` keeps the stored values (and needs no right to
- *   read them); `comer` is readable only as id and title, so an appointment
- *   with a walk-in visitor is not written back.
+ * - Custom fields: every save of an appointment that is or becomes arrived is
+ *   checked against the custom fields the location requires on arrival, and
+ *   only the values in the request count, not the stored ones. So the echo
+ *   carries the values read whenever the appointment is or becomes arrived;
+ *   otherwise it sends `custom_field_values: null`, which keeps them. When the
+ *   read is refused them, `null` is sent, and a location that requires such a
+ *   field refuses the save. No route says which fields a location requires.
+ * - The visitor (`comer`: the person, pet or vehicle the appointment is for)
+ *   reads back from V2 as id and title only. The save needs
+ *   `{id, title, slug, type}`, and an absent type means a person, which would
+ *   turn a pet or a vehicle into one; the V1 appointment read carries the
+ *   slug, which gives the type. `comer: null`, or an empty title, removes the
+ *   visitor.
  * - Failures answer with the V1 envelope `{success:false, meta:{message}}`:
  *   403 for a status that cannot sell products or a missing right, 406 when the
  *   location forbids negative stock, 409 for a schedule conflict, 400 for a
- *   printed bill or another refusal.
+ *   printed bill or another refusal. The message follows `Accept-Language`, so
+ *   the save asks for English and known refusals are recognized by their text.
  */
 import { createHash } from 'node:crypto';
 import type { AltegioHttp } from '../altegio-http.js';
@@ -47,11 +59,15 @@ import { httpFromClient } from '../altegio-http.js';
 import type { AltegioClient } from '../../providers/altegio-client.js';
 import type { AltegioApiError } from '../../utils/errors.js';
 import {
+  apiMessage,
+  FinanceAccessError,
   FinanceInputError,
   FinanceNotFoundError,
   mapFinanceHttpError,
 } from '../../capabilities/finance/errors.js';
+import { upstreamDetail } from '../../tools/tool-result.js';
 import { V1_SERVER_TIMEZONE, wallTime } from '../v1/server-time.js';
+import { asPositiveId, asRecord, asText } from '../v1/wire-values.js';
 import type {
   AddProductLineRequest,
   ProductLineSaveResult,
@@ -90,7 +106,23 @@ export const APPOINTMENT_INCLUDES = [
   'client_notification_settings',
   'duration_details',
   'client',
+  'custom_field_values',
 ] as const;
+
+/** The include a user without the right to see custom fields may be refused. */
+const CUSTOM_FIELDS_INCLUDE = 'custom_field_values';
+
+/** `attendance_status` of an arrived appointment. */
+const ARRIVED = 1;
+
+/** The visitor's type the save needs, by the slug the V1 read gives. */
+const VISITOR_TYPES: Record<string, number> = { person: 1, pet: 2, vehicle: 3 };
+
+function visitorType(slug: string | null): number | null {
+  return slug !== null && Object.hasOwn(VISITOR_TYPES, slug)
+    ? VISITOR_TYPES[slug]!
+    : null;
+}
 
 // ========== wire reading ==========
 
@@ -135,8 +167,22 @@ interface WireService {
   discount_percent: number;
   cost: number | null;
   composite_service_id: number | null;
-  /** On a composite service whose id did not read back. */
+  /** On a combined service whose id did not read back. */
   composite_unresolved: boolean;
+}
+
+/** The visitor: the person, pet or vehicle the appointment is for. */
+interface WireVisitor {
+  id: number | null;
+  title: string;
+  /** `person`, `pet` or `vehicle`, from the V1 read; null until read. */
+  slug: string | null;
+}
+
+/** One custom field value of the appointment, keyed by the field's code. */
+interface WireCustomField {
+  code: string;
+  value: string | number;
 }
 
 interface WireAssistant {
@@ -181,7 +227,9 @@ interface WireAppointment {
   bill_printed: boolean;
   resource_instance_ids: number[];
   label_ids: number[];
-  comer: { id: number | null; title: string } | null;
+  comer: WireVisitor | null;
+  /** Null when the read was refused them. */
+  custom_fields: WireCustomField[] | null;
   notification: { sms: number; email: number } | null;
   services: WireService[];
   assistants: WireAssistant[];
@@ -269,6 +317,31 @@ function goodFromWire(
   };
 }
 
+/**
+ * The appointment's custom field values, or null when the read did not carry
+ * them all (the include was refused, or a value did not side-load).
+ */
+function customFieldsFromWire(
+  record: JsonApiResource,
+  included: IncludedIndex
+): WireCustomField[] | null {
+  if (record.relationships?.[CUSTOM_FIELDS_INCLUDE] === undefined) return null;
+  const values: WireCustomField[] = [];
+  for (const ref of relationshipRefs(record, CUSTOM_FIELDS_INCLUDE)) {
+    const f = attrs(included.get(ref.type, ref.id));
+    const code = str(f.slug) || str(f.code);
+    if (code === '') return null;
+    values.push({
+      code,
+      value:
+        typeof f.value === 'number' && Number.isFinite(f.value)
+          ? f.value
+          : str(f.value),
+    });
+  }
+  return values;
+}
+
 function appointmentFromWire(
   record: JsonApiResource,
   included: IncludedIndex
@@ -308,10 +381,11 @@ function appointmentFromWire(
       .map((ref) => id(ref.id))
       .filter((v): v is number => v !== null),
     comer: comer
-      ? { id: id(comer.id), title: str(attrs(comer).title) }
+      ? { id: id(comer.id), title: str(attrs(comer).title), slug: null }
       : relationshipRefs(record, 'comer').length > 0
-        ? { id: null, title: '' }
+        ? { id: null, title: '', slug: null }
         : null,
+    custom_fields: customFieldsFromWire(record, included),
     notification: notification
       ? {
           sms: num(attrs(notification).sms_hours_before_visit) ?? 0,
@@ -329,11 +403,14 @@ function appointmentFromWire(
 
 /** Why the appointment cannot be echoed exactly, or null. */
 function unsupportedReason(w: WireAppointment): string | null {
-  if (w.comer) {
-    return 'it has a walk-in visitor, which cannot be read back exactly';
+  if (
+    w.comer &&
+    (w.comer.id === null || w.comer.title === '' || !visitorType(w.comer.slug))
+  ) {
+    return 'its visitor (the person, pet or vehicle the appointment is for) did not read back with its type';
   }
   if (w.services.some((s) => s.composite_unresolved)) {
-    return 'one of its services is part of a composite service whose id does not read back';
+    return 'one of its services is part of a combined service whose id does not read back';
   }
   if (w.notification === null || w.technical_break_duration === null) {
     return 'its reminder settings or technical break did not read back';
@@ -402,11 +479,12 @@ interface Snapshot {
   sale: AppointmentSale;
 }
 
-function snapshot(
+/** The appointment and the other appointments of its visit, as read. */
+function appointmentsOf(
   doc: JsonApiDocument | null,
   locationId: number,
   appointmentId: number
-): Snapshot {
+): { target: WireAppointment; others: WireAppointment[] } {
   const included = new IncludedIndex(doc?.included ?? []);
   const records = primaryList(doc).map((r) => appointmentFromWire(r, included));
   const target = records.find((r) => r.id === appointmentId);
@@ -415,7 +493,15 @@ function snapshot(
       `Appointment ${appointmentId} was not found at location ${locationId}. Check the id with appointments_list.`
     );
   }
-  const others = records.filter((r) => r.id !== appointmentId);
+  return { target, others: records.filter((r) => r.id !== appointmentId) };
+}
+
+function snapshot(
+  target: WireAppointment,
+  others: WireAppointment[],
+  locationId: number,
+  appointmentId: number
+): Snapshot {
   return {
     target,
     others,
@@ -432,6 +518,7 @@ function snapshot(
       start_local: target.date,
       duration_seconds: target.length,
       client_discount_percent: target.client_discount_percent,
+      custom_fields_readable: target.custom_fields !== null,
       service_lines: target.services.map(serviceLine),
       product_lines: target.goods.map(lineFromWire),
       other_appointments: others.map((o) => ({
@@ -521,6 +608,35 @@ export function reductionBody(
   return echoBody(w, goods, w.attendance_status);
 }
 
+/**
+ * The custom field values to send: those read, when the appointment is or
+ * becomes arrived (the only saves checked against the fields the location
+ * requires on arrival); otherwise null, which keeps the stored values. A
+ * number goes as text: the save takes a value as text or as a fraction.
+ */
+function customFieldsToWire(
+  w: WireAppointment,
+  attendanceStatus: number
+): Array<{ code: string; value: string }> | null {
+  const checked =
+    attendanceStatus === ARRIVED || w.attendance_status === ARRIVED;
+  if (!checked || w.custom_fields === null) return null;
+  const values = w.custom_fields
+    .map((f) => ({ code: f.code, value: String(f.value) }))
+    .filter((f) => f.value.trim() !== '');
+  return values.length > 0 ? values : null;
+}
+
+function visitorToWire(w: WireAppointment): Record<string, unknown> | null {
+  if (!w.comer) return null;
+  return {
+    id: w.comer.id,
+    title: w.comer.title,
+    slug: w.comer.slug,
+    type: visitorType(w.comer.slug),
+  };
+}
+
 /** The appointment as read, key by key, with these product lines and status. */
 function echoBody(
   w: WireAppointment,
@@ -543,8 +659,8 @@ function echoBody(
         attendance_status: attendanceStatus,
         label_ids: w.label_ids,
         resource_instance_ids: w.resource_instance_ids,
-        custom_field_values: null,
-        comer: null,
+        custom_field_values: customFieldsToWire(w, attendanceStatus),
+        comer: visitorToWire(w),
         client_notification_settings: {
           sms_hours_before_visit: w.notification?.sms ?? 0,
           email_hours_before_visit: w.notification?.email ?? 0,
@@ -609,7 +725,16 @@ function unexpectedChanges(
     sorted(after.resource_instance_ids)
   );
   check('tags', sorted(before.label_ids), sorted(after.label_ids));
-  check('walk-in visitor', before.comer, after.comer);
+  check('visitor', before.comer, after.comer);
+  if (before.custom_fields !== null && after.custom_fields !== null) {
+    const byCode = (fields: WireCustomField[]) =>
+      [...fields].sort((x, y) => x.code.localeCompare(y.code));
+    check(
+      'custom fields',
+      byCode(before.custom_fields),
+      byCode(after.custom_fields)
+    );
+  }
   check('reminder settings', before.notification, after.notification);
   const serviceKey = (s: WireService) => [
     s.id,
@@ -663,8 +788,81 @@ const FORBIDDEN = {
     'Altegio changes products only on an appointment marked arrived or confirmed, and the user needs the rights to edit and delete product sales in appointments, within their day limits, and to edit arrived or fully paid appointments; locations_diagnose_access shows what the user may do.',
 };
 
-/** Maps a failed save; `kind` says whether a line was added or reduced. */
-function saveErrorFor(kind: 'add' | 'reduce') {
+/** The language the save's messages are asked in, so refusals can be recognized. */
+const SAVE_LANGUAGE = 'en';
+
+/**
+ * Refusals of the save recognized by their English message (or by the message
+ * key, which the backend returns when a text is missing). The first match
+ * names the cause; the backend's message follows it as data.
+ */
+const KNOWN_REFUSALS: Array<{
+  pattern: RegExp;
+  cause: (customFieldsRead: boolean) => string;
+}> = [
+  {
+    pattern: /mandatory.field/i,
+    cause: (read) =>
+      read
+        ? 'the location requires an appointment custom field once the client has arrived, and it is empty on this appointment (the Altegio message quoted at the end names it). Fill it in on the appointment in Altegio, then retry.'
+        : 'the location requires an appointment custom field once the client has arrived (the Altegio message quoted at the end names it), and this server could not send it back: the user lacks the right to view appointment custom fields, so their values could not be read. Make the change in Altegio, or ask for that right.',
+  },
+  {
+    pattern: /\bonly one service\b|possible_one_service/i,
+    cause: () =>
+      'Altegio saves a group event appointment only with exactly one service line.',
+  },
+  {
+    pattern: /related.to.events|service.change.forbidden/i,
+    cause: () =>
+      'Altegio does not let the service of a group event appointment change.',
+  },
+  {
+    pattern: /capacity|participants/i,
+    cause: () =>
+      'the group event has no room for the clients this appointment holds (its capacity, or its limit of extra participants per booking).',
+  },
+  {
+    pattern: /gift.card|membership/i,
+    cause: () =>
+      'Altegio refused a gift card or membership line of the visit: a missing or used number, a missing activation date, or an archived type (the Altegio message quoted at the end says which). Change the line in Altegio.',
+  },
+  {
+    pattern: /receipt has been printed|printed.check/i,
+    cause: () =>
+      'the bill of the visit is printed, and Altegio refuses product changes until a return receipt is printed in Altegio.',
+  },
+  {
+    pattern: /online.payment|prepayment/i,
+    cause: () =>
+      'the appointment waits for an online advance payment, and Altegio refuses changes while it does.',
+  },
+];
+
+const COMMON_CAUSES =
+  'Common causes: a printed bill or a fiscal receipt being prepared, an appointment waiting for an online advance payment, an appointment custom field the location requires on arrival, and the rules of group events, gift cards and memberships.';
+
+/** A 400 or 422 from the save, named by its cause when it is a known one. */
+function saveRefusal(
+  body: unknown,
+  customFieldsRead: boolean
+): FinanceInputError {
+  const message = apiMessage(body);
+  const known = message
+    ? KNOWN_REFUSALS.find((r) => r.pattern.test(message))
+    : undefined;
+  const detail = upstreamDetail(message);
+  const lead = known
+    ? `Nothing was changed: ${known.cause(customFieldsRead)}`
+    : `Nothing was changed: Altegio refused the save; the Altegio message quoted at the end names the cause. ${COMMON_CAUSES}`;
+  return new FinanceInputError(detail ? `${lead} ${detail}` : lead);
+}
+
+/**
+ * Maps a failed save; `kind` says whether a line was added or reduced, and
+ * `customFieldsRead` whether the save could carry the custom field values.
+ */
+function saveErrorFor(kind: 'add' | 'reduce', customFieldsRead: boolean) {
   const elsewhere =
     kind === 'add'
       ? 'add the product in Altegio'
@@ -680,10 +878,11 @@ function saveErrorFor(kind: 'add' | 'reduce') {
         invalid: `Altegio reports a conflict for the appointment as it stands — a busy time slot, a team member who no longer provides one of its services, a busy resource or a deleted team member. Nothing was changed; ${elsewhere}, where the conflict can be reviewed.`,
       });
     }
+    if (status === 400 || status === 422) {
+      return saveRefusal(body, customFieldsRead);
+    }
     return mapFinanceHttpError(status, body, context, {
       forbidden: FORBIDDEN[kind],
-      invalid:
-        'Nothing was changed. Altegio refuses product changes once the bill is printed or a fiscal receipt is being prepared, and while the appointment waits for an online prepayment.',
       notFound:
         'Check the appointment id with appointments_list; a deleted appointment cannot be changed.',
     });
@@ -706,16 +905,17 @@ export class VisitProductsV2Adapter implements VisitProductsApi {
     return new VisitProductsV2Adapter(httpFromClient(client));
   }
 
-  private async read(
+  private async readDocument(
     locationId: number,
-    appointmentId: number
-  ): Promise<Snapshot> {
-    const doc = await callJsonApi(
+    appointmentId: number,
+    includes: readonly string[]
+  ): Promise<JsonApiDocument | null> {
+    return callJsonApi(
       this.http,
       `/locations/${locationId}/attendances/record_${appointmentId}/appointments`,
       {
         context: `read appointment ${appointmentId}`,
-        query: { 'include[]': APPOINTMENT_INCLUDES },
+        query: { 'include[]': includes },
         mapError: (status, body, context) =>
           mapFinanceHttpError(status, body, context, {
             notFound:
@@ -725,7 +925,65 @@ export class VisitProductsV2Adapter implements VisitProductsApi {
           }),
       }
     );
-    return snapshot(doc, locationId, appointmentId);
+  }
+
+  /**
+   * The visitor's slug from the V1 appointment read, the only read that
+   * carries it; null when it does not read back for this visitor.
+   */
+  private async visitorSlug(
+    locationId: number,
+    appointmentId: number,
+    visitorId: number
+  ): Promise<string | null> {
+    try {
+      const response = await this.http.request(
+        `/locations/${locationId}/appointments/${appointmentId}`,
+        { method: 'GET' }
+      );
+      if (!response.ok) return null;
+      const visitor = asRecord(
+        asRecord(asRecord(await response.json()).data).comer
+      );
+      return asPositiveId(visitor.id) === visitorId
+        ? asText(visitor.slug)
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async read(
+    locationId: number,
+    appointmentId: number
+  ): Promise<Snapshot> {
+    let doc: JsonApiDocument | null;
+    try {
+      doc = await this.readDocument(
+        locationId,
+        appointmentId,
+        APPOINTMENT_INCLUDES
+      );
+    } catch (error) {
+      if (!(error instanceof FinanceAccessError)) throw error;
+      // Other reads of the same values require the right to view appointment
+      // custom fields; without them the rest still reads, and the save sends
+      // none back.
+      doc = await this.readDocument(
+        locationId,
+        appointmentId,
+        APPOINTMENT_INCLUDES.filter((i) => i !== CUSTOM_FIELDS_INCLUDE)
+      );
+    }
+    const { target, others } = appointmentsOf(doc, locationId, appointmentId);
+    if (target.comer?.id) {
+      target.comer.slug = await this.visitorSlug(
+        locationId,
+        appointmentId,
+        target.comer.id
+      );
+    }
+    return snapshot(target, others, locationId, appointmentId);
   }
 
   async getAppointmentSale(
@@ -836,8 +1094,9 @@ export class VisitProductsV2Adapter implements VisitProductsApi {
       {
         context: `save the product line on appointment ${appointmentId}`,
         method: 'POST',
+        headers: { 'Accept-Language': SAVE_LANGUAGE },
         body: plan.body(before.target),
-        mapError: saveErrorFor(plan.kind),
+        mapError: saveErrorFor(plan.kind, before.target.custom_fields !== null),
       }
     );
 
