@@ -172,6 +172,7 @@ describe('tools/list per facet', () => {
       'visits_add_product',
       'visits_cancel_payment',
       'visits_get',
+      'visits_remove_product',
     ]);
     await client.close();
   });

@@ -55,6 +55,7 @@ describe('destructive tools are gated', () => {
       'services_unlink_team_member',
       'team_members_delete',
       'visits_cancel_payment',
+      'visits_remove_product',
     ]);
   });
 

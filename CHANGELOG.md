@@ -6,6 +6,30 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — `visits_remove_product`: take a product off a visit
+
+- **`visits_remove_product`** is the undo of `visits_add_product`: it takes a
+  product line off an appointment's visit bill, or lowers its quantity
+  (`quantity` omitted takes the whole line). The product returns to the line's
+  inventory at once; payments already recorded are not changed, and the result
+  says when the bill becomes overpaid.
+- **Guards.** The caller names the line (`line_id`, from `visits_get` or the
+  `visits_add_product` result) and states its current quantity
+  (`expected_current_quantity`), so a repeated confirmed call cannot take off
+  twice. Refused before anyone is asked, like the sale: group event
+  appointments, a printed bill, an appointment that is not arrived or
+  confirmed, gift card and membership lines, a visit whose other appointments
+  sell products, appointments with a walk-in visitor or an unreadable
+  composite service. Lines in the consumable unit are refused, and a line with
+  goods marking codes is taken off whole.
+- **Confirmation and result.** `destructiveHint: true`; the confirmation shows
+  the line before and after and the stock that returns to the inventory. The
+  result reads the line, the stock and the bill back after the save, and
+  reports any other change to the appointment as an error. It runs on the same
+  guarded read-modify-write of the V2 appointment save as the sale.
+- Scopes `inventory:sell` and `appointments:write`; served on `/mcp`,
+  `/mcp/ops` and `/mcp/finance`.
+
 ### Added — `visits_add_product`: sell a product on a visit
 
 - **`visits_add_product`** sells a product on an appointment's visit bill the

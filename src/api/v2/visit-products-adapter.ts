@@ -1,18 +1,19 @@
 /**
- * V2 adapter for the `VisitProductsApi` port: a product sold on a visit,
- * saved the way the web app's appointment window saves it.
+ * V2 adapter for the `VisitProductsApi` port: a product sold on a visit, or
+ * taken off it, saved the way the web app's appointment window saves it.
  *
  * The write is `POST /locations/{id}/attendance/appointments`, a replace: each
  * record sent replaces the whole appointment — start, team member, length,
  * resources, tags, color, walk-in visitor, reminder settings, assistants,
- * services and products. So a sale is a read-modify-write:
+ * services and products. So a sale, and its undo, is a read-modify-write:
  *
  * 1. read the appointment with every include the echo needs
  *    (`GET /locations/{id}/attendances/record_{appointment_id}/appointments`);
  * 2. read it again right before the save and refuse when it changed since the
  *    read the sale was planned on (`version`, a hash of everything echoed);
  * 3. send the appointment back exactly as read, with the one product line
- *    added or raised, `ignore_conflicts: false` and no instant notification;
+ *    added, raised, lowered or left out, `ignore_conflicts: false` and no
+ *    instant notification;
  * 4. read it back and name anything that changed besides the product line and
  *    the status the caller asked for.
  *
@@ -28,6 +29,8 @@
  * - Product lines are echoed with `manual_cost` (after the line's discount,
  *   before loyalty); echoing `cost`, which includes loyalty, would apply a
  *   loyalty discount twice. A same-product raise keeps the line id.
+ * - A line left out of the echo is soft-deleted and its product returns to the
+ *   line's inventory; a lowered line keeps its id and returns the difference.
  * - Product lines of the visit's other appointments are re-sent by the backend
  *   from their post-loyalty totals; the use case refuses such visits.
  * - `custom_field_values: null` keeps the stored values (and needs no right to
@@ -51,7 +54,8 @@ import {
 import { V1_SERVER_TIMEZONE, wallTime } from '../v1/server-time.js';
 import type {
   AddProductLineRequest,
-  AddProductLineResult,
+  ProductLineSaveResult,
+  ReduceProductLineRequest,
   AppointmentAttendance,
   AppointmentSale,
   ProductForSale,
@@ -493,6 +497,36 @@ export function saveBody(
       discount_percent: line.discount_percent,
     });
   }
+  return echoBody(w, goods, request.mark_arrived ? 1 : w.attendance_status);
+}
+
+/** The save body: the appointment as read, with one line lowered or left out. */
+export function reductionBody(
+  w: WireAppointment,
+  request: ReduceProductLineRequest
+): Record<string, unknown> {
+  const goods = w.goods.flatMap((g) =>
+    g.id !== request.line_id
+      ? [goodToWire(g)]
+      : request.quantity > 0
+        ? [
+            {
+              ...goodToWire(g),
+              quantity: request.quantity,
+              manual_cost: request.amount,
+            },
+          ]
+        : []
+  );
+  return echoBody(w, goods, w.attendance_status);
+}
+
+/** The appointment as read, key by key, with these product lines and status. */
+function echoBody(
+  w: WireAppointment,
+  goods: Array<Record<string, unknown>>,
+  attendanceStatus: number
+): Record<string, unknown> {
   return {
     ignore_conflicts: false,
     records: [
@@ -506,7 +540,7 @@ export function saveBody(
         technical_break_duration: w.technical_break_duration,
         comment: w.comment,
         custom_color: w.custom_color,
-        attendance_status: request.mark_arrived ? 1 : w.attendance_status,
+        attendance_status: attendanceStatus,
         label_ids: w.label_ids,
         resource_instance_ids: w.resource_instance_ids,
         custom_field_values: null,
@@ -537,7 +571,7 @@ export function saveBody(
 function unexpectedChanges(
   before: WireAppointment,
   after: WireAppointment,
-  request: AddProductLineRequest,
+  expectedStatus: number,
   savedLineId: number | null
 ): string[] {
   const changes: string[] = [];
@@ -560,7 +594,6 @@ function unexpectedChanges(
   );
   check('client', before.client_id, after.client_id);
   check('visit', before.visit_id, after.visit_id);
-  const expectedStatus = request.mark_arrived ? 1 : before.attendance_status;
   check(
     `status (${before.attendance_status} → ${after.attendance_status})`,
     expectedStatus,
@@ -624,32 +657,46 @@ function unexpectedChanges(
 
 // ========== the adapter ==========
 
-const FORBIDDEN =
-  'Altegio sells products only on an appointment marked arrived or confirmed, and the user needs the rights to create product sales in appointments (to edit them, for a quantity raise), within their day limits, and to edit arrived or fully paid appointments; locations_diagnose_access shows what the user may do.';
+const FORBIDDEN = {
+  add: 'Altegio sells products only on an appointment marked arrived or confirmed, and the user needs the rights to create product sales in appointments (to edit them, for a quantity raise), within their day limits, and to edit arrived or fully paid appointments; locations_diagnose_access shows what the user may do.',
+  reduce:
+    'Altegio changes products only on an appointment marked arrived or confirmed, and the user needs the rights to edit and delete product sales in appointments, within their day limits, and to edit arrived or fully paid appointments; locations_diagnose_access shows what the user may do.',
+};
 
-function saveError(
-  status: number,
-  body: unknown,
-  context: string
-): AltegioApiError {
-  if (status === 406) {
-    return new FinanceInputError(
-      `Nothing was changed: the location forbids negative stock, and the inventory holds less of the product than this sale takes (${context}). Pick another inventory_id (products_search shows stock per inventory) or record a product receipt first.`
-    );
-  }
-  if (status === 409) {
+/** Maps a failed save; `kind` says whether a line was added or reduced. */
+function saveErrorFor(kind: 'add' | 'reduce') {
+  const elsewhere =
+    kind === 'add'
+      ? 'add the product in Altegio'
+      : 'change the product line in Altegio';
+  return (status: number, body: unknown, context: string): AltegioApiError => {
+    if (status === 406 && kind === 'add') {
+      return new FinanceInputError(
+        `Nothing was changed: the location forbids negative stock, and the inventory holds less of the product than this sale takes (${context}). Pick another inventory_id (products_search shows stock per inventory) or record a product receipt first.`
+      );
+    }
+    if (status === 409) {
+      return mapFinanceHttpError(status, body, context, {
+        invalid: `Altegio reports a conflict for the appointment as it stands — a busy time slot, a team member who no longer provides one of its services, a busy resource or a deleted team member. Nothing was changed; ${elsewhere}, where the conflict can be reviewed.`,
+      });
+    }
     return mapFinanceHttpError(status, body, context, {
+      forbidden: FORBIDDEN[kind],
       invalid:
-        'Altegio reports a conflict for the appointment as it stands — a busy time slot, a team member who no longer provides one of its services, a busy resource or a deleted team member. Nothing was changed; add the product in Altegio, where the conflict can be reviewed.',
+        'Nothing was changed. Altegio refuses product changes once the bill is printed or a fiscal receipt is being prepared, and while the appointment waits for an online prepayment.',
+      notFound:
+        'Check the appointment id with appointments_list; a deleted appointment cannot be changed.',
     });
-  }
-  return mapFinanceHttpError(status, body, context, {
-    forbidden: FORBIDDEN,
-    invalid:
-      'Nothing was changed. Altegio refuses product changes once the bill is printed or a fiscal receipt is being prepared, and while the appointment waits for an online prepayment.',
-    notFound:
-      'Check the appointment id with appointments_list; a deleted appointment cannot be changed.',
-  });
+  };
+}
+
+/** One guarded save: what to send and how to name it. */
+interface GuardedSave {
+  expected_version: string;
+  /** The existing line the save changes, or null for a new line. */
+  line_id: number | null;
+  body: (target: WireAppointment) => Record<string, unknown>;
+  kind: 'add' | 'reduce';
 }
 
 export class VisitProductsV2Adapter implements VisitProductsApi {
@@ -749,30 +796,37 @@ export class VisitProductsV2Adapter implements VisitProductsApi {
     };
   }
 
-  async addProductLine(
+  /**
+   * Read again right before the save, refuse if anything changed since the
+   * plan's read (the save writes back everything read, so the change would be
+   * overwritten), save, and read back.
+   */
+  private async guardedSave(
     locationId: number,
     appointmentId: number,
-    request: AddProductLineRequest
-  ): Promise<AddProductLineResult> {
-    // Read again right before the save: the save writes back everything read,
-    // so anything changed since the sale was planned would be overwritten.
+    plan: GuardedSave
+  ): Promise<{ before: Snapshot; after: Snapshot }> {
     const before = await this.read(locationId, appointmentId);
-    if (before.sale.version !== request.expected_version) {
+    const elsewhere =
+      plan.kind === 'add'
+        ? 'Add the product in Altegio.'
+        : 'Change the product line in Altegio.';
+    if (before.sale.version !== plan.expected_version) {
       throw new FinanceInputError(
-        `Nothing was changed: appointment ${appointmentId} changed while the sale was being prepared (its schedule, services, products or status). Read it again with visits_get and retry.`
+        `Nothing was changed: appointment ${appointmentId} changed while the ${plan.kind === 'add' ? 'sale' : 'change'} was being prepared (its schedule, services, products or status). Read it again with visits_get and retry.`
       );
     }
     if (before.sale.unsupported) {
       throw new FinanceInputError(
-        `Nothing was changed: appointment ${appointmentId} cannot be saved back exactly: ${before.sale.unsupported}. Add the product in Altegio.`
+        `Nothing was changed: appointment ${appointmentId} cannot be saved back exactly: ${before.sale.unsupported}. ${elsewhere}`
       );
     }
     if (
-      request.line.line_id !== null &&
-      !before.target.goods.some((g) => g.id === request.line.line_id)
+      plan.line_id !== null &&
+      !before.target.goods.some((g) => g.id === plan.line_id)
     ) {
       throw new FinanceInputError(
-        `Nothing was changed: product line ${request.line.line_id} is no longer on appointment ${appointmentId}.`
+        `Nothing was changed: product line ${plan.line_id} is no longer on appointment ${appointmentId}.`
       );
     }
 
@@ -782,12 +836,31 @@ export class VisitProductsV2Adapter implements VisitProductsApi {
       {
         context: `save the product line on appointment ${appointmentId}`,
         method: 'POST',
-        body: saveBody(before.target, request),
-        mapError: saveError,
+        body: plan.body(before.target),
+        mapError: saveErrorFor(plan.kind),
       }
     );
 
-    const after = await this.read(locationId, appointmentId);
+    return { before, after: await this.read(locationId, appointmentId) };
+  }
+
+  async addProductLine(
+    locationId: number,
+    appointmentId: number,
+    request: AddProductLineRequest
+  ): Promise<ProductLineSaveResult> {
+    const status = (target: WireAppointment) =>
+      request.mark_arrived ? 1 : target.attendance_status;
+    const { before, after } = await this.guardedSave(
+      locationId,
+      appointmentId,
+      {
+        expected_version: request.expected_version,
+        line_id: request.line.line_id,
+        body: (target) => saveBody(target, request),
+        kind: 'add',
+      }
+    );
     const savedLineId =
       request.line.line_id ??
       after.target.goods.find(
@@ -801,8 +874,34 @@ export class VisitProductsV2Adapter implements VisitProductsApi {
       unexpected_changes: unexpectedChanges(
         before.target,
         after.target,
-        request,
+        status(before.target),
         savedLineId
+      ),
+    };
+  }
+
+  async reduceProductLine(
+    locationId: number,
+    appointmentId: number,
+    request: ReduceProductLineRequest
+  ): Promise<ProductLineSaveResult> {
+    const { before, after } = await this.guardedSave(
+      locationId,
+      appointmentId,
+      {
+        expected_version: request.expected_version,
+        line_id: request.line_id,
+        body: (target) => reductionBody(target, request),
+        kind: 'reduce',
+      }
+    );
+    return {
+      appointment: after.sale,
+      unexpected_changes: unexpectedChanges(
+        before.target,
+        after.target,
+        before.target.attendance_status,
+        request.line_id
       ),
     };
   }

@@ -1,5 +1,6 @@
 /**
- * Selling a product on a visit — what `visits_add_product` does.
+ * Selling a product on a visit — what `visits_add_product` does — and taking
+ * it off again — what `visits_remove_product` does.
  *
  * It follows the web app's appointment window: a product already on the
  * appointment gets its quantity raised instead of a second line; a new line
@@ -17,6 +18,13 @@
  * confirmed call cannot sell twice, and the adapter refuses to save over any
  * change made since the plan's read. Calls that cannot be saved back exactly
  * are refused before anyone is asked.
+ *
+ * Removal is the undo of a sale: it drops one product line, or lowers its
+ * quantity, and the product returns to the line's inventory. It takes the
+ * same guards — the caller states the line's quantity as read
+ * (`expected_current_quantity`), so a repeated confirmed call cannot take off
+ * twice — and the confirmation shows the line before and after and the stock
+ * that comes back.
  */
 import type { AltegioClient } from '../../providers/altegio-client.js';
 import { VisitProductsV2Adapter } from '../../api/v2/visit-products-adapter.js';
@@ -323,11 +331,15 @@ const STATUS_TEXT: Record<AppointmentSale['attendance'], string> = {
 const ARRIVED_EFFECTS =
   'Marking it arrived runs the loyalty auto-programs (cashback and the like), writes off the consumables of its services and reschedules the client’s repeat-visit reminder.';
 
+function appointmentHeader(sale: AppointmentSale): string {
+  return `Appointment ${sale.appointment_id}${sale.visit_id ? ` (visit ${sale.visit_id}` : ' ('}${sale.client_id ? `, client ${sale.client_id})` : sale.visit_id ? ')' : 'no client)'} with team member ${sale.team_member_id}, ${STATUS_TEXT[sale.attendance]}, starts ${sale.start_local.replace('T', ' ')} at the location.`;
+}
+
 function planLines(plan: SalePlan, currency: string | null): string[] {
   const { sale, line, existing } = plan;
   const p = `product ${line.product_id}`;
   const lines = [
-    `Appointment ${sale.appointment_id}${sale.visit_id ? ` (visit ${sale.visit_id}` : ' ('}${sale.client_id ? `, client ${sale.client_id})` : sale.visit_id ? ')' : 'no client)'} with team member ${sale.team_member_id}, ${STATUS_TEXT[sale.attendance]}, starts ${sale.start_local.replace('T', ' ')} at the location.`,
+    appointmentHeader(sale),
     existing
       ? `Raises line ${existing.id} of ${p} from ${existing.quantity} to ${line.quantity} (${money(line.unit_price, currency)} each, discount ${line.discount_percent}%): line total ${money(existing.amount, currency)} → ${money(line.amount, currency)} before loyalty programs.`
       : `Adds ${p} ×${line.quantity} from inventory ${line.inventory_id}, sold by team member ${line.team_member_id}: ${money(line.unit_price, currency)} each, discount ${line.discount_percent}% → line total ${money(line.amount, currency)} before loyalty programs.`,
@@ -427,15 +439,7 @@ export async function addProduct(
             l.product_id === plan.line.product_id &&
             !plan.sale.product_lines.some((b) => b.id === l.id)
         );
-  let bill: VisitBill | null = null;
-  try {
-    bill = await FinanceAdapter.forClient(client).getVisitBill(
-      input.location_id,
-      input.appointment_id
-    );
-  } catch {
-    bill = null;
-  }
+  const bill = await billAfter(client, input.location_id, input.appointment_id);
 
   const p = `product ${plan.line.product_id}`;
   const adjusted =
@@ -469,7 +473,7 @@ export async function addProduct(
     bill
       ? `Bill of the visit: total amount ${money(bill.total_amount, currency)}, paid ${money(bill.paid_amount, currency)}, amount due ${money(bill.amount_due, currency)}.`
       : 'The bill could not be read back; read it with visits_get.',
-    'The product is written off the inventory at once. Record the payment with visits_add_payment. This server cannot remove a product line; a person removes it in Altegio.',
+    'The product is written off the inventory at once. Record the payment with visits_add_payment. To undo the sale, visits_remove_product takes the line off or lowers its quantity.',
     ...(currency ? [] : ['Currency: not reported for this location.']),
   ].join('\n');
 
@@ -500,5 +504,308 @@ export async function addProduct(
       unexpected_changes: unexpected,
     },
     ...(!saved || unexpected.length > 0 ? { isError: true } : {}),
+  };
+}
+
+// ========== removing a product line ==========
+
+export interface RemoveProductInput {
+  location_id: number;
+  appointment_id: number;
+  /** The product line, from visits_get or visits_add_product. */
+  line_id: number;
+  /** How much to take off, in the line's unit; omitted takes the whole line. */
+  quantity?: number;
+  /** The line's quantity as the caller read it. */
+  expected_current_quantity: number;
+}
+
+/** Everything one removal writes, computed from fresh reads. */
+export interface RemovalPlan {
+  sale: AppointmentSale;
+  /** The line as it stands. */
+  line: VisitProductLine;
+  /** The quantity the line keeps; 0 drops it. */
+  quantity: number;
+  /** The line total it keeps, before loyalty programs. */
+  amount: number;
+  /** How much returns to the inventory. */
+  removed: number;
+  /** Null when the product could not be read (a deleted product). */
+  product: ProductForSale | null;
+  /** Stock of the product in the line's inventory before the removal. */
+  stock_before: number | null;
+}
+
+function refuseChange(message: string): never {
+  throw new FinanceInputError(`Nothing was changed: ${message}`);
+}
+
+const CHANGE_IN_ALTEGIO = 'Change the product line in Altegio.';
+
+/** Read the appointment and decide what the line keeps, or refuse. */
+export async function planRemoval(
+  api: VisitProductsApi,
+  input: RemoveProductInput
+): Promise<RemovalPlan> {
+  const sale = await api.getAppointmentSale(
+    input.location_id,
+    input.appointment_id
+  );
+  const appt = `appointment ${input.appointment_id}`;
+
+  if (sale.group_event) {
+    refuseChange(
+      `${appt} is a client's place in a group event; products of group event appointments are changed through the event in Altegio, not here.`
+    );
+  }
+  if (sale.unsupported) {
+    refuseChange(
+      `${appt} cannot be saved back exactly — ${sale.unsupported}. ${CHANGE_IN_ALTEGIO}`
+    );
+  }
+  if (sale.bill_printed) {
+    refuseChange(
+      `the bill of ${appt}'s visit is printed (or a fiscal receipt is being prepared), and Altegio refuses product changes after that.`
+    );
+  }
+  const crowded = sale.other_appointments.filter((o) => o.product_lines > 0);
+  if (crowded.length > 0) {
+    refuseChange(
+      `other appointments of the same visit (${crowded.map((o) => o.appointment_id).join(', ')}) also sell products. Saving this appointment would make Altegio rewrite their product lines from amounts that already include loyalty discounts, which can apply a discount twice. ${CHANGE_IN_ALTEGIO}`
+    );
+  }
+  if (sale.attendance !== 'arrived' && sale.attendance !== 'confirmed') {
+    refuseChange(
+      `${appt} is ${sale.attendance === 'no_show' ? 'marked no-show' : sale.attendance === 'waiting' ? 'waiting' : 'in a status this server does not know'}; Altegio changes products only on an appointment marked arrived or confirmed, and a save in another status can drop every product line of the visit. ${CHANGE_IN_ALTEGIO}`
+    );
+  }
+
+  const line = sale.product_lines.find((l) => l.id === input.line_id);
+  if (!line) {
+    const ids = sale.product_lines.map((l) => l.id);
+    refuseChange(
+      `${appt} has no product line ${input.line_id} (${ids.length > 0 ? `its product lines: ${ids.join(', ')}` : 'it has no product lines'}) — the line was removed already, or the id is not a product line of this appointment. Read the bill with visits_get.`
+    );
+  }
+  if (line.loyalty_kind) {
+    refuseChange(
+      `line ${line.id} issued a ${line.loyalty_kind === 'gift_card' ? 'gift card' : 'membership'}; remove it in Altegio, which handles the card it issued.`
+    );
+  }
+  const issued = sale.product_lines.find((l) => l.loyalty_kind !== null);
+  if (issued) {
+    refuseChange(
+      `${appt} also sells a gift card or membership (line ${issued.id}), whose number and activation date cannot be saved back here. ${CHANGE_IN_ALTEGIO}`
+    );
+  }
+  if (line.unit_kind !== 'sale') {
+    refuseChange(
+      `line ${line.id} is sold in the product's consumable unit; this tool changes lines sold in the sale unit, as visits_add_product adds them. ${CHANGE_IN_ALTEGIO}`
+    );
+  }
+
+  const current = round3(line.quantity);
+  if (round3(input.expected_current_quantity) !== current) {
+    refuseChange(
+      `line ${line.id} holds ${current} of product ${line.product_id} now, not the ${round3(input.expected_current_quantity)} this change was based on — the bill changed, or this removal was already recorded. Read the bill again with visits_get.`
+    );
+  }
+  const removed =
+    input.quantity === undefined ? current : round3(input.quantity);
+  if (removed > current) {
+    refuseChange(
+      `line ${line.id} holds ${current} of product ${line.product_id}, less than the ${removed} to take off. Omit quantity to take off the whole line.`
+    );
+  }
+  const quantity = round3(current - removed);
+  if (quantity > 0 && line.marks.length > 0) {
+    refuseChange(
+      `line ${line.id} carries goods marking codes, and lowering its quantity would leave codes for units no longer sold. Take off the whole line (omit quantity) and sell the right quantity again with its codes, or change it in Altegio.`
+    );
+  }
+
+  const product = await api
+    .getProductForSale(input.location_id, line.product_id)
+    .catch(() => null);
+  return {
+    sale,
+    line,
+    quantity,
+    amount:
+      quantity > 0
+        ? lineAmount(line.unit_price, quantity, line.discount_percent)
+        : 0,
+    removed,
+    product,
+    stock_before: stockIn(product, line.inventory_id),
+  };
+}
+
+function stockIn(
+  product: ProductForSale | null,
+  inventoryId: number
+): number | null {
+  return (
+    product?.stock.find((s) => s.inventory_id === inventoryId)?.sale_quantity ??
+    null
+  );
+}
+
+function removalLines(plan: RemovalPlan, currency: string | null): string[] {
+  const { line } = plan;
+  const p = `product ${line.product_id}`;
+  return [
+    appointmentHeader(plan.sale),
+    plan.quantity === 0
+      ? `Takes off line ${line.id} of ${p} ×${line.quantity} (inventory ${line.inventory_id}, team member ${line.team_member_id}, ${money(line.unit_price, currency)} each, discount ${line.discount_percent}%): line total ${money(line.amount, currency)} before loyalty programs${line.amount_after_loyalty !== null && round2(line.amount_after_loyalty) !== round2(line.amount) ? `, ${money(line.amount_after_loyalty, currency)} after them,` : ''} comes off the bill.`
+      : `Lowers line ${line.id} of ${p} from ${line.quantity} to ${plan.quantity} (${money(line.unit_price, currency)} each, discount ${line.discount_percent}%): line total ${money(line.amount, currency)} → ${money(plan.amount, currency)} before loyalty programs.`,
+    plan.stock_before !== null
+      ? `Stock of ${p} in inventory ${line.inventory_id}: ${round3(plan.stock_before)} → ${round3(plan.stock_before + plan.removed)} (${plan.removed} returned).`
+      : `Altegio returns ${plan.removed} of ${p} to inventory ${line.inventory_id}; its stock there could not be read.`,
+  ];
+}
+
+/** The confirmation detail: the line before and after and the stock returned. */
+export async function describeRemoval(
+  client: AltegioClient,
+  input: RemoveProductInput
+): Promise<string> {
+  let plan: RemovalPlan;
+  try {
+    plan = await planRemoval(visitProductsApi(client), input);
+  } catch (error) {
+    if (error instanceof FinanceInputError) {
+      throw new ConfirmationRefusal(
+        error.message.replace(/^Nothing was changed: /, '')
+      );
+    }
+    throw error;
+  }
+  const currency = await currencyOf(client, input.location_id);
+  return removalLines(plan, currency).join('\n');
+}
+
+async function billAfter(
+  client: AltegioClient,
+  locationId: number,
+  appointmentId: number
+): Promise<VisitBill | null> {
+  try {
+    return await FinanceAdapter.forClient(client).getVisitBill(
+      locationId,
+      appointmentId
+    );
+  } catch {
+    return null;
+  }
+}
+
+export async function removeProduct(
+  client: AltegioClient,
+  input: RemoveProductInput
+): Promise<VisitProductsResult> {
+  const api = visitProductsApi(client);
+  const plan = await planRemoval(api, input);
+  const currency = await currencyOf(client, input.location_id);
+  const { line } = plan;
+
+  const { appointment: after, unexpected_changes: unexpected } =
+    await api.reduceProductLine(input.location_id, input.appointment_id, {
+      line_id: line.id,
+      quantity: plan.quantity,
+      amount: plan.amount,
+      expected_version: plan.sale.version,
+    });
+
+  const now = after.product_lines.find((l) => l.id === line.id) ?? null;
+  const applied =
+    plan.quantity === 0
+      ? now === null
+      : now !== null && round3(now.quantity) === plan.quantity;
+  const [stockAfter, bill] = await Promise.all([
+    api
+      .getProductForSale(input.location_id, line.product_id)
+      .then((product) => stockIn(product, line.inventory_id))
+      .catch(() => null),
+    billAfter(client, input.location_id, input.appointment_id),
+  ]);
+
+  const p = `product ${line.product_id}`;
+  const appt = `appointment ${input.appointment_id}`;
+  const head = applied
+    ? plan.quantity === 0
+      ? `Took line ${line.id} (${p} ×${line.quantity}) off ${appt}.`
+      : `Lowered line ${line.id} of ${p} on ${appt} from ${line.quantity} to ${plan.quantity}.`
+    : now === null
+      ? `The save went through, but line ${line.id} of ${p} no longer reads back on ${appt}, instead of holding ×${plan.quantity}. Read the bill with visits_get before trying again.`
+      : `The save went through, but line ${line.id} of ${p} still holds ×${now.quantity} on ${appt}, not the ×${plan.quantity} asked. Read the bill with visits_get before trying again; the user may lack the right to edit or delete product sales in appointments.`;
+  let stockText: string;
+  if (plan.stock_before !== null && stockAfter !== null) {
+    const returned = round3(stockAfter - plan.stock_before);
+    stockText = `Stock of ${p} in inventory ${line.inventory_id}: ${round3(plan.stock_before)} → ${round3(stockAfter)} (${returned} returned${applied && returned !== plan.removed ? `, not the ${plan.removed} expected — another stock movement may have happened meanwhile` : ''}).`;
+  } else {
+    stockText = `Stock of ${p} in inventory ${line.inventory_id} could not be read back${applied ? `; Altegio returns ${plan.removed} to it` : ''}.`;
+  }
+  const discount = after.client_discount_percent ?? 0;
+  // The bill reports no negative amount due; overpaid is paid above the total.
+  const overpaid = bill ? round2(bill.paid_amount - bill.total_amount) : 0;
+  const text = [
+    head,
+    ...(unexpected.length > 0
+      ? [
+          `Warning — the save also changed the appointment: ${unexpected.join('; ')}. Check ${appt} in Altegio and correct it there.`,
+        ]
+      : []),
+    `Line before: ${lineText(line, currency)}.`,
+    `Line now: ${now ? lineText(now, currency) : 'taken off'}.`,
+    stockText,
+    bill
+      ? `Bill of the visit: total amount ${money(bill.total_amount, currency)}, paid ${money(bill.paid_amount, currency)}, amount due ${money(bill.amount_due, currency)}.`
+      : 'The bill could not be read back; read it with visits_get.',
+    ...(overpaid > 0
+      ? [
+          `The bill is now overpaid by ${money(overpaid, currency)}; payments are not changed. Cancel a payment with visits_cancel_payment and record the right amount with visits_add_payment, or refund the difference in Altegio.`,
+        ]
+      : []),
+    ...(discount > 0
+      ? [
+          `The client’s personal discount is ${discount}%. Where discount levels follow what a client spends, Altegio raises it after a large sale and does not lower it when the sale is taken off; if this sale raised it, a person resets it in the client card.`,
+        ]
+      : []),
+    ...(currency ? [] : ['Currency: not reported for this location.']),
+  ].join('\n');
+
+  return {
+    text: withUntrustedBlock(
+      text,
+      [{ label: `${p} title`, value: plan.product?.title ?? null }],
+      { maxChars: FIELD_MAX_CHARS }
+    ),
+    structuredContent: {
+      location_id: input.location_id,
+      appointment_id: input.appointment_id,
+      visit_id: after.visit_id,
+      currency,
+      removed_line: plan.quantity === 0,
+      removed_quantity: plan.removed,
+      line_before: lineStructured(line),
+      line: now ? lineStructured(now) : null,
+      stock: {
+        inventory_id: line.inventory_id,
+        before: plan.stock_before,
+        after: stockAfter,
+      },
+      bill: bill
+        ? {
+            total_amount: bill.total_amount,
+            paid_amount: bill.paid_amount,
+            amount_due: bill.amount_due,
+          }
+        : null,
+      product_lines: after.product_lines.map(lineStructured),
+      unexpected_changes: unexpected,
+    },
+    ...(!applied || unexpected.length > 0 ? { isError: true } : {}),
   };
 }

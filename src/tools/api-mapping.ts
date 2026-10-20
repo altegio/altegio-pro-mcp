@@ -1044,6 +1044,47 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       pathParams: ['location_id', 'document_id'],
     },
   ],
+  // The undo of visits_add_product, on the same read-modify-write: the line is
+  // left out of the echo (or sent with a lower quantity), the product read
+  // gives the stock before and after, and the bill read gives the total.
+  visits_remove_product: [
+    {
+      path: '/locations/{location_id}/attendances/{attendance_id}/appointments',
+      method: 'get',
+      operationId: 'list_attendance_appointments',
+      pathParams: ['location_id', 'attendance_id'],
+      queryParams: ['include'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/attendance/appointments',
+      method: 'post',
+      operationId: 'save_attendance_appointments',
+      pathParams: ['location_id'],
+      bodyParams: ['ignore_conflicts', 'records'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/products/{product_id}',
+      method: 'get',
+      operationId: 'get_product',
+      pathParams: ['location_id', 'product_id'],
+      queryParams: ['include'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/appointments/{record_id}',
+      method: 'get',
+      operationId: 'get_appointment',
+      pathParams: ['location_id', 'record_id'],
+    },
+    {
+      path: '/locations/{location_id}/sale/{document_id}',
+      method: 'get',
+      operationId: 'get_sale_transaction',
+      pathParams: ['location_id', 'document_id'],
+    },
+  ],
   visits_cancel_payment: [
     {
       path: '/locations/{location_id}/appointments/{record_id}',
