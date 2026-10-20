@@ -79,8 +79,6 @@ type PrepareConfirmation = (args: unknown) => PreparedConfirmation | undefined;
 export interface RegisterToolsOptions {
   /** Which static view to serve. Defaults to the full default view. */
   readonly facet?: FacetKey;
-  /** Drop the onboarding walkthrough from the default view (config switch). */
-  readonly excludeOnboardingFromDefault?: boolean;
   /**
    * Admit the email + password login tools to the HTTP views (config switch).
    * Off by default; the unfiltered `all` view stdio uses always has them.
@@ -459,7 +457,6 @@ export function registerTools(
   const facet = options.facet ?? DEFAULT_FACET;
   const publicBaseUrl = options.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL;
   const listing = listView(facet, {
-    excludeOnboardingFromDefault: options.excludeOnboardingFromDefault,
     exposePasswordLogin: options.exposePasswordLogin,
     publicBaseUrl,
   });

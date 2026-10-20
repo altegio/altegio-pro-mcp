@@ -4,6 +4,8 @@ Complete guide for using the conversational onboarding assistant to set up your 
 
 ## Overview
 
+The onboarding wizard is served at `https://mcp.alteg.io/pro/onboarding` (and on stdio), not on the default address `https://mcp.alteg.io/pro`.
+
 The onboarding wizard provides **12 specialized tools** to help new users quickly configure their business platform through natural conversation or bulk data import. Perfect for first-time setup with positions, staff, services, schedules, and client databases.
 
 **Key Features:**

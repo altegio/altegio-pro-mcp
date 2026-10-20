@@ -6,6 +6,33 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — six low-use groups leave the default view
+
+`/mcp` (hosted `https://mcp.alteg.io/pro`) no longer lists 26 tools that
+carried 0.27 % of its calls over 22 days (442 of about 164,600). They are not
+removed: each group is still served on its view, and on stdio.
+
+| Group                                           | Tools                                                                                                                                                  | Now on                                                                    |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| Onboarding wizard                               | all 12 `onboarding_*`                                                                                                                                  | `https://mcp.alteg.io/pro/onboarding`                                     |
+| Event duplication patterns                      | `events_list_duplication_strategies`, `events_create_duplication_strategy`, `events_update_duplication_strategy`, `events_delete_duplication_strategy` | `https://mcp.alteg.io/pro/ops`                                            |
+| Client files                                    | `clients_list_files`, `clients_upload_file`                                                                                                            | `https://mcp.alteg.io/pro/ops`                                            |
+| Membership freeze, balance and validity changes | `memberships_freeze`, `memberships_unfreeze`, `memberships_set_balance`, `memberships_set_validity`                                                    | `https://mcp.alteg.io/pro/marketing` (freeze and unfreeze also on `/ops`) |
+| Membership type archive/delete                  | `memberships_archive_type`, `memberships_delete_type`                                                                                                  | `https://mcp.alteg.io/pro/marketing`                                      |
+| Booking form create/delete                      | `booking_forms_create`, `booking_forms_delete`                                                                                                         | `https://mcp.alteg.io/pro/catalog`                                        |
+
+- `/mcp` goes from 121 tools and 148,185 bytes of `tools/list` to 95 tools and
+  125,389 bytes; its budget drops from 155,500 to 132,000.
+- A model on `/mcp` is pointed at them: the default view's `initialize`
+  instructions name each group and its address; `booking_forms_list`,
+  `memberships_list_types`, `events_duplicate` and `clients_add_comment` name
+  the tools with a "served on" address; a call to one on `/mcp` is refused with
+  the address that serves it; the `onboarding_walkthrough` prompt says where its
+  tools are.
+- `/mcp/readonly` and every facet are unchanged.
+- **Removed: `MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING`.** The onboarding wizard is
+  now off `/mcp` in every deployment, so the switch has nothing left to do.
+
 ### Fixed — visit payments and visit products carry the confirmation's key
 
 - `visits_add_payment` and `visits_cancel_payment` now hand the confirmed

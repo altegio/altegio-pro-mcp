@@ -333,7 +333,7 @@ export const membershipsListTypesTool = defineTool({
   name: 'memberships_list_types',
   category: 'Memberships',
   description:
-    'Membership types of a chain (the templates memberships are sold from): price, covered services, balance, validity and activation, freezing, sold count. Active by default, archived=true for archived; filter by title. Paged: follow pagination.next_page. Selling locations: memberships_get_type.',
+    'Membership types of a chain (the templates memberships are sold from): price, covered services, balance, validity and activation, freezing, sold count. Active by default, archived=true for archived; filter by title. Paged: follow pagination.next_page. Selling locations: memberships_get_type. Archive or delete a type: memberships_archive_type, memberships_delete_type.',
   annotations: { title: 'Memberships: list membership types', ...READ_ONLY },
   input: z.object({
     chain_id: chainId,

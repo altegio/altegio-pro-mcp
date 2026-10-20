@@ -75,7 +75,6 @@ export function listView(
   const facetIndex = buildFacetIndex(
     facetToolsFromSpecs(entries.map((entry) => entry.spec)),
     {
-      excludeOnboardingFromDefault: options.excludeOnboardingFromDefault,
       exposePasswordLogin: options.exposePasswordLogin,
     }
   );

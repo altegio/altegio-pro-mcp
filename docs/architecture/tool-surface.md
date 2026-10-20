@@ -55,13 +55,13 @@ Served tools per category, in `tools/list` order:
 
 | View | Address | Serves (of 159 defined) | `tools/list` bytes | Budget (used) | Reasons |
 | --- | --- | --- | --- | --- | --- |
-| `all` | stdio (no HTTP route) | 153 | 208,729 | — | all ×153, -off ×6 |
-| `default` | `/mcp` | 121 | 148,185 | 155,500 (95 %) | dflt ×117, -pack ×29, -off ×6, base ×3, -pwd ×2, -name ×1, xtra ×1 |
-| `readonly` | `/mcp/readonly` | 84 | 119,840 | 126,000 (95 %) | ro ×84, -write ×67, -off ×6, -pwd ×2 |
+| `all` | stdio (no HTTP route) | 153 | 208,877 | — | all ×153, -off ×6 |
+| `default` | `/mcp` | 95 | 125,389 | 132,000 (95 %) | dflt ×91, -pack ×29, -low ×26, -off ×6, base ×3, -pwd ×2, -name ×1, xtra ×1 |
+| `readonly` | `/mcp/readonly` | 84 | 120,239 | 126,000 (95 %) | ro ×84, -write ×67, -off ×6, -pwd ×2 |
 | `ops` | `/mcp/ops` | 53 | 73,980 | 78,000 (95 %) | - ×98, pfx ×27, rule ×23, -off ×6, base ×3, -pwd ×2 |
-| `catalog` | `/mcp/catalog` | 34 | 26,632 | 28,000 (95 %) | - ×117, rule ×31, -off ×6, base ×3, -pwd ×2 |
+| `catalog` | `/mcp/catalog` | 34 | 26,703 | 28,000 (95 %) | - ×117, rule ×31, -off ×6, base ×3, -pwd ×2 |
 | `finance` | `/mcp/finance` | 57 | 100,907 | 106,000 (95 %) | - ×94, pfx ×50, -off ×6, rule ×4, base ×3, -pwd ×2 |
-| `marketing` | `/mcp/marketing` | 17 | 24,235 | 25,500 (95 %) | - ×134, pfx ×13, -off ×6, base ×3, -pwd ×2, rule ×1 |
+| `marketing` | `/mcp/marketing` | 17 | 24,312 | 25,500 (95 %) | - ×134, pfx ×13, -off ×6, base ×3, -pwd ×2, rule ×1 |
 | `analytics` | `/mcp/analytics` | 33 | 63,825 | 67,500 (95 %) | - ×118, pfx ×30, -off ×6, base ×3, -pwd ×2 |
 | `onboarding` | `/mcp/onboarding` | 15 | 12,463 | 13,500 (92 %) | - ×136, pfx ×12, -off ×6, base ×3, -pwd ×2 |
 
@@ -74,6 +74,20 @@ the tests and `npm run surface:check` fail above them. `/mcp` is headed for
 A facet answers *how many tools fit in this host’s context*; `readonly`
 answers *what may this agent do at all*. They are different kinds of view —
 `readonly` is not a seventh facet (ADR-001 D3 addendum).
+
+## Demoted from `/mcp`
+
+Low-use groups served on their facet only (`-low` in the `/mcp` column).
+The default view’s `initialize` instructions name each group and its address.
+
+| Group | Served on | Tools |
+| --- | --- | --- |
+| the first-time setup wizard | `/mcp/onboarding` | `onboarding_add_categories`, `onboarding_add_positions`, `onboarding_add_services_batch`, `onboarding_add_team_members_batch`, `onboarding_create_test_appointments`, `onboarding_import_clients`, `onboarding_preview_data`, `onboarding_resume`, `onboarding_rollback_phase`, `onboarding_set_schedules`, `onboarding_start`, `onboarding_status` |
+| event duplication patterns | `/mcp/ops` | `events_create_duplication_strategy`, `events_delete_duplication_strategy`, `events_list_duplication_strategies`, `events_update_duplication_strategy` |
+| client files | `/mcp/ops` | `clients_list_files`, `clients_upload_file` |
+| membership freeze, balance and validity changes | `/mcp/marketing` | `memberships_freeze`, `memberships_set_balance`, `memberships_set_validity`, `memberships_unfreeze` |
+| archiving or deleting a membership type | `/mcp/marketing` | `memberships_archive_type`, `memberships_delete_type` |
+| creating or deleting a booking form | `/mcp/catalog` | `booking_forms_create`, `booking_forms_delete` |
 
 ## Legend
 
@@ -90,7 +104,7 @@ answers *what may this agent do at all*. They are different kinds of view —
 | `-pwd` | no | a password prompt under an OAuth endpoint | `PASSWORD_LOGIN_TOOLS` + `ALTEGIO_EXPOSE_PASSWORD_LOGIN` |
 | `-name` | no | a dangerous right `/mcp` does not hand a generic agent | `DEFAULT_FACET_EXCLUDED_TOOLS` |
 | `-pack` | no | a whole pack held back from `/mcp`’s byte budget | `DEFAULT_FACET_EXCLUDED_PREFIXES` |
-| `-onb` | no | the onboarding config switch is on | `MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING` |
+| `-low` | no | a low-use group served on its facet only | `DEFAULT_FACET_DEMOTED_GROUPS` |
 | `-` | no | this facet’s rule does not name it | `FACET_RULES[<facet>]` |
 | `-write` | no | it changes data, so the read-only address will not serve it | the tool’s own annotations |
 | `-off` | no | withheld from every view, stdio included | `DISABLED_TOOL_NAMES` |
@@ -207,11 +221,11 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | `clients_get_segment_report` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
 | `clients_get_visit_history` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
 | `clients_list_comments` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
-| `clients_list_files` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
+| `clients_list_files` | `all` | `-low` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
 | `clients_list_profiles` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
 | `clients_lookup` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
 | `clients_search` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:read |
-| `clients_upload_file` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:write |
+| `clients_upload_file` | `all` | `-low` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | clients:write |
 
 ### Events
 
@@ -219,19 +233,19 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `events_book_clients` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:create |
 | `events_create` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write |
-| `events_create_duplication_strategy` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write |
+| `events_create_duplication_strategy` | `all` | `-low` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write |
 | `events_delete` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write, confirm |
-| `events_delete_duplication_strategy` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write, confirm |
+| `events_delete_duplication_strategy` | `all` | `-low` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write, confirm |
 | `events_duplicate` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write + appointments:create |
 | `events_get` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:read |
 | `events_list` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:read |
 | `events_list_dates` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:read |
-| `events_list_duplication_strategies` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:read |
+| `events_list_duplication_strategies` | `all` | `-low` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:read |
 | `events_list_services` | `all` | `dflt` | `ro` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:read |
 | `events_reschedule_appointment` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write |
 | `events_update` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write |
 | `events_update_appointment` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write |
-| `events_update_duplication_strategy` | `all` | `dflt` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write |
+| `events_update_duplication_strategy` | `all` | `-low` | `-write` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write |
 
 ### Feedback
 
@@ -276,36 +290,36 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 
 | Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `memberships_archive_type` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:configure |
+| `memberships_archive_type` | `all` | `-low` | `-write` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:configure |
 | `memberships_create_type` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:configure |
-| `memberships_delete_type` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:configure, confirm |
-| `memberships_freeze` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:transact |
+| `memberships_delete_type` | `all` | `-low` | `-write` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:configure, confirm |
+| `memberships_freeze` | `all` | `-low` | `-write` | `rule` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:transact |
 | `memberships_get_type` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:read |
 | `memberships_list` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:read |
 | `memberships_list_chains` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:read |
 | `memberships_list_for_client` | `all` | `dflt` | `ro` | `rule` | `-` | `-` | `pfx` | `-` | `-` | clients:read + loyalty:read |
 | `memberships_list_types` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:read |
-| `memberships_set_balance` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:transact, confirm |
-| `memberships_set_validity` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:transact, confirm |
-| `memberships_unfreeze` | `all` | `dflt` | `-write` | `rule` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:transact |
+| `memberships_set_balance` | `all` | `-low` | `-write` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:transact, confirm |
+| `memberships_set_validity` | `all` | `-low` | `-write` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:transact, confirm |
+| `memberships_unfreeze` | `all` | `-low` | `-write` | `rule` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:transact |
 | `memberships_update_type` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:configure |
 
 ### Onboarding
 
 | Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `onboarding_add_categories` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | services:write |
-| `onboarding_add_positions` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | team_members:write |
-| `onboarding_add_services_batch` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | services:write |
-| `onboarding_add_team_members_batch` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | team_members:write |
-| `onboarding_create_test_appointments` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | appointments:create |
-| `onboarding_import_clients` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | clients:write |
-| `onboarding_preview_data` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `-` | `-` | `pfx` | — |
-| `onboarding_resume` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `-` | `-` | `pfx` | — |
-| `onboarding_rollback_phase` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | team_members:write + services:write + clients:write + appointments:write, confirm |
-| `onboarding_set_schedules` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | team_members:write |
-| `onboarding_start` | `all` | `dflt` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | — |
-| `onboarding_status` | `all` | `dflt` | `ro` | `-` | `-` | `-` | `-` | `-` | `pfx` | — |
+| `onboarding_add_categories` | `all` | `-low` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | services:write |
+| `onboarding_add_positions` | `all` | `-low` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | team_members:write |
+| `onboarding_add_services_batch` | `all` | `-low` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | services:write |
+| `onboarding_add_team_members_batch` | `all` | `-low` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | team_members:write |
+| `onboarding_create_test_appointments` | `all` | `-low` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | appointments:create |
+| `onboarding_import_clients` | `all` | `-low` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | clients:write |
+| `onboarding_preview_data` | `all` | `-low` | `ro` | `-` | `-` | `-` | `-` | `-` | `pfx` | — |
+| `onboarding_resume` | `all` | `-low` | `ro` | `-` | `-` | `-` | `-` | `-` | `pfx` | — |
+| `onboarding_rollback_phase` | `all` | `-low` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | team_members:write + services:write + clients:write + appointments:write, confirm |
+| `onboarding_set_schedules` | `all` | `-low` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | team_members:write |
+| `onboarding_start` | `all` | `-low` | `-write` | `-` | `-` | `-` | `-` | `-` | `pfx` | — |
+| `onboarding_status` | `all` | `-low` | `ro` | `-` | `-` | `-` | `-` | `-` | `pfx` | — |
 
 ### Payroll
 
@@ -352,8 +366,8 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 
 | Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `booking_forms_create` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write |
-| `booking_forms_delete` | `all` | `dflt` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write, confirm |
+| `booking_forms_create` | `all` | `-low` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write |
+| `booking_forms_delete` | `all` | `-low` | `-write` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write, confirm |
 | `booking_forms_list` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
 | `settings_get_appointment_calendar` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
 | `settings_get_online_booking` | `all` | `dflt` | `ro` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
@@ -388,8 +402,8 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 
 ## Deployment switches
 
-The table above describes the default configuration: password login off,
-onboarding on `/mcp`. Two environment switches change it.
+The table above describes the default configuration, password login off.
+One environment switch changes it.
 
 `ALTEGIO_EXPOSE_PASSWORD_LOGIN=true` (the closed staff deployment):
 
@@ -400,8 +414,4 @@ onboarding on `/mcp`. Two environment switches change it.
 - `/mcp/marketing` — +`auth_login`, +`auth_logout`
 - `/mcp/analytics` — +`auth_login`, +`auth_logout`
 - `/mcp/onboarding` — +`auth_login`, +`auth_logout`
-
-`MCP_DEFAULT_FACET_EXCLUDE_ONBOARDING=true`:
-
-- `/mcp` — −`onboarding_add_categories`, −`onboarding_add_positions`, −`onboarding_add_services_batch`, −`onboarding_add_team_members_batch`, −`onboarding_create_test_appointments`, −`onboarding_import_clients`, −`onboarding_preview_data`, −`onboarding_resume`, −`onboarding_rollback_phase`, −`onboarding_set_schedules`, −`onboarding_start`, −`onboarding_status`
 
