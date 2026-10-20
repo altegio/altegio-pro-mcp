@@ -6,6 +6,46 @@ is declared stable.
 
 ## [Unreleased]
 
+### Fixed — replay and lost-update guards on stock and money writes
+
+- **`inventory_create_operation` refuses a repeat.** The confirmation token is
+  valid for its arguments for ten minutes and is not single use, so a repeated
+  confirmed call recorded a second receipt, write-off or sale and moved stock
+  again. The tool now refuses when an identical operation — same kind,
+  inventory, lines, quantities, prices, date and comment, and the same client
+  of a sale or Supplier of a receipt — was recorded within the last ten
+  minutes (or, with a `date`, at that minute), naming the document. A genuine
+  second one is recorded with a comment that tells the two apart. The check
+  also runs before the confirmation, so nobody is asked to approve a repeat.
+  A duplicate check was chosen over an `expected_stock` per line: it needs no
+  extra read from the model, and stock that other sales move meanwhile would
+  refuse genuine calls.
+- **Version binding for read-modify-write tools.** `appointments_set_consumables`
+  and `financial_transactions_update` re-read before they write; their
+  confirmation now carries a version — a hash of exactly what it showed (the
+  consumables before and after, the Bill of Materials and the attendance; the
+  transaction's fields) — and the write is refused with a re-read hint when the
+  state has moved since. A confirmed `replace: true` no longer drops a line
+  added after the person approved, and an update no longer overwrites a change
+  made in between. `financial_transactions_update` now shows the transaction
+  and the change in its confirmation, and refuses an update that changes
+  nothing before anyone is asked.
+- **Token wording.** The confirmation says the token is "valid for these
+  arguments until <time>" instead of "for this call only", and ADR-001 D8 no
+  longer calls it one-time; it records that money and stock writes carry their
+  own replay guards.
+- **Idempotency seam for V3.** Every write method of the finance and inventory
+  ports takes an optional `idempotency_key`, derived from the confirmation (a
+  hash of the tool name, the canonical arguments and the token's expiry), so a
+  repeat of one confirmed call carries the same key. The V1 adapters ignore it;
+  a V3 adapter sends it as `Idempotency-Key`. `visits_add_payment` and
+  `visits_cancel_payment` accept it in their use cases and are wired at the
+  tool once the concurrent visits work lands.
+- The consumables result no longer prints "every line has a new line id:" when
+  no line remains.
+- An opt-in live suite (`replay-guards-live`) drives both guards through the
+  token path on a disposable location and cleans up after itself.
+
 ### Added — `visits_remove_product`: take a product off a visit
 
 - **`visits_remove_product`** is the undo of `visits_add_product`: it takes a

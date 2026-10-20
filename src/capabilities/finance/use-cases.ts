@@ -16,8 +16,12 @@
  *
  * Writes that record money check the state they were confirmed against before
  * they run: a payment needs the amount due the caller read, a deposit the
- * balance. The confirmation token is valid for ten minutes and is not single
- * use, so without that check a repeated call would record the money twice.
+ * balance, a new financial transaction that no identical one was just
+ * recorded, and a change to one the version of the transaction the person was
+ * shown. The confirmation token is valid for these arguments for ten minutes
+ * and is not single use, so without that check a repeated call would record
+ * the money twice. Each write also hands the port the confirmed call's
+ * idempotency key (`../../api/write-options.ts`).
  */
 import type { AltegioClient } from '../../providers/altegio-client.js';
 import { FinanceAdapter, roundMoney } from '../../api/v1/finance-adapter.js';
@@ -40,6 +44,13 @@ import type {
   VisitBill,
   VisitPayment,
 } from '../../api/finance-api.js';
+import { writeOptions } from '../../api/write-options.js';
+import {
+  ConfirmationRefusal,
+  stateVersion,
+  type ConfirmationDetail,
+  type ConfirmedCall,
+} from '../../tools/confirmation.js';
 import { FinanceInputError, FinanceNotFoundError } from './errors.js';
 import {
   paginateCollection,
@@ -442,7 +453,8 @@ export function paymentSummary(input: AddPaymentInput): string {
 
 export async function addPayment(
   client: AltegioClient,
-  input: AddPaymentInput
+  input: AddPaymentInput,
+  confirmation?: ConfirmedCall
 ): Promise<FinanceResult> {
   const request = paymentRequest(input);
   const finance = api(client);
@@ -486,7 +498,8 @@ export async function addPayment(
   const after = await finance.addPayment(
     input.location_id,
     input.appointment_id,
-    request
+    request,
+    writeOptions(confirmation)
   );
   const known = new Set(before.payments.map((p) => p.id));
   const added = after.payments.filter((p) => !known.has(p.id));
@@ -523,7 +536,8 @@ export async function describePayment(
 
 export async function cancelPayment(
   client: AltegioClient,
-  input: { location_id: number; appointment_id: number; payment_id: string }
+  input: { location_id: number; appointment_id: number; payment_id: string },
+  confirmation?: ConfirmedCall
 ): Promise<FinanceResult> {
   const finance = api(client);
   const [before, currency] = await Promise.all([
@@ -539,7 +553,8 @@ export async function cancelPayment(
   const after = await finance.cancelPayment(
     input.location_id,
     input.appointment_id,
-    input.payment_id
+    input.payment_id,
+    writeOptions(confirmation)
   );
   const gone = !after.payments.some((p) => p.id === input.payment_id);
   return {
@@ -628,7 +643,8 @@ export async function describeClientAccount(
 
 export async function deposit(
   client: AltegioClient,
-  input: DepositInput
+  input: DepositInput,
+  confirmation?: ConfirmedCall
 ): Promise<FinanceResult> {
   const finance = api(client);
   const [accounts, currency] = await Promise.all([
@@ -654,15 +670,19 @@ export async function deposit(
       `Nothing was deposited: client account ${account.id} has a balance of ${amountText(account.balance, currency)}, not the ${amountText(input.expected_balance, currency)} this deposit was confirmed for — the balance changed, or this deposit was already recorded. Read it again with client_accounts_list_for_client.`
     );
   }
-  const result = await finance.deposit(input.location_id, {
-    client_id: input.client_id,
-    client_account_id: input.client_account_id,
-    amount: input.amount,
-    account_id: input.account_id,
-    ...(input.team_member_id !== undefined
-      ? { team_member_id: input.team_member_id }
-      : {}),
-  });
+  const result = await finance.deposit(
+    input.location_id,
+    {
+      client_id: input.client_id,
+      client_account_id: input.client_account_id,
+      amount: input.amount,
+      account_id: input.account_id,
+      ...(input.team_member_id !== undefined
+        ? { team_member_id: input.team_member_id }
+        : {}),
+    },
+    writeOptions(confirmation)
+  );
   return {
     text: lines(
       `Deposited ${amountText(result.amount, currency)} to client account ${result.client_account_id} of client ${input.client_id}, received into account or cash register ${input.account_id}${result.financial_transaction_id ? ` (financial transaction ${result.financial_transaction_id})` : ''}.`,
@@ -920,7 +940,8 @@ const DUPLICATE_WINDOW_MS = 10 * 60 * 1000;
 export async function createFinancialTransaction(
   client: AltegioClient,
   input: CreateTransactionInput,
-  now: number = Date.now()
+  now: number = Date.now(),
+  confirmation?: ConfirmedCall
 ): Promise<FinanceResult> {
   const finance = api(client);
   const [zone, currency] = await Promise.all([
@@ -973,7 +994,8 @@ export async function createFinancialTransaction(
 
   const created = await finance.createFinancialTransaction(
     input.location_id,
-    fields
+    fields,
+    writeOptions(confirmation)
   );
   return {
     text: withUntrustedBlock(
@@ -1026,10 +1048,24 @@ export interface UpdateTransactionInput {
   clear?: Array<'client' | 'team_member' | 'supplier' | 'comment'>;
 }
 
-export async function updateFinancialTransaction(
+/** A change to a transaction, worked out on the transaction as just read. */
+interface TransactionUpdatePlan {
+  before: FinancialTransaction;
+  fields: FinancialTransactionFields;
+  /** `before.date` as location wall time, `YYYY-MM-DD HH:MM:SS`. */
+  beforeLocal: string | null;
+  currency: string | null;
+  /**
+   * `stateVersion` of every field the update overwrites, as read: what the
+   * confirmation shows, and what the confirmed call must still find.
+   */
+  version: string;
+}
+
+async function planTransactionUpdate(
   client: AltegioClient,
   input: UpdateTransactionInput
-): Promise<FinanceResult> {
+): Promise<TransactionUpdatePlan> {
   const finance = api(client);
   const [before, zone, currency] = await Promise.all([
     finance.getFinancialTransaction(input.location_id, input.transaction_id),
@@ -1069,10 +1105,97 @@ export async function updateFinancialTransaction(
       `Financial transaction ${before.id} reports no payment item or account; pass payment_item_id and account_id.`
     );
   }
-  const after = await finance.updateFinancialTransaction(
+  return {
+    before,
+    fields,
+    beforeLocal,
+    currency,
+    version: stateVersion({
+      payment_item_id: before.payment_item_id,
+      account_id: before.account_id,
+      amount: roundMoney(before.amount),
+      date: before.date,
+      client_id: before.client_id,
+      team_member_id: before.team_member_id,
+      supplier_id: before.supplier_id,
+      comment: before.comment ?? '',
+    }),
+  };
+}
+
+/** The confirmation detail: the transaction now, and what the call changes. */
+export async function describeTransactionChange(
+  client: AltegioClient,
+  input: UpdateTransactionInput
+): Promise<ConfirmationDetail> {
+  let plan: TransactionUpdatePlan;
+  try {
+    plan = await planTransactionUpdate(client, input);
+  } catch (error) {
+    if (error instanceof FinanceInputError) {
+      throw new ConfirmationRefusal(
+        error.message.replace(/^Nothing was changed: /, '')
+      );
+    }
+    throw error;
+  }
+  const { before, fields, beforeLocal, currency } = plan;
+  const none = (id: number | null) => (id === null ? 'none' : String(id));
+  const changes = [
+    !sameMoney(Math.abs(before.amount), fields.amount) &&
+      `amount ${amountText(Math.abs(before.amount), currency)} → ${amountText(fields.amount, currency)}`,
+    before.payment_item_id !== fields.payment_item_id &&
+      `payment item ${none(before.payment_item_id)} → ${fields.payment_item_id}`,
+    before.account_id !== fields.account_id &&
+      `account ${none(before.account_id)} → ${fields.account_id}`,
+    beforeLocal !== fields.local_date &&
+      `date ${beforeLocal ?? 'none'} → ${fields.local_date} (location time)`,
+    before.client_id !== fields.client_id &&
+      `client ${none(before.client_id)} → ${none(fields.client_id)}`,
+    before.team_member_id !== fields.team_member_id &&
+      `team member ${none(before.team_member_id)} → ${none(fields.team_member_id)}`,
+    before.supplier_id !== fields.supplier_id &&
+      `supplier ${none(before.supplier_id)} → ${none(fields.supplier_id)}`,
+    (before.comment ?? '') !== fields.comment &&
+      (fields.comment === '' ? 'comment removed' : 'comment replaced'),
+  ].filter((c): c is string => typeof c === 'string');
+  if (changes.length === 0) {
+    throw new ConfirmationRefusal(
+      `financial transaction ${before.id} already holds these values; there is nothing to change.`
+    );
+  }
+  return {
+    text: [
+      `Now: ${transactionLine(before, currency).slice(2)}${before.comment ? ' · with a comment' : ''}.`,
+      'Changes:',
+      ...changes.map((c) => `- ${c}`),
+    ].join('\n'),
+    version: plan.version,
+  };
+}
+
+export async function updateFinancialTransaction(
+  client: AltegioClient,
+  input: UpdateTransactionInput,
+  confirmation?: ConfirmedCall
+): Promise<FinanceResult> {
+  const plan = await planTransactionUpdate(client, input);
+  const { before, fields, currency } = plan;
+  // The update replaces every field, so it must run on the transaction the
+  // person saw: a change made since would be overwritten unseen.
+  if (
+    confirmation?.version !== undefined &&
+    confirmation.version !== plan.version
+  ) {
+    throw new FinanceInputError(
+      `Nothing was changed: financial transaction ${before.id} was changed after the confirmation was shown, so the change approved is no longer the change this call would make. Read it again with financial_transactions_list, then repeat the call without confirmation_token to confirm against what it holds now.`
+    );
+  }
+  const after = await api(client).updateFinancialTransaction(
     input.location_id,
     input.transaction_id,
-    fields
+    fields,
+    writeOptions(confirmation)
   );
   const changes = [
     !sameMoney(before.amount, after.amount) &&
@@ -1110,7 +1233,8 @@ export async function updateFinancialTransaction(
 
 export async function deleteFinancialTransaction(
   client: AltegioClient,
-  input: { location_id: number; transaction_id: number }
+  input: { location_id: number; transaction_id: number },
+  confirmation?: ConfirmedCall
 ): Promise<FinanceResult> {
   const finance = api(client);
   const [before, currency] = await Promise.all([
@@ -1120,7 +1244,8 @@ export async function deleteFinancialTransaction(
   refuseLinked(before, 'deleted');
   await finance.deleteFinancialTransaction(
     input.location_id,
-    input.transaction_id
+    input.transaction_id,
+    writeOptions(confirmation)
   );
   return {
     text: withUntrustedBlock(

@@ -25,6 +25,8 @@
  *   location's; see `./server-time.ts`.
  * - The payroll period read answers 416 when no payroll scheme applies to the
  *   team member; that is reported as "no calculation", not as a failure.
+ * - V1 has no idempotency header, so the write methods ignore the
+ *   `idempotency_key` of their `WriteOptions` (`../write-options.ts`).
  */
 import {
   httpFromClient,

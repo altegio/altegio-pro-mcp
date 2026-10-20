@@ -7,6 +7,12 @@
  * the structured content. Money carries the location's ISO currency code; a
  * quantity carries its unit. Titles and comments are other people's text and
  * go into the untrusted block only (see `./shared.ts`).
+ *
+ * The confirmation token of a write is valid for its arguments for ten
+ * minutes and is not single use, so recording an operation first checks that
+ * no identical one was just recorded (`findRepeat`): a repeated call would
+ * otherwise move the stock twice. Each write hands the port the confirmed
+ * call's idempotency key (`../../api/write-options.ts`).
  */
 import type { AltegioClient } from '../../providers/altegio-client.js';
 import type {
@@ -32,7 +38,13 @@ import {
   withUntrustedBlock,
   type UntrustedField,
 } from '../../tools/tool-result.js';
-import { ConfirmationRefusal } from '../../tools/confirmation.js';
+import { writeOptions } from '../../api/write-options.js';
+import { instantOfWallTime, wallTime } from '../../api/v1/server-time.js';
+import { knownLocationTimezone } from '../analytics/location-timezone.js';
+import {
+  ConfirmationRefusal,
+  type ConfirmedCall,
+} from '../../tools/confirmation.js';
 import { InventoryInputError, InventoryNotFoundError } from './errors.js';
 import {
   FIELD_MAX_CHARS,
@@ -628,17 +640,180 @@ function stockEffect(kind: InventoryOperationKind): string {
   return kind === 'receipt' ? 'adds to' : 'takes from';
 }
 
+// ========== inventory operations: the repeat guard ==========
+
+/** How recent an identical undated operation must be to count as a repeat. */
+const REPEAT_WINDOW_MS = 10 * 60 * 1000;
+/** Lines of the window's days the repeat check reads at most. */
+const REPEAT_PAGE_SIZE = 100;
+const REPEAT_PAGES_MAX = 5;
+
+const round3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/** One planned line, in the terms a recorded movement line reads back in. */
+function lineKey(
+  productId: number | null,
+  quantity_: number | null,
+  unitPrice: number | null,
+  discount: number | null
+): string {
+  return [
+    productId,
+    quantity_ === null ? null : round3(quantity_),
+    unitPrice === null ? null : round2(unitPrice),
+    round2(discount ?? 0),
+  ].join(':');
+}
+
+/** Widest a location's clock can be from UTC, for when its zone is unknown. */
+const MAX_ZONE_OFFSET_MS = 14 * 60 * 60 * 1000;
+
+/**
+ * Where a check for `now` has to look: the location days to read, and how
+ * close to `now` a line's time must be. The list stores a line's date as the
+ * location's wall time (and labels it with the server's offset, which is not
+ * the location's), so only the wall time is read, placed in the location's
+ * zone. When the zone is unknown, every day and every offset a location could
+ * have is allowed: refusing a genuine call is cheap, a comment tells it apart.
+ */
+async function repeatWindow(
+  client: AltegioClient,
+  locationId: number,
+  now: number
+): Promise<{
+  date_from: string;
+  date_to: string;
+  recent: (wall: string) => boolean;
+}> {
+  const zone = await knownLocationTimezone(client, locationId).catch(
+    () => null
+  );
+  if (zone) {
+    return {
+      date_from: wallTime(now - REPEAT_WINDOW_MS, zone).slice(0, 10),
+      date_to: wallTime(now, zone).slice(0, 10),
+      recent: (wall) => {
+        const at = instantOfWallTime(wall, zone);
+        return at !== null && Math.abs(now - at) <= REPEAT_WINDOW_MS;
+      },
+    };
+  }
+  return {
+    date_from: new Date(now - MAX_ZONE_OFFSET_MS).toISOString().slice(0, 10),
+    date_to: new Date(now + MAX_ZONE_OFFSET_MS).toISOString().slice(0, 10),
+    recent: (wall) => {
+      const at = instantOfWallTime(wall, 'UTC');
+      return (
+        at !== null &&
+        Math.abs(now - at) <= MAX_ZONE_OFFSET_MS + REPEAT_WINDOW_MS
+      );
+    },
+  };
+}
+
+/**
+ * A document already recorded with the same kind, inventory, lines (product,
+ * quantity, unit price, discount), date and comment — and, where the lines
+ * keep them, the same client (a sale) or Supplier (a receipt). That is the
+ * trace a repeated confirmed call leaves. With a `date` the document must be
+ * dated the same minute; without one, it must have been recorded within the
+ * last ten minutes, the life of a confirmation token.
+ */
+async function findRepeat(
+  client: AltegioClient,
+  input: CreateOperationInput,
+  plan: OperationPlan,
+  now: number
+): Promise<InventoryMovement[] | undefined> {
+  const dated = plan.write.date_local;
+  const window = dated
+    ? undefined
+    : await repeatWindow(client, input.location_id, now);
+  const range = dated
+    ? { date_from: dated.slice(0, 10), date_to: dated.slice(0, 10) }
+    : { date_from: window!.date_from, date_to: window!.date_to };
+  const sameTime = (m: InventoryMovement) => {
+    // `YYYY-MM-DD HH:MM:SS`, the location's wall time; the offset is dropped.
+    const wall = m.date?.slice(0, 19).replace('T', ' ');
+    if (!wall) return false;
+    return dated
+      ? wall.slice(0, 16) === dated.slice(0, 16)
+      : window!.recent(wall);
+  };
+
+  const documents = new Map<number, InventoryMovement[]>();
+  const api = inventoryApi(client);
+  for (let page = 1; page <= REPEAT_PAGES_MAX; page += 1) {
+    const rows = await api.listMovements(input.location_id, {
+      ...range,
+      page,
+      page_size: REPEAT_PAGE_SIZE,
+    });
+    for (const m of rows) {
+      if (m.document_id === null) continue;
+      documents.set(m.document_id, [
+        ...(documents.get(m.document_id) ?? []),
+        m,
+      ]);
+    }
+    if (rows.length < REPEAT_PAGE_SIZE) break;
+  }
+
+  const comment = input.comment ?? '';
+  const wanted = plan.lines
+    .map((l) =>
+      lineKey(l.product_id, l.quantity, l.unit_price, l.discount_percent)
+    )
+    .sort();
+  for (const lines of documents.values()) {
+    if (lines.length !== wanted.length) continue;
+    const same = lines.every(
+      (m) =>
+        m.kind === input.kind &&
+        m.inventory_id === plan.inventory.id &&
+        (m.comment ?? '') === comment &&
+        sameTime(m) &&
+        (input.kind !== 'sale' || m.client_id === (input.client_id ?? null)) &&
+        (input.kind !== 'receipt' ||
+          m.supplier_id === (input.supplier_id ?? null))
+    );
+    if (!same) continue;
+    const got = lines
+      .map((m) =>
+        lineKey(m.product_id, m.quantity, m.unit_price, m.discount_percent)
+      )
+      .sort();
+    if (got.every((key, index) => key === wanted[index])) return lines;
+  }
+  return undefined;
+}
+
+function repeatRefusal(
+  input: CreateOperationInput,
+  lines: readonly InventoryMovement[]
+): InventoryInputError {
+  const first = lines[0]!;
+  return new InventoryInputError(
+    `Nothing was recorded: document ${first.document_id} — a ${KIND_LABEL[input.kind]} with the same inventory, lines, quantities, prices${input.date ? ', date' : ''} and comment — was already recorded (dated ${first.date ? `${first.date.slice(0, 16).replace('T', ' ')} location time` : 'not reported'}), so this looks like a repeat of the same call. If a second identical ${KIND_LABEL[input.kind]} is really meant, call again with a comment that tells the two apart; it needs a new confirmation.`
+  );
+}
+
 /** The confirmation detail: inventory and every priced line, resolved. */
 export async function describeOperation(
   client: AltegioClient,
-  input: CreateOperationInput
+  input: CreateOperationInput,
+  now: number = Date.now()
 ): Promise<string> {
   let plan: OperationPlan;
   try {
     plan = await planOperation(client, input);
+    const repeat = await findRepeat(client, input, plan, now);
+    if (repeat) throw repeatRefusal(input, repeat);
   } catch (error) {
     if (error instanceof InventoryInputError)
-      throw new ConfirmationRefusal(error.message);
+      throw new ConfirmationRefusal(
+        error.message.replace(/^Nothing was recorded: /, '')
+      );
     throw error;
   }
   const sum = round2(plan.lines.reduce((s, l) => s + l.total, 0));
@@ -658,12 +833,18 @@ function documentLine(d: InventoryDocument): string {
 
 export async function createOperation(
   client: AltegioClient,
-  input: CreateOperationInput
+  input: CreateOperationInput,
+  now: number = Date.now(),
+  confirmation?: ConfirmedCall
 ): Promise<InventoryResult> {
   const plan = await planOperation(client, input);
+  // A repeated call with the same confirmation token must not move stock twice.
+  const repeat = await findRepeat(client, input, plan, now);
+  if (repeat) throw repeatRefusal(input, repeat);
   const created = await inventoryApi(client).createOperation(
     input.location_id,
-    plan.write
+    plan.write,
+    writeOptions(confirmation)
   );
   const lines: MovementRow[] = created.lines.map((m) => ({
     ...m,
@@ -763,7 +944,8 @@ export async function describeDocumentLines(
 
 export async function deleteDocument(
   client: AltegioClient,
-  input: { location_id: number; document_id: number }
+  input: { location_id: number; document_id: number },
+  confirmation?: ConfirmedCall
 ): Promise<InventoryResult> {
   const api = inventoryApi(client);
   const document = await api.getDocument(input.location_id, input.document_id);
@@ -771,7 +953,11 @@ export async function deleteDocument(
     documentLines(client, input.location_id, input.document_id),
     locationCurrency(client, input.location_id),
   ]);
-  await api.deleteDocument(input.location_id, input.document_id);
+  await api.deleteDocument(
+    input.location_id,
+    input.document_id,
+    writeOptions(confirmation)
+  );
   const rows: MovementRow[] = lines.map((m) => ({ ...m, currency }));
   return {
     text: withUntrustedBlock(

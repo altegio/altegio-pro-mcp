@@ -19,7 +19,12 @@
  * Quantities are in the unit each field names: the product's sale unit
  * ("pcs") or its consumable unit ("ml"). Money is in major units of the
  * location's currency, as the API reports it.
+ *
+ * Every write takes `WriteOptions`: the idempotency key a V3 adapter sends as
+ * `Idempotency-Key` (see `./write-options.ts`).
  */
+
+import type { WriteOptions } from './write-options.js';
 
 /**
  * What an inventory operation recorded through the API does to stock. The
@@ -234,10 +239,15 @@ export interface InventoryApi {
     locationId: number,
     documentId: number
   ): Promise<InventoryDocument>;
-  deleteDocument(locationId: number, documentId: number): Promise<void>;
+  deleteDocument(
+    locationId: number,
+    documentId: number,
+    options?: WriteOptions
+  ): Promise<void>;
   createOperation(
     locationId: number,
-    operation: OperationWrite
+    operation: OperationWrite,
+    options?: WriteOptions
   ): Promise<CreatedOperation>;
   listSuppliers(locationId: number): Promise<Supplier[]>;
   listBillsOfMaterials(
@@ -261,7 +271,8 @@ export interface InventoryApi {
     locationId: number,
     appointmentId: number,
     serviceId: number,
-    lines: readonly ConsumableWrite[]
+    lines: readonly ConsumableWrite[],
+    options?: WriteOptions
   ): Promise<AppointmentServiceConsumables[]>;
 }
 
