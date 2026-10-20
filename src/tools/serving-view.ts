@@ -105,17 +105,83 @@ function listedAnnotations(
   return out;
 }
 
+/** Keys whose value is one schema, or an array of schemas. */
+const SUBSCHEMA_KEYS = new Set([
+  'items',
+  'prefixItems',
+  'anyOf',
+  'oneOf',
+  'allOf',
+  'not',
+]);
+
+/** Keys whose value maps names to schemas. */
+const SCHEMA_MAP_KEYS = new Set(['properties', '$defs', 'definitions']);
+
 /**
- * The input schema without the top-level `additionalProperties: false`. The
- * server still refuses an unknown argument — and names the accepted ones in
- * the refusal — so repeating the rule on every tool only costs tokens.
+ * Whether an integer argument's `minimum: 1` only restates that ids and pages
+ * count from one: `id`, `*_id`, the items of `*_ids`, `page`, `page_size`.
  */
-function listedInputSchema(schema: unknown): unknown {
-  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
-    return schema;
+function countsFromOne(name: string | undefined): boolean {
+  return (
+    name !== undefined &&
+    (name === 'id' ||
+      name === 'page' ||
+      name === 'page_size' ||
+      name.endsWith('_id') ||
+      name.endsWith('_ids'))
+  );
+}
+
+/**
+ * One node of the input schema as listed, at any depth: without
+ * `additionalProperties: false`, and without `minimum: 1` on an integer id or
+ * page. The server still refuses an unknown argument, a zero id or page, and
+ * names the rule in the refusal, so repeating either on every tool only costs
+ * tokens — about 4 KB of `/mcp` in October 2026. `name` is the argument the
+ * node describes; array items and union branches inherit it.
+ */
+function listedSchemaNode(node: unknown, name?: string): unknown {
+  if (Array.isArray(node)) {
+    return node.map((item) => listedSchemaNode(item, name));
   }
-  const { additionalProperties, ...rest } = schema as Record<string, unknown>;
-  return additionalProperties === false ? rest : schema;
+  if (!node || typeof node !== 'object') return node;
+  const schema = node as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(schema)) {
+    if (key === 'additionalProperties' && value === false) continue;
+    if (
+      key === 'minimum' &&
+      value === 1 &&
+      schema.type === 'integer' &&
+      countsFromOne(name)
+    ) {
+      continue;
+    }
+    if (
+      SCHEMA_MAP_KEYS.has(key) &&
+      value &&
+      typeof value === 'object' &&
+      !Array.isArray(value)
+    ) {
+      out[key] = Object.fromEntries(
+        Object.entries(value).map(([prop, sub]) => [
+          prop,
+          listedSchemaNode(sub, prop),
+        ])
+      );
+    } else if (SUBSCHEMA_KEYS.has(key)) {
+      out[key] = listedSchemaNode(value, name);
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
+/** The input schema as listed; see `listedSchemaNode`. */
+function listedInputSchema(schema: unknown): unknown {
+  return listedSchemaNode(schema);
 }
 
 /**
@@ -124,8 +190,9 @@ function listedInputSchema(schema: unknown): unknown {
  * Three things differ from the definition:
  *
  * - **Annotations** drop hints equal to the protocol default
- *   (`listedAnnotations`), and the input schema its top-level
- *   `additionalProperties: false` (`listedInputSchema`).
+ *   (`listedAnnotations`), and the input schema every
+ *   `additionalProperties: false` and the `minimum: 1` of ids and pages
+ *   (`listedSchemaNode`).
  * - **No `outputSchema`.** It is optional in MCP, results still carry
  *   `structuredContent`, and it was the largest part of `tools/list` (up to
  *   44% of the read-only view) — paid by every host on every connection, for a

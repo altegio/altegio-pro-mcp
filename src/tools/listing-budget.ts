@@ -40,17 +40,17 @@ export const DEFAULT_VIEW_TARGET_BYTES = 100_000;
 
 /** Bytes of `tools/list` result per view; see the module comment. */
 export const LISTING_BUDGETS: Readonly<Record<HttpViewKey, number>> = {
-  // 125,389 bytes, 95 tools on 2026-10-20, after six low-use groups moved to
-  // their facets (DEFAULT_FACET_DEMOTED_GROUPS); 148,042 bytes before.
-  // Target: DEFAULT_VIEW_TARGET_BYTES.
-  [DEFAULT_FACET]: 132_000,
-  readonly: 126_000, // 119,808 bytes, 84 tools on 2026-10-20
-  ops: 78_000, // 73,914 bytes, 53 tools
-  catalog: 28_000, // 26,622 bytes, 34 tools
-  finance: 106_000, // 100,774 bytes, 57 tools
-  marketing: 25_500, // 24,235 bytes, 17 tools
-  analytics: 67_500, // 63,825 bytes, 33 tools
-  onboarding: 13_500, // 12,463 bytes, 15 tools
+  // 119,604 bytes, 95 tools on 2026-10-20, after six low-use groups moved to
+  // their facets (DEFAULT_FACET_DEMOTED_GROUPS) and the listing trims;
+  // 148,042 bytes before. Target: DEFAULT_VIEW_TARGET_BYTES.
+  [DEFAULT_FACET]: 126_000,
+  readonly: 123_000, // 116,761 bytes, 84 tools on 2026-10-20
+  ops: 74_500, // 70,833 bytes, 53 tools
+  catalog: 27_000, // 25,511 bytes, 34 tools
+  finance: 103_000, // 97,877 bytes, 57 tools
+  marketing: 24_000, // 22,856 bytes, 17 tools
+  analytics: 66_000, // 62,445 bytes, 33 tools
+  onboarding: 13_500, // 12,387 bytes, 15 tools
 };
 
 export interface ViewSize {

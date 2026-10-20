@@ -67,8 +67,7 @@ export const CONFIRMATION_TOKEN_ARG = 'confirmation_token';
 /** JSON Schema fragment injected into every confirmable tool's `inputSchema`. */
 export const CONFIRMATION_TOKEN_SCHEMA = {
   type: 'string',
-  description:
-    'Omit at first; then from this tool’s confirmation_required answer, once the user agreed.',
+  description: 'From confirmation_required, after the user agreed.',
 } as const;
 
 const TOKEN_TTL_MS = 10 * 60 * 1000;

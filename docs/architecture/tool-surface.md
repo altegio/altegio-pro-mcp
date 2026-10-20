@@ -55,15 +55,15 @@ Served tools per category, in `tools/list` order:
 
 | View | Address | Serves (of 159 defined) | `tools/list` bytes | Budget (used) | Reasons |
 | --- | --- | --- | --- | --- | --- |
-| `all` | stdio (no HTTP route) | 153 | 208,877 | — | all ×153, -off ×6 |
-| `default` | `/mcp` | 95 | 125,389 | 132,000 (95 %) | dflt ×91, -pack ×29, -low ×26, -off ×6, base ×3, -pwd ×2, -name ×1, xtra ×1 |
-| `readonly` | `/mcp/readonly` | 84 | 120,239 | 126,000 (95 %) | ro ×84, -write ×67, -off ×6, -pwd ×2 |
-| `ops` | `/mcp/ops` | 53 | 73,980 | 78,000 (95 %) | - ×98, pfx ×27, rule ×23, -off ×6, base ×3, -pwd ×2 |
-| `catalog` | `/mcp/catalog` | 34 | 26,703 | 28,000 (95 %) | - ×117, rule ×31, -off ×6, base ×3, -pwd ×2 |
-| `finance` | `/mcp/finance` | 57 | 100,907 | 106,000 (95 %) | - ×94, pfx ×50, -off ×6, rule ×4, base ×3, -pwd ×2 |
-| `marketing` | `/mcp/marketing` | 17 | 24,312 | 25,500 (95 %) | - ×134, pfx ×13, -off ×6, base ×3, -pwd ×2, rule ×1 |
-| `analytics` | `/mcp/analytics` | 33 | 63,825 | 67,500 (95 %) | - ×118, pfx ×30, -off ×6, base ×3, -pwd ×2 |
-| `onboarding` | `/mcp/onboarding` | 15 | 12,463 | 13,500 (92 %) | - ×136, pfx ×12, -off ×6, base ×3, -pwd ×2 |
+| `all` | stdio (no HTTP route) | 153 | 200,976 | — | all ×153, -off ×6 |
+| `default` | `/mcp` | 95 | 119,604 | 126,000 (95 %) | dflt ×91, -pack ×29, -low ×26, -off ×6, base ×3, -pwd ×2, -name ×1, xtra ×1 |
+| `readonly` | `/mcp/readonly` | 84 | 116,761 | 123,000 (95 %) | ro ×84, -write ×67, -off ×6, -pwd ×2 |
+| `ops` | `/mcp/ops` | 53 | 70,833 | 74,500 (95 %) | - ×98, pfx ×27, rule ×23, -off ×6, base ×3, -pwd ×2 |
+| `catalog` | `/mcp/catalog` | 34 | 25,511 | 27,000 (94 %) | - ×117, rule ×31, -off ×6, base ×3, -pwd ×2 |
+| `finance` | `/mcp/finance` | 57 | 97,877 | 103,000 (95 %) | - ×94, pfx ×50, -off ×6, rule ×4, base ×3, -pwd ×2 |
+| `marketing` | `/mcp/marketing` | 17 | 22,856 | 24,000 (95 %) | - ×134, pfx ×13, -off ×6, base ×3, -pwd ×2, rule ×1 |
+| `analytics` | `/mcp/analytics` | 33 | 62,445 | 66,000 (95 %) | - ×118, pfx ×30, -off ×6, base ×3, -pwd ×2 |
+| `onboarding` | `/mcp/onboarding` | 15 | 12,387 | 13,500 (92 %) | - ×136, pfx ×12, -off ×6, base ×3, -pwd ×2 |
 
 `tools/list` bytes is the serialized result the view sends in the default
 deployment — what a host that loads the whole list pays on every connection,
