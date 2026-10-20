@@ -32225,17 +32225,24 @@
               "type": "string"
             },
             "create_date": {
-              "description": "Date of the inventory transaction",
-              "format": "date-time",
+              "description": "Date of the inventory transaction in the Location timezone as `YYYY-MM-DD HH:MM:SS`. A value in another format is refused with 400.",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$",
               "type": "string"
             },
             "storage_id": {
               "description": "Inventory ID",
-              "type": "number"
+              "type": "integer"
             },
             "type_id": {
-              "description": "Document type (sale 1, receipt 3, write-off 7)",
-              "type": "number"
+              "description": "Document type: 1 product sale, 3 product receipt, 4 product write-off, 5 transfer, 6 stock audit. Any other value is refused with 400. An update cannot change the type (422).",
+              "enum": [
+                1,
+                3,
+                4,
+                5,
+                6
+              ],
+              "type": "integer"
             }
           },
           "required": [
@@ -32352,8 +32359,7 @@
               "type": "number"
             },
             "create_date": {
-              "description": "date of creation",
-              "format": "date-time",
+              "description": "Document date in the Location timezone as `YYYY-MM-DD HH:MM:SS`",
               "type": "string"
             },
             "id": {
@@ -32583,8 +32589,7 @@
               "type": "number"
             },
             "create_date": {
-              "description": "date of creation",
-              "format": "date-time",
+              "description": "Document date in the Location timezone as `YYYY-MM-DD HH:MM:SS`",
               "type": "string"
             },
             "id": {
@@ -32728,17 +32733,24 @@
               "type": "string"
             },
             "create_date": {
-              "description": "Date of the inventory transaction",
-              "format": "date-time",
+              "description": "Date of the inventory transaction in the Location timezone as `YYYY-MM-DD HH:MM:SS`. A value in another format is refused with 400.",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$",
               "type": "string"
             },
             "storage_id": {
               "description": "Inventory ID",
-              "type": "number"
+              "type": "integer"
             },
             "type_id": {
-              "description": "Document type (sale 1, receipt 3, write-off 7)",
-              "type": "number"
+              "description": "Document type: 1 product sale, 3 product receipt, 4 product write-off, 5 transfer, 6 stock audit. Any other value is refused with 400. An update cannot change the type (422).",
+              "enum": [
+                1,
+                3,
+                4,
+                5,
+                6
+              ],
+              "type": "integer"
             }
           },
           "required": [
@@ -32855,8 +32867,7 @@
               "type": "number"
             },
             "create_date": {
-              "description": "date of creation",
-              "format": "date-time",
+              "description": "Document date in the Location timezone as `YYYY-MM-DD HH:MM:SS`",
               "type": "string"
             },
             "id": {
@@ -32949,6 +32960,7 @@
       "path": "/storage_operations/documents/{location_id}/{document_id}",
       "displayPath": "/storage_operations/documents/{location_id}/{document_id}",
       "summary": "Delete document",
+      "description": "Deletes an inventory operation document together with its product lines, so the stock they moved comes back. Payment transactions of the document stay in place.\n\nOnly inventory operation documents are found here: a product sale on a visit and the consumables of an appointment answer 404, and so does a document that is already deleted.",
       "tags": [
         "Inventory"
       ],
@@ -32981,7 +32993,12 @@
         }
       ],
       "response": {
-        "statusCode": "202"
+        "contentType": "application/json",
+        "statusCode": "202",
+        "envelope": "v1",
+        "schema": {
+          "type": "null"
+        }
       },
       "curation": {
         "domain": "inventory",
@@ -33351,12 +33368,16 @@
         "schema": {
           "description": "Create Transaction",
           "properties": {
+            "account_id": {
+              "description": "Cash register ID for the payment. Used with `paid`.",
+              "type": "number"
+            },
             "amount": {
-              "description": "Quantity",
+              "description": "Quantity, greater than 0. The document type sets the direction of the stock movement.",
               "type": "number"
             },
             "client_id": {
-              "description": "ID of the customer who bought the product",
+              "description": "ID of the customer who bought the product. Stored for a sale only.",
               "type": "number"
             },
             "comment": {
@@ -33374,7 +33395,7 @@
               "type": "number"
             },
             "discount": {
-              "description": "Discount in %",
+              "description": "Discount in %, from 0 to 100",
               "type": "number"
             },
             "document_id": {
@@ -33387,30 +33408,38 @@
               "type": "string"
             },
             "operation_unit_type": {
-              "description": "unit type: 1 - for sale, 2 - for write-off",
+              "description": "Unit the quantity is counted in: 1 sale unit, 2 service unit. Derived from `unit_id` when omitted.",
+              "enum": [
+                1,
+                2
+              ],
               "type": "number"
+            },
+            "paid": {
+              "description": "When `true`, a payment transaction for the line is created on the cash register `account_id`, which is then required.",
+              "type": "boolean"
             },
             "product_id": {
               "description": "Product ID",
               "type": "number"
             },
             "supplier_id": {
-              "description": "Supplier ID from [List Location Suppliers](#tag/Payments/operation/list_location_suppliers)",
+              "description": "Supplier ID from [List Location Suppliers](#tag/Payments/operation/list_location_suppliers). Stored for a receipt only.",
               "type": "number"
             },
             "team_member_id": {
-              "description": "ID of the Team Member who sold the Product",
+              "description": "ID of the Team Member who sold the Product. Stored for a sale only.",
+              "type": "number"
+            },
+            "unit_id": {
+              "description": "Unit ID. Defaults to the sale unit of the product. Pass the service unit to count the quantity in service units.",
               "type": "number"
             }
           },
           "required": [
             "amount",
-            "cost",
-            "cost_per_unit",
-            "discount",
             "document_id",
-            "product_id",
-            "operation_unit_type"
+            "product_id"
           ],
           "type": "object"
         }
@@ -33477,8 +33506,7 @@
               "type": "number"
             },
             "create_date": {
-              "description": "date of creation",
-              "format": "date-time",
+              "description": "Line date in the Location timezone as `YYYY-MM-DD HH:MM:SS`",
               "type": "string"
             },
             "deleted": {
@@ -33941,8 +33969,7 @@
               "type": "number"
             },
             "create_date": {
-              "description": "date of creation",
-              "format": "date-time",
+              "description": "Line date in the Location timezone as `YYYY-MM-DD HH:MM:SS`",
               "type": "string"
             },
             "deleted": {
@@ -34348,12 +34375,16 @@
         "schema": {
           "description": "Create Transaction",
           "properties": {
+            "account_id": {
+              "description": "Cash register ID for the payment. Used with `paid`.",
+              "type": "number"
+            },
             "amount": {
-              "description": "Quantity",
+              "description": "Quantity, greater than 0. The document type sets the direction of the stock movement.",
               "type": "number"
             },
             "client_id": {
-              "description": "ID of the customer who bought the product",
+              "description": "ID of the customer who bought the product. Stored for a sale only.",
               "type": "number"
             },
             "comment": {
@@ -34371,7 +34402,7 @@
               "type": "number"
             },
             "discount": {
-              "description": "Discount in %",
+              "description": "Discount in %, from 0 to 100",
               "type": "number"
             },
             "document_id": {
@@ -34384,30 +34415,38 @@
               "type": "string"
             },
             "operation_unit_type": {
-              "description": "unit type: 1 - for sale, 2 - for write-off",
+              "description": "Unit the quantity is counted in: 1 sale unit, 2 service unit. Derived from `unit_id` when omitted.",
+              "enum": [
+                1,
+                2
+              ],
               "type": "number"
+            },
+            "paid": {
+              "description": "When `true`, a payment transaction for the line is created on the cash register `account_id`, which is then required.",
+              "type": "boolean"
             },
             "product_id": {
               "description": "Product ID",
               "type": "number"
             },
             "supplier_id": {
-              "description": "Supplier ID from [List Location Suppliers](#tag/Payments/operation/list_location_suppliers)",
+              "description": "Supplier ID from [List Location Suppliers](#tag/Payments/operation/list_location_suppliers). Stored for a receipt only.",
               "type": "number"
             },
             "team_member_id": {
-              "description": "ID of the Team Member who sold the Product",
+              "description": "ID of the Team Member who sold the Product. Stored for a sale only.",
+              "type": "number"
+            },
+            "unit_id": {
+              "description": "Unit ID. Defaults to the sale unit of the product. Pass the service unit to count the quantity in service units.",
               "type": "number"
             }
           },
           "required": [
             "amount",
-            "cost",
-            "cost_per_unit",
-            "discount",
             "document_id",
-            "product_id",
-            "operation_unit_type"
+            "product_id"
           ],
           "type": "object"
         }
@@ -34474,8 +34513,7 @@
               "type": "number"
             },
             "create_date": {
-              "description": "date of creation",
-              "format": "date-time",
+              "description": "Line date in the Location timezone as `YYYY-MM-DD HH:MM:SS`",
               "type": "string"
             },
             "deleted": {
@@ -34876,7 +34914,12 @@
         }
       ],
       "response": {
-        "statusCode": "202"
+        "contentType": "application/json",
+        "statusCode": "202",
+        "envelope": "v1",
+        "schema": {
+          "type": "null"
+        }
       }
     },
     {
@@ -34886,7 +34929,7 @@
       "path": "/storage_operations/operation/{location_id}",
       "displayPath": "/storage_operations/operation/{location_id}",
       "summary": "Create an inventory operation",
-      "description": "An inventory operation is created by submitting a document along with multiple product transactions in a single API request. If a payment type is specified, the corresponding financial transactions will be generated automatically.",
+      "description": "Creates an inventory document and its product lines in one request. Supported types are 1 (product sale), 3 (product receipt) and 4 (product write-off); 2 (consumption) and 5 (transfer) are refused with 422.\n\n- A Team Member is required for every type, but only a sale keeps it, together with the client, on its lines. A receipt keeps `supplier_id` on its lines.\n- `document.comment` becomes the comment of the document and of every line.\n- Send `date` as `YYYY-MM-DD HH:MM:SS` in the Location timezone. A value in another format is ignored and the current Location time is used.\n- With `paid` and `account_id`, payment transactions are created for the lines; without them no financial transaction is created.\n\nTo undo an operation, delete its document with [Delete document](#tag/Inventory/operation/delete_document): the lines are deleted and the stock comes back.",
       "tags": [
         "Inventory"
       ],
@@ -34911,44 +34954,136 @@
       ],
       "requestBody": {
         "required": true,
-        "contentType": "*/*",
+        "contentType": "application/json",
         "schema": {
           "description": "Create an inventory operation",
           "properties": {
-            "comment": {
-              "description": "A comment",
+            "account_id": {
+              "description": "Cash register ID for the payment. Used with `paid`.",
+              "type": "integer"
+            },
+            "client": {
+              "description": "Client of a sale. Pass the `id` of a Location client, or contact details to find or create one.",
+              "properties": {
+                "email": {
+                  "description": "Client email",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "Client ID",
+                  "type": "integer"
+                },
+                "name": {
+                  "description": "Client name",
+                  "type": "string"
+                },
+                "phone": {
+                  "description": "Client phone number",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "date": {
+              "description": "Operation date in the Location timezone as `YYYY-MM-DD HH:MM:SS`. Defaults to the current Location time. A value in another format is ignored and the current Location time is used. A date more than f…",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$",
               "type": "string"
             },
-            "create_date": {
-              "description": "Document creation date",
-              "format": "date-time",
-              "type": "string"
+            "document": {
+              "description": "Document parameters",
+              "properties": {
+                "comment": {
+                  "description": "Document comment. It is also stored as the comment of every line.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
             },
             "goods_transactions": {
-              "description": "An array of objects containing transaction parameters, similar to a request to create a product transaction",
+              "description": "Product lines of the operation",
               "items": {
+                "properties": {
+                  "amount": {
+                    "description": "Quantity, greater than 0. The operation type sets the direction of the stock movement.",
+                    "type": "number",
+                    "x-truncated": true
+                  },
+                  "cost": {
+                    "description": "Total line amount. Stored as sent, not computed from the price, quantity and discount.",
+                    "type": "number",
+                    "x-truncated": true
+                  },
+                  "cost_per_unit": {
+                    "description": "Price per unit",
+                    "type": "number",
+                    "x-truncated": true
+                  },
+                  "discount": {
+                    "description": "Discount in %, from 0 to 100",
+                    "type": "number",
+                    "x-truncated": true
+                  },
+                  "good_id": {
+                    "description": "Product ID. Inside this array only `good_id` is read; `product_id` is refused with 422.",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "good_special_number": {
+                    "description": "Membership or gift card code when the product sells one",
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "operation_unit_type": {
+                    "description": "Unit the quantity is counted in: 1 sale unit, 2 service unit. Derived from `unit_id` when omitted.",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "supplier_id": {
+                    "description": "Supplier ID from [List Location Suppliers](#tag/Payments/operation/list_location_suppliers). Stored for a receipt only.",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "unit_id": {
+                    "description": "Unit ID. Defaults to the sale unit of the product. Pass the service unit to count the quantity in service units.",
+                    "type": "integer",
+                    "x-truncated": true
+                  }
+                },
+                "required": [
+                  "good_id",
+                  "amount"
+                ],
                 "type": "object"
               },
               "type": "array"
             },
+            "paid": {
+              "description": "When `true`, payment transactions for the lines are created on the cash register `account_id`. Without it no financial transaction is created.",
+              "type": "boolean"
+            },
             "storage_id": {
               "description": "Inventory ID",
-              "type": "number"
+              "type": "integer"
             },
             "team_member_id": {
-              "description": "Team Member ID",
-              "type": "number"
+              "description": "ID of the Team Member who performs the operation. Required for every type; a dismissed Team Member is refused. Only a sale stores it on its lines. The legacy name `master_id` is also accepted.",
+              "type": "integer"
             },
             "type_id": {
-              "description": "Document type (Sale 1, Usage / Material Consumption 2, Product Receipt / Incoming 3, Inventory Write-off / Product Disposal 4, Internal Transfer 5)",
-              "type": "number"
+              "description": "Operation type: 1 product sale, 3 product receipt, 4 product write-off. Any other value, including 2 (consumption) and 5 (transfer), is refused with 422.",
+              "enum": [
+                1,
+                3,
+                4
+              ],
+              "type": "integer"
             }
           },
           "required": [
-            "create_date",
-            "goods_transactions",
+            "type_id",
             "storage_id",
-            "type_id"
+            "team_member_id",
+            "goods_transactions"
           ],
           "type": "object"
         }
@@ -34960,9 +35095,43 @@
         "schema": {
           "description": "Object with data",
           "properties": {
+            "abonements": {
+              "description": "Memberships sold by the operation",
+              "items": {
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "account_id": {
+              "description": "Cash register ID of the payment; 0 when unpaid",
+              "type": "integer"
+            },
+            "client": {
+              "description": "Client of a sale; null when there is none or the Business User may not see clients",
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "client_id": {
+              "description": "Client ID of a sale; 0 when there is none",
+              "type": "integer"
+            },
+            "company_id": {
+              "description": "location ID",
+              "type": "integer"
+            },
+            "date": {
+              "description": "Operation date in the Location timezone as `YYYY-MM-DD HH:MM:SS`",
+              "type": "string"
+            },
             "document": {
-              "description": "Document",
+              "description": "Object with data",
               "properties": {
+                "bill_print_status": {
+                  "description": "Bill print status",
+                  "type": "number"
+                },
                 "comment": {
                   "description": "A comment",
                   "type": "string"
@@ -34975,6 +35144,26 @@
                       "type": "string",
                       "x-truncated": true
                     },
+                    "allow_change_record": {
+                      "description": "Allow changing records",
+                      "type": "boolean",
+                      "x-truncated": true
+                    },
+                    "allow_delete_record": {
+                      "description": "Allow deleting records",
+                      "type": "boolean",
+                      "x-truncated": true
+                    },
+                    "business_group_id": {
+                      "description": "Business group ID",
+                      "type": "number",
+                      "x-truncated": true
+                    },
+                    "business_type_id": {
+                      "description": "Business type ID",
+                      "type": "number",
+                      "x-truncated": true
+                    },
                     "city_id": {
                       "description": "City ID",
                       "type": "number",
@@ -34982,12 +35171,12 @@
                     },
                     "coordinate_lat": {
                       "description": "Latitude",
-                      "type": "string",
+                      "type": "number",
                       "x-truncated": true
                     },
                     "coordinate_lon": {
                       "description": "Longitude",
-                      "type": "string",
+                      "type": "number",
                       "x-truncated": true
                     },
                     "country_id": {
@@ -35005,9 +35194,19 @@
                       "type": "string",
                       "x-truncated": true
                     },
+                    "phone": {
+                      "description": "Location phone number",
+                      "type": "string",
+                      "x-truncated": true
+                    },
                     "phones": {
                       "description": "location phone",
                       "type": "array",
+                      "x-truncated": true
+                    },
+                    "public_title": {
+                      "description": "Public-facing location name",
+                      "type": "string",
                       "x-truncated": true
                     },
                     "site": {
@@ -35016,7 +35215,12 @@
                       "x-truncated": true
                     },
                     "timezone": {
-                      "description": "time zone",
+                      "description": "Timezone ID",
+                      "type": "number",
+                      "x-truncated": true
+                    },
+                    "timezone_name": {
+                      "description": "Timezone name",
                       "type": "string",
                       "x-truncated": true
                     },
@@ -35038,8 +35242,7 @@
                   "type": "number"
                 },
                 "create_date": {
-                  "description": "date of creation",
-                  "format": "date-time",
+                  "description": "Document date in the Location timezone as `YYYY-MM-DD HH:MM:SS`",
                   "type": "string"
                 },
                 "id": {
@@ -35071,7 +35274,7 @@
                   "type": "number"
                 },
                 "type": {
-                  "description": "Document Type",
+                  "description": "Document type",
                   "properties": {
                     "id": {
                       "description": "Document type identifier",
@@ -35093,9 +35296,24 @@
                 "user": {
                   "description": "User",
                   "properties": {
+                    "avatar": {
+                      "description": "User avatar URL",
+                      "type": "string",
+                      "x-truncated": true
+                    },
+                    "email": {
+                      "description": "User email",
+                      "type": "string",
+                      "x-truncated": true
+                    },
                     "id": {
                       "description": "User ID",
                       "type": "number",
+                      "x-truncated": true
+                    },
+                    "is_approved": {
+                      "description": "Is user approved",
+                      "type": "boolean",
                       "x-truncated": true
                     },
                     "name": {
@@ -35104,7 +35322,7 @@
                       "x-truncated": true
                     },
                     "phone": {
-                      "description": "User phone number",
+                      "description": "User phone",
                       "type": "string",
                       "x-truncated": true
                     }
@@ -35118,9 +35336,14 @@
               },
               "type": "object"
             },
-            "transactions": {
-              "description": "transaction",
+            "document_id": {
+              "description": "Document ID. Use it to read the lines or to delete the operation.",
+              "type": "integer"
+            },
+            "goods_transactions": {
+              "description": "Product lines of the operation. `amount` is the quantity as sent, without a sign.",
               "items": {
+                "description": "Object with data",
                 "properties": {
                   "amount": {
                     "description": "Quantity",
@@ -35128,8 +35351,7 @@
                     "x-truncated": true
                   },
                   "client": {
-                    "description": "Customer",
-                    "type": "array",
+                    "description": "Customer (can be array or object)",
                     "x-truncated": true
                   },
                   "client_id": {
@@ -35148,33 +35370,32 @@
                     "x-truncated": true
                   },
                   "cost": {
-                    "description": "total price",
+                    "description": "Price",
                     "type": "number",
                     "x-truncated": true
                   },
                   "cost_per_unit": {
-                    "description": "Price per unit",
+                    "description": "Unit price",
                     "type": "number",
                     "x-truncated": true
                   },
                   "create_date": {
-                    "description": "date of creation",
+                    "description": "Line date in the Location timezone as `YYYY-MM-DD HH:MM:SS`",
                     "type": "string",
                     "x-truncated": true
                   },
                   "deleted": {
-                    "description": "Has the transaction been deleted?",
+                    "description": "Delete transaction flag",
                     "type": "boolean",
                     "x-truncated": true
                   },
                   "discount": {
-                    "description": "Skdika",
+                    "description": "Discount",
                     "type": "number",
                     "x-truncated": true
                   },
                   "document_id": {
-                    "description": "Document ID",
-                    "type": "number",
+                    "type": "integer",
                     "x-truncated": true
                   },
                   "good": {
@@ -35187,18 +35408,64 @@
                     "type": "number",
                     "x-truncated": true
                   },
+                  "good_special_number": {
+                    "description": "Special number (e.g., certificate code)",
+                    "type": "string",
+                    "x-truncated": true
+                  },
+                  "goods_marks": {
+                    "description": "Product marking codes",
+                    "type": "array",
+                    "x-truncated": true
+                  },
                   "id": {
-                    "description": "Transaction ID",
-                    "type": "number",
+                    "type": "integer",
+                    "x-truncated": true
+                  },
+                  "last_change_date": {
+                    "description": "Last modified date",
+                    "type": "string",
                     "x-truncated": true
                   },
                   "master": {
-                    "description": "Team Member",
-                    "type": "array",
+                    "description": "Team Member (can be array or object)",
                     "x-truncated": true
                   },
                   "master_id": {
                     "description": "team member ID",
+                    "type": "number",
+                    "x-truncated": true
+                  },
+                  "operation_unit_type": {
+                    "description": "Operation unit type",
+                    "type": "number",
+                    "x-truncated": true
+                  },
+                  "sale_amount": {
+                    "description": "Sale quantity",
+                    "type": "number",
+                    "x-truncated": true
+                  },
+                  "sale_unit": {
+                    "description": "Sales unit (can be object or null)",
+                    "x-truncated": true
+                  },
+                  "sale_unit_id": {
+                    "description": "Sale unit ID",
+                    "type": "number",
+                    "x-truncated": true
+                  },
+                  "service_amount": {
+                    "description": "Service quantity",
+                    "type": "number",
+                    "x-truncated": true
+                  },
+                  "service_unit": {
+                    "description": "Sales unit for service (can be object or null)",
+                    "x-truncated": true
+                  },
+                  "service_unit_id": {
+                    "description": "Service unit ID",
                     "type": "number",
                     "x-truncated": true
                   },
@@ -35223,17 +35490,16 @@
                     "x-truncated": true
                   },
                   "type": {
-                    "description": "Document type",
+                    "description": "Transaction type",
                     "type": "object",
                     "x-truncated": true
                   },
                   "type_id": {
-                    "description": "Document type identifier",
-                    "type": "number",
+                    "type": "integer",
                     "x-truncated": true
                   },
                   "unit": {
-                    "description": "Units",
+                    "description": "unit of measurement",
                     "type": "object",
                     "x-truncated": true
                   },
@@ -35246,6 +35512,46 @@
                 "type": "object"
               },
               "type": "array"
+            },
+            "kkm_transactions": {
+              "description": "Fiscal receipt transactions; null when the Business User may not print receipts",
+              "items": {
+                "type": "object"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "master_id": {
+              "description": "Team Member ID taken from the sale lines; 0 for a receipt or a write-off",
+              "type": "integer"
+            },
+            "paid": {
+              "description": "Whether the operation has payment transactions",
+              "type": "boolean"
+            },
+            "payment_transactions": {
+              "description": "Payment transactions; null when the Business User has no access to them",
+              "items": {
+                "type": "object"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "storage_id": {
+              "description": "Inventory ID",
+              "type": "integer"
+            },
+            "type_id": {
+              "description": "Operation type: 1 product sale, 3 product receipt, 4 product write-off",
+              "type": "integer"
+            },
+            "user_id": {
+              "description": "ID of the Business User who created the operation",
+              "type": "integer"
             }
           },
           "type": "object"
@@ -35347,6 +35653,7 @@
       "path": "/storages/transactions/{location_id}",
       "displayPath": "/storages/transactions/{location_id}",
       "summary": "Search for product transactions",
+      "description": "Lists the product lines of the Location, newest first. Deleted lines are not listed. A line reports its Team Member and client only when it belongs to a sale, and its Supplier only when it belongs to a receipt; otherwise these fields are empty arrays.",
       "tags": [
         "Inventory"
       ],
@@ -35440,26 +35747,42 @@
           "description": "Array of objects with data",
           "items": {
             "properties": {
-              "clients": {
-                "description": "Customer",
-                "properties": {
-                  "id": {
-                    "description": "Client ID",
-                    "type": "number",
-                    "x-truncated": true
+              "amount": {
+                "description": "Quantity with a sign: negative when the stock goes down (sale, consumption, write-off)",
+                "type": "number"
+              },
+              "client": {
+                "anyOf": [
+                  {
+                    "maxItems": 0,
+                    "type": "array"
                   },
-                  "name": {
-                    "description": "Client name",
-                    "type": "string",
-                    "x-truncated": true
-                  },
-                  "phone": {
-                    "description": "Customer phone",
-                    "type": "string",
-                    "x-truncated": true
+                  {
+                    "properties": {
+                      "id": {
+                        "description": "Client ID",
+                        "type": "number",
+                        "x-truncated": true
+                      },
+                      "name": {
+                        "description": "Client name",
+                        "type": "string",
+                        "x-truncated": true
+                      },
+                      "phone": {
+                        "description": "Client phone number",
+                        "type": "string",
+                        "x-truncated": true
+                      }
+                    },
+                    "type": "object"
                   }
-                },
-                "type": "object"
+                ],
+                "description": "Client of a sale; an empty array when the line has none"
+              },
+              "comment": {
+                "description": "A comment",
+                "type": "string"
               },
               "cost": {
                 "description": "Price",
@@ -35510,24 +35833,40 @@
                 "format": "date-time",
                 "type": "string"
               },
+              "loyalty_abonement_id": {
+                "description": "ID of the membership sold by the line; 0 when none",
+                "type": "number"
+              },
+              "loyalty_certificate_id": {
+                "description": "ID of the gift card sold by the line; 0 when none",
+                "type": "number"
+              },
               "master": {
-                "description": "team member",
-                "properties": {
-                  "id": {
-                    "description": "team member ID",
-                    "type": "number",
-                    "x-truncated": true
+                "anyOf": [
+                  {
+                    "maxItems": 0,
+                    "type": "array"
                   },
-                  "title": {
-                    "description": "team member name",
-                    "type": "string",
-                    "x-truncated": true
+                  {
+                    "properties": {
+                      "id": {
+                        "description": "Team Member ID",
+                        "type": "number",
+                        "x-truncated": true
+                      },
+                      "title": {
+                        "description": "Team Member name",
+                        "type": "string",
+                        "x-truncated": true
+                      }
+                    },
+                    "type": "object"
                   }
-                },
-                "type": "object"
+                ],
+                "description": "Team Member of a sale; an empty array when the line has none, as on a receipt or a write-off"
               },
               "operation_unit_type": {
-                "description": "Unit type: 1 - for sale, 2 - for write-off",
+                "description": "Unit the quantity is counted in: 1 sale unit, 2 service unit",
                 "type": "number"
               },
               "record_id": {
@@ -35535,20 +35874,28 @@
                 "type": "number"
               },
               "service": {
-                "description": "Service",
-                "properties": {
-                  "id": {
-                    "description": "Service ID",
-                    "type": "number",
-                    "x-truncated": true
+                "anyOf": [
+                  {
+                    "maxItems": 0,
+                    "type": "array"
                   },
-                  "title": {
-                    "description": "Service name",
-                    "type": "string",
-                    "x-truncated": true
+                  {
+                    "properties": {
+                      "id": {
+                        "description": "Service ID",
+                        "type": "number",
+                        "x-truncated": true
+                      },
+                      "title": {
+                        "description": "Service name",
+                        "type": "string",
+                        "x-truncated": true
+                      }
+                    },
+                    "type": "object"
                   }
-                },
-                "type": "object"
+                ],
+                "description": "Service of an appointment consumable; an empty array when the line has none"
               },
               "storage": {
                 "description": "Inventory",
@@ -35567,20 +35914,28 @@
                 "type": "object"
               },
               "supplier": {
-                "description": "The supplier",
-                "properties": {
-                  "id": {
-                    "description": "Vendor ID",
-                    "type": "number",
-                    "x-truncated": true
+                "anyOf": [
+                  {
+                    "maxItems": 0,
+                    "type": "array"
                   },
-                  "title": {
-                    "description": "Supplier name",
-                    "type": "string",
-                    "x-truncated": true
+                  {
+                    "properties": {
+                      "id": {
+                        "description": "Supplier ID",
+                        "type": "number",
+                        "x-truncated": true
+                      },
+                      "title": {
+                        "description": "Supplier name",
+                        "type": "string",
+                        "x-truncated": true
+                      }
+                    },
+                    "type": "object"
                   }
-                },
-                "type": "object"
+                ],
+                "description": "Supplier of a receipt; an empty array when the line has none"
               },
               "type": {
                 "description": "Transaction type",

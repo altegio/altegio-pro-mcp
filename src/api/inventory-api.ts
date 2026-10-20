@@ -21,16 +21,19 @@
  * location's currency, as the API reports it.
  */
 
-/** What an inventory operation does to stock. */
-export type InventoryOperationKind =
-  'sale' | 'consumption' | 'receipt' | 'write_off';
+/**
+ * What an inventory operation recorded through the API does to stock. The
+ * operation endpoint refuses consumption and transfers.
+ */
+export type InventoryOperationKind = 'sale' | 'receipt' | 'write_off';
 
 /**
- * The kind of one product line read back: an operation kind, a `transfer`
- * between inventories, or `other` for a kind this build does not know.
+ * The kind of one product line read back: an operation kind, `consumption`,
+ * a `transfer` between inventories, or `other` for a kind this build does not
+ * know.
  */
 export type InventoryMovementKind =
-  InventoryOperationKind | 'transfer' | 'other';
+  InventoryOperationKind | 'consumption' | 'transfer' | 'other';
 
 /** One inventory of a location. */
 export interface Inventory {
