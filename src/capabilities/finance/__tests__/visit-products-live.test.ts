@@ -24,6 +24,19 @@
  * fields `utmSource` (text) and `roistat_marker` (number) at the location, as
  * the test location has, so a text and a number value are both sent back.
  *
+ * Two more runs need their own fixtures and are skipped without them:
+ *
+ * - `ALTEGIO_E2E_EVENT_SERVICE_ID` — a service the team member runs as group
+ *   events: the run creates a past event, books the client into it, sells and
+ *   takes off the product on that booking, then deletes the booking and the
+ *   event;
+ * - `ALTEGIO_E2E_MEMBERSHIP_PRODUCT_ID` — a product that sells a membership
+ *   (activated on the first visit, so it needs no activation date): the run
+ *   sells it on the appointment through the save the web app uses, with a
+ *   number, sells and takes off the plain product next to it, checks the
+ *   membership's number reads back unchanged, then takes the membership off
+ *   (which deletes the issued membership) and deletes the appointment.
+ *
  *   ALTEGIO_E2E=1 CREDENTIALS_DIR=/tmp/altegio-mcp-live \
  *     ALTEGIO_API_TOKEN=… ALTEGIO_USER_TOKEN=… ALTEGIO_E2E_LOCATION_ID=… \
  *     ALTEGIO_E2E_CLIENT_ID=… ALTEGIO_E2E_TEAM_MEMBER_ID=… \
@@ -33,7 +46,11 @@
 import { AltegioClient } from '../../../providers/altegio-client.js';
 import { httpFromClient } from '../../../api/altegio-http.js';
 import { FinanceAdapter } from '../../../api/v1/finance-adapter.js';
-import { VisitProductsV2Adapter } from '../../../api/v2/visit-products-adapter.js';
+import {
+  APPOINTMENT_INCLUDES,
+  VisitProductsV2Adapter,
+} from '../../../api/v2/visit-products-adapter.js';
+import { EventsAdapter } from '../../../api/v2/events-adapter.js';
 import {
   addProduct,
   describeRemoval,
@@ -54,6 +71,9 @@ describeLive('visit products end-to-end against the test location', () => {
   const service = env('ALTEGIO_E2E_SERVICE_ID');
   const product = env('ALTEGIO_E2E_PRODUCT_ID');
   const inventory = env('ALTEGIO_E2E_INVENTORY_ID');
+  const eventService = env('ALTEGIO_E2E_EVENT_SERVICE_ID');
+  const membershipProduct = env('ALTEGIO_E2E_MEMBERSHIP_PRODUCT_ID');
+  const itIf = (ready: boolean) => (ready ? it : it.skip);
   let client: AltegioClient;
 
   beforeAll(() => {
@@ -275,4 +295,222 @@ describeLive('visit products end-to-end against the test location', () => {
       await client.deleteBooking(location, appointment);
     }
   }, 120_000);
+  /** Sell and take off the plain product, checking nothing else moved. */
+  const sellAndTakeOff = async (appointment: number) => {
+    const sold = await addProduct(client, {
+      location_id: location,
+      appointment_id: appointment,
+      product_id: product,
+      quantity: 1,
+      expected_current_quantity: 0,
+      inventory_id: inventory,
+      discount_percent: 0,
+      mark_arrived: true,
+    });
+    expect(sold.isError).toBeUndefined();
+    expect(sold.structuredContent).toMatchObject({ unexpected_changes: [] });
+    const line = (sold.structuredContent as { item: { id: number } }).item;
+    const removed = await removeProduct(client, {
+      location_id: location,
+      appointment_id: appointment,
+      visit_item_id: line.id,
+      expected_current_quantity: 1,
+    });
+    expect(removed.isError).toBeUndefined();
+    expect(removed.structuredContent).toMatchObject({
+      removed_item: true,
+      unexpected_changes: [],
+    });
+  };
+
+  itIf(eventService > 0)(
+    'sells and takes off a product on a group event booking',
+    async () => {
+      const events = EventsAdapter.forClient(client);
+      const day = new Date(Date.now() - 8 * 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+      const event = await events.createEvent(location, {
+        team_member_id: teamMember,
+        service_id: eventService,
+        start: `${day} 07:00:00`,
+        duration_seconds: 3600,
+        capacity: 2,
+        resource_ids: [],
+        tag_ids: [],
+        comment: 'visit-products-live: deleted by the suite',
+        force: true,
+      });
+      let appointment: number | undefined;
+      try {
+        const booked = await events.bookClients(
+          location,
+          event.id,
+          [{ client_id: clientId }],
+          { send_sms: false }
+        );
+        appointment = booked.booked[0]?.appointment_id;
+        expect(appointment).toBeGreaterThan(0);
+        const sale = await VisitProductsV2Adapter.forClient(
+          client
+        ).getAppointmentSale(location, appointment!);
+        expect(sale.group_event).toBe(true);
+        expect(sale.service_lines).toHaveLength(1);
+        await sellAndTakeOff(appointment!);
+        const after = await VisitProductsV2Adapter.forClient(
+          client
+        ).getAppointmentSale(location, appointment!);
+        expect(after.product_lines).toEqual([]);
+        // Arrival runs the loyalty programs, which may change only what the
+        // client pays for the service.
+        const kept = (lines: typeof sale.service_lines) =>
+          lines.map(({ amount_after_loyalty: _paid, ...line }) => line);
+        expect(kept(after.service_lines)).toEqual(kept(sale.service_lines));
+        expect(after.attendance).toBe('arrived');
+      } finally {
+        if (appointment) await client.deleteBooking(location, appointment);
+        await events.deleteEvent(location, event.id);
+      }
+    },
+    180_000
+  );
+
+  itIf(membershipProduct > 0)(
+    'keeps a membership on the visit through a sale and its undo',
+    async () => {
+      const http = httpFromClient(client);
+      const v2 = `/../v2/locations/${location}`;
+      const readRaw = async (appointment: number) => {
+        const query = APPOINTMENT_INCLUDES.map(
+          (i) => `include[]=${encodeURIComponent(i)}`
+        ).join('&');
+        const response = await http.request(
+          `${v2}/attendances/record_${appointment}/appointments?${query}`,
+          { method: 'GET' }
+        );
+        expect(response.status).toBe(200);
+        return (await response.json()) as {
+          data: Array<{ id: string; attributes: Record<string, unknown> }>;
+          included?: Array<{
+            type: string;
+            id: string;
+            attributes: Record<string, unknown>;
+          }>;
+        };
+      };
+      const membershipLines = async (appointment: number) => {
+        const doc = await readRaw(appointment);
+        const included = doc.included ?? [];
+        return included
+          .filter(
+            (r) =>
+              r.type === 'attendance_good_item' &&
+              Number(r.attributes.good_id) === membershipProduct
+          )
+          .map((r) => ({
+            id: Number(r.id),
+            number:
+              included.find((x) => x.type === 'loyalty_abonement')?.attributes
+                .number ?? null,
+          }));
+      };
+      /** The appointment as the suite created it, with these product lines. */
+      const save = async (
+        appointment: number,
+        goods: Array<Record<string, unknown>>
+      ) => {
+        const doc = await readRaw(appointment);
+        const record = doc.data.find((r) => Number(r.id) === appointment)!;
+        const a = record.attributes;
+        const services = (doc.included ?? [])
+          .filter((r) => r.type === 'attendance_service_item')
+          .map((r) => ({
+            id: Number(r.id),
+            service_id: r.attributes.service_id,
+            quantity: r.attributes.quantity,
+            cost_per_unit: r.attributes.cost_per_unit,
+            manual_cost: r.attributes.manual_cost,
+            discount_percent: r.attributes.discount_percent,
+            composite_service_id: null,
+          }));
+        const duration = (doc.included ?? []).find(
+          (r) => r.type === 'duration_details'
+        )?.attributes;
+        const response = await http.request(`${v2}/attendance/appointments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ignore_conflicts: true,
+            records: [
+              {
+                id: appointment,
+                external_id: a.external_id ?? '',
+                date: a.date,
+                staff_id: teamMember,
+                client_id: clientId,
+                length: a.length,
+                technical_break_duration:
+                  duration?.technical_break_duration ?? 0,
+                comment: a.comment,
+                custom_color: a.custom_color ?? '',
+                attendance_status: 1,
+                label_ids: [],
+                resource_instance_ids: [],
+                custom_field_values: null,
+                comer: null,
+                client_notification_settings: {
+                  sms_hours_before_visit: 0,
+                  email_hours_before_visit: 0,
+                },
+                is_instant_sms_notification_required: false,
+                clients_count: 1,
+                attendance_service_items: services,
+                assistants: [],
+                attendance_good_items: goods,
+              },
+            ],
+          }),
+        });
+        expect(response.status).toBe(200);
+      };
+
+      const appointment = await createAppointment(7);
+      const number = `E2E${Date.now() % 1_000_000_000}`;
+      try {
+        await save(appointment, [
+          {
+            id: null,
+            good_id: membershipProduct,
+            unit_id: (
+              await VisitProductsV2Adapter.forClient(client).getProductForSale(
+                location,
+                membershipProduct
+              )
+            ).sale_unit_id,
+            storage_id: inventory,
+            staff_id: teamMember,
+            operation_unit_type: 'sale',
+            number,
+            planned_activation_date: null,
+            marks: [],
+            quantity: 1,
+            cost_per_unit: 100,
+            manual_cost: 100,
+            discount_percent: 0,
+          },
+        ]);
+        const before = await membershipLines(appointment);
+        expect(before).toEqual([{ id: expect.any(Number), number }]);
+
+        await sellAndTakeOff(appointment);
+
+        expect(await membershipLines(appointment)).toEqual(before);
+      } finally {
+        // Taking the membership off deletes the membership it issued.
+        await save(appointment, []).catch(() => undefined);
+        await client.deleteBooking(location, appointment);
+      }
+    },
+    180_000
+  );
 });

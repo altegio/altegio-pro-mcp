@@ -48,7 +48,10 @@ export interface VisitProductLine {
   amount: number;
   /** What the client pays for the line once loyalty programs apply. */
   amount_after_loyalty: number | null;
-  /** Set when the line issued a gift card or a membership. */
+  /**
+   * Set when the line issued a gift card or a membership; a save sends its
+   * number and activation date back as read.
+   */
   loyalty_kind: 'gift_card' | 'membership' | null;
   /** Product marking codes recorded on the line. */
   marks: string[];
@@ -91,8 +94,18 @@ export interface AppointmentSale {
   custom_fields_readable: boolean;
   service_lines: VisitServiceLine[];
   product_lines: VisitProductLine[];
-  /** The other appointments of the visit and how many product lines each holds. */
-  other_appointments: Array<{ appointment_id: number; product_lines: number }>;
+  /**
+   * The other appointments of the visit: how many product lines each holds,
+   * and how many of those carry a loyalty discount (their amount after loyalty
+   * programs differs from their amount, or does not read back). A save of this
+   * appointment makes Altegio re-save the other appointments' product lines
+   * from their amounts after loyalty, which changes exactly those lines.
+   */
+  other_appointments: Array<{
+    appointment_id: number;
+    product_lines: number;
+    loyalty_priced_lines: number;
+  }>;
   /**
    * Why this appointment cannot be written back exactly (a visitor or a
    * combined service that does not read back, a start time that does not

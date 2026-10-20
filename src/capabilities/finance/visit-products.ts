@@ -172,9 +172,9 @@ export async function planSale(
   ]);
   const appt = `appointment ${input.appointment_id}`;
 
-  if (sale.group_event) {
+  if (sale.group_event && sale.service_lines.length !== 1) {
     refuse(
-      `${appt} is a client's place in a group event; products of group event appointments are changed through the event in Altegio, not here.`
+      `${appt} is a client's place in a group event and holds ${sale.service_lines.length} service lines; Altegio saves a group event appointment only with exactly one. Add the product in Altegio.`
     );
   }
   if (sale.unsupported) {
@@ -187,10 +187,10 @@ export async function planSale(
       `${appt}'s visit has a printed receipt (or a fiscal receipt is being prepared), and Altegio refuses product changes after that.`
     );
   }
-  const crowded = sale.other_appointments.filter((o) => o.product_lines > 0);
+  const crowded = loyaltyPricedOthers(sale);
   if (crowded.length > 0) {
     refuse(
-      `other appointments of the same visit (${crowded.map((o) => o.appointment_id).join(', ')}) already sell products. Saving this appointment would make Altegio rewrite their visit items from amounts that already include loyalty discounts, which can apply a discount twice; add the product in Altegio.`
+      `other appointments of the same visit (${crowded.join(', ')}) sell products at a loyalty discount. Saving this appointment would make Altegio rewrite those visit items from their discounted amounts, applying the discount twice; add the product in Altegio.`
     );
   }
   if (sale.attendance === 'waiting' && !input.mark_arrived) {
@@ -210,12 +210,6 @@ export async function planSale(
   if (product.loyalty_kind) {
     refuse(
       `product ${product.id} sells a ${product.loyalty_kind === 'gift_card' ? 'gift card' : 'membership'}; this tool sells regular products only. Sell it in Altegio, which asks for its number and activation date.`
-    );
-  }
-  const issued = sale.product_lines.find((l) => l.loyalty_kind !== null);
-  if (issued) {
-    refuse(
-      `${appt} already sells a gift card or membership (visit item ${issued.id}), whose number and activation date cannot be saved back here. Add the product in Altegio.`
     );
   }
   if (product.sale_price === null || product.sale_unit_id === null) {
@@ -345,6 +339,43 @@ const ARRIVED_EFFECTS =
 const CUSTOM_FIELDS_UNREAD =
   'Its custom field values could not be read (the user lacks the right to view appointment custom fields), so the save cannot send them back; where the location requires custom fields once the client has arrived, Altegio refuses the save and nothing changes.';
 
+/** Other appointments of the visit whose product lines carry a loyalty discount. */
+function loyaltyPricedOthers(sale: AppointmentSale): number[] {
+  return sale.other_appointments
+    .filter((o) => o.loyalty_priced_lines > 0)
+    .map((o) => o.appointment_id);
+}
+
+/**
+ * What else the save sends back and keeps: the group event booking, the gift
+ * card and membership items, and the other appointments' product items.
+ */
+function echoNotes(sale: AppointmentSale, changedLineId: number | null) {
+  const notes: string[] = [];
+  if (sale.group_event) {
+    notes.push(
+      `Appointment ${sale.appointment_id} is one client's place in a group event: only this appointment is saved, with its service and seats as they are; the event and its other clients do not change.`
+    );
+  }
+  const loyalty = sale.product_lines.filter(
+    (l) => l.loyalty_kind !== null && l.id !== changedLineId
+  );
+  if (loyalty.length > 0) {
+    notes.push(
+      `Gift card and membership visit items ${loyalty.map((l) => l.id).join(', ')} are sent back with their numbers and activation dates, unchanged.`
+    );
+  }
+  const others = sale.other_appointments
+    .filter((o) => o.product_lines > 0)
+    .map((o) => o.appointment_id);
+  if (others.length > 0) {
+    notes.push(
+      `Altegio also saves the product items of appointment${others.length === 1 ? '' : 's'} ${others.join(', ')} of the same visit again from their stored amounts; none carries a loyalty discount, so they keep their values.`
+    );
+  }
+  return notes;
+}
+
 function appointmentHeader(sale: AppointmentSale): string {
   return `Appointment ${sale.appointment_id}${sale.visit_id ? ` (visit ${sale.visit_id}` : ' ('}${sale.client_id ? `, client ${sale.client_id})` : sale.visit_id ? ')' : 'no client)'} with team member ${sale.team_member_id}, ${STATUS_TEXT[sale.attendance]}, starts ${sale.start_local.replace('T', ' ')} at the location.`;
 }
@@ -393,6 +424,7 @@ function planLines(plan: SalePlan, currency: string | null): string[] {
   ) {
     lines.push(CUSTOM_FIELDS_UNREAD);
   }
+  lines.push(...echoNotes(sale, existing?.id ?? null));
   return lines;
 }
 
@@ -584,9 +616,9 @@ export async function planRemoval(
   );
   const appt = `appointment ${input.appointment_id}`;
 
-  if (sale.group_event) {
+  if (sale.group_event && sale.service_lines.length !== 1) {
     refuseChange(
-      `${appt} is a client's place in a group event; products of group event appointments are changed through the event in Altegio, not here.`
+      `${appt} is a client's place in a group event and holds ${sale.service_lines.length} service lines; Altegio saves a group event appointment only with exactly one. ${CHANGE_IN_ALTEGIO}`
     );
   }
   if (sale.unsupported) {
@@ -599,10 +631,10 @@ export async function planRemoval(
       `${appt}'s visit has a printed receipt (or a fiscal receipt is being prepared), and Altegio refuses product changes after that.`
     );
   }
-  const crowded = sale.other_appointments.filter((o) => o.product_lines > 0);
+  const crowded = loyaltyPricedOthers(sale);
   if (crowded.length > 0) {
     refuseChange(
-      `other appointments of the same visit (${crowded.map((o) => o.appointment_id).join(', ')}) also sell products. Saving this appointment would make Altegio rewrite their visit items from amounts that already include loyalty discounts, which can apply a discount twice. ${CHANGE_IN_ALTEGIO}`
+      `other appointments of the same visit (${crowded.join(', ')}) sell products at a loyalty discount. Saving this appointment would make Altegio rewrite those visit items from their discounted amounts, applying the discount twice. ${CHANGE_IN_ALTEGIO}`
     );
   }
   if (sale.attendance !== 'arrived' && sale.attendance !== 'confirmed') {
@@ -621,12 +653,6 @@ export async function planRemoval(
   if (line.loyalty_kind) {
     refuseChange(
       `visit item ${line.id} issued a ${line.loyalty_kind === 'gift_card' ? 'gift card' : 'membership'}; remove it in Altegio, which handles the card it issued.`
-    );
-  }
-  const issued = sale.product_lines.find((l) => l.loyalty_kind !== null);
-  if (issued) {
-    refuseChange(
-      `${appt} also sells a gift card or membership (visit item ${issued.id}), whose number and activation date cannot be saved back here. ${CHANGE_IN_ALTEGIO}`
     );
   }
   if (line.unit_kind !== 'sale') {
@@ -697,6 +723,7 @@ function removalLines(plan: RemovalPlan, currency: string | null): string[] {
   if (!plan.sale.custom_fields_readable && plan.sale.attendance === 'arrived') {
     lines.push(CUSTOM_FIELDS_UNREAD);
   }
+  lines.push(...echoNotes(plan.sale, line.id));
   return lines;
 }
 
