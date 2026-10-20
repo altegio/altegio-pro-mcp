@@ -19,6 +19,7 @@ import {
   CONFIRMATION_TOKEN_ARG,
   CONFIRMATION_TOKEN_SCHEMA,
   type ConfirmationSpec,
+  type ConfirmedCall,
   type PreparedConfirmation,
 } from './confirmation.js';
 import {
@@ -57,6 +58,11 @@ export interface HandlerOutput {
 export interface ToolContext<T> {
   input: T;
   client: AltegioClient;
+  /**
+   * Present when a person confirmed this call (`confirm`): the version they
+   * were shown and the call's idempotency key (see `./confirmation.ts`).
+   */
+  confirmation?: ConfirmedCall;
 }
 
 export interface ToolDefinition<T extends ZodType> {
@@ -101,7 +107,7 @@ export interface DefinedTool<T extends ZodType = ZodType> {
   toMcpTool: () => McpToolSpec;
   createHandler: (
     client: AltegioClient
-  ) => (args: unknown) => Promise<ToolResult>;
+  ) => (args: unknown, confirmation?: ConfirmedCall) => Promise<ToolResult>;
   /**
    * Present only when the definition declares `confirm`. Binds the declared
    * spec to one set of raw arguments with the input generic erased, so the
@@ -204,27 +210,33 @@ export function defineTool<T extends ZodType>(
       return parsed.success ? undefined : parsed.error.issues;
     },
 
-    createHandler: (client: AltegioClient) => (args: unknown) =>
-      withErrorHandling(
-        def.name,
-        async () => {
-          const input = schema.parse(normalized(args)) as z.infer<T>;
-          const { text, structuredContent, extraContent, isError } =
-            await def.handler({
-              input,
-              client,
-            });
-          const result: ToolResult = {
-            content: [{ type: 'text' as const, text }, ...(extraContent ?? [])],
-          };
-          if (structuredContent !== undefined) {
-            result.structuredContent = structuredContent;
-          }
-          if (isError === true) result.isError = true;
-          return result;
-        },
-        { acceptedKeysAt: acceptedKeys }
-      ),
+    createHandler:
+      (client: AltegioClient) =>
+      (args: unknown, confirmation?: ConfirmedCall) =>
+        withErrorHandling(
+          def.name,
+          async () => {
+            const input = schema.parse(normalized(args)) as z.infer<T>;
+            const { text, structuredContent, extraContent, isError } =
+              await def.handler({
+                input,
+                client,
+                ...(confirmation ? { confirmation } : {}),
+              });
+            const result: ToolResult = {
+              content: [
+                { type: 'text' as const, text },
+                ...(extraContent ?? []),
+              ],
+            };
+            if (structuredContent !== undefined) {
+              result.structuredContent = structuredContent;
+            }
+            if (isError === true) result.isError = true;
+            return result;
+          },
+          { acceptedKeysAt: acceptedKeys }
+        ),
 
     meta: { ...def, requiredScopes: requiredScopesFor(def.name) },
   };

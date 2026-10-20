@@ -19,10 +19,10 @@
  *   `elicitation/create` form and performs the operation only on an explicit
  *   accept. A decline, a cancel, or a broken elicitation stops the call.
  * - **Host does not** — the first call performs nothing and returns the
- *   consequence text plus a one-time `confirmation_token`; the caller must
- *   repeat the call with that token to proceed. Without this fallback the call
- *   would simply hang on an older host. That answer is a successful result
- *   with `structuredContent.status = "confirmation_required"`, not an error:
+ *   consequence text plus a `confirmation_token`; the caller must repeat the
+ *   call with that token to proceed. Without this fallback the call would
+ *   simply hang on an older host. That answer is a successful result with
+ *   `structuredContent.status = "confirmation_required"`, not an error:
  *   nothing failed, the call is waiting for a person, and hosts that treat an
  *   error as "retry differently" looped on it.
  *
@@ -34,8 +34,29 @@
  * repeat may differ cosmetically — `"4564"` for `4564`, `null` for an omitted
  * field — and still match. Nothing is stored server-side: `tools/list` stays
  * static and no state is scoped to a session (ADR-001 D7).
+ *
+ * Being stateless, the token is not single-use: it authorises these exact
+ * arguments, as often as they are sent, until it expires. Replay protection is
+ * the tool's job, as a precondition on the state the person approved — the
+ * V1/V2 stand-in for V3's `If-Match` and `Idempotency-Key`:
+ *
+ * - money and stock writes carry their own guard (the amount due or balance
+ *   the caller read, the current quantity of a line, an identical record made
+ *   minutes ago);
+ * - a read-modify-write tool returns a `version` with its confirmation detail
+ *   (`ConfirmationDetail`): a hash of the state the person was shown. The
+ *   token carries it, and the handler refuses when the state has moved since;
+ * - every confirmed call carries an `idempotency_key` (`ConfirmedCall`) that
+ *   is the same for every repeat of one token, for a V3 adapter to send as
+ *   `Idempotency-Key`.
  */
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import {
+  createHash,
+  createHmac,
+  randomBytes,
+  randomUUID,
+  timingSafeEqual,
+} from 'node:crypto';
 import type { AltegioClient } from '../providers/altegio-client.js';
 import { sanitizeUntrusted, type ToolResult } from './tool-result.js';
 import { canonicalInput } from './input-normalization.js';
@@ -87,12 +108,44 @@ export interface ConfirmationSpec<TInput> {
    * like a resolved label. A failure leaves it out, with one exception: a
    * `ConfirmationRefusal` says the call would be refused anyway, and the gate
    * then answers that refusal instead of asking a person to approve it.
+   * A read-modify-write tool returns a `ConfirmationDetail` with the version
+   * of what it shows.
    */
   readonly detail?: (
     input: TInput,
     client: AltegioClient
-  ) => Promise<string | undefined>;
+  ) => Promise<string | ConfirmationDetail | undefined>;
 }
+
+/** A confirmation detail bound to the state it was computed from. */
+export interface ConfirmationDetail {
+  readonly text: string;
+  /**
+   * `stateVersion` of exactly what `text` shows. It comes back to the handler
+   * as `ConfirmedCall.version`, and the handler refuses when the state it
+   * re-reads has another version: the person approved something else.
+   */
+  readonly version: string;
+}
+
+/** What a confirmed call carries into its handler. */
+export interface ConfirmedCall {
+  /**
+   * The `ConfirmationDetail.version` the person was shown; absent when the
+   * tool binds none or its detail could not be read.
+   */
+  readonly version?: string;
+  /**
+   * The same for every repeat of one confirmed call (one token), different
+   * for a new confirmation. Ports take it as `idempotency_key`; a V3 adapter
+   * sends it as `Idempotency-Key`, the V1/V2 adapters ignore it.
+   */
+  readonly idempotency_key: string;
+}
+
+/** The gate's answer: run the handler with this confirmation, or stop here. */
+export type GateOutcome =
+  { readonly proceed: ConfirmedCall } | { readonly stop: ToolResult };
 
 /**
  * Thrown by `ConfirmationSpec.detail` when the call cannot succeed (a
@@ -112,7 +165,9 @@ export interface PreparedConfirmation {
   readonly target: string;
   readonly consequence: string;
   readonly resolve?: (client: AltegioClient) => Promise<string | undefined>;
-  readonly detail?: (client: AltegioClient) => Promise<string | undefined>;
+  readonly detail?: (
+    client: AltegioClient
+  ) => Promise<string | ConfirmationDetail | undefined>;
   /**
    * What the token binds: the parsed input in canonical form. Absent only for
    * a hand-built preparation, which then binds the raw arguments.
@@ -175,20 +230,81 @@ function canonicalCall(toolName: string, args: unknown): string {
   return `${toolName}\n${JSON.stringify(stable(args ?? {}))}`;
 }
 
-function sign(expiresAt: number, toolName: string, args: unknown): string {
+function sign(
+  expiresAt: number,
+  version: string | undefined,
+  toolName: string,
+  args: unknown
+): string {
   return createHmac('sha256', TOKEN_SECRET)
-    .update(`${expiresAt}\n${canonicalCall(toolName, args)}`)
+    .update(`${expiresAt}\n${version ?? ''}\n${canonicalCall(toolName, args)}`)
     .digest('base64url');
 }
 
-/** Mint a token that authorises exactly this tool with exactly these arguments. */
+/** A version is carried inside the token, between dots: no dot of its own. */
+const VERSION_SHAPE = /^[A-Za-z0-9_-]{1,64}$/;
+
+/**
+ * Mint a token that authorises exactly this tool with exactly these arguments,
+ * and, when given, the `version` of the state the person was shown.
+ */
 export function mintConfirmationToken(
   toolName: string,
   args: unknown,
-  now: number = Date.now()
+  now: number = Date.now(),
+  version?: string
 ): string {
+  if (version !== undefined && !VERSION_SHAPE.test(version)) {
+    throw new Error('A confirmation version must be a stateVersion() value.');
+  }
   const expiresAt = now + TOKEN_TTL_MS;
-  return `${expiresAt}.${sign(expiresAt, toolName, args)}`;
+  const signature = sign(expiresAt, version, toolName, args);
+  return version === undefined
+    ? `${expiresAt}.${signature}`
+    : `${expiresAt}.${version}.${signature}`;
+}
+
+/** What a token that verifies says: when it expires, and the version it binds. */
+export interface VerifiedToken {
+  readonly expiresAt: number;
+  readonly version?: string;
+}
+
+/**
+ * The expiry and version of an unexpired token this process minted for this
+ * exact call, or `undefined`.
+ */
+export function readConfirmationToken(
+  token: unknown,
+  toolName: string,
+  args: unknown,
+  now: number = Date.now()
+): VerifiedToken | undefined {
+  if (typeof token !== 'string') return undefined;
+  const parts = token.split('.');
+  if (parts.length !== 2 && parts.length !== 3) return undefined;
+  const [expiry, ...rest] = parts;
+  const signature = rest.pop()!;
+  const version = rest[0];
+  if (version !== undefined && !VERSION_SHAPE.test(version)) return undefined;
+
+  const expiresAt = Number(expiry);
+  if (!expiry || !Number.isFinite(expiresAt) || expiresAt <= now) {
+    return undefined;
+  }
+
+  const provided = Buffer.from(signature, 'utf8');
+  const expected = Buffer.from(
+    sign(expiresAt, version, toolName, args),
+    'utf8'
+  );
+  if (
+    provided.length !== expected.length ||
+    !timingSafeEqual(provided, expected)
+  ) {
+    return undefined;
+  }
+  return version === undefined ? { expiresAt } : { expiresAt, version };
 }
 
 /** True only for an unexpired token this process minted for this exact call. */
@@ -198,18 +314,37 @@ export function verifyConfirmationToken(
   args: unknown,
   now: number = Date.now()
 ): boolean {
-  if (typeof token !== 'string') return false;
-  const separator = token.indexOf('.');
-  if (separator <= 0) return false;
+  return readConfirmationToken(token, toolName, args, now) !== undefined;
+}
 
-  const expiresAt = Number(token.slice(0, separator));
-  if (!Number.isFinite(expiresAt) || expiresAt <= now) return false;
+/**
+ * A short, stable hash of a state, for `ConfirmationDetail.version`: the same
+ * value for the same content whatever the key order.
+ */
+export function stateVersion(state: unknown): string {
+  return createHash('sha256')
+    .update(canonicalCall('', state))
+    .digest('base64url')
+    .slice(0, 22);
+}
 
-  const provided = Buffer.from(token.slice(separator + 1), 'utf8');
-  const expected = Buffer.from(sign(expiresAt, toolName, args), 'utf8');
-  return (
-    provided.length === expected.length && timingSafeEqual(provided, expected)
-  );
+/**
+ * The idempotency key of a token-confirmed call: a hash of the tool name, the
+ * canonical arguments and the token's expiry, so every repeat of one token
+ * carries the same key and a new confirmation a new one. It names no secret,
+ * so it outlives a restart. Shaped as a UUID, which V3 recommends.
+ */
+export function confirmationIdempotencyKey(
+  toolName: string,
+  args: unknown,
+  expiresAt: number
+): string {
+  const hex = createHash('sha256')
+    .update(`${expiresAt}\n${canonicalCall(toolName, args)}`)
+    .digest('hex');
+  // Version 8 (custom) and the RFC 9562 variant, so it parses as a UUID.
+  const variant = ((parseInt(hex[16]!, 16) & 0x3) | 0x8).toString(16);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-8${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
 // ========== the gate ==========
@@ -249,8 +384,9 @@ function subjectLine(prepared: PreparedConfirmation, target: string): string {
 /**
  * Run the gate for one call.
  *
- * Returns `undefined` when the operation may proceed, or the `ToolResult` to
- * return to the caller instead of performing it.
+ * Answers `proceed` with what the handler needs to know about the
+ * confirmation, or `stop` with the `ToolResult` to return to the caller
+ * instead of performing the operation.
  */
 export async function requireConfirmation(options: {
   readonly toolName: string;
@@ -258,7 +394,7 @@ export async function requireConfirmation(options: {
   readonly prepared: PreparedConfirmation;
   readonly client: AltegioClient;
   readonly runtime: ConfirmationRuntime;
-}): Promise<ToolResult | undefined> {
+}): Promise<GateOutcome> {
   const { toolName, args, prepared, client, runtime } = options;
 
   const supplied =
@@ -270,29 +406,48 @@ export async function requireConfirmation(options: {
   // for a preparation that did not supply one.
   const bound = 'binding' in prepared ? prepared.binding : args;
 
-  // Already confirmed, for these arguments, within the last 10 minutes.
-  if (verifyConfirmationToken(supplied, toolName, bound)) return undefined;
+  // Already confirmed, for these arguments, within the last 10 minutes. The
+  // token is not spent by this: a repeat with it proceeds again, and the
+  // tool's own guard (or the version) decides whether that repeat may write.
+  const verified = readConfirmationToken(supplied, toolName, bound);
+  if (verified) {
+    return {
+      proceed: {
+        ...(verified.version !== undefined
+          ? { version: verified.version }
+          : {}),
+        idempotency_key: confirmationIdempotencyKey(
+          toolName,
+          bound,
+          verified.expiresAt
+        ),
+      },
+    };
+  }
 
-  // A token that does not verify is never silently ignored: it is a stale,
-  // altered or reused one, and proceeding would defeat the argument binding.
+  // A token that does not verify is never silently ignored: it is a stale or
+  // altered one, and proceeding would defeat the argument binding.
   if (supplied !== undefined) {
-    return refusal(
-      `Nothing was changed: the ${CONFIRMATION_TOKEN_ARG} for ${toolName} is not valid for these arguments. A token is bound to the call it was issued for (same target and options) and expires after 10 minutes. Repeat the call without a token to get a new one.`
-    );
+    return {
+      stop: refusal(
+        `Nothing was changed: the ${CONFIRMATION_TOKEN_ARG} for ${toolName} is not valid for these arguments. A token is bound to the call it was issued for (same target and options) and expires after 10 minutes. Repeat the call without a token to get a new one.`
+      ),
+    };
   }
 
   const target = await resolveTarget(prepared, client);
   const headline = subjectLine(prepared, target);
-  let detail: string | undefined;
+  let detail: { text: string; version?: string } | undefined;
   try {
     detail = await resolveDetail(prepared, client);
   } catch (error) {
     if (!(error instanceof ConfirmationRefusal)) throw error;
-    return refusal(`Nothing was changed: ${error.message}`);
+    return { stop: refusal(`Nothing was changed: ${error.message}`) };
   }
   const consequence = detail
-    ? `${prepared.consequence}\n\n${detail}`
+    ? `${prepared.consequence}\n\n${detail.text}`
     : prepared.consequence;
+  const version = detail?.version;
 
   if (runtime.supportsElicitation()) {
     let answer: ConfirmationAnswer;
@@ -303,26 +458,39 @@ export async function requireConfirmation(options: {
       // closed: minting a token here would let the caller route around the
       // one check that actually reaches a human.
       const reason = error instanceof Error ? error.message : String(error);
-      return refusal(
-        `Nothing was changed: ${toolName} could not obtain confirmation from the host (${reason}). ${headline}`
-      );
+      return {
+        stop: refusal(
+          `Nothing was changed: ${toolName} could not obtain confirmation from the host (${reason}). ${headline}`
+        ),
+      };
     }
 
-    if (answer === 'accept') return undefined;
-    return refusal(
-      answer === 'decline'
-        ? `Confirmation declined — nothing was changed. ${headline}`
-        : `Confirmation dismissed by the host — nothing was changed. ${headline} Ask the user to confirm before retrying.`
-    );
+    // Each accept is a new approval, so a new key: there is no token to
+    // repeat on this path.
+    if (answer === 'accept') {
+      return {
+        proceed: {
+          ...(version !== undefined ? { version } : {}),
+          idempotency_key: randomUUID(),
+        },
+      };
+    }
+    return {
+      stop: refusal(
+        answer === 'decline'
+          ? `Confirmation declined — nothing was changed. ${headline}`
+          : `Confirmation dismissed by the host — nothing was changed. ${headline} Ask the user to confirm before retrying.`
+      ),
+    };
   }
 
   // No elicitation on this host: hand back the consequences and a token, and
   // perform nothing until the caller repeats the call with it. This is a
   // successful answer, not a failure: the call is waiting for a person.
   const now = Date.now();
-  const token = mintConfirmationToken(toolName, bound, now);
+  const token = mintConfirmationToken(toolName, bound, now, version);
   const expiresAt = new Date(now + TOKEN_TTL_MS).toISOString();
-  return {
+  const stop: ToolResult = {
     content: [
       {
         type: 'text' as const,
@@ -332,7 +500,7 @@ export async function requireConfirmation(options: {
           headline,
           consequence,
           ``,
-          `Show this to the person you act for. Only if they agree, call ${toolName} again with the same arguments plus ${CONFIRMATION_TOKEN_ARG}="${token}" (valid until ${expiresAt}, for this call only). Do not retry without asking.`,
+          `Show this to the person you act for. Only if they agree, call ${toolName} again with the same arguments plus ${CONFIRMATION_TOKEN_ARG}="${token}" (valid for these arguments until ${expiresAt}). Do not retry without asking, and do not repeat a call that went through.`,
         ].join('\n'),
       },
     ],
@@ -346,6 +514,7 @@ export async function requireConfirmation(options: {
       next_step: `Ask the user. Only if they agree, call ${toolName} again with the same arguments plus ${CONFIRMATION_TOKEN_ARG}.`,
     },
   };
+  return { stop };
 }
 
 /** Lines of a detail block: cleaned one by one, capped in count and width. */
@@ -362,17 +531,18 @@ const DETAIL_LINE_MAX_CHARS = 240;
 async function resolveDetail(
   prepared: PreparedConfirmation,
   client: AltegioClient
-): Promise<string | undefined> {
+): Promise<{ text: string; version?: string } | undefined> {
   if (!prepared.detail) return undefined;
-  let raw: string | undefined;
+  let raw: string | ConfirmationDetail | undefined;
   try {
     raw = await prepared.detail(client);
   } catch (error) {
     if (error instanceof ConfirmationRefusal) throw error;
     return undefined;
   }
-  if (!raw) return undefined;
-  const lines = raw
+  const text = typeof raw === 'string' ? raw : raw?.text;
+  if (!text) return undefined;
+  const lines = text
     .split('\n')
     .map((line) => sanitizeUntrusted(line, { maxChars: DETAIL_LINE_MAX_CHARS }))
     .filter((line): line is string => line !== null);
@@ -381,7 +551,9 @@ async function resolveDetail(
   if (lines.length > kept.length) {
     kept.push(`… and ${lines.length - kept.length} more line(s).`);
   }
-  return kept.join('\n');
+  return typeof raw === 'string'
+    ? { text: kept.join('\n') }
+    : { text: kept.join('\n'), version: raw!.version };
 }
 
 async function resolveTarget(

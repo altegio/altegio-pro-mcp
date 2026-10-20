@@ -25,6 +25,7 @@ import {
   requireConfirmation,
   type ConfirmationAnswer,
   type ConfirmationRuntime,
+  type ConfirmedCall,
   type PreparedConfirmation,
 } from './confirmation.js';
 import {
@@ -67,7 +68,10 @@ import {
   type ValidationIssue,
 } from '../utils/tool-call-observation.js';
 
-type CallHandler = (args: unknown) => Promise<ToolResult>;
+type CallHandler = (
+  args: unknown,
+  confirmation?: ConfirmedCall
+) => Promise<ToolResult>;
 
 /** A tool's confirmation spec bound to raw arguments (see `./confirmation.ts`). */
 type PrepareConfirmation = (args: unknown) => PreparedConfirmation | undefined;
@@ -535,11 +539,13 @@ export function registerTools(
         return denial;
       }
 
-      // Destructive operations stop here until a human says yes. `undefined`
-      // means "already confirmed, or nothing to confirm"; anything else is the
-      // result the caller gets instead of the operation being performed —
-      // logged as `confirmation_required` whatever shape that result takes.
+      // Destructive operations stop here until a human says yes. `stop` is
+      // the result the caller gets instead of the operation being performed —
+      // logged as `confirmation_required` whatever shape that result takes;
+      // `proceed` carries the confirmation into the handler (the version the
+      // person was shown, the idempotency key).
       const prepared = confirmations.get(name)?.(callArgs);
+      let confirmed: ConfirmedCall | undefined;
       if (prepared) {
         const gate = await requireConfirmation({
           toolName: name,
@@ -548,13 +554,14 @@ export function registerTools(
           client,
           runtime: confirmationRuntime(server, extra.requestId),
         });
-        if (gate) {
+        if ('stop' in gate) {
           call.confirmation = true;
-          return gate;
+          return gate.stop;
         }
+        confirmed = gate.proceed;
       }
 
-      return handler(callArgs);
+      return handler(callArgs, confirmed);
     };
 
     // The SDK deliberately schedules protocol handlers on a later promise turn.

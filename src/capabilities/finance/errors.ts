@@ -54,7 +54,7 @@ const FORBIDDEN =
  * The API's message plus its field errors. A validation failure may answer
  * with a generic message and put the cause in `meta.errors`, keyed by field.
  */
-function apiMessage(body: unknown): string | undefined {
+export function apiMessage(body: unknown): string | undefined {
   const message = backendMessage(body);
   const errors = (body as { meta?: { errors?: unknown } } | undefined)?.meta
     ?.errors;

@@ -55,12 +55,12 @@ Served tools per category, in `tools/list` order:
 
 | View | Address | Serves (of 159 defined) | `tools/list` bytes | Budget (used) | Reasons |
 | --- | --- | --- | --- | --- | --- |
-| `all` | stdio (no HTTP route) | 153 | 208,249 | — | all ×153, -off ×6 |
-| `default` | `/mcp` | 121 | 147,705 | 155,500 (95 %) | dflt ×117, -pack ×29, -off ×6, base ×3, -pwd ×2, -name ×1, xtra ×1 |
+| `all` | stdio (no HTTP route) | 153 | 208,574 | — | all ×153, -off ×6 |
+| `default` | `/mcp` | 121 | 148,030 | 155,500 (95 %) | dflt ×117, -pack ×29, -off ×6, base ×3, -pwd ×2, -name ×1, xtra ×1 |
 | `readonly` | `/mcp/readonly` | 84 | 119,808 | 126,000 (95 %) | ro ×84, -write ×67, -off ×6, -pwd ×2 |
-| `ops` | `/mcp/ops` | 53 | 73,816 | 78,000 (95 %) | - ×98, pfx ×27, rule ×23, -off ×6, base ×3, -pwd ×2 |
+| `ops` | `/mcp/ops` | 53 | 73,902 | 78,000 (95 %) | - ×98, pfx ×27, rule ×23, -off ×6, base ×3, -pwd ×2 |
 | `catalog` | `/mcp/catalog` | 34 | 26,622 | 28,000 (95 %) | - ×117, rule ×31, -off ×6, base ×3, -pwd ×2 |
-| `finance` | `/mcp/finance` | 57 | 100,470 | 105,500 (95 %) | - ×94, pfx ×50, -off ×6, rule ×4, base ×3, -pwd ×2 |
+| `finance` | `/mcp/finance` | 57 | 100,762 | 106,000 (95 %) | - ×94, pfx ×50, -off ×6, rule ×4, base ×3, -pwd ×2 |
 | `marketing` | `/mcp/marketing` | 17 | 24,235 | 25,500 (95 %) | - ×134, pfx ×13, -off ×6, base ×3, -pwd ×2, rule ×1 |
 | `analytics` | `/mcp/analytics` | 33 | 63,825 | 67,500 (95 %) | - ×118, pfx ×30, -off ×6, base ×3, -pwd ×2 |
 | `onboarding` | `/mcp/onboarding` | 15 | 12,463 | 13,500 (92 %) | - ×136, pfx ×12, -off ×6, base ×3, -pwd ×2 |

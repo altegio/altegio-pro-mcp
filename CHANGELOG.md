@@ -20,13 +20,80 @@ is declared stable.
   view's `tools/list` has a budget in `src/tools/listing-budget.ts`: its
   measured size plus about 5 %. The tests and `npm run surface:check` fail
   when a view grows past it. `docs/architecture/tool-surface.md` now prints
-  every view's size and share of its budget. `/mcp` is 147,705 bytes for 121
+  every view's size and share of its budget. `/mcp` is 148,030 bytes for 121
   tools (budget 155,500) and is headed for 100,000 bytes or less. Which rarely
   used packs move to their facet is the product owner's decision.
 - ADR-001 §1.3 records the October 2026 host landscape: Claude Code and
   claude.ai connectors defer HTTP connector tools, Cursor's dynamic context
   discovery, ChatGPT loading the full list, GitHub's toolset paths and
   read-only address, and Atlassian's discover/execute with 21 primary tools.
+
+### Fixed — replay and lost-update guards on stock and money writes
+
+- **`inventory_create_operation` refuses a repeat.** The confirmation token is
+  valid for its arguments for ten minutes and is not single use, so a repeated
+  confirmed call recorded a second receipt, write-off or sale and moved stock
+  again. The tool now refuses when an identical operation — same kind,
+  inventory, lines, quantities, prices, date and comment, and the same client
+  of a sale or Supplier of a receipt — was recorded within the last ten
+  minutes (or, with a `date`, at that minute), naming the document. A genuine
+  second one is recorded with a comment that tells the two apart. The check
+  also runs before the confirmation, so nobody is asked to approve a repeat.
+  A duplicate check was chosen over an `expected_stock` per line: it needs no
+  extra read from the model, and stock that other sales move meanwhile would
+  refuse genuine calls.
+- **Version binding for read-modify-write tools.** `appointments_set_consumables`
+  and `financial_transactions_update` re-read before they write; their
+  confirmation now carries a version — a hash of exactly what it showed (the
+  consumables before and after, the Bill of Materials and the attendance; the
+  transaction's fields) — and the write is refused with a re-read hint when the
+  state has moved since. A confirmed `replace: true` no longer drops a line
+  added after the person approved, and an update no longer overwrites a change
+  made in between. `financial_transactions_update` now shows the transaction
+  and the change in its confirmation, and refuses an update that changes
+  nothing before anyone is asked.
+- **Token wording.** The confirmation says the token is "valid for these
+  arguments until <time>" instead of "for this call only", and ADR-001 D8 no
+  longer calls it one-time; it records that money and stock writes carry their
+  own replay guards.
+- **Idempotency seam for V3.** Every write method of the finance and inventory
+  ports takes an optional `idempotency_key`, derived from the confirmation (a
+  hash of the tool name, the canonical arguments and the token's expiry), so a
+  repeat of one confirmed call carries the same key. The V1 adapters ignore it;
+  a V3 adapter sends it as `Idempotency-Key`. `visits_add_payment` and
+  `visits_cancel_payment` accept it in their use cases and are wired at the
+  tool once the concurrent visits work lands.
+- The consumables result no longer prints "every line has a new line id:" when
+  no line remains.
+- An opt-in live suite (`replay-guards-live`) drives both guards through the
+  token path on a disposable location and cleans up after itself.
+
+### Fixed — visit products: visitors, custom fields and refusal messages
+
+- **Arrival-required custom fields no longer block every sale and removal.**
+  Altegio checks each save of an arrived appointment against the custom
+  fields the location requires on arrival, counting only the values the save
+  sends. `visits_add_product` and `visits_remove_product` sent none, so at
+  such locations every call on an arrived appointment failed. They now read
+  the appointment's custom field values and send them back unchanged whenever
+  the appointment is or becomes arrived. When the user may not read them, the
+  confirmation says so, and a refusal names the missing right.
+- **Appointments for a visitor are supported.** The visitor — the person, pet
+  or vehicle the appointment is for — is sent back with its type and checked
+  after the save; an absent type would have turned a pet or a vehicle into a
+  person. The refusal of "walk-in visitor" appointments, which also used the
+  wrong term, is gone.
+- **Refusals name their cause.** A refused save is no longer always explained
+  as a printed bill or a pending advance payment. A required custom field, a
+  group event's single service or capacity, a gift card or membership number,
+  activation date or archived type, a printed bill and a pending online
+  advance payment each get their own message; anything else says Altegio
+  refused, quotes its message and lists the common causes.
+- **The personal discount.** The sale confirmation says that a large sale can
+  raise a spend-based personal discount for good, and that
+  `visits_remove_product` does not lower it again.
+- Wording follows the glossary: combined service, advance payment, product
+  marking codes, visitor.
 
 ### Added — `visits_remove_product`: take a product off a visit
 
@@ -41,9 +108,9 @@ is declared stable.
   twice. Refused before anyone is asked, like the sale: group event
   appointments, a printed bill, an appointment that is not arrived or
   confirmed, gift card and membership lines, a visit whose other appointments
-  sell products, appointments with a walk-in visitor or an unreadable
-  composite service. Lines in the consumable unit are refused, and a line with
-  goods marking codes is taken off whole.
+  sell products, appointments whose visitor or combined service does not read
+  back. Lines in the consumable unit are refused, and a line with product
+  marking codes is taken off whole.
 - **Confirmation and result.** `destructiveHint: true`; the confirmation shows
   the line before and after and the stock that returns to the inventory. The
   result reads the line, the stock and the bill back after the save, and
@@ -60,15 +127,15 @@ is declared stable.
   a line is added at the product's sale price in its sale unit, sold by the
   appointment's team member, with the client's personal discount, from the
   highest-ranked inventory for sale that holds the product. Inventory, team
-  member and discount can be overridden; goods marking codes are optional.
+  member and discount can be overridden; product marking codes are optional.
 - **Guards.** The caller states the quantity already on the bill
   (`expected_current_quantity`), so a repeated confirmed call cannot sell
   twice. A waiting appointment is marked arrived only with
   `mark_arrived: true`, and the confirmation says what that triggers. Refused
   before anyone is asked: group event appointments, a printed bill, a no-show,
   gift card and membership products or lines, a visit whose other appointments
-  sell products, appointments with a walk-in visitor or an unreadable
-  composite service.
+  sell products, appointments whose visitor or combined service does not read
+  back.
 - **How it saves.** It runs on the V2 appointment save the web app uses, which
   replaces the whole appointment: the appointment is read with every include,
   read again right before the save (refused if anything changed), sent back

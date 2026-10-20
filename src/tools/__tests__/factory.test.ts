@@ -31,6 +31,34 @@ describe('defineTool factory', () => {
     expect(spec.annotations).toEqual({ readOnlyHint: true });
   });
 
+  it('hands a confirmed call’s version and key to the handler', async () => {
+    const gated = defineTool({
+      name: 'demo_gated',
+      category: 'Demo',
+      description: 'demo',
+      input: z.object({ x: z.number().int() }),
+      confirm: {
+        action: 'Demo',
+        target: (input) => `x ${input.x}`,
+        consequence: 'demo',
+      },
+      handler: async ({ confirmation }) => ({
+        text: JSON.stringify(confirmation ?? null),
+      }),
+    });
+    const handler = gated.createHandler(mockClient());
+    const confirmed = await handler(
+      { x: 1, confirmation_token: 'checked by the gate' },
+      { version: 'v1', idempotency_key: 'k1' }
+    );
+    expect(JSON.parse(confirmed.content[0]!.text!)).toEqual({
+      version: 'v1',
+      idempotency_key: 'k1',
+    });
+    const unconfirmed = await handler({ x: 1 });
+    expect(unconfirmed.content[0]?.text).toBe('null');
+  });
+
   it('returns content + structuredContent on success', async () => {
     const res = await tool.createHandler(mockClient())({ x: 5 });
     expect(res.content[0]?.text).toBe('x=5');

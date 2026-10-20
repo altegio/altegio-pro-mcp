@@ -11,6 +11,8 @@ import {
   type SetConsumablesInput,
 } from '../consumables.js';
 import { InventoryInputError } from '../errors.js';
+import { InventoryAdapter } from '../../../api/v1/inventory-adapter.js';
+import type { ConfirmedCall } from '../../../tools/confirmation.js';
 import {
   CANARY,
   currencyRoute,
@@ -375,7 +377,7 @@ describe('setConsumables', () => {
 describe('describeConsumablesChange', () => {
   it('shows before → after with product names, the Bill of Materials detach and the stock note', async () => {
     const { client, calls } = setup(routes(2));
-    const detail = await describeConsumablesChange(client, {
+    const { text: detail } = await describeConsumablesChange(client, {
       ...BASE,
       consumables: [
         { product_id: 6, quantity: 0 },
@@ -407,5 +409,88 @@ describe('describeConsumablesChange', () => {
     await expect(
       describeConsumablesChange(wrong.client, { ...BASE, service_id: 4 })
     ).rejects.toThrow(ConfirmationRefusal);
+  });
+});
+
+describe('setConsumables against the version the person was shown', () => {
+  const KEY = '0f6b1c2d-3e4f-8a5b-9c6d-7e8f9a0b1c2d';
+  const REPLACE: SetConsumablesInput = {
+    ...BASE,
+    replace: true,
+    consumables: [{ product_id: 5, quantity: 30 }],
+  };
+
+  async function shown(input: SetConsumablesInput, attendance = 1) {
+    const { client } = setup(routes(attendance));
+    const { version } = await describeConsumablesChange(client, input);
+    return { version, idempotency_key: KEY } satisfies ConfirmedCall;
+  }
+
+  it('writes when nothing moved since the confirmation, handing the port the key', async () => {
+    const confirmation = await shown(REPLACE);
+    const spy = jest.spyOn(
+      InventoryAdapter.prototype,
+      'setAppointmentServiceConsumables'
+    );
+    try {
+      const { client, calls } = setup(routes());
+      await setConsumables(client, REPLACE, confirmation);
+      expect(calls.some((c) => c.method === 'PUT')).toBe(true);
+      expect((spy.mock.calls[0] as unknown[])[4]).toEqual({
+        idempotency_key: KEY,
+      });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('refuses a confirmed replace when a line was added after the confirmation', async () => {
+    const confirmation = await shown(REPLACE);
+    const later = [
+      block(9, 3, [
+        { line: 61, product: 5, amount: 30 },
+        { line: 62, product: 6, amount: 10 },
+        { line: 65, product: 8, amount: 2 },
+      ]),
+      VISIT[1],
+    ];
+    const { client, calls } = setup([
+      putRoute,
+      readRoute(later),
+      appointmentRoute(1),
+      currencyRoute,
+    ]);
+    const error = await setConsumables(client, REPLACE, confirmation).catch(
+      (e) => e
+    );
+    expect(error).toBeInstanceOf(InventoryInputError);
+    expect(error.message).toContain('changed after the confirmation was shown');
+    expect(error.message).toContain('appointments_get_consumables');
+    expect(error.message).toContain('without confirmation_token');
+    expect(calls.some((c) => c.method === 'PUT')).toBe(false);
+  });
+
+  it('refuses when the appointment was marked arrived since: stock would now move', async () => {
+    const input = { ...BASE, consumables: [{ product_id: 6, quantity: 12 }] };
+    const confirmation = await shown(input, 2);
+    const { client, calls } = setup(routes(1));
+    await expect(setConsumables(client, input, confirmation)).rejects.toThrow(
+      'changed after the confirmation was shown'
+    );
+    expect(calls.some((c) => c.method === 'PUT')).toBe(false);
+  });
+
+  it('says no line remains instead of listing none', async () => {
+    const { client } = setup(routes());
+    const result = await setConsumables(client, {
+      ...BASE,
+      consumables: [
+        { product_id: 5, quantity: 0 },
+        { product_id: 6, quantity: 0 },
+      ],
+    });
+    const ours = summary(result.text);
+    expect(ours).toContain('No consumables remain on this service.');
+    expect(ours).not.toContain('every line has a new line id');
   });
 });

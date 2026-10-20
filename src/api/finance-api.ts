@@ -16,7 +16,12 @@
  * Money is in major units, exactly as the API reports and accepts it, and is
  * always read next to the location's ISO currency code. Datetimes are RFC 3339
  * in the location's own offset.
+ *
+ * Every write takes `WriteOptions`: the idempotency key a V3 adapter sends as
+ * `Idempotency-Key` (see `./write-options.ts`).
  */
+
+import type { WriteOptions } from './write-options.js';
 
 // ========== visit bill ==========
 
@@ -344,13 +349,15 @@ export interface FinanceApi {
   addPayment(
     locationId: number,
     appointmentId: number,
-    payment: PaymentRequest
+    payment: PaymentRequest,
+    options?: WriteOptions
   ): Promise<VisitBill>;
   /** Cancel one recorded payment and return the bill after it. */
   cancelPayment(
     locationId: number,
     appointmentId: number,
-    paymentId: string
+    paymentId: string,
+    options?: WriteOptions
   ): Promise<VisitBill>;
 
   listClientAccounts(
@@ -359,7 +366,8 @@ export interface FinanceApi {
   ): Promise<ClientAccount[]>;
   deposit(
     locationId: number,
-    request: ClientAccountDepositRequest
+    request: ClientAccountDepositRequest,
+    options?: WriteOptions
   ): Promise<ClientAccountDepositResult>;
 
   listCashRegistersAndAccounts(
@@ -377,7 +385,8 @@ export interface FinanceApi {
   ): Promise<FinancialTransaction>;
   createFinancialTransaction(
     locationId: number,
-    fields: FinancialTransactionFields
+    fields: FinancialTransactionFields,
+    options?: WriteOptions
   ): Promise<FinancialTransaction>;
   /**
    * Replace every field of the transaction; the caller merges the changes.
@@ -387,11 +396,13 @@ export interface FinanceApi {
   updateFinancialTransaction(
     locationId: number,
     transactionId: number,
-    fields: FinancialTransactionFields
+    fields: FinancialTransactionFields,
+    options?: WriteOptions
   ): Promise<FinancialTransaction>;
   deleteFinancialTransaction(
     locationId: number,
-    transactionId: number
+    transactionId: number,
+    options?: WriteOptions
   ): Promise<void>;
 
   getPayroll(
