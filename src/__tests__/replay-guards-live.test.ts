@@ -141,9 +141,15 @@ describeLive('replay and lost-update guards against the test location', () => {
     ).document.id;
     expect(document).toBeGreaterThan(0);
 
+    // A repeat the guard misses is a second document; delete it too.
+    const documents = [document];
     try {
       // The same token, the same arguments: the guard finds the document.
       const repeated = await run();
+      const twice = (
+        repeated.structuredContent as { document?: { id: number } } | undefined
+      )?.document?.id;
+      if (twice) documents.push(twice);
       expect(repeated.isError).toBe(true);
       expect(textOf(repeated)).toContain(
         `Nothing was recorded: document ${document}`
@@ -153,12 +159,14 @@ describeLive('replay and lost-update guards against the test location', () => {
       expect(again.isError).toBe(true);
       expect(textOf(again)).toContain(`document ${document}`);
     } finally {
-      const removal = await confirmed('inventory_delete_document', {
-        location_id: location,
-        document_id: document,
-      });
-      const deleted = await removal.run();
-      expect(deleted.structuredContent).toMatchObject({ deleted: true });
+      for (const id of documents) {
+        const removal = await confirmed('inventory_delete_document', {
+          location_id: location,
+          document_id: id,
+        });
+        const deleted = await removal.run();
+        expect(deleted.structuredContent).toMatchObject({ deleted: true });
+      }
     }
   }, 120_000);
 

@@ -24,12 +24,68 @@ The surface check is self-contained; regenerate with `npm run surface:build`.
 
 ## Live integration tests
 
-Live suites are explicitly opt-in. Read the environment guards at the top of
-`src/__tests__/*live.test.ts` and `src/api/v1/__tests__/analytics-live.test.ts`
-before running them. Use a dedicated disposable location and credentials with
-appropriate rights. Appointment suites create and remove real entities; cleanup
-can fail when upstream access is lost. They read the target location from
-`ALTEGIO_E2E_LOCATION_ID`. Never enable live flags in default CI.
+Live suites (`*-live.test.ts`) are explicitly opt-in: they run only with
+`ALTEGIO_E2E=1` and call the real API. Read the header of each suite before
+running it. Use a dedicated disposable location and credentials with
+appropriate rights. Never enable live flags in default CI.
+
+```sh
+ALTEGIO_E2E=1 CREDENTIALS_DIR=/tmp/altegio-mcp-live \
+  ALTEGIO_API_TOKEN=… ALTEGIO_USER_TOKEN=… ALTEGIO_E2E_LOCATION_ID=… … \
+  npx jest --runInBand --testPathPatterns='-live\.test\.ts$'
+```
+
+Credentials and fixture ids come from the environment, never from a file in
+this public repository:
+
+| Variable | What it is |
+| --- | --- |
+| `ALTEGIO_API_TOKEN`, `ALTEGIO_USER_TOKEN` | Partner and user tokens with rights at the location |
+| `ALTEGIO_E2E_LOCATION_ID` | The disposable test location |
+| `ALTEGIO_E2E_CLIENT_ID` | A client with no reachable phone or email: arrived appointments can message the client |
+| `ALTEGIO_E2E_TEAM_MEMBER_ID`, `ALTEGIO_E2E_SERVICE_ID` | A team member who provides a priced service with no Bill of Materials |
+| `ALTEGIO_E2E_OPERATION_TEAM_MEMBER_ID` | A team member who may record inventory operations |
+| `ALTEGIO_E2E_PRODUCT_ID`, `ALTEGIO_E2E_INVENTORY_ID` | A cheap plain product and a sale inventory that holds it |
+| `ALTEGIO_E2E_CONSUMABLES_INVENTORY_ID` | The consumables inventory |
+| `ALTEGIO_E2E_ACCOUNT_ID` | A cash register used only by tests |
+
+Rules the suites follow, and a new suite must follow too:
+
+- Every write is reverted by the suite that made it, and the suite checks the
+  location reads back as before: financial transactions and inventory
+  documents are deleted, payments cancelled, consumables cleared, appointments
+  deleted. A write without a reversal (a client account deposit, for one) is
+  not tested.
+- Writes go through `tools/call` of a host without forms, so they exercise the
+  confirmation token; `src/__tests__/helpers/live.ts` has the host and the
+  disposable appointment.
+- Appointments are created by the suite, in the past, for the client above,
+  with notifications off. Never point a suite at an existing appointment: a
+  consumables change detaches its Bill of Materials for good.
+- One run at a time per location: the suites compare stock and amounts due, so
+  another writer on the same product or register makes them fail.
+- A known defect is an `it.failing` test with a comment naming it. When the
+  defect is fixed that test fails; make it a plain `it`.
+
+Not covered live: the refusal for an appointment custom field required on
+arrival. The flag is set only in the chain's custom field settings in Altegio,
+not through the API.
+
+### Scheduled run
+
+`.github/workflows/live.yml` runs every live suite nightly (03:17 UTC) and on
+demand from the Actions tab, on `main` of this repository only; it never runs
+for a pull request. It stays inert until a maintainer:
+
+1. creates the `live-e2e` environment, with deployments allowed from `main`
+   only;
+2. adds the environment secrets `ALTEGIO_E2E_PARTNER_TOKEN`,
+   `ALTEGIO_E2E_USER_TOKEN` and every `ALTEGIO_E2E_*` id in the table above;
+3. sets the repository variable `LIVE_E2E_ENABLED` to `true`.
+
+The log and the job summary are public. Jest runs silent and
+`src/__tests__/helpers/live-reporter.cjs` prints test names and short, masked
+failure lines only; run a failing suite locally for its details.
 
 ## Transport checks
 

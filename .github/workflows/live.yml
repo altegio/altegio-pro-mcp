@@ -1,0 +1,92 @@
+name: Live
+
+# Every opt-in live suite (`*-live.test.ts`, see TESTING.md) against the
+# disposable test location: nightly, and on demand from the Actions tab. It
+# never runs for a pull request, so no fork sees the secrets, and it runs only
+# on main of this repository.
+#
+# Inert until set up: the job runs only once the repository variable
+# LIVE_E2E_ENABLED is "true", and takes its secrets from the `live-e2e`
+# environment, which should allow deployments from main only. TESTING.md lists
+# the secrets.
+#
+# The log and the job summary of a public repository are public: tool logs are
+# off, Jest runs silent, and the reporter prints test names and short masked
+# failure lines only. Run a failing suite locally for its details.
+
+on:
+  schedule:
+    # 03:17 UTC: away from midnight in UTC and at the test location, since
+    # several suites read a calendar day, and off the hour marks other
+    # schedules start on.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # The suites share one location; two runs at once would see each other's
+  # stock and payments.
+  group: live-e2e
+  cancel-in-progress: false
+
+jobs:
+  live:
+    if: >-
+      vars.LIVE_E2E_ENABLED == 'true' &&
+      github.repository == 'altegio/altegio-pro-mcp' &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: live-e2e
+    env:
+      ALTEGIO_E2E: '1'
+      ALTEGIO_API_TOKEN: ${{ secrets.ALTEGIO_E2E_PARTNER_TOKEN }}
+      ALTEGIO_USER_TOKEN: ${{ secrets.ALTEGIO_E2E_USER_TOKEN }}
+      ALTEGIO_E2E_LOCATION_ID: ${{ secrets.ALTEGIO_E2E_LOCATION_ID }}
+      ALTEGIO_E2E_CLIENT_ID: ${{ secrets.ALTEGIO_E2E_CLIENT_ID }}
+      ALTEGIO_E2E_TEAM_MEMBER_ID: ${{ secrets.ALTEGIO_E2E_TEAM_MEMBER_ID }}
+      ALTEGIO_E2E_OPERATION_TEAM_MEMBER_ID: ${{ secrets.ALTEGIO_E2E_OPERATION_TEAM_MEMBER_ID }}
+      ALTEGIO_E2E_SERVICE_ID: ${{ secrets.ALTEGIO_E2E_SERVICE_ID }}
+      ALTEGIO_E2E_PRODUCT_ID: ${{ secrets.ALTEGIO_E2E_PRODUCT_ID }}
+      ALTEGIO_E2E_INVENTORY_ID: ${{ secrets.ALTEGIO_E2E_INVENTORY_ID }}
+      ALTEGIO_E2E_CONSUMABLES_INVENTORY_ID: ${{ secrets.ALTEGIO_E2E_CONSUMABLES_INVENTORY_ID }}
+      ALTEGIO_E2E_ACCOUNT_ID: ${{ secrets.ALTEGIO_E2E_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check the secrets are set
+        run: |
+          missing=""
+          for name in ALTEGIO_API_TOKEN ALTEGIO_USER_TOKEN \
+            ALTEGIO_E2E_LOCATION_ID ALTEGIO_E2E_CLIENT_ID \
+            ALTEGIO_E2E_TEAM_MEMBER_ID ALTEGIO_E2E_OPERATION_TEAM_MEMBER_ID \
+            ALTEGIO_E2E_SERVICE_ID ALTEGIO_E2E_PRODUCT_ID \
+            ALTEGIO_E2E_INVENTORY_ID ALTEGIO_E2E_CONSUMABLES_INVENTORY_ID \
+            ALTEGIO_E2E_ACCOUNT_ID; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Not set in the live-e2e environment:$missing"
+            exit 1
+          fi
+
+      - name: Run the live suites
+        env:
+          CREDENTIALS_DIR: ${{ runner.temp }}/altegio-live
+        run: >-
+          npx jest --runInBand --silent --coverage=false
+          --testPathPatterns='-live\.test\.ts$'
+          --reporters=./src/__tests__/helpers/live-reporter.cjs
