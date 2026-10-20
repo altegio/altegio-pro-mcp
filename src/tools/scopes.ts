@@ -373,6 +373,8 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   // V2 save rewrites the whole appointment and may mark it arrived, so it also
   // needs `appointments:write`.
   visits_add_product: ['inventory:sell', 'appointments:write'],
+  // Taking a product line off is the same sale change on the same save.
+  visits_remove_product: ['inventory:sell', 'appointments:write'],
   client_accounts_list_for_client: 'client_accounts:read',
   client_accounts_deposit: 'client_accounts:write',
   accounts_and_cash_registers_list: 'finance:read',

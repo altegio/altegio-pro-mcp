@@ -1,6 +1,6 @@
 /**
  * `[Visits]` tool pack — the bill of an appointment's visit, the products sold
- * on it and the payments recorded against it.
+ * on it (and taken off again) and the payments recorded against it.
  *
  * A visit's bill lists what the client pays for (service lines from the
  * appointment, product lines sold with it), the payments already recorded, the
@@ -305,11 +305,37 @@ const productLineSchema = {
 
 const ATTENDANCE = ['waiting', 'confirmed', 'arrived', 'no_show', 'unknown'];
 
+const quantity = z
+  .number()
+  .positive()
+  .max(1_000_000)
+  .refine(
+    (v) => v >= 0.001 && Math.abs(v * 1000 - Math.round(v * 1000)) < 1e-6,
+    {
+      message: 'Use at least 0.001 and at most three decimals.',
+    }
+  );
+
+const billSummarySchema = {
+  anyOf: [
+    {
+      type: 'object' as const,
+      properties: {
+        total_amount: { type: 'number' as const },
+        paid_amount: { type: 'number' as const },
+        amount_due: { type: 'number' as const },
+      },
+      required: ['total_amount', 'paid_amount', 'amount_due'],
+    },
+    { type: 'null' as const },
+  ],
+};
+
 export const visitsAddProductTool = defineTool({
   name: 'visits_add_product',
   category: 'Visits',
   description:
-    'Sell a product on an appointment’s visit bill, as the appointment window in Altegio does: a product already on the appointment gets its quantity raised, otherwise a line is added at the product’s sale price in its sale unit, sold by the appointment’s team member, with the client’s personal discount, from the inventory Altegio would pick (override with inventory_id, team_member_id, discount_percent). Stock is written off at once; loyalty programs may take more off the line, and the result shows the line and bill as saved. The appointment must be arrived or confirmed — for a waiting one pass mark_arrived: true once the client is there. Pass the quantity of this product already on the bill (visits_get; 0 if none) as expected_current_quantity; the call is refused if it differs. Refused for group event appointments, a printed bill, gift cards and memberships, and a visit whose other appointments sell products. Altegio saves the whole appointment again from a fresh read and the call is refused if it changed meanwhile; a change made in the same instant can still be overwritten. No tool removes a line. Asks for confirmation first.',
+    'Sell a product on an appointment’s visit bill, as the appointment window in Altegio does: a product already on the appointment gets its quantity raised, otherwise a line is added at the product’s sale price in its sale unit, sold by the appointment’s team member, with the client’s personal discount, from the inventory Altegio would pick (override with inventory_id, team_member_id, discount_percent). Stock is written off at once; loyalty programs may take more off the line, and the result shows the line and bill as saved. The appointment must be arrived or confirmed — for a waiting one pass mark_arrived: true once the client is there. Pass the quantity of this product already on the bill (visits_get; 0 if none) as expected_current_quantity; the call is refused if it differs. Refused for group event appointments, a printed bill, gift cards and memberships, and a visit whose other appointments sell products. Altegio saves the whole appointment again from a fresh read and the call is refused if it changed meanwhile; a change made in the same instant can still be overwritten. visits_remove_product undoes a sale. Asks for confirmation first.',
   annotations: {
     title: 'Visits: sell a product',
     destructiveHint: false,
@@ -324,17 +350,9 @@ export const visitsAddProductTool = defineTool({
       .int()
       .positive()
       .describe('Product id, from products_search.'),
-    quantity: z
-      .number()
-      .positive()
-      .max(1_000_000)
-      .refine(
-        (v) => v >= 0.001 && Math.abs(v * 1000 - Math.round(v * 1000)) < 1e-6,
-        {
-          message: 'Use at least 0.001 and at most three decimals.',
-        }
-      )
-      .describe('How much to sell, in the product’s sale unit.'),
+    quantity: quantity.describe(
+      'How much to sell, in the product’s sale unit.'
+    ),
     expected_current_quantity: z
       .number()
       .min(0)
@@ -372,7 +390,7 @@ export const visitsAddProductTool = defineTool({
     target: (input) =>
       `product ${input.product_id} ×${input.quantity} on appointment ${input.appointment_id} at location ${input.location_id}`,
     consequence: (input) =>
-      `Altegio saves the appointment again exactly as it reads now, with the product line added or its quantity raised. The product is written off the inventory at once and the bill grows by the line total after loyalty programs. Integrations receive an appointment update; the client gets no message.${input.mark_arrived ? ' If the appointment is waiting, it is marked arrived.' : ''} This server cannot remove the line afterwards; a person removes it in Altegio.`,
+      `Altegio saves the appointment again exactly as it reads now, with the product line added or its quantity raised. The product is written off the inventory at once and the bill grows by the line total after loyalty programs. Integrations receive an appointment update; the client gets no message.${input.mark_arrived ? ' If the appointment is waiting, it is marked arrived.' : ''} visits_remove_product can take the line off again.`,
     detail: (input, client) => visitProducts.describeSale(client, input),
   },
   outputSchema: {
@@ -387,20 +405,7 @@ export const visitsAddProductTool = defineTool({
       line: { anyOf: [productLineSchema, { type: 'null' as const }] },
       attendance_before: { type: 'string' as const, enum: ATTENDANCE },
       attendance: { type: 'string' as const, enum: ATTENDANCE },
-      bill: {
-        anyOf: [
-          {
-            type: 'object' as const,
-            properties: {
-              total_amount: { type: 'number' as const },
-              paid_amount: { type: 'number' as const },
-              amount_due: { type: 'number' as const },
-            },
-            required: ['total_amount', 'paid_amount', 'amount_due'],
-          },
-          { type: 'null' as const },
-        ],
-      },
+      bill: billSummarySchema,
       product_lines: { type: 'array' as const, items: productLineSchema },
       unexpected_changes: {
         type: 'array' as const,
@@ -418,4 +423,88 @@ export const visitsAddProductTool = defineTool({
     ],
   },
   handler: async ({ input, client }) => visitProducts.addProduct(client, input),
+});
+
+export const visitsRemoveProductTool = defineTool({
+  name: 'visits_remove_product',
+  category: 'Visits',
+  description:
+    'Take a product line off an appointment’s visit bill, or lower its quantity — the undo of visits_add_product. The product returns to the line’s inventory at once and the bill shrinks by the line total after loyalty programs; payments already recorded are not changed. Pass line_id (visits_get or the visits_add_product result) and the line’s current quantity as expected_current_quantity; the call is refused if it differs, so a repeated call cannot take off twice. Omit quantity to take off the whole line. Lines sold in the sale unit only; a line with goods marking codes is taken off whole. The appointment must be arrived or confirmed. Refused for group event appointments, a printed bill, gift cards and memberships, and a visit whose other appointments sell products. Altegio saves the whole appointment again from a fresh read and the call is refused if it changed meanwhile; a change made in the same instant can still be overwritten. Asks for confirmation first.',
+  annotations: {
+    title: 'Visits: take a product off',
+    destructiveHint: true,
+    // A repeat with the same expected_current_quantity is refused, so it
+    // takes nothing further off.
+    idempotentHint: true,
+    openWorldHint: true,
+  },
+  input: z.object({
+    location_id: locationId,
+    appointment_id: appointmentId,
+    line_id: z
+      .number()
+      .int()
+      .positive()
+      .describe(
+        'Product line id, from visits_get or the visits_add_product result.'
+      ),
+    quantity: quantity
+      .optional()
+      .describe(
+        'How much to take off, in the product’s sale unit. Default: the whole line.'
+      ),
+    expected_current_quantity: z
+      .number()
+      .positive()
+      .describe('Quantity the line holds now, from visits_get.'),
+  }),
+  confirm: {
+    action: 'Take a product off a visit',
+    target: (input) =>
+      `${input.quantity === undefined ? 'the whole of' : `×${input.quantity} of`} product line ${input.line_id} on appointment ${input.appointment_id} at location ${input.location_id}`,
+    consequence: () =>
+      'Altegio saves the appointment again exactly as it reads now, with the product line taken off or its quantity lowered. The product returns to the inventory at once and the bill shrinks by the line total after loyalty programs; payments already recorded are not changed, so a paid bill becomes overpaid. Integrations receive an appointment update; the client gets no message.',
+    detail: (input, client) => visitProducts.describeRemoval(client, input),
+  },
+  outputSchema: {
+    type: 'object' as const,
+    properties: {
+      location_id: { type: 'integer' as const },
+      appointment_id: { type: 'integer' as const },
+      visit_id: int,
+      currency: str,
+      removed_line: { type: 'boolean' as const },
+      removed_quantity: { type: 'number' as const },
+      line_before: productLineSchema,
+      line: { anyOf: [productLineSchema, { type: 'null' as const }] },
+      stock: {
+        type: 'object' as const,
+        properties: {
+          inventory_id: { type: 'integer' as const },
+          before: num,
+          after: num,
+        },
+        required: ['inventory_id', 'before', 'after'],
+      },
+      bill: billSummarySchema,
+      product_lines: { type: 'array' as const, items: productLineSchema },
+      unexpected_changes: {
+        type: 'array' as const,
+        items: { type: 'string' as const },
+      },
+    },
+    required: [
+      'location_id',
+      'appointment_id',
+      'currency',
+      'line_before',
+      'line',
+      'stock',
+      'bill',
+      'product_lines',
+      'unexpected_changes',
+    ],
+  },
+  handler: async ({ input, client }) =>
+    visitProducts.removeProduct(client, input),
 });

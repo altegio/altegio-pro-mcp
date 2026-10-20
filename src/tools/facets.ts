@@ -193,6 +193,7 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
       'visits_get',
       'visits_add_payment',
       'visits_add_product',
+      'visits_remove_product',
       'visits_cancel_payment',
       'client_accounts_list_for_client',
       'client_accounts_deposit',

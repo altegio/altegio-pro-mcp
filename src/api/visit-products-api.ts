@@ -1,5 +1,6 @@
 /**
- * `VisitProductsApi` — the port behind `visits_add_product` (ADR-001 D5).
+ * `VisitProductsApi` — the port behind `visits_add_product` and
+ * `visits_remove_product` (ADR-001 D5).
  *
  * A product sold on a visit is a product line of one appointment of the visit:
  * the product, a quantity in its sale unit, the inventory it is taken from,
@@ -16,8 +17,8 @@
  * uses (`./v2/visit-products-adapter.ts`), which rewrites the whole
  * appointment, so it echoes what it read and refuses to write over a change.
  * The planned V3 `addVisitItem` appends one line and checks the visit's ETag;
- * an adapter over it replaces this one without changing the tool. Money is in
- * major units of the location's currency.
+ * an adapter over it replaces this one without changing the tools. Money is
+ * in major units of the location's currency.
  */
 import type { AppointmentAttendance } from './inventory-api.js';
 
@@ -140,7 +141,7 @@ export interface AddProductLineRequest {
   expected_version: string;
 }
 
-export interface AddProductLineResult {
+export interface ProductLineSaveResult {
   /** The appointment read back after the save. */
   appointment: AppointmentSale;
   /**
@@ -149,6 +150,17 @@ export interface AddProductLineResult {
    * when nothing else changed.
    */
   unexpected_changes: string[];
+}
+
+/** A product line to drop, or to keep with a lower quantity. */
+export interface ReduceProductLineRequest {
+  line_id: number;
+  /** The quantity the line keeps, in its unit; 0 drops the line. */
+  quantity: number;
+  /** quantity × unit_price less the line's discount; 0 when dropped. */
+  amount: number;
+  /** `version` of the read the change was planned on. */
+  expected_version: string;
 }
 
 export interface VisitProductsApi {
@@ -168,5 +180,15 @@ export interface VisitProductsApi {
     locationId: number,
     appointmentId: number,
     request: AddProductLineRequest
-  ): Promise<AddProductLineResult>;
+  ): Promise<ProductLineSaveResult>;
+  /**
+   * Drop the line or lower its quantity; the product returns to the line's
+   * inventory. Refuses without writing when the appointment no longer matches
+   * `expected_version`.
+   */
+  reduceProductLine(
+    locationId: number,
+    appointmentId: number,
+    request: ReduceProductLineRequest
+  ): Promise<ProductLineSaveResult>;
 }

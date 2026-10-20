@@ -1355,6 +1355,10 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     what: 'the title of the product sold',
     coveredBy: 'src/capabilities/finance/__tests__/visit-products.test.ts',
   },
+  visits_remove_product: {
+    what: 'the title of the product taken off',
+    coveredBy: 'src/capabilities/finance/__tests__/visit-products.test.ts',
+  },
 };
 
 // ===========================================================================

@@ -1,13 +1,17 @@
 /**
- * visits_add_product: the use case over the V2 adapter, driven through a fake
+ * visits_add_product and visits_remove_product: the use cases over the V2
+ * adapter, driven through a fake
  * transport that keeps the appointment's state, so the save body is asserted
  * key by key and every read after the save sees what the save did.
  */
 import type { AltegioClient } from '../../../providers/altegio-client.js';
 import {
   addProduct,
+  describeRemoval,
   describeSale,
+  removeProduct,
   type AddProductInput,
+  type RemoveProductInput,
 } from '../visit-products.js';
 import { FinanceAccessError, FinanceInputError } from '../errors.js';
 import { ConfirmationRefusal } from '../../../tools/confirmation.js';
@@ -54,6 +58,10 @@ interface State {
   nextId: number;
   /** Loyalty takes this share off every saved product line. */
   loyaltyShare: number;
+  /** Sale-unit stock of PRODUCT in inventory 38882; saves move it. */
+  stock: number;
+  /** Money already paid on the bill. */
+  paid: number;
   /** Runs on every appointment read; may change the state. */
   onRead?: (state: State, readNo: number) => void;
   /** Runs after a save; may change the state. */
@@ -78,6 +86,8 @@ function freshState(overrides: Partial<State> = {}): State {
     others: [],
     nextId: 649590900,
     loyaltyShare: 0,
+    stock: 5,
+    paid: 0,
     ...overrides,
   };
 }
@@ -270,7 +280,7 @@ function attendanceDoc(s: State) {
   };
 }
 
-function productDoc(options: { loyalty?: 'membership' } = {}) {
+function productDoc(options: { loyalty?: 'membership'; stock?: number } = {}) {
   return {
     data: {
       type: 'good',
@@ -310,7 +320,7 @@ function productDoc(options: { loyalty?: 'membership' } = {}) {
       },
       ...[
         [36538, 4],
-        [38882, 5],
+        [38882, options.stock ?? 5],
         [1183500, 0],
       ].map(([storage, amount]) => ({
         type: 'good_storage_amount',
@@ -372,7 +382,10 @@ function fakeClient(
         return respond(200, attendanceDoc(state));
       }
       if (path === `/../v2/locations/${LOCATION}/products/${PRODUCT}`) {
-        return respond(200, options.product ?? productDoc());
+        return respond(
+          200,
+          options.product ?? productDoc({ stock: state.stock })
+        );
       }
       if (
         method === 'POST' &&
@@ -388,6 +401,17 @@ function fakeClient(
         }
         const sent = (body as { records: Array<Record<string, unknown>> })
           .records[0]!;
+        const held = (
+          goods: Array<{
+            good_id: number;
+            storage_id: number;
+            quantity: number;
+          }>
+        ) =>
+          goods
+            .filter((g) => g.good_id === PRODUCT && g.storage_id === 38882)
+            .reduce((sum, g) => sum + g.quantity, 0);
+        const heldBefore = held(state.goods);
         state.status = sent.attendance_status as number;
         state.goods = (
           sent.attendance_good_items as Array<Record<string, unknown>>
@@ -408,6 +432,9 @@ function fakeClient(
             marks: g.marks as string[],
           };
         });
+        state.stock =
+          Math.round((state.stock + heldBefore - held(state.goods)) * 1000) /
+          1000;
         state.afterSave?.(state);
         return respond(200, attendanceDoc(state));
       }
@@ -449,7 +476,10 @@ function fakeClient(
                 },
                 ...goods,
               ],
-              payment_transactions: [],
+              payment_transactions:
+                state.paid > 0
+                  ? [{ id: 589566843, amount: state.paid, account_id: 1 }]
+                  : [],
               loyalty_transactions: [],
               deposit_holds: [],
             },
@@ -457,7 +487,7 @@ function fakeClient(
               {
                 type: 'account',
                 account: { id: 1, title: 'Cash' },
-                applicable_amount: total,
+                applicable_amount: Math.max(0, total - state.paid),
                 is_applicable: true,
               },
             ],
@@ -900,5 +930,357 @@ describe('visits_add_product: the confirmation detail', () => {
     await expect(
       describeSale(fakeClient(state, []), input())
     ).rejects.toBeInstanceOf(ConfirmationRefusal);
+  });
+});
+
+// ========== visits_remove_product ==========
+
+const removal = (
+  overrides: Partial<RemoveProductInput> = {}
+): RemoveProductInput => ({
+  location_id: LOCATION,
+  appointment_id: APPOINTMENT,
+  line_id: 649590969,
+  expected_current_quantity: 1,
+  ...overrides,
+});
+
+const sentGoods = (state: State) =>
+  (
+    state.saveBody as {
+      records: Array<{ attendance_good_items: Array<Record<string, unknown>> }>;
+    }
+  ).records[0]!.attendance_good_items;
+
+describe('visits_remove_product: the save body', () => {
+  it('sends the appointment back exactly as read, without the line', async () => {
+    const other = existingLine({
+      id: 649590970,
+      good_id: OTHER_PRODUCT,
+      marks: [],
+    });
+    const state = freshState({
+      goods: [existingLine(), other],
+      composite: true,
+    });
+    const calls: Call[] = [];
+    const result = await removeProduct(fakeClient(state, calls), removal());
+
+    expect(saves(calls)).toHaveLength(1);
+    const sent = (state.saveBody as { records: Array<Record<string, unknown>> })
+      .records[0]!;
+    expect(sent).toMatchObject({
+      id: APPOINTMENT,
+      date: '2026-10-12T07:00:00',
+      staff_id: 3100100,
+      attendance_status: 1,
+      custom_field_values: null,
+      comer: null,
+      is_instant_sms_notification_required: false,
+      attendance_service_items: [
+        expect.objectContaining({
+          id: 898868874,
+          composite_service_id: 13900000,
+        }),
+      ],
+      // The backend re-saves the appointment, so assistants are echoed.
+      assistants: [
+        {
+          service_id: 13833134,
+          assistant_id: 3100101,
+          compensation_share_percent: 25,
+        },
+      ],
+    });
+    expect(sentGoods(state)).toEqual([
+      {
+        id: 649590970,
+        good_id: OTHER_PRODUCT,
+        unit_id: 216760,
+        storage_id: 38882,
+        staff_id: 3100100,
+        operation_unit_type: 'sale',
+        number: null,
+        planned_activation_date: null,
+        marks: [],
+        quantity: 1,
+        cost_per_unit: 20.1,
+        manual_cost: 18.09,
+        discount_percent: 10,
+      },
+    ]);
+    expect(result.isError).toBeUndefined();
+    expect(result.structuredContent).toMatchObject({
+      removed_line: true,
+      removed_quantity: 1,
+      currency: 'CZK',
+      line_before: { id: 649590969, product_id: PRODUCT, quantity: 1 },
+      line: null,
+      stock: { inventory_id: 38882, before: 5, after: 6 },
+      product_lines: [{ id: 649590970 }],
+      unexpected_changes: [],
+    });
+    const text = summaryOf(result.text);
+    expect(text).toContain(
+      'Took line 649590969 (product 232659 ×1) off appointment 678202164.'
+    );
+    expect(text).toContain('Line now: taken off.');
+    expect(text).toContain(
+      'Stock of product 232659 in inventory 38882: 5 → 6 (1 returned).'
+    );
+    expect(text).not.toContain(CANARY);
+    expect(result.text).toContain('product 232659 title:');
+  });
+
+  it('sends an empty list when the last line is taken off', async () => {
+    const state = freshState({ goods: [existingLine()] });
+    await removeProduct(fakeClient(state, []), removal());
+    expect(sentGoods(state)).toEqual([]);
+  });
+
+  it('lowers the quantity of a line, keeping its id', async () => {
+    const state = freshState({
+      goods: [existingLine({ quantity: 3, manual_cost: 54.27, marks: [] })],
+    });
+    const result = await removeProduct(
+      fakeClient(state, []),
+      removal({ quantity: 2, expected_current_quantity: 3 })
+    );
+    expect(sentGoods(state)).toEqual([
+      expect.objectContaining({
+        id: 649590969,
+        quantity: 1,
+        cost_per_unit: 20.1,
+        discount_percent: 10,
+        // round(20.1 × 1 × 0.9, 2), the web app's own formula.
+        manual_cost: 18.09,
+      }),
+    ]);
+    expect(result.structuredContent).toMatchObject({
+      removed_line: false,
+      removed_quantity: 2,
+      line_before: { quantity: 3, amount: 54.27 },
+      line: { id: 649590969, quantity: 1, amount: 18.09 },
+      stock: { before: 5, after: 7 },
+    });
+    expect(summaryOf(result.text)).toContain(
+      'Lowered line 649590969 of product 232659 on appointment 678202164 from 3 to 1.'
+    );
+  });
+
+  it('takes the whole line off when the quantity equals the line', async () => {
+    const state = freshState({ goods: [existingLine({ marks: [] })] });
+    const result = await removeProduct(
+      fakeClient(state, []),
+      removal({ quantity: 1 })
+    );
+    expect(sentGoods(state)).toEqual([]);
+    expect(result.structuredContent).toMatchObject({ removed_line: true });
+  });
+
+  it('keeps a confirmed appointment confirmed', async () => {
+    const state = freshState({ status: 2, goods: [existingLine()] });
+    await removeProduct(fakeClient(state, []), removal());
+    expect(
+      (state.saveBody as { records: Array<{ attendance_status: number }> })
+        .records[0]!.attendance_status
+    ).toBe(2);
+  });
+});
+
+describe('visits_remove_product: refusals before any save', () => {
+  const refused = async (
+    state: State,
+    args: Partial<RemoveProductInput>,
+    pattern: RegExp
+  ) => {
+    const calls: Call[] = [];
+    const error = await removeProduct(
+      fakeClient(state, calls),
+      removal(args)
+    ).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(FinanceInputError);
+    expect((error as Error).message).toMatch(/^Nothing was changed: /);
+    expect((error as Error).message).toMatch(pattern);
+    expect((error as Error).message).not.toContain(CANARY);
+    expect(saves(calls)).toHaveLength(0);
+  };
+  const withLine = (overrides: Partial<State> = {}) =>
+    freshState({ goods: [existingLine()], ...overrides });
+
+  it('refuses a group event appointment', () =>
+    refused(withLine({ activity: 10827797 }), {}, /group event/));
+  it('refuses a printed bill', () =>
+    refused(withLine({ printed: true }), {}, /bill .* is printed/));
+  it('refuses a waiting appointment', () =>
+    refused(
+      withLine({ status: 0 }),
+      {},
+      /is waiting; .*can drop every product line/
+    ));
+  it('refuses a no-show appointment', () =>
+    refused(withLine({ status: -1 }), {}, /marked no-show/));
+  it('refuses an appointment with a walk-in visitor', () =>
+    refused(withLine({ comer: true }), {}, /walk-in visitor/));
+  it('refuses a visit whose other appointments sell products', () =>
+    refused(
+      withLine({
+        others: [{ id: 678202999, goods: [existingLine({ id: 1 })] }],
+      }),
+      {},
+      /other appointments of the same visit \(678202999\).*twice/
+    ));
+  it('refuses a line that issued a membership', () =>
+    refused(
+      freshState({ goods: [existingLine({ membership: true })] }),
+      {},
+      /line 649590969 issued a membership/
+    ));
+  it('refuses while another line issued a membership', () =>
+    refused(
+      freshState({
+        goods: [
+          existingLine(),
+          existingLine({ id: 649590970, membership: true }),
+        ],
+      }),
+      {},
+      /also sells a gift card or membership \(line 649590970\)/
+    ));
+  it('refuses a line the appointment does not have', () =>
+    refused(
+      withLine(),
+      { line_id: 123 },
+      /no product line 123 \(its product lines: 649590969\)/
+    ));
+  it('refuses a line sold in the consumable unit', () =>
+    refused(
+      freshState({ goods: [existingLine({ op: 'consumable' })] }),
+      {},
+      /consumable unit/
+    ));
+  it('refuses when the line holds another quantity than the caller read', () =>
+    refused(
+      withLine(),
+      { expected_current_quantity: 2 },
+      /line 649590969 holds 1 of product 232659 now, not the 2.*already recorded/
+    ));
+  it('refuses to take off more than the line holds', () =>
+    refused(withLine(), { quantity: 2 }, /less than the 2 to take off/));
+  it('refuses to lower a line with goods marking codes', () =>
+    refused(
+      freshState({ goods: [existingLine({ quantity: 2, marks: ['M'] })] }),
+      { quantity: 1, expected_current_quantity: 2 },
+      /goods marking codes/
+    ));
+});
+
+describe('visits_remove_product: concurrency and read-back', () => {
+  it('refuses to save over a change made after the plan was read', async () => {
+    const state = freshState({
+      goods: [existingLine()],
+      onRead: (s, n) => {
+        // Someone adds a product between the plan and the save.
+        if (n === 2) s.goods.push(existingLine({ id: 649590971 }));
+      },
+    });
+    const calls: Call[] = [];
+    await expect(
+      removeProduct(fakeClient(state, calls), removal())
+    ).rejects.toThrow(/changed while the change was being prepared/);
+    expect(saves(calls)).toHaveLength(0);
+  });
+
+  it('flags a save after which the line still reads back', async () => {
+    const state = freshState({
+      goods: [existingLine()],
+      afterSave: (s) => {
+        s.goods = [existingLine()];
+      },
+    });
+    const result = await removeProduct(fakeClient(state, []), removal());
+    expect(result.isError).toBe(true);
+    expect(summaryOf(result.text)).toMatch(
+      /line 649590969 of product 232659 still holds ×1/
+    );
+  });
+
+  it('fails loudly when the save changed the appointment', async () => {
+    const state = freshState({
+      goods: [existingLine()],
+      afterSave: (s) => {
+        s.color = 'ff0000';
+      },
+    });
+    const result = await removeProduct(fakeClient(state, []), removal());
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      unexpected_changes: ['color'],
+    });
+  });
+
+  it('says when the bill becomes overpaid and when the client has a discount', async () => {
+    const state = freshState({
+      goods: [existingLine()],
+      paid: 202.85,
+      clientDiscount: 10,
+    });
+    const result = await removeProduct(fakeClient(state, []), removal());
+    const text = summaryOf(result.text);
+    expect(result.structuredContent).toMatchObject({
+      bill: { total_amount: 192, paid_amount: 202.85 },
+    });
+    expect(text).toContain('The bill is now overpaid by 10.85 CZK');
+    expect(text).toContain('personal discount is 10%');
+  });
+
+  it('maps a refused save', async () => {
+    const state = freshState({ goods: [existingLine()], saveStatus: 403 });
+    const error = await removeProduct(fakeClient(state, []), removal()).catch(
+      (e: unknown) => e
+    );
+    expect(error).toBeInstanceOf(FinanceAccessError);
+    expect((error as Error).message).toMatch(
+      /rights to edit and delete product sales/
+    );
+  });
+});
+
+describe('visits_remove_product: the confirmation detail', () => {
+  it('shows the line taken off and the stock returned', async () => {
+    const state = freshState({ goods: [existingLine()], loyaltyShare: 0.4 });
+    const detail = await describeRemoval(fakeClient(state, []), removal());
+    expect(detail).toContain(
+      'Takes off line 649590969 of product 232659 ×1 (inventory 38882, team member 3100100, 20.1 CZK each, discount 10%): line total 18.09 CZK before loyalty programs, 10.85 CZK after them, comes off the bill.'
+    );
+    expect(detail).toContain(
+      'Stock of product 232659 in inventory 38882: 5 → 6 (1 returned).'
+    );
+    expect(detail).not.toContain(CANARY);
+  });
+
+  it('shows the line before and after a lower quantity', async () => {
+    const state = freshState({
+      goods: [existingLine({ quantity: 3, manual_cost: 54.27, marks: [] })],
+    });
+    const detail = await describeRemoval(
+      fakeClient(state, []),
+      removal({ quantity: 1.5, expected_current_quantity: 3 })
+    );
+    expect(detail).toContain(
+      'Lowers line 649590969 of product 232659 from 3 to 1.5 (20.1 CZK each, discount 10%): line total 54.27 CZK → 27.14 CZK before loyalty programs.'
+    );
+    expect(detail).toContain(
+      'Stock of product 232659 in inventory 38882: 5 → 6.5 (1.5 returned).'
+    );
+  });
+
+  it('refuses before anyone is asked', async () => {
+    const state = freshState({ goods: [existingLine()], printed: true });
+    const error = await describeRemoval(fakeClient(state, []), removal()).catch(
+      (e: unknown) => e
+    );
+    expect(error).toBeInstanceOf(ConfirmationRefusal);
+    expect((error as Error).message).not.toMatch(/^Nothing was changed/);
   });
 });
