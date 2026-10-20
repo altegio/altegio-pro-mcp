@@ -484,7 +484,6 @@ const DEFAULT_PURPOSE: Record<
   'sale' | 'consumables' | null
 > = {
   sale: 'sale',
-  consumption: 'consumables',
   receipt: null,
   write_off: null,
 };
@@ -537,8 +536,7 @@ async function planOperation(
         `${where} sells a ${product.loyalty_kind === 'membership' ? 'membership' : 'gift card'}; record that sale on the client's visit in Altegio, not as an inventory operation.`
       );
     }
-    const unitKind =
-      line.unit ?? (input.kind === 'consumption' ? 'consumable' : 'sale');
+    const unitKind = line.unit ?? 'sale';
     const unitId =
       unitKind === 'sale' ? product.sale_unit_id : product.consumable_unit_id;
     if (unitId === null)

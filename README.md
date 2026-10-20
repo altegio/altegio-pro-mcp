@@ -131,8 +131,8 @@ Inventory is the `inventory_*` pack with `products_search`, `suppliers_list`
 and the appointment consumables pair: `inventory_list` (a location's
 inventories), `products_search` (by name, article number or barcode, with the
 quantity in each inventory on request), `inventory_list_operations` (product
-lines by date or document), `inventory_create_operation` (a sale, consumption,
-product receipt or write-off as one document), `inventory_delete_document`,
+lines by date or document), `inventory_create_operation` (a sale, product
+receipt or write-off as one document), `inventory_delete_document`,
 `inventory_list_bills_of_materials`, `appointments_get_consumables` and
 `appointments_set_consumables` (read-modify-write of one service's
 consumables, with the change shown before it is applied). Quantities carry

@@ -15,9 +15,12 @@
  *   `master_id`, `client.id`, `date` (`Y-m-d H:i:s`, location time; any other
  *   format silently becomes "now"), `document.comment` and
  *   `goods_transactions[]`; the spec's `create_date`, `comment` and
- *   `transactions` are not read. Only types 1–4 are accepted (5, transfer, is
- *   refused), a team member is mandatory, a date more than five minutes ahead
- *   is refused, and the document comment overwrites every line's comment.
+ *   `transactions` are not read. Only types 1, 3 and 4 are accepted (2,
+ *   consumption, and 5, transfer, are refused with 422: the document accepts
+ *   1/3/4/5/6, the operation 1/2/3/4), a team member is mandatory, a date
+ *   more than five minutes ahead is refused, and the document comment
+ *   overwrites every line's comment. Only a sale keeps the team member and
+ *   client on its lines; a receipt keeps the Supplier.
  *   Without `paid` + `account_id` no financial transaction is created. The
  *   answer lists the document and its lines as `goods_transactions` (the
  *   spec says `transactions`).
@@ -78,7 +81,6 @@ import type {
 
 const KIND_TO_WIRE: Record<InventoryOperationKind, number> = {
   sale: 1,
-  consumption: 2,
   receipt: 3,
   write_off: 4,
 };

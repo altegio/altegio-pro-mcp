@@ -314,7 +314,7 @@ const operationLine = z
       .enum(['sale', 'consumable'])
       .optional()
       .describe(
-        'sale: the product’s sale unit (pcs, bottle); consumable: its consumable unit (ml, g). Default: consumable for consumption, sale otherwise.'
+        'sale: the product’s sale unit (pcs, bottle); consumable: its consumable unit (ml, g). Default: sale.'
       ),
     unit_price: z
       .number()
@@ -335,7 +335,6 @@ const operationLine = z
 
 const KIND_TEXT: Record<inventory.CreateOperationInput['kind'], string> = {
   sale: 'product sale',
-  consumption: 'consumption',
   receipt: 'product receipt',
   write_off: 'write-off',
 };
@@ -344,7 +343,7 @@ export const inventoryCreateOperationTool = defineTool({
   name: 'inventory_create_operation',
   category: 'Inventory',
   description:
-    'Record an inventory operation as one document with one line per product: kind sale (sold over the counter), consumption (used outside an appointment), receipt (products arriving, optionally from a supplier_id) or write_off (damaged, expired, lost). Transfers between inventories are not available. Each line takes product_id or product (name, article number, barcode), a quantity in the sale or consumable unit, and optionally unit_price and discount_percent; a line total is quantity × price minus the discount. team_member_id is required. No payment is recorded. For an appointment’s consumables use appointments_set_consumables. Undo with inventory_delete_document. Asks for confirmation first.',
+    'Record an inventory operation as one document with one line per product: kind sale (sold over the counter), receipt (products arriving, optionally from a supplier_id) or write_off (damaged, expired, lost). Consumption outside an appointment and transfers between inventories are not available. Each line takes product_id or product (name, article number, barcode), a quantity in the sale or consumable unit, and optionally unit_price and discount_percent; a line total is quantity × price minus the discount. team_member_id is required. No payment is recorded. For an appointment’s consumables use appointments_set_consumables. Undo with inventory_delete_document. Asks for confirmation first.',
   annotations: {
     title: 'Inventory: record an inventory operation',
     destructiveHint: false,
@@ -354,8 +353,8 @@ export const inventoryCreateOperationTool = defineTool({
   input: z.object({
     location_id: locationId,
     kind: z
-      .enum(['sale', 'consumption', 'receipt', 'write_off'])
-      .describe('sale, consumption, receipt or write_off.'),
+      .enum(['sale', 'receipt', 'write_off'])
+      .describe('sale, receipt or write_off.'),
     team_member_id: z
       .number()
       .int()
@@ -371,7 +370,7 @@ export const inventoryCreateOperationTool = defineTool({
     inventory_id: inventoryId
       .optional()
       .describe(
-        'Inventory id (inventory_list). Default: the location’s only sale inventory for a sale, its only consumables inventory for consumption; required otherwise.'
+        'Inventory id (inventory_list). Default: the location’s only sale inventory for a sale; required otherwise.'
       ),
     client_id: z
       .number()

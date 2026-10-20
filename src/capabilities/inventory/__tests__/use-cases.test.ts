@@ -382,17 +382,18 @@ describe('createOperation', () => {
     expect(result.text).toContain('inventory_delete_document');
   });
 
-  it('prices consumption per consumable unit from the cost price', async () => {
+  it('prices a write-off per consumable unit from the cost price', async () => {
     const { client, calls } = setup(operationRoutes([createdRoute()]));
     await createOperation(client, {
       location_id: 1,
-      kind: 'consumption',
+      kind: 'write_off',
       team_member_id: 7,
-      lines: [{ product_id: 5, quantity: 50 }],
+      inventory_id: 4,
+      lines: [{ product_id: 5, quantity: 50, unit: 'consumable' }],
     });
     const post = calls.find((c) => c.method === 'POST')!;
     expect(post.body).toMatchObject({
-      type_id: 2,
+      type_id: 4,
       storage_id: 4,
       goods_transactions: [
         { amount: 50, unit_id: 2, cost_per_unit: 0.48, discount: 0, cost: 24 },
