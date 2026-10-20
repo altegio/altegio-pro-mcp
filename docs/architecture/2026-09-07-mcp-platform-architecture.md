@@ -150,6 +150,11 @@ The table renders to the committed `docs/architecture/tool-surface.md` (`npm run
 
 Tool names, parameters and result fields use the V3 object model (`location`, `team_member`, `service`, `client`, `appointment`, `visit`, `payment`, `position`, `resource`). The capability layer calls an `AltegioApi` port; `v1` adapters implement it today, `v3` adapters replace them per domain as operations flip to `available`. Tool names never change during the migration, so hosts, prompts and evals keep working. Fields that exist only in V1 are marked `x-v1-only` in the overlay so the drift check reports them when V3 becomes canonical.
 
+**Addendum (2026-10-20) — one port per V3 resource.** A port follows the V3 resource it will map to, not the backend that serves it today. The Visit resource (`getVisit`, `addVisitItem`, `createPayment`, `cancelPayment`) is one `VisitsApi` port (`src/api/visits-api.ts`): the visit and its payments run on V1 and product lines on the V2 appointment save, put together per method in `src/api/visits-adapter.ts`, which a V3 adapter replaces whole. `FinanceApi` keeps client accounts, accounts and cash registers, financial transactions and payroll. Two pieces are shared across ports:
+
+- **One failure mapping** (`src/api/http-failure.ts`): our next step first, the API's wording quoted after it, and a 401 worded for the connection — `auth_login` where the view serves it, the MCP client's own sign-in everywhere else.
+- **One guarded read-modify-write** (`src/capabilities/guarded-change.ts`) for a write that replaces a whole record (appointment consumables, a financial transaction, an appointment for a visit product): the confirmation binds a version of what it showed, and the confirmed call refuses when a fresh read has another.
+
 ### D6 — Auth roadmap
 
 | Today                                                                                                                                                                             | After V3 auth (planned Oct 2026)                                                                                                                                                                                                                                                                                                         |

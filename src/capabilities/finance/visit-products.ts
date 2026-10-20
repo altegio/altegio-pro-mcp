@@ -30,36 +30,32 @@
  * (`../../api/write-options.ts`).
  */
 import type { AltegioClient } from '../../providers/altegio-client.js';
-import { VisitProductsV2Adapter } from '../../api/v2/visit-products-adapter.js';
-import { FinanceAdapter } from '../../api/v1/finance-adapter.js';
 import { InventoryAdapter } from '../../api/v1/inventory-adapter.js';
 import { resolveLocationCurrency } from '../../api/v1/location-currency.js';
 import type {
   AppointmentSale,
   ProductForSale,
   ProductLineWrite,
+  Visit,
   VisitProductLine,
-  VisitProductsApi,
-} from '../../api/visit-products-api.js';
-import type { Visit } from '../../api/finance-api.js';
+  VisitsApi,
+} from '../../api/visits-api.js';
 import { knownInventory } from '../inventory/shared.js';
-import {
-  ConfirmationRefusal,
-  type ConfirmedCall,
+import type {
+  ConfirmationDetail,
+  ConfirmedCall,
 } from '../../tools/confirmation.js';
+import { planConfirmed, planForConfirmation } from '../guarded-change.js';
 import { writeOptions } from '../../api/write-options.js';
 import { lineTotal, majorOf, moneyOf, roundMajor } from '../../api/money.js';
 import { withUntrustedBlock } from '../../tools/tool-result.js';
 import { FinanceInputError } from './errors.js';
+import { visitsApi } from './ports.js';
 
 export interface VisitProductsResult {
   text: string;
   structuredContent: unknown;
   isError?: boolean;
-}
-
-export function visitProductsApi(client: AltegioClient): VisitProductsApi {
-  return VisitProductsV2Adapter.forClient(client);
 }
 
 export interface AddProductInput {
@@ -154,6 +150,8 @@ export interface SalePlan {
   inventory_not_for_sale: boolean;
   /** The sale marks a waiting appointment arrived. */
   marks_arrived: boolean;
+  /** `version` of the appointment as read: what the confirmation binds. */
+  version: string;
 }
 
 function refuse(message: string): never {
@@ -163,7 +161,7 @@ function refuse(message: string): never {
 /** Read the appointment and the product and decide the line, or refuse. */
 export async function planSale(
   client: AltegioClient,
-  api: VisitProductsApi,
+  api: VisitsApi,
   input: AddProductInput
 ): Promise<SalePlan> {
   const [sale, product] = await Promise.all([
@@ -311,6 +309,7 @@ export async function planSale(
 
   return {
     sale,
+    version: sale.version,
     product,
     line,
     existing,
@@ -432,20 +431,13 @@ function planLines(plan: SalePlan, currency: string | null): string[] {
 export async function describeSale(
   client: AltegioClient,
   input: AddProductInput
-): Promise<string> {
-  let plan: SalePlan;
-  try {
-    plan = await planSale(client, visitProductsApi(client), input);
-  } catch (error) {
-    if (error instanceof FinanceInputError) {
-      throw new ConfirmationRefusal(
-        error.message.replace(/^Nothing was sold: /, '')
-      );
-    }
-    throw error;
-  }
+): Promise<ConfirmationDetail> {
+  const plan = await planForConfirmation(
+    () => planSale(client, visitsApi(client), input),
+    FinanceInputError
+  );
   const currency = await currencyOf(client, input.location_id);
-  return planLines(plan, currency).join('\n');
+  return { text: planLines(plan, currency).join('\n'), version: plan.version };
 }
 
 function lineText(l: VisitProductLine, currency: string | null): string {
@@ -473,8 +465,15 @@ export async function addProduct(
   input: AddProductInput,
   confirmation?: ConfirmedCall
 ): Promise<VisitProductsResult> {
-  const api = visitProductsApi(client);
-  const plan = await planSale(client, api, input);
+  const api = visitsApi(client);
+  const plan = await planConfirmed(
+    () => planSale(client, api, input),
+    confirmation,
+    () =>
+      new FinanceInputError(
+        `Nothing was sold: appointment ${input.appointment_id} changed after the confirmation was shown, so this call would no longer make the sale approved. Read the visit again with visits_get, then repeat the call without confirmation_token to confirm against what it holds now.`
+      )
+  );
   const currency = await currencyOf(client, input.location_id);
 
   const { appointment: after, unexpected_changes: unexpected } =
@@ -497,11 +496,7 @@ export async function addProduct(
             l.product_id === plan.line.product_id &&
             !plan.sale.product_lines.some((b) => b.id === l.id)
         );
-  const visit = await visitAfter(
-    client,
-    input.location_id,
-    input.appointment_id
-  );
+  const visit = await visitAfter(api, input.location_id, input.appointment_id);
 
   const p = `product ${plan.line.product_id}`;
   const adjusted =
@@ -597,6 +592,8 @@ export interface RemovalPlan {
   product: ProductForSale | null;
   /** Stock of the product in the line's inventory before the removal. */
   stock_before: number | null;
+  /** `version` of the appointment as read: what the confirmation binds. */
+  version: string;
 }
 
 function refuseChange(message: string): never {
@@ -607,7 +604,7 @@ const CHANGE_IN_ALTEGIO = 'Make the change in Altegio.';
 
 /** Read the appointment and decide what the line keeps, or refuse. */
 export async function planRemoval(
-  api: VisitProductsApi,
+  api: VisitsApi,
   input: RemoveProductInput
 ): Promise<RemovalPlan> {
   const sale = await api.getAppointmentSale(
@@ -686,6 +683,7 @@ export async function planRemoval(
     .catch(() => null);
   return {
     sale,
+    version: sale.version,
     line,
     quantity,
     amount:
@@ -731,32 +729,25 @@ function removalLines(plan: RemovalPlan, currency: string | null): string[] {
 export async function describeRemoval(
   client: AltegioClient,
   input: RemoveProductInput
-): Promise<string> {
-  let plan: RemovalPlan;
-  try {
-    plan = await planRemoval(visitProductsApi(client), input);
-  } catch (error) {
-    if (error instanceof FinanceInputError) {
-      throw new ConfirmationRefusal(
-        error.message.replace(/^Nothing was changed: /, '')
-      );
-    }
-    throw error;
-  }
+): Promise<ConfirmationDetail> {
+  const plan = await planForConfirmation(
+    () => planRemoval(visitsApi(client), input),
+    FinanceInputError
+  );
   const currency = await currencyOf(client, input.location_id);
-  return removalLines(plan, currency).join('\n');
+  return {
+    text: removalLines(plan, currency).join('\n'),
+    version: plan.version,
+  };
 }
 
 async function visitAfter(
-  client: AltegioClient,
+  api: VisitsApi,
   locationId: number,
   appointmentId: number
 ): Promise<Visit | null> {
   try {
-    return await FinanceAdapter.forClient(client).getVisit(
-      locationId,
-      appointmentId
-    );
+    return await api.getVisit(locationId, appointmentId);
   } catch {
     return null;
   }
@@ -767,8 +758,15 @@ export async function removeProduct(
   input: RemoveProductInput,
   confirmation?: ConfirmedCall
 ): Promise<VisitProductsResult> {
-  const api = visitProductsApi(client);
-  const plan = await planRemoval(api, input);
+  const api = visitsApi(client);
+  const plan = await planConfirmed(
+    () => planRemoval(api, input),
+    confirmation,
+    () =>
+      new FinanceInputError(
+        `Nothing was changed: appointment ${input.appointment_id} changed after the confirmation was shown, so this call would no longer make the change approved. Read the visit again with visits_get, then repeat the call without confirmation_token to confirm against what it holds now.`
+      )
+  );
   const currency = await currencyOf(client, input.location_id);
   const { line } = plan;
 
@@ -795,7 +793,7 @@ export async function removeProduct(
       .getProductForSale(input.location_id, line.product_id)
       .then((product) => stockIn(product, line.inventory_id))
       .catch(() => null),
-    visitAfter(client, input.location_id, input.appointment_id),
+    visitAfter(api, input.location_id, input.appointment_id),
   ]);
 
   const p = `product ${line.product_id}`;

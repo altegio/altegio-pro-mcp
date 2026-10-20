@@ -45,7 +45,6 @@
  */
 import { AltegioClient } from '../../../providers/altegio-client.js';
 import { httpFromClient } from '../../../api/altegio-http.js';
-import { FinanceAdapter } from '../../../api/v1/finance-adapter.js';
 import {
   APPOINTMENT_INCLUDES,
   VisitProductsV2Adapter,
@@ -57,6 +56,7 @@ import {
   removeProduct,
 } from '../visit-products.js';
 import { FinanceInputError } from '../errors.js';
+import { visitsApi } from '../ports.js';
 
 const LIVE = process.env.ALTEGIO_E2E === '1';
 const CREDENTIALS_DIR = process.env.CREDENTIALS_DIR ?? '/tmp/altegio-mcp-live';
@@ -159,10 +159,7 @@ describeLive('visit products end-to-end against the test location', () => {
       if (stockBefore !== null) expect(await stockNow()).toBe(stockBefore - 2);
 
       // The visit item id visits_get shows is the product line's id.
-      const visit = await FinanceAdapter.forClient(client).getVisit(
-        location,
-        appointment
-      );
+      const visit = await visitsApi(client).getVisit(location, appointment);
       expect(
         visit.items.filter((l) => l.kind === 'product').map((l) => l.id)
       ).toEqual([line.id]);
@@ -174,10 +171,17 @@ describeLive('visit products end-to-end against the test location', () => {
         quantity: 1,
         expected_current_quantity: 2,
       };
-      expect(await describeRemoval(client, lower)).toContain(
+      // The confirmation binds the appointment as read; the confirmed call
+      // reads it again and finds the same version.
+      const detail = await describeRemoval(client, lower);
+      expect(detail.text).toContain(
         `Lowers visit item ${line.id} of product ${product} from 2 to 1`
       );
-      const lowered = await removeProduct(client, lower);
+      const confirmed = {
+        idempotency_key: '3b1f6c1e-0d0e-4c49-9a52-5d7e0f7a1c01',
+        version: detail.version,
+      };
+      const lowered = await removeProduct(client, lower, confirmed);
       expect(lowered.isError).toBeUndefined();
       expect(lowered.structuredContent).toMatchObject({
         removed_item: false,
@@ -187,15 +191,25 @@ describeLive('visit products end-to-end against the test location', () => {
       if (stockBefore !== null) expect(await stockNow()).toBe(stockBefore - 1);
 
       // A repeated confirmed call is refused by the expected quantity.
-      await expect(removeProduct(client, lower)).rejects.toBeInstanceOf(
-        FinanceInputError
-      );
+      await expect(
+        removeProduct(client, lower, confirmed)
+      ).rejects.toBeInstanceOf(FinanceInputError);
 
-      const removed = await removeProduct(client, {
+      // A call confirmed on the appointment before the change is refused by
+      // the version, though its quantity matches now.
+      const takeOff = {
         location_id: location,
         appointment_id: appointment,
         visit_item_id: line.id,
         expected_current_quantity: 1,
+      };
+      await expect(removeProduct(client, takeOff, confirmed)).rejects.toThrow(
+        /changed after the confirmation was shown/
+      );
+
+      const removed = await removeProduct(client, takeOff, {
+        idempotency_key: '3b1f6c1e-0d0e-4c49-9a52-5d7e0f7a1c02',
+        version: (await describeRemoval(client, takeOff)).version,
       });
       expect(removed.isError).toBeUndefined();
       expect(removed.structuredContent).toMatchObject({

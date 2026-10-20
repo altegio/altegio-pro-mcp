@@ -25,6 +25,7 @@ import {
 } from '../use-cases.js';
 import { FinanceInputError, FinanceNotFoundError } from '../errors.js';
 import { FinanceAdapter } from '../../../api/v1/finance-adapter.js';
+import { VisitsV1Adapter } from '../../../api/v1/visits-adapter.js';
 import { ConfirmationRefusal } from '../../../tools/confirmation.js';
 import { clearCurrencyCache } from '../../../api/v1/location-currency.js';
 import { clearTimezoneCache } from '../../analytics/location-timezone.js';
@@ -395,7 +396,7 @@ describe('visits_add_payment', () => {
   });
 
   it('hands the confirmation’s key from the tool to the port', async () => {
-    const spy = jest.spyOn(FinanceAdapter.prototype, 'addPayment');
+    const spy = jest.spyOn(VisitsV1Adapter.prototype, 'addPayment');
     try {
       const result = await visitsAddPaymentTool.createHandler(
         fakeClient(routes(), [])
@@ -475,7 +476,7 @@ describe('visits_cancel_payment', () => {
   });
 
   it('hands the confirmation’s key from the tool to the port', async () => {
-    const spy = jest.spyOn(FinanceAdapter.prototype, 'cancelPayment');
+    const spy = jest.spyOn(VisitsV1Adapter.prototype, 'cancelPayment');
     try {
       const client = fakeClient(
         [

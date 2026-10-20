@@ -87,9 +87,8 @@ export const GENDER_FROM_CODE: Readonly<Record<number, Gender>> = {
 // ========== appointment outcome — TWO different numberings ==========
 
 /**
- * Outcome → the code the **client-search appointment-history filter** uses
- * (`ClientSearchCriteriaRecordFilter`): did-not-come 1, waiting 2, came 3,
- * confirmed 4. Note this is NOT the numbering the visit-history search uses.
+ * Outcome → the code the **client-search appointment-history filter** uses:
+ * did-not-come 1, waiting 2, came 3, confirmed 4. Note this is NOT the numbering the visit-history search uses.
  */
 export const OUTCOME_TO_RECORD_CODE: Readonly<
   Record<AppointmentOutcome, number>

@@ -10,7 +10,7 @@
  * `is_allow_empty_code`, `expiration_type_id`, `balance_container` and
  * `service_price_correction` stop here.
  *
- * Contract details verified against the backend (biz.erp, 2026-09-30):
+ * Contract details verified against the backend source (2026-09-30):
  *
  * - `PUT` on a type replaces it: every field missing from the body falls back
  *   to its default. An update therefore reads the type first and sends every
@@ -34,6 +34,7 @@
 import { majorOf } from '../money.js';
 import { httpFromClient, type AltegioHttp } from '../altegio-http.js';
 import type { AltegioClient } from '../../providers/altegio-client.js';
+import { v1Read, type V1CallOptions, type V1Envelope } from './envelope.js';
 import {
   MembershipsNotFoundError,
   mapMembershipsHttpError,
@@ -397,7 +398,6 @@ export function allowancesTook(
 
 // ========== the adapter ==========
 
-type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 type QueryValue = string | number | boolean | readonly number[] | undefined;
 
 function queryString(query: Record<string, QueryValue>): string {
@@ -414,14 +414,6 @@ function queryString(query: Record<string, QueryValue>): string {
   return rendered ? `?${rendered}` : '';
 }
 
-async function safeJson(response: Response): Promise<unknown> {
-  try {
-    return await response.json();
-  } catch {
-    return undefined;
-  }
-}
-
 export class MembershipsAdapter implements MembershipsApi {
   constructor(private readonly http: AltegioHttp) {}
 
@@ -432,44 +424,18 @@ export class MembershipsAdapter implements MembershipsApi {
   private async call(
     path: string,
     context: string,
-    options: {
-      method?: Method;
+    options: Omit<V1CallOptions<MembershipsErrorHints>, 'query'> & {
       query?: Record<string, QueryValue>;
-      body?: unknown;
-      hints?: MembershipsErrorHints;
     } = {}
-  ): Promise<{ data: unknown; meta: Row }> {
-    if (!this.http.isAuthenticated()) {
-      throw mapMembershipsHttpError(401, undefined, context);
-    }
-    const headers: Record<string, string> = {};
-    let body: string | undefined;
-    if (options.body !== undefined) {
-      headers['Content-Type'] = 'application/json';
-      body = JSON.stringify(options.body);
-    }
-    const response = await this.http.request(
-      `${path}${options.query ? queryString(options.query) : ''}`,
-      {
-        method: options.method ?? 'GET',
-        headers,
-        ...(body !== undefined ? { body } : {}),
-      }
+  ): Promise<V1Envelope> {
+    const { query, ...rest } = options;
+    return v1Read(
+      this.http,
+      `${path}${query ? queryString(query) : ''}`,
+      context,
+      mapMembershipsHttpError,
+      rest
     );
-    const payload = await safeJson(response);
-    if (!response.ok) {
-      throw mapMembershipsHttpError(
-        response.status,
-        payload,
-        context,
-        options.hints
-      );
-    }
-    const envelope = asRow(payload);
-    if (envelope.success === false) {
-      throw mapMembershipsHttpError(422, payload, context, options.hints);
-    }
-    return { data: envelope.data ?? null, meta: asRow(envelope.meta) };
   }
 
   private typesPath(chainId: number, typeId?: number): string {

@@ -46,6 +46,7 @@ import {
   type ConfirmationDetail,
   type ConfirmedCall,
 } from '../../tools/confirmation.js';
+import { planConfirmed, planForConfirmation } from '../guarded-change.js';
 import { InventoryInputError } from './errors.js';
 import {
   FIELD_MAX_CHARS,
@@ -448,14 +449,10 @@ export async function describeConsumablesChange(
   client: AltegioClient,
   input: SetConsumablesInput
 ): Promise<ConfirmationDetail> {
-  let plan: ConsumablesPlan;
-  try {
-    plan = await planConsumables(client, input);
-  } catch (error) {
-    if (error instanceof InventoryInputError)
-      throw new ConfirmationRefusal(error.message);
-    throw error;
-  }
+  const plan = await planForConfirmation(
+    () => planConsumables(client, input),
+    InventoryInputError
+  );
   if (plan.changes.length === 0)
     throw new ConfirmationRefusal(
       `the consumables of service ${input.service_id} on appointment ${input.appointment_id} already match; there is nothing to change.`
@@ -481,15 +478,14 @@ export async function setConsumables(
   input: SetConsumablesInput,
   confirmation?: ConfirmedCall
 ): Promise<InventoryResult> {
-  const plan = await planConsumables(client, input);
-  if (
-    confirmation?.version !== undefined &&
-    confirmation.version !== plan.version
-  ) {
-    throw new InventoryInputError(
-      `Nothing was changed: the consumables of service ${input.service_id} on appointment ${input.appointment_id} (or its attendance) changed after the confirmation was shown, so this call would no longer make the change approved. Read them again with appointments_get_consumables, then repeat the call without confirmation_token to confirm the change against what they hold now.`
-    );
-  }
+  const plan = await planConfirmed(
+    () => planConsumables(client, input),
+    confirmation,
+    () =>
+      new InventoryInputError(
+        `Nothing was changed: the consumables of service ${input.service_id} on appointment ${input.appointment_id} (or its attendance) changed after the confirmation was shown, so this call would no longer make the change approved. Read them again with appointments_get_consumables, then repeat the call without confirmation_token to confirm the change against what they hold now.`
+      )
+  );
   const currency = await locationCurrency(client, input.location_id);
   if (plan.changes.length === 0) {
     return {

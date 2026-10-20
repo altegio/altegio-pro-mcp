@@ -24,6 +24,7 @@ import { isLocationMetadataRead } from './location-read-policy.js';
 import { CredentialManager } from './credential-manager.js';
 import { prepareClientFile } from './client-file-upload.js';
 import { AuthenticationError, AltegioApiError } from '../utils/errors.js';
+import { notSignedIn, sessionExpired } from '../api/http-failure.js';
 import {
   noteUpstreamFailure,
   noteUpstreamResponse,
@@ -446,9 +447,7 @@ export class AltegioClient {
 
     switch (response.status) {
       case 401:
-        throw new AuthenticationError(
-          `Session expired while trying to ${context}. Call auth_login to re-authenticate.`
-        );
+        throw sessionExpired(context);
       case 403:
         // A permission problem and a plain validation refusal both arrive as
         // 4xx, so the upstream wording is kept — quoted — rather than collapsed
@@ -539,9 +538,7 @@ export class AltegioClient {
    */
   private requireAuth(): void {
     if (!this.resolveUserToken()) {
-      throw new AuthenticationError(
-        'Not authenticated. Call auth_login first.'
-      );
+      throw notSignedIn();
     }
   }
 
