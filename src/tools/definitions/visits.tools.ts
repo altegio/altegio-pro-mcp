@@ -197,7 +197,7 @@ export const visitsAddPaymentTool = defineTool({
   name: 'visits_add_payment',
   category: 'Visits',
   description:
-    'Record a payment or an advance payment on an appointment’s visit: money received into an account or cash register (method account + account_id), or paid from a client account, loyalty card, loyalty program, gift card, membership or advance payment hold — method and its id from payment_options in visits_get. Pass amount_due from visits_get as expected_amount_due; the call is refused if the visit changed. Records money received; charges no card. Asks for confirmation first.',
+    'Record a payment or an advance payment on an appointment’s visit: money received into an account or cash register (method account + account_id), or paid from a client account, loyalty card, loyalty program, gift card, membership or advance payment hold — method and its id from payment_options in visits_get. Pass amount_due from visits_get as expected_amount_due; the call is refused if the visit changed. Refused on a waiting or no-show appointment, where Altegio does not keep a payment; paying a confirmed appointment whose time has passed marks it arrived. Records money received; charges no card. Asks for confirmation first.',
   annotations: {
     title: 'Visits: record a payment',
     destructiveHint: false,
@@ -252,7 +252,7 @@ export const visitsAddPaymentTool = defineTool({
     target: (input) =>
       `appointment ${input.appointment_id} at location ${input.location_id}`,
     resolve: (input, client) => finance.describeVisit(client, input),
-    detail: (input, client) => finance.checkPaymentMoney(client, input),
+    detail: (input, client) => finance.describeNewPayment(client, input),
     consequence: (input) =>
       `Records ${finance.paymentSummary(input)} against the visit: the amount due drops by it and the location's finances and reports include it. No card is charged — this records money already received. It can be undone with visits_cancel_payment.`,
   },

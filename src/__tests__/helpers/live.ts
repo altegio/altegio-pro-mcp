@@ -138,7 +138,12 @@ export async function createAppointment(
     service: number;
     client: number;
   },
-  options: { day: string; time: string; comment: string; attendance?: 0 | 1 }
+  options: {
+    day: string;
+    time: string;
+    comment: string;
+    attendance?: 0 | 1 | 2;
+  }
 ): Promise<number> {
   const created = await httpFromClient(client).request(
     `/locations/${fixture.location}/appointments`,

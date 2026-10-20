@@ -207,10 +207,9 @@ describeLive('inventory tools against the test location', () => {
     120_000
   );
 
-  // Known defect: the create answer carries unsigned line amounts, and the
-  // result reads every line as moving stock in. Passing here means the defect
-  // is gone — make it a plain `it`.
-  it.failing('names the direction the stock moved in the create result', () => {
+  // The create answer carries unsigned line amounts; the result names the
+  // direction from the operation kind.
+  it('names the direction the stock moved in the create result', () => {
     expect(reported.write_off).toBeDefined();
     expect(reported.sale).toBeDefined();
     for (const kind of ['receipt', 'write_off', 'sale'] as const) {
@@ -220,50 +219,43 @@ describeLive('inventory tools against the test location', () => {
     }
   });
 
-  // Known defect: the listing labels the location's wall time with the
-  // server's offset, so the instant is off by the difference. Passing here
-  // means the defect is gone — make it a plain `it`.
-  it.failing('lists a line at the instant it was recorded', () => {
+  // The listing labels the location's wall time with the server's offset;
+  // the adapter places it in the location's zone.
+  it('lists a line at the instant it was recorded', () => {
     const receipt = reported.receipt!;
     const listedAt = Date.parse(receipt.listed.date!);
     expect(Math.abs(listedAt - receipt.at)).toBeLessThan(5 * 60_000);
   });
 
-  // Known defect: the repeat guard reads the location's day, but the listing
-  // files a line under another day near midnight, so a repeat dated just
-  // after (east of UTC) or just before (west of it) midnight is recorded
-  // twice. Passing here means the defect is gone — make it a plain `it`.
-  it.failing(
-    'refuses a repeated confirmed receipt dated near midnight',
-    async () => {
-      const recorded: number[] = [];
-      try {
-        for (const time of ['00:30', '23:30']) {
-          const create = await host.confirmed(
-            'inventory_create_operation',
-            operation('receipt', { date: `${isoDay(-2)}T${time}` })
-          );
-          const first = await create.run();
-          expect(first.isError).toBeFalsy();
+  // The listing files a line under its UTC day, which near midnight is not
+  // the location's; the guard reads the UTC days that cover the location's.
+  it('refuses a repeated confirmed receipt dated near midnight', async () => {
+    const recorded: number[] = [];
+    try {
+      for (const time of ['00:30', '23:30']) {
+        const create = await host.confirmed(
+          'inventory_create_operation',
+          operation('receipt', { date: `${isoDay(-2)}T${time}` })
+        );
+        const first = await create.run();
+        expect(first.isError).toBeFalsy();
+        recorded.push(
+          (first.structuredContent as unknown as Recorded).document.id
+        );
+        const repeated = await create.run();
+        if (!repeated.isError) {
           recorded.push(
-            (first.structuredContent as unknown as Recorded).document.id
-          );
-          const repeated = await create.run();
-          if (!repeated.isError) {
-            recorded.push(
-              (repeated.structuredContent as unknown as Recorded).document.id
-            );
-          }
-          expect(textOf(repeated)).toContain(
-            `Nothing was recorded: document ${recorded[recorded.length - 1]}`
+            (repeated.structuredContent as unknown as Recorded).document.id
           );
         }
-      } finally {
-        for (const document of recorded) await deleteDocument(document);
+        expect(textOf(repeated)).toContain(
+          `Nothing was recorded: document ${recorded[recorded.length - 1]}`
+        );
       }
-    },
-    120_000
-  );
+    } finally {
+      for (const document of recorded) await deleteDocument(document);
+    }
+  }, 120_000);
 
   it('sets, changes and clears a consumable, and the appointment reads back as it was', async () => {
     const appointment = await createAppointment(

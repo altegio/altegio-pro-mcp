@@ -150,6 +150,14 @@ export interface Visit {
   appointment_id: number;
   visit_id: number | null;
   client_id: number | null;
+  /**
+   * The appointment's attendance. Altegio keeps a payment only on an arrived
+   * or confirmed appointment; on a waiting or no-show one the payment is
+   * answered as recorded and then not kept.
+   */
+  attendance: AppointmentAttendance;
+  /** When the appointment starts, RFC 3339 in the location's offset. */
+  starts_at: string | null;
   items: VisitItem[];
   payments: VisitPayment[];
   advance_payment_holds: AdvancePaymentHold[];

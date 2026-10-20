@@ -97,7 +97,10 @@ export interface InventoryMovement {
   id: number;
   document_id: number | null;
   kind: InventoryMovementKind;
-  /** RFC 3339 with the offset the API reports. */
+  /**
+   * RFC 3339 in the location's offset; the location's wall time without an
+   * offset when the location's time zone is unknown.
+   */
   date: string | null;
   product_id: number | null;
   product_title: string | null;
@@ -224,11 +227,24 @@ export interface AppointmentState {
 }
 
 export interface MovementQuery {
+  /** First location day, `YYYY-MM-DD`. */
   date_from?: string;
+  /** Last location day, `YYYY-MM-DD`. */
   date_to?: string;
   document_id?: number;
   page: number;
   page_size: number;
+}
+
+/**
+ * One page of product lines. It may hold fewer than `page_size` lines and
+ * still be followed by more: the API pages by its own days, and lines outside
+ * the location days asked for are left out.
+ */
+export interface MovementPage {
+  lines: InventoryMovement[];
+  /** The API has another page. */
+  more: boolean;
 }
 
 export interface InventoryApi {
@@ -236,7 +252,7 @@ export interface InventoryApi {
   listMovements(
     locationId: number,
     query: MovementQuery
-  ): Promise<InventoryMovement[]>;
+  ): Promise<MovementPage>;
   getDocument(
     locationId: number,
     documentId: number

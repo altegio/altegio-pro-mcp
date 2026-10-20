@@ -409,6 +409,62 @@ export async function checkPaymentMoney(
   });
 }
 
+/**
+ * Altegio keeps a payment only on an arrived or confirmed appointment. On a
+ * waiting or no-show one the payment route answers with the payment and the
+ * lower amount due, and a fresh read has neither (verified live 2026-10-20),
+ * so such a payment is refused before anything is sent.
+ */
+function refuseUnkeptPayment(visit: Visit): void {
+  const state =
+    visit.attendance === 'waiting'
+      ? 'still waiting for the client'
+      : visit.attendance === 'no_show'
+        ? 'marked as a no-show'
+        : null;
+  if (state === null) return;
+  throw new FinanceInputError(
+    `Nothing was recorded: appointment ${visit.appointment_id} is ${state}, and Altegio keeps a payment only on an arrived or confirmed appointment. Set its status to arrived (once the client is there) or confirmed with appointments_update, then pay.`
+  );
+}
+
+/** Paying a confirmed appointment whose start has passed marks it arrived. */
+function paymentMarksArrived(visit: Visit, now = Date.now()): boolean {
+  if (visit.attendance !== 'confirmed' || visit.starts_at === null) {
+    return false;
+  }
+  const start = Date.parse(visit.starts_at);
+  return Number.isFinite(start) && start <= now;
+}
+
+function marksArrivedNote(visit: Visit): string {
+  return `Appointment ${visit.appointment_id} is confirmed and its time has passed: Altegio marks it arrived when the payment is recorded.`;
+}
+
+/**
+ * The payment's confirmation detail: an amount the currency cannot carry, or
+ * an appointment where Altegio would not keep the payment, is refused before
+ * anyone is asked; a payment that marks the appointment arrived says so.
+ */
+export async function describeNewPayment(
+  client: AltegioClient,
+  input: { location_id: number; appointment_id: number; amount?: number }
+): Promise<string | undefined> {
+  await checkPaymentMoney(client, input);
+  const visit = await visitsApi(client).getVisit(
+    input.location_id,
+    input.appointment_id
+  );
+  try {
+    refuseUnkeptPayment(visit);
+  } catch (error) {
+    throw new ConfirmationRefusal(
+      (error as Error).message.replace(/^Nothing was recorded: /, '')
+    );
+  }
+  return paymentMarksArrived(visit) ? marksArrivedNote(visit) : undefined;
+}
+
 /** Refuse an amount the location's currency cannot carry before anyone is asked. */
 export async function checkMoneyArg(
   client: AltegioClient,
@@ -571,6 +627,7 @@ export async function addPayment(
       `Nothing was recorded: appointment ${input.appointment_id} has nothing due.`
     );
   }
+  refuseUnkeptPayment(before);
   const option = before.payment_options.find(
     (o) => o.applicable && matchesOption(o, request)
   );
@@ -594,21 +651,36 @@ export async function addPayment(
     }
   }
 
-  const after = await visits.addPayment(
+  const answer = await visits.addPayment(
     input.location_id,
     input.appointment_id,
     request,
     writeOptions(confirmation)
   );
+  // The route's answer is not proof the payment was kept: the result is what
+  // a fresh read of the visit shows.
+  const after = await visits
+    .getVisit(input.location_id, input.appointment_id)
+    .catch(() => answer);
   const known = new Set(before.payments.map((p) => p.id));
   const added = after.payments.filter((p) => !known.has(p.id));
+  const answered = answer.payments.filter((p) => !known.has(p.id));
   const head =
     added.length > 0
       ? `Recorded ${added.map((p) => `payment ${p.id} (${amountText(p.amount, currency)}, ${p.method})`).join(', ')} on appointment ${after.appointment_id}. Amount due is now ${amountText(after.amount_due, currency)}.`
-      : `The payment was sent, but the visit shows no new payment; amount due is ${amountText(after.amount_due, currency)}. Read the visit with visits_get before trying again.`;
+      : answered.length > 0
+        ? `Altegio answered with ${answered.map((p) => `payment ${p.id}`).join(', ')}, but a fresh read of the visit shows no new payment, so it was not kept; amount due is ${amountText(after.amount_due, currency)}. Read the visit with visits_get before trying again.`
+        : `The payment was sent, but the visit shows no new payment; amount due is ${amountText(after.amount_due, currency)}. Read the visit with visits_get before trying again.`;
+  const arrived =
+    added.length > 0 &&
+    before.attendance === 'confirmed' &&
+    after.attendance === 'arrived'
+      ? `Altegio marked appointment ${after.appointment_id} arrived with the payment.`
+      : '';
   return {
     text: lines(
       head,
+      arrived,
       visitText(after, currency, visitHead(after, true)),
       'Undo a payment with visits_cancel_payment.'
     ),
@@ -1131,6 +1203,38 @@ export async function describeTransaction(
     resolveLocationCurrency(client, input.location_id),
   ]);
   return `financial transaction ${t.id}: ${signed(t.amount, currency)}, account ${t.account_id}, payment item ${t.payment_item_id}, dated ${t.date ?? 'not reported'}`;
+}
+
+/**
+ * The deletion's confirmation detail: a transaction that is not there, or
+ * that a payment or document recorded, is refused before anyone is asked.
+ */
+export async function describeTransactionDeletion(
+  client: AltegioClient,
+  input: { location_id: number; transaction_id: number }
+): Promise<undefined> {
+  try {
+    refuseLinked(
+      await api(client).getFinancialTransaction(
+        input.location_id,
+        input.transaction_id
+      ),
+      'deleted'
+    );
+  } catch (error) {
+    if (error instanceof FinanceNotFoundError) {
+      throw new ConfirmationRefusal(
+        `financial transaction ${input.transaction_id} was not found at location ${input.location_id}; it may be deleted already. Check the id with financial_transactions_list.`
+      );
+    }
+    if (error instanceof FinanceInputError) {
+      throw new ConfirmationRefusal(
+        error.message.replace(/^Nothing was changed: /, '')
+      );
+    }
+    throw error;
+  }
+  return undefined;
 }
 
 export interface UpdateTransactionInput {

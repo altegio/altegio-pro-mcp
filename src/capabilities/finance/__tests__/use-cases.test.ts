@@ -12,8 +12,10 @@ import {
   createFinancialTransaction,
   deleteFinancialTransaction,
   deposit,
+  describeNewPayment,
   describeNewTransaction,
   describeTransactionChange,
+  describeTransactionDeletion,
   getPayroll,
   getVisit,
   listCashRegistersAndAccounts,
@@ -112,7 +114,10 @@ beforeEach(() => {
 const APPOINTMENT = 675876521;
 const DOCUMENT = 772428324;
 
-const appointmentRoute: Route = [
+const appointmentAt = (
+  attendance: number,
+  datetime = '2026-10-19T11:00:00+02:00'
+): Route => [
   'GET',
   new RegExp(`^/locations/${LOCATION}/appointments/${APPOINTMENT}$`),
   200,
@@ -121,12 +126,15 @@ const appointmentRoute: Route = [
     company_id: LOCATION,
     visit_id: 576878661,
     client: { id: 186529551 },
+    attendance,
+    datetime,
     documents: [
       { id: 1, type_id: 1, record_id: APPOINTMENT },
       { id: DOCUMENT, type_id: 7, record_id: APPOINTMENT },
     ],
   }),
 ];
+const appointmentRoute = appointmentAt(1);
 
 function sale(
   overrides: { payments?: unknown[]; loyalty?: unknown[]; due?: number } = {}
@@ -301,7 +309,81 @@ describe('visits_add_payment', () => {
       ],
     }),
   ];
-  const routes = () => [appointmentRoute, saleRoute(sale()), paymentRoute];
+  // A fresh read after the payment shows what Altegio kept.
+  const routes = (kept = true, appointment = appointmentRoute): Route[] => {
+    let paid = false;
+    return [
+      appointment,
+      [
+        'GET',
+        new RegExp(`^/locations/${LOCATION}/sale/${DOCUMENT}$`),
+        200,
+        () => (paid && kept ? paymentRoute[3] : sale()),
+      ],
+      [
+        paymentRoute[0],
+        paymentRoute[1],
+        paymentRoute[2],
+        () => {
+          paid = true;
+          return paymentRoute[3];
+        },
+      ],
+    ];
+  };
+  const pay = {
+    location_id: LOCATION,
+    appointment_id: APPOINTMENT,
+    method: 'account' as const,
+    account_id: 35501,
+    amount: 200,
+    expected_amount_due: 550,
+  };
+
+  it.each([
+    [0, 'still waiting for the client'],
+    [-1, 'marked as a no-show'],
+  ])(
+    'refuses a payment Altegio would not keep (attendance %i)',
+    async (attendance, state) => {
+      const calls: Call[] = [];
+      const client = fakeClient(routes(true, appointmentAt(attendance)), calls);
+      await expect(addPayment(client, pay)).rejects.toThrow(
+        `Nothing was recorded: appointment ${APPOINTMENT} is ${state}`
+      );
+      await expect(describeNewPayment(client, pay)).rejects.toBeInstanceOf(
+        ConfirmationRefusal
+      );
+      expect(calls.some((c) => c.method === 'POST')).toBe(false);
+    }
+  );
+
+  it('says when a payment marks a past confirmed appointment arrived', async () => {
+    const past = fakeClient(routes(true, appointmentAt(2)), []);
+    await expect(describeNewPayment(past, pay)).resolves.toBe(
+      `Appointment ${APPOINTMENT} is confirmed and its time has passed: Altegio marks it arrived when the payment is recorded.`
+    );
+    const future = fakeClient(
+      routes(true, appointmentAt(2, '2099-01-01T11:00:00+01:00')),
+      []
+    );
+    await expect(describeNewPayment(future, pay)).resolves.toBeUndefined();
+    await expect(
+      describeNewPayment(fakeClient(routes(), []), pay)
+    ).resolves.toBeUndefined();
+  });
+
+  it('reports a payment the answer showed but a fresh read does not', async () => {
+    const result = await addPayment(fakeClient(routes(false), []), pay);
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain(
+      'Altegio answered with payment t588834559, but a fresh read of the visit shows no new payment, so it was not kept'
+    );
+    expect(result.structuredContent).toMatchObject({
+      amount_due: 550,
+      added_payment_ids: [],
+    });
+  });
 
   it('records an advance payment into an account and names the new payment', async () => {
     const calls: Call[] = [];
@@ -1076,6 +1158,33 @@ describe('financial_transactions_update and _delete', () => {
     expect(result.structuredContent).toMatchObject({ deleted: true });
     expect(result.text).toContain('transaction 589532167 comment: rent');
     expect(calls.map((c) => c.method)).toEqual(['GET', 'DELETE']);
+  });
+
+  it('refuses before the confirmation a transaction that is not there', async () => {
+    const missing: Route = [
+      'GET',
+      /^\/finance_transactions\/4564\/589532167$/,
+      404,
+      {
+        success: false,
+        data: null,
+        meta: { message: 'Transaction not found' },
+      },
+    ];
+    const error = await describeTransactionDeletion(fakeClient([missing], []), {
+      location_id: LOCATION,
+      transaction_id: 589532167,
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ConfirmationRefusal);
+    expect((error as Error).message).toBe(
+      'financial transaction 589532167 was not found at location 4564; it may be deleted already. Check the id with financial_transactions_list.'
+    );
+    await expect(
+      describeTransactionDeletion(fakeClient([single({})], []), {
+        location_id: LOCATION,
+        transaction_id: 589532167,
+      })
+    ).resolves.toBeUndefined();
   });
 });
 
