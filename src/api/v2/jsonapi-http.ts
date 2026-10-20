@@ -37,6 +37,8 @@ export interface JsonApiCall {
   method?: JsonApiMethod;
   query?: Record<string, QueryValue>;
   body?: unknown;
+  /** Extra request headers, e.g. `Accept-Language` for messages to recognize. */
+  headers?: Record<string, string>;
   mapError: (status: number, body: unknown, context: string) => AltegioApiError;
 }
 
@@ -99,7 +101,7 @@ export async function callJsonApi(
 ): Promise<JsonApiDocument | null> {
   requireUserToken(http, call.context);
   const method = call.method ?? 'GET';
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...call.headers };
   let body: string | undefined;
   if (call.body !== undefined) {
     headers['Content-Type'] = 'application/json';

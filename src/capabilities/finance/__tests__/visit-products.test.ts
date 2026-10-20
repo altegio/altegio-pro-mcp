@@ -18,6 +18,10 @@ import { ConfirmationRefusal } from '../../../tools/confirmation.js';
 import { clearCurrencyCache } from '../../../api/v1/location-currency.js';
 import { clearTimezoneCache } from '../../analytics/location-timezone.js';
 import { APPOINTMENT_INCLUDES } from '../../../api/v2/visit-products-adapter.js';
+import {
+  visitsAddProductTool,
+  visitsRemoveProductTool,
+} from '../../../tools/definitions/visits.tools.js';
 
 const LOCATION = 4564;
 const APPOINTMENT = 678202164;
@@ -50,7 +54,14 @@ interface State {
   color: string;
   activity: number;
   printed: boolean;
-  comer: boolean;
+  /** The visitor's type, or false for none. */
+  comer: false | 'person' | 'pet' | 'vehicle';
+  /** The V1 read gives the visitor without its slug. */
+  visitorSlugMissing?: boolean;
+  /** The appointment's custom field values. */
+  customFields: Array<{ code: string; value: string | number }>;
+  /** A read that asks for custom field values is refused (403). */
+  customFieldsForbidden?: boolean;
   composite: boolean;
   clientDiscount: number;
   goods: Good[];
@@ -67,7 +78,10 @@ interface State {
   /** Runs after a save; may change the state. */
   afterSave?: (state: State) => void;
   saveStatus?: number;
+  /** The message of a refused save; the canary by default. */
+  saveMessage?: string;
   saveBody?: unknown;
+  saveHeaders?: Record<string, string>;
 }
 
 function freshState(overrides: Partial<State> = {}): State {
@@ -80,6 +94,7 @@ function freshState(overrides: Partial<State> = {}): State {
     activity: 0,
     printed: false,
     comer: false,
+    customFields: [],
     composite: false,
     clientDiscount: 0,
     goods: [],
@@ -127,7 +142,12 @@ function goodItem(g: Good) {
   };
 }
 
-function record(id: number, s: State, goods: Good[]) {
+function record(
+  id: number,
+  s: State,
+  goods: Good[],
+  withCustomFields: boolean
+) {
   return {
     type: 'record',
     id: String(id),
@@ -169,6 +189,19 @@ function record(id: number, s: State, goods: Good[]) {
       comer: {
         data: s.comer && id === APPOINTMENT ? { type: 'comer', id: '3' } : null,
       },
+      ...(withCustomFields
+        ? {
+            custom_field_values: {
+              data:
+                id === APPOINTMENT
+                  ? s.customFields.map((_, i) => ({
+                      type: 'custom_field_value',
+                      id: `cf-${i}`,
+                    }))
+                  : [],
+            },
+          }
+        : {}),
       client_notification_settings: {
         data: { type: 'record_client_notification_settings', id: String(id) },
       },
@@ -177,12 +210,12 @@ function record(id: number, s: State, goods: Good[]) {
   };
 }
 
-function attendanceDoc(s: State) {
+function attendanceDoc(s: State, withCustomFields = true) {
   const allGoods = [...s.goods, ...s.others.flatMap((o) => o.goods)];
   return {
     data: [
-      record(APPOINTMENT, s, s.goods),
-      ...s.others.map((o) => record(o.id, s, o.goods)),
+      record(APPOINTMENT, s, s.goods, withCustomFields),
+      ...s.others.map((o) => record(o.id, s, o.goods, withCustomFields)),
     ],
     included: [
       {
@@ -251,8 +284,22 @@ function attendanceDoc(s: State) {
       {
         type: 'comer',
         id: '3',
-        attributes: { title: 'Walk-in' },
+        attributes: { title: 'Rex' },
+        relationships: { person: { data: null }, vehicle: { data: null } },
       },
+      ...(withCustomFields
+        ? s.customFields.map((f, i) => ({
+            type: 'custom_field_value',
+            id: `cf-${i}`,
+            attributes: {
+              id: 700 + i,
+              custom_field_id: 800 + i,
+              code: f.code,
+              slug: f.code,
+              value: f.value,
+            },
+          }))
+        : []),
       {
         type: 'client',
         id: '186890992',
@@ -343,6 +390,7 @@ interface Call {
   path: string;
   query: URLSearchParams;
   body: Record<string, unknown> | undefined;
+  headers: Record<string, string>;
 }
 
 const v1 = (data: unknown) => ({ success: true, data, meta: [] });
@@ -372,14 +420,26 @@ function fakeClient(
           v1({ income_total_stats: { currency: { iso: 'CZK' } } })
         );
       }
-      calls.push({ method, path, query: new URLSearchParams(queryPart), body });
+      const headers = { ...(init.headers as Record<string, string>) };
+      const query = new URLSearchParams(queryPart);
+      calls.push({ method, path, query, body, headers });
       if (
         path ===
         `/../v2/locations/${LOCATION}/attendances/record_${APPOINTMENT}/appointments`
       ) {
+        const withCustomFields = query
+          .getAll('include[]')
+          .includes('custom_field_values');
+        if (withCustomFields && state.customFieldsForbidden) {
+          return respond(403, {
+            success: false,
+            data: null,
+            meta: { message: 'Access denied' },
+          });
+        }
         reads += 1;
         state.onRead?.(state, reads);
-        return respond(200, attendanceDoc(state));
+        return respond(200, attendanceDoc(state, withCustomFields));
       }
       if (path === `/../v2/locations/${LOCATION}/products/${PRODUCT}`) {
         return respond(
@@ -392,11 +452,12 @@ function fakeClient(
         path === `/../v2/locations/${LOCATION}/attendance/appointments`
       ) {
         state.saveBody = body;
+        state.saveHeaders = headers;
         if (state.saveStatus && state.saveStatus !== 200) {
           return respond(state.saveStatus, {
             success: false,
             data: null,
-            meta: { message: CANARY },
+            meta: { message: state.saveMessage ?? CANARY },
           });
         }
         const sent = (body as { records: Array<Record<string, unknown>> })
@@ -446,6 +507,15 @@ function fakeClient(
             company_id: LOCATION,
             visit_id: VISIT,
             client: { id: 186890992 },
+            comer: state.comer
+              ? {
+                  id: 3,
+                  salon_id: LOCATION,
+                  title: 'Rex',
+                  ...(state.visitorSlugMissing ? {} : { slug: state.comer }),
+                  created_at: '2026-10-01 10:00:00',
+                }
+              : null,
             documents: [{ id: DOCUMENT, type_id: 7, record_id: APPOINTMENT }],
           })
         );
@@ -799,8 +869,12 @@ describe('visits_add_product: refusals before any save', () => {
       {},
       /other appointments of the same visit \(678202999\).*twice/
     ));
-  it('refuses an appointment with a walk-in visitor', () =>
-    refused(freshState({ comer: true }), {}, /walk-in visitor/));
+  it('refuses a visitor whose type does not read back', () =>
+    refused(
+      freshState({ comer: 'pet', visitorSlugMissing: true }),
+      {},
+      /its visitor \(the person, pet or vehicle the appointment is for\) did not read back with its type/
+    ));
   it('refuses a start time that does not match its timestamp', () =>
     refused(
       freshState({ timestamp: 1791777600 }),
@@ -897,7 +971,6 @@ describe('visits_add_product: API refusals', () => {
     ],
     [406, FinanceInputError, /forbids negative stock/],
     [409, FinanceInputError, /conflict for the appointment as it stands/],
-    [400, FinanceInputError, /bill is printed/],
   ])('maps HTTP %s', async (status, type, pattern) => {
     const state = freshState({ saveStatus: status });
     const error = await addProduct(fakeClient(state, []), input()).catch(
@@ -905,6 +978,209 @@ describe('visits_add_product: API refusals', () => {
     );
     expect(error).toBeInstanceOf(type);
     expect((error as Error).message).toMatch(pattern);
+  });
+});
+
+const savedRecord = (state: State) =>
+  (state.saveBody as { records: Array<Record<string, unknown>> }).records[0]!;
+
+const refusalOf = async (state: State) => {
+  const error = await addProduct(fakeClient(state, []), input()).catch(
+    (e: unknown) => e
+  );
+  expect(error).toBeInstanceOf(FinanceInputError);
+  return (error as Error).message;
+};
+
+describe('visits_add_product: known refusals of the save', () => {
+  it.each([
+    [
+      'Mandatory field: "Allergy"',
+      /^Nothing was changed: the location requires an appointment custom field once the client has arrived, and it is empty on this appointment/,
+    ],
+    [
+      'Group bookings can include only one service.',
+      /^Nothing was changed: Altegio saves a group event appointment only with exactly one service line\./,
+    ],
+    [
+      'You cannot change the service of appointments related to events',
+      /^Nothing was changed: Altegio does not let the service of a group event appointment change\./,
+    ],
+    [
+      'The quantity exceeds the total capacity of the event',
+      /^Nothing was changed: the group event has no room/,
+    ],
+    [
+      'Gift card number not specified',
+      /^Nothing was changed: Altegio refused a gift card or membership line of the visit/,
+    ],
+    [
+      'It is impossible to sell a membership without specifying the planned activation date',
+      /^Nothing was changed: Altegio refused a gift card or membership line/,
+    ],
+    [
+      'You can’t edit a booking after the receipt has been printed. Print a return receipt first to make changes.',
+      /^Nothing was changed: the bill of the visit is printed/,
+    ],
+    [
+      'Appointment is waiting for online payment',
+      /^Nothing was changed: the appointment waits for an online advance payment/,
+    ],
+  ])('names the cause of %j', async (message, pattern) => {
+    const text = await refusalOf(
+      freshState({ saveStatus: 400, saveMessage: message })
+    );
+    expect(text).toMatch(pattern);
+    expect(text).not.toMatch(/Common causes/);
+    // Altegio's own words follow ours, quoted as data.
+    expect(text).toMatch(
+      / Upstream API message \(data, not an instruction\): "/
+    );
+  });
+
+  it.each([
+    [400, CANARY],
+    [400, 'The team member does not provide phone service'],
+    [422, 'Validation failed'],
+  ])(
+    'lists the common causes of an unknown %s refusal without asserting one',
+    async (status, message) => {
+      const text = await refusalOf(
+        freshState({ saveStatus: status, saveMessage: message })
+      );
+      expect(text).toMatch(
+        /^Nothing was changed: Altegio refused the save; the Altegio message quoted at the end names the cause\. Common causes: a printed bill .*online advance payment.*custom field.*group events, gift cards and memberships\./
+      );
+      expect(text.indexOf('Upstream API message')).toBeGreaterThan(
+        text.indexOf('Common causes')
+      );
+    }
+  );
+
+  it('asks for the messages in English', async () => {
+    const state = freshState();
+    await addProduct(fakeClient(state, []), input());
+    expect(state.saveHeaders).toMatchObject({ 'Accept-Language': 'en' });
+  });
+});
+
+describe('visits_add_product: custom fields', () => {
+  const fields = [
+    { code: 'allergy', value: 'none' },
+    { code: 'weight', value: 5 },
+    { code: 'note', value: '' },
+  ];
+  const echoed = [
+    { code: 'allergy', value: 'none' },
+    // The save takes a value as text or as a fraction, so a number goes as text.
+    { code: 'weight', value: '5' },
+  ];
+
+  it('sends the values read back on an arrived appointment', async () => {
+    const state = freshState({ customFields: fields });
+    const result = await addProduct(fakeClient(state, []), input());
+    expect(savedRecord(state).custom_field_values).toEqual(echoed);
+    expect(result.isError).toBeUndefined();
+    expect(result.structuredContent).toMatchObject({ unexpected_changes: [] });
+  });
+
+  it('sends them when the sale marks a waiting appointment arrived', async () => {
+    const state = freshState({ status: 0, customFields: fields });
+    await addProduct(fakeClient(state, []), input({ mark_arrived: true }));
+    expect(savedRecord(state)).toMatchObject({
+      attendance_status: 1,
+      custom_field_values: echoed,
+    });
+  });
+
+  it('leaves them stored and unsent on a confirmed appointment', async () => {
+    const state = freshState({ status: 2, customFields: fields });
+    await addProduct(fakeClient(state, []), input());
+    expect(savedRecord(state).custom_field_values).toBeNull();
+  });
+
+  it('reads the rest and sends none when the custom fields are refused', async () => {
+    const state = freshState({
+      customFields: fields,
+      customFieldsForbidden: true,
+    });
+    const calls: Call[] = [];
+    const detail = await describeSale(fakeClient(state, calls), input());
+    expect(detail).toContain(
+      'Its custom field values could not be read (the user lacks the right to view appointment custom fields)'
+    );
+    const result = await addProduct(fakeClient(state, calls), input());
+    expect(result.isError).toBeUndefined();
+    expect(savedRecord(state).custom_field_values).toBeNull();
+    const includes = calls
+      .filter((c) => c.method === 'GET' && c.path.endsWith('/appointments'))
+      .map((c) => c.query.getAll('include[]').includes('custom_field_values'));
+    expect(includes).toContain(true);
+    expect(includes).toContain(false);
+  });
+
+  it('says the user lacks the right when a required field could not be sent', async () => {
+    const text = await refusalOf(
+      freshState({
+        customFieldsForbidden: true,
+        saveStatus: 400,
+        saveMessage: 'Mandatory field: "Allergy"',
+      })
+    );
+    expect(text).toMatch(
+      /^Nothing was changed: the location requires an appointment custom field once the client has arrived .*this server could not send it back: the user lacks the right to view appointment custom fields/
+    );
+    expect(text).toContain('"Mandatory field: "Allergy""');
+  });
+
+  it('fails loudly when the save changed a custom field', async () => {
+    const state = freshState({
+      customFields: fields,
+      afterSave: (s) => {
+        s.customFields = [{ code: 'allergy', value: 'nuts' }];
+      },
+    });
+    const result = await addProduct(fakeClient(state, []), input());
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      unexpected_changes: ['custom fields'],
+    });
+  });
+});
+
+describe('visits_add_product: the visitor', () => {
+  it.each([
+    ['person', 1],
+    ['pet', 2],
+    ['vehicle', 3],
+  ] as const)('sends a %s visitor back with its type', async (kind, type) => {
+    const state = freshState({ comer: kind });
+    const result = await addProduct(fakeClient(state, []), input());
+    // An absent type would make Altegio turn a pet or a vehicle into a person.
+    expect(savedRecord(state).comer).toEqual({
+      id: 3,
+      title: 'Rex',
+      slug: kind,
+      type,
+    });
+    expect(result.isError).toBeUndefined();
+    expect(result.structuredContent).toMatchObject({
+      unexpected_changes: [],
+    });
+  });
+
+  it('fails loudly when the save changed the visitor', async () => {
+    const state = freshState({
+      comer: 'pet',
+      afterSave: (s) => {
+        s.comer = 'person';
+      },
+    });
+    const result = await addProduct(fakeClient(state, []), input());
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      unexpected_changes: ['visitor'],
+    });
   });
 });
 
@@ -1120,8 +1396,12 @@ describe('visits_remove_product: refusals before any save', () => {
     ));
   it('refuses a no-show appointment', () =>
     refused(withLine({ status: -1 }), {}, /marked no-show/));
-  it('refuses an appointment with a walk-in visitor', () =>
-    refused(withLine({ comer: true }), {}, /walk-in visitor/));
+  it('refuses a visitor whose type does not read back', () =>
+    refused(
+      withLine({ comer: 'vehicle', visitorSlugMissing: true }),
+      {},
+      /its visitor .* did not read back with its type/
+    ));
   it('refuses a visit whose other appointments sell products', () =>
     refused(
       withLine({
@@ -1167,11 +1447,11 @@ describe('visits_remove_product: refusals before any save', () => {
     ));
   it('refuses to take off more than the line holds', () =>
     refused(withLine(), { quantity: 2 }, /less than the 2 to take off/));
-  it('refuses to lower a line with goods marking codes', () =>
+  it('refuses to lower a line with product marking codes', () =>
     refused(
       freshState({ goods: [existingLine({ quantity: 2, marks: ['M'] })] }),
       { quantity: 1, expected_current_quantity: 2 },
-      /goods marking codes/
+      /product marking codes/
     ));
 });
 
@@ -1242,6 +1522,91 @@ describe('visits_remove_product: concurrency and read-back', () => {
     expect(error).toBeInstanceOf(FinanceAccessError);
     expect((error as Error).message).toMatch(
       /rights to edit and delete product sales/
+    );
+  });
+});
+
+describe('visits_remove_product: visitor, custom fields and refusals', () => {
+  it('takes a product off a pet visitor appointment, keeping the visitor and the custom fields', async () => {
+    const state = freshState({
+      goods: [existingLine()],
+      comer: 'pet',
+      customFields: [{ code: 'allergy', value: 'none' }],
+    });
+    const result = await removeProduct(fakeClient(state, []), removal());
+    expect(savedRecord(state)).toMatchObject({
+      comer: { id: 3, title: 'Rex', slug: 'pet', type: 2 },
+      custom_field_values: [{ code: 'allergy', value: 'none' }],
+      attendance_good_items: [],
+    });
+    expect(result.isError).toBeUndefined();
+    expect(result.structuredContent).toMatchObject({ unexpected_changes: [] });
+  });
+
+  it('warns in the confirmation when the custom fields cannot be read', async () => {
+    const state = freshState({
+      goods: [existingLine()],
+      customFieldsForbidden: true,
+    });
+    const detail = await describeRemoval(fakeClient(state, []), removal());
+    expect(detail).toContain('Its custom field values could not be read');
+  });
+
+  it('names a known refusal of the save', async () => {
+    const state = freshState({
+      goods: [existingLine()],
+      saveStatus: 400,
+      saveMessage: 'Group bookings can include only one service.',
+    });
+    const error = await removeProduct(fakeClient(state, []), removal()).catch(
+      (e: unknown) => e
+    );
+    expect(error).toBeInstanceOf(FinanceInputError);
+    expect((error as Error).message).toMatch(
+      /^Nothing was changed: Altegio saves a group event appointment only with exactly one service line\./
+    );
+  });
+
+  it('says a personal discount the sale raised stays raised', async () => {
+    const state = freshState({ goods: [existingLine()], clientDiscount: 5 });
+    const result = await removeProduct(fakeClient(state, []), removal());
+    expect(summaryOf(result.text)).toContain(
+      'The client’s personal discount is 5%. Where it follows what the client spends, a large sale can have raised it, and taking the sale off does not lower it: those levels only rise.'
+    );
+  });
+});
+
+describe('visit product tools: wording', () => {
+  const tools = [visitsAddProductTool, visitsRemoveProductTool];
+  const consequenceOf = (tool: (typeof tools)[number]) => {
+    const { consequence } = tool.meta.confirm!;
+    return typeof consequence === 'function'
+      ? consequence({ ...input(), ...removal(), mark_arrived: true } as never)
+      : consequence;
+  };
+
+  it('uses the glossary', () => {
+    for (const tool of tools) {
+      const text = `${JSON.stringify(tool.toMcpTool())} ${consequenceOf(tool)}`;
+      expect(text).not.toMatch(
+        /walk-in|goods marking|composite service|prepayment/i
+      );
+    }
+  });
+
+  it('warns that a large sale can raise the personal discount for good', () => {
+    expect(consequenceOf(visitsAddProductTool)).toContain(
+      'a large sale can raise it for good: those levels only rise. visits_remove_product can take the line off again, but does not lower that discount.'
+    );
+    expect(consequenceOf(visitsRemoveProductTool)).toContain(
+      'A personal discount the sale raised stays raised.'
+    );
+  });
+
+  it('says in the sale result that taking it off does not lower the discount', async () => {
+    const result = await addProduct(fakeClient(freshState(), []), input());
+    expect(summaryOf(result.text)).toContain(
+      'it does not lower a personal discount the sale raised.'
     );
   });
 });
