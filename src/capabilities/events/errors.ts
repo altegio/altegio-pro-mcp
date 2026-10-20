@@ -81,6 +81,6 @@ export function mapEventsHttpError(
       notFound:
         'Check the location id with locations_list and the event id with events_list.',
     },
-    { ...hints, forbidden: undefined }
+    hints
   );
 }
