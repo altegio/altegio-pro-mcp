@@ -11,7 +11,8 @@
  * Method names and DTOs use the product glossary (visit, appointment,
  * product, inventory, team member, bill); the wire names (`record`,
  * `attendance`, `staff_id`, `good_id`, `storage_id`, `attendance_good_items`,
- * `manual_cost`, `comer`, `activity`) stop inside the adapter.
+ * `manual_cost`, `comer`, `activity`, `custom_field_values`) stop inside the
+ * adapter.
  *
  * The adapter is chosen per method: today the V2 appointment save the web app
  * uses (`./v2/visit-products-adapter.ts`), which rewrites the whole
@@ -45,7 +46,7 @@ export interface VisitProductLine {
   amount_after_loyalty: number | null;
   /** Set when the line issued a gift card or a membership. */
   loyalty_kind: 'gift_card' | 'membership' | null;
-  /** Goods marking codes recorded on the line. */
+  /** Product marking codes recorded on the line. */
   marks: string[];
 }
 
@@ -78,14 +79,20 @@ export interface AppointmentSale {
   duration_seconds: number;
   /** The client's personal discount, which the web app applies to new lines. */
   client_discount_percent: number | null;
+  /**
+   * The appointment's custom field values could be read, so a save of an
+   * arrived appointment sends them back. When false, a location that requires
+   * custom fields on arrival refuses such a save.
+   */
+  custom_fields_readable: boolean;
   service_lines: VisitServiceLine[];
   product_lines: VisitProductLine[];
   /** The other appointments of the visit and how many product lines each holds. */
   other_appointments: Array<{ appointment_id: number; product_lines: number }>;
   /**
-   * Why this appointment cannot be written back exactly (a walk-in visitor,
-   * a composite service, a start time that does not read back) — null when
-   * it can. A sale is refused while it is set.
+   * Why this appointment cannot be written back exactly (a visitor or a
+   * combined service that does not read back, a start time that does not
+   * read back) — null when it can. A sale is refused while it is set.
    */
   unsupported: string | null;
   /** Opaque version of everything a save writes back; any change changes it. */

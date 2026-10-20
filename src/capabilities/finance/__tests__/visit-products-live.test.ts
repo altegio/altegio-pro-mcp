@@ -2,7 +2,8 @@
  * Opt-in live suite for visits_add_product and visits_remove_product: create
  * a waiting appointment, sell a product on it (marking it arrived), lower the
  * line, take it off, and check the stock and the bill come back — then delete
- * the appointment.
+ * the appointment. A second run does the same on an appointment for a pet
+ * visitor with custom field values, and checks both read back unchanged.
  *
  * Skipped unless `ALTEGIO_E2E=1`. Credentials come from the environment, as in
  * `src/__tests__/appointments-e2e-live.test.ts`; the fixture ids too, never a
@@ -16,6 +17,12 @@
  * - `ALTEGIO_E2E_PRODUCT_ID`, `ALTEGIO_E2E_INVENTORY_ID` — a cheap plain
  *   product and an inventory that holds it (a large sale can raise the
  *   client's spend-based discount, which taking it off does not lower).
+ *
+ * The visitor run gives the client a pet visitor named "E2E pet", which stays
+ * on the client (Altegio reuses it by name on the next run), and writes custom
+ * field values only on the appointment it deletes. It needs appointment custom
+ * fields `utmSource` (text) and `roistat_marker` (number) at the location, as
+ * the test location has, so a text and a number value are both sent back.
  *
  *   ALTEGIO_E2E=1 CREDENTIALS_DIR=/tmp/altegio-mcp-live \
  *     ALTEGIO_API_TOKEN=… ALTEGIO_USER_TOKEN=… ALTEGIO_E2E_LOCATION_ID=… \
@@ -64,48 +71,59 @@ describeLive('visit products end-to-end against the test location', () => {
     client = new AltegioClient({ partnerToken, userToken }, CREDENTIALS_DIR);
   });
 
+  /** A waiting appointment some days back, with no message to the client. */
+  const createAppointment = async (
+    daysBack: number,
+    extra: Record<string, unknown> = {}
+  ): Promise<number> => {
+    const day = new Date(Date.now() - daysBack * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    const created = await httpFromClient(client).request(
+      `/locations/${location}/appointments`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          staff_id: teamMember,
+          services: [{ id: service }],
+          client: { id: clientId },
+          datetime: `${day}T07:00:00`,
+          seance_length: 3600,
+          send_sms: 0,
+          sms_remain_hours: 0,
+          email_remain_hours: 0,
+          attendance: 0,
+          save_if_busy: true,
+          comment: 'visit-products-live: deleted by the suite',
+          ...extra,
+        }),
+      }
+    );
+    const createdBody = (await created.json()) as { data?: { id?: number } };
+    expect(created.status).toBeLessThan(300);
+    expect(createdBody.data?.id).toBeGreaterThan(0);
+    return createdBody.data!.id!;
+  };
+
   it('sells a product, lowers the line, takes it off, and the stock comes back', async () => {
-    const http = httpFromClient(client);
     const api = VisitProductsV2Adapter.forClient(client);
     const stockNow = async () =>
       (await api.getProductForSale(location, product)).stock.find(
         (s) => s.inventory_id === inventory
       )?.sale_quantity ?? null;
 
-    const day = new Date(Date.now() - 3 * 86_400_000)
-      .toISOString()
-      .slice(0, 10);
-    const created = await http.request(`/locations/${location}/appointments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        staff_id: teamMember,
-        services: [{ id: service }],
-        client: { id: clientId },
-        datetime: `${day}T07:00:00`,
-        seance_length: 3600,
-        send_sms: 0,
-        sms_remain_hours: 0,
-        email_remain_hours: 0,
-        attendance: 0,
-        save_if_busy: true,
-        comment: 'visit-products-live: deleted by the suite',
-      }),
-    });
-    const createdBody = (await created.json()) as { data?: { id?: number } };
-    const appointment = createdBody.data?.id;
-    expect(created.status).toBeLessThan(300);
-    expect(appointment).toBeGreaterThan(0);
+    const appointment = await createAppointment(3);
 
     try {
       const stockBefore = await stockNow();
       const discountBefore = (
-        await api.getAppointmentSale(location, appointment!)
+        await api.getAppointmentSale(location, appointment)
       ).client_discount_percent;
 
       const sold = await addProduct(client, {
         location_id: location,
-        appointment_id: appointment!,
+        appointment_id: appointment,
         product_id: product,
         quantity: 2,
         expected_current_quantity: 0,
@@ -123,7 +141,7 @@ describeLive('visit products end-to-end against the test location', () => {
       // The id visits_get shows for the bill line is the product line's id.
       const bill = await FinanceAdapter.forClient(client).getVisitBill(
         location,
-        appointment!
+        appointment
       );
       expect(
         bill.lines.filter((l) => l.kind === 'product').map((l) => l.id)
@@ -131,7 +149,7 @@ describeLive('visit products end-to-end against the test location', () => {
 
       const lower = {
         location_id: location,
-        appointment_id: appointment!,
+        appointment_id: appointment,
         line_id: line.id,
         quantity: 1,
         expected_current_quantity: 2,
@@ -155,7 +173,7 @@ describeLive('visit products end-to-end against the test location', () => {
 
       const removed = await removeProduct(client, {
         location_id: location,
-        appointment_id: appointment!,
+        appointment_id: appointment,
         line_id: line.id,
         expected_current_quantity: 1,
       });
@@ -168,12 +186,93 @@ describeLive('visit products end-to-end against the test location', () => {
         stock: { before: stockBefore === null ? null : stockBefore - 1 },
       });
       expect(await stockNow()).toBe(stockBefore);
-      const after = await api.getAppointmentSale(location, appointment!);
+      const after = await api.getAppointmentSale(location, appointment);
       expect(after.product_lines).toEqual([]);
       expect(after.attendance).toBe('arrived');
       expect(after.client_discount_percent).toBe(discountBefore);
     } finally {
-      await client.deleteBooking(location, appointment!);
+      await client.deleteBooking(location, appointment);
+    }
+  }, 120_000);
+
+  it('keeps a pet visitor and the custom field values through a sale and its undo', async () => {
+    const http = httpFromClient(client);
+    // The V1 read carries the visitor with its type; the V2 read, the custom
+    // field values. Both must read back as before.
+    const visitorOf = async (appointment: number) => {
+      const response = await http.request(
+        `/locations/${location}/appointments/${appointment}`,
+        { method: 'GET' }
+      );
+      const body = (await response.json()) as {
+        data?: { comer?: { id: number; title: string; slug: string } | null };
+      };
+      return body.data?.comer ?? null;
+    };
+    const customFieldsOf = async (appointment: number) => {
+      const response = await http.request(
+        `/../v2/locations/${location}/attendances/record_${appointment}/appointments?include[]=custom_field_values`,
+        { method: 'GET' }
+      );
+      const body = (await response.json()) as {
+        included?: Array<{
+          type: string;
+          attributes: { code: string; value: unknown };
+        }>;
+      };
+      return (body.included ?? [])
+        .filter((r) => r.type === 'custom_field_value')
+        .map((r) => [r.attributes.code, r.attributes.value])
+        .sort();
+    };
+
+    const appointment = await createAppointment(5, {
+      comer: { title: 'E2E pet', type: 2 },
+      custom_fields: { utmSource: 'visit-products-live', roistat_marker: 7 },
+    });
+
+    try {
+      const visitor = await visitorOf(appointment);
+      expect(visitor).toMatchObject({ title: 'E2E pet', slug: 'pet' });
+      const fields = await customFieldsOf(appointment);
+      expect(fields).toEqual([
+        ['roistat_marker', 7],
+        ['utmSource', 'visit-products-live'],
+      ]);
+
+      const sold = await addProduct(client, {
+        location_id: location,
+        appointment_id: appointment,
+        product_id: product,
+        quantity: 1,
+        expected_current_quantity: 0,
+        inventory_id: inventory,
+        discount_percent: 0,
+        mark_arrived: true,
+      });
+      expect(sold.isError).toBeUndefined();
+      expect(sold.structuredContent).toMatchObject({
+        attendance: 'arrived',
+        unexpected_changes: [],
+      });
+      const line = (sold.structuredContent as { line: { id: number } }).line;
+
+      const removed = await removeProduct(client, {
+        location_id: location,
+        appointment_id: appointment,
+        line_id: line.id,
+        expected_current_quantity: 1,
+      });
+      expect(removed.isError).toBeUndefined();
+      expect(removed.structuredContent).toMatchObject({
+        removed_line: true,
+        unexpected_changes: [],
+      });
+
+      expect(await visitorOf(appointment)).toEqual(visitor);
+      expect(await customFieldsOf(appointment)).toEqual(fields);
+    } finally {
+      await client.deleteBooking(location, appointment);
     }
   }, 120_000);
 });
