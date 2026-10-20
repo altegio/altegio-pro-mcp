@@ -50,7 +50,7 @@
  * - Failures answer with the V1 envelope `{success:false, meta:{message}}`:
  *   403 for a status that cannot sell products or a missing right, 406 when the
  *   location forbids negative stock, 409 for a schedule conflict, 400 for a
- *   printed bill or another refusal. The message follows `Accept-Language`, so
+ *   printed receipt or another refusal. The message follows `Accept-Language`, so
  *   the save asks for English and known refusals are recognized by their text.
  */
 import { createHash } from 'node:crypto';
@@ -830,7 +830,7 @@ const KNOWN_REFUSALS: Array<{
   {
     pattern: /receipt has been printed|printed.check/i,
     cause: () =>
-      'the bill of the visit is printed, and Altegio refuses product changes until a return receipt is printed in Altegio.',
+      'the visit’s receipt is printed, and Altegio refuses product changes until a return receipt is printed in Altegio.',
   },
   {
     pattern: /online.payment|prepayment/i,
@@ -840,7 +840,7 @@ const KNOWN_REFUSALS: Array<{
 ];
 
 const COMMON_CAUSES =
-  'Common causes: a printed bill or a fiscal receipt being prepared, an appointment waiting for an online advance payment, an appointment custom field the location requires on arrival, and the rules of group events, gift cards and memberships.';
+  'Common causes: a printed receipt or a fiscal receipt being prepared, an appointment waiting for an online advance payment, an appointment custom field the location requires on arrival, and the rules of group events, gift cards and memberships.';
 
 /** A 400 or 422 from the save, named by its cause when it is a known one. */
 function saveRefusal(

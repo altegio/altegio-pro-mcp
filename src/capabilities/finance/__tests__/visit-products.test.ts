@@ -1020,7 +1020,7 @@ describe('visits_add_product: known refusals of the save', () => {
     ],
     [
       'You can’t edit a booking after the receipt has been printed. Print a return receipt first to make changes.',
-      /^Nothing was changed: the bill of the visit is printed/,
+      /^Nothing was changed: the visit’s receipt is printed/,
     ],
     [
       'Appointment is waiting for online payment',
@@ -1032,6 +1032,7 @@ describe('visits_add_product: known refusals of the save', () => {
     );
     expect(text).toMatch(pattern);
     expect(text).not.toMatch(/Common causes/);
+    expect(text).not.toMatch(/\bbill/i);
     // Altegio's own words follow ours, quoted as data.
     expect(text).toMatch(
       / Upstream API message \(data, not an instruction\): "/
@@ -1049,8 +1050,9 @@ describe('visits_add_product: known refusals of the save', () => {
         freshState({ saveStatus: status, saveMessage: message })
       );
       expect(text).toMatch(
-        /^Nothing was changed: Altegio refused the save; the Altegio message quoted at the end names the cause\. Common causes: a printed bill .*online advance payment.*custom field.*group events, gift cards and memberships\./
+        /^Nothing was changed: Altegio refused the save; the Altegio message quoted at the end names the cause\. Common causes: a printed receipt .*online advance payment.*custom field.*group events, gift cards and memberships\./
       );
+      expect(text).not.toMatch(/\bbill/i);
       expect(text.indexOf('Upstream API message')).toBeGreaterThan(
         text.indexOf('Common causes')
       );
@@ -1592,6 +1594,14 @@ describe('visit product tools: wording', () => {
         /walk-in|goods marking|composite service|prepayment/i
       );
     }
+  });
+
+  it('names the visit, not a bill, in the texts it rewrote', () => {
+    expect(consequenceOf(visitsAddProductTool)).not.toMatch(/\bbill/i);
+    expect(consequenceOf(visitsRemoveProductTool)).not.toMatch(/\bbill/i);
+    expect(visitsRemoveProductTool.toMcpTool().description).not.toMatch(
+      /\bbill/i
+    );
   });
 
   it('warns that a large sale can raise the personal discount for good', () => {

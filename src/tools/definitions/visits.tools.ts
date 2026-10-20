@@ -390,7 +390,7 @@ export const visitsAddProductTool = defineTool({
     target: (input) =>
       `product ${input.product_id} ×${input.quantity} on appointment ${input.appointment_id} at location ${input.location_id}`,
     consequence: (input) =>
-      `Altegio saves the appointment again exactly as it reads now, with the product line added or its quantity raised. The product is written off the inventory at once and the bill grows by the line total after loyalty programs. Integrations receive an appointment update; the client gets no message.${input.mark_arrived ? ' If the appointment is waiting, it is marked arrived.' : ''} Where the client’s personal discount follows what the client spends, a large sale can raise it for good: those levels only rise. visits_remove_product can take the line off again, but does not lower that discount.`,
+      `Altegio saves the appointment again exactly as it reads now, with the product line added or its quantity raised. The product is written off the inventory at once, and the visit’s amount due grows by the line total after loyalty programs. Integrations receive an appointment update; the client gets no message.${input.mark_arrived ? ' If the appointment is waiting, it is marked arrived.' : ''} Where the client’s personal discount follows what the client spends, a large sale can raise it for good: those levels only rise. visits_remove_product can take the line off again, but does not lower that discount.`,
     detail: (input, client) => visitProducts.describeSale(client, input),
   },
   outputSchema: {
@@ -429,7 +429,7 @@ export const visitsRemoveProductTool = defineTool({
   name: 'visits_remove_product',
   category: 'Visits',
   description:
-    'Take a product line off an appointment’s visit bill, or lower its quantity — the undo of visits_add_product. The product returns to the line’s inventory at once and the bill shrinks by the line total after loyalty programs; payments already recorded are not changed. Pass line_id (visits_get or the visits_add_product result) and the line’s current quantity as expected_current_quantity; the call is refused if it differs, so a repeated call cannot take off twice. Omit quantity to take off the whole line. Lines sold in the sale unit only; a line with product marking codes is taken off whole. The appointment must be arrived or confirmed. Refused for group event appointments, a printed bill, gift cards and memberships, and a visit whose other appointments sell products. Altegio saves the whole appointment again from a fresh read and the call is refused if it changed meanwhile; a change made in the same instant can still be overwritten. Asks for confirmation first.',
+    'Take a product line off an appointment’s visit, or lower its quantity — the undo of visits_add_product. The product returns to the line’s inventory at once and the visit’s amount due falls by the line total after loyalty programs; payments already recorded are not changed. Pass line_id (visits_get or the visits_add_product result) and the line’s current quantity as expected_current_quantity; the call is refused if it differs, so a repeated call cannot take off twice. Omit quantity to take off the whole line. Lines sold in the sale unit only; a line with product marking codes is taken off whole. The appointment must be arrived or confirmed. Refused for group event appointments, a printed receipt, gift cards and memberships, and a visit whose other appointments sell products. Altegio saves the whole appointment again from a fresh read and the call is refused if it changed meanwhile; a change made in the same instant can still be overwritten. Asks for confirmation first.',
   annotations: {
     title: 'Visits: take a product off',
     destructiveHint: true,
@@ -463,7 +463,7 @@ export const visitsRemoveProductTool = defineTool({
     target: (input) =>
       `${input.quantity === undefined ? 'the whole of' : `×${input.quantity} of`} product line ${input.line_id} on appointment ${input.appointment_id} at location ${input.location_id}`,
     consequence: () =>
-      'Altegio saves the appointment again exactly as it reads now, with the product line taken off or its quantity lowered. The product returns to the inventory at once and the bill shrinks by the line total after loyalty programs; payments already recorded are not changed, so a paid bill becomes overpaid. A personal discount the sale raised stays raised. Integrations receive an appointment update; the client gets no message.',
+      'Altegio saves the appointment again exactly as it reads now, with the product line taken off or its quantity lowered. The product returns to the inventory at once and the visit’s amount due falls by the line total after loyalty programs; payments already recorded are not changed, so a fully paid visit becomes overpaid. A personal discount the sale raised stays raised. Integrations receive an appointment update; the client gets no message.',
     detail: (input, client) => visitProducts.describeRemoval(client, input),
   },
   outputSchema: {
