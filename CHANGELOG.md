@@ -47,6 +47,28 @@ Text the model reads changes with them:
 - `src/generated/catalog.json` is rebuilt against the current specification,
   which also brings in its V3 OAuth wording.
 
+### Changed — back-office finance on `/mcp`; a byte budget per view
+
+- **Back-office finance joins the default view.** `financial_transactions_list`,
+  `financial_transactions_create`, `financial_transactions_update`,
+  `financial_transactions_delete`, `financial_transactions_list_payment_items`
+  and `payroll_get_calculation` are now served on `/mcp` (hosted
+  `https://mcp.alteg.io/pro`) as well as on `/mcp/finance`. Before this, an
+  owner on the default address could record a payment or a stock receipt but
+  had no way to record an expense. `/mcp/finance` and `/mcp/readonly` do not
+  change; the analytics pack stays off `/mcp` except `analytics_get_overview`.
+- **A byte budget replaces the "under 40 tools" rule (ADR-001 D3).** Every HTTP
+  view's `tools/list` has a budget in `src/tools/listing-budget.ts`: its
+  measured size plus about 5 %. The tests and `npm run surface:check` fail
+  when a view grows past it. `docs/architecture/tool-surface.md` now prints
+  every view's size and share of its budget. `/mcp` is 148,042 bytes for 121
+  tools (budget 155,500) and is headed for 100,000 bytes or less. Which rarely
+  used packs move to their facet is the product owner's decision.
+- ADR-001 §1.3 records the October 2026 host landscape: Claude Code and
+  claude.ai connectors defer HTTP connector tools, Cursor's dynamic context
+  discovery, ChatGPT loading the full list, GitHub's toolset paths and
+  read-only address, and Atlassian's discover/execute with 21 primary tools.
+
 ### Fixed — replay and lost-update guards on stock and money writes
 
 - **`inventory_create_operation` refuses a repeat.** The confirmation token is
