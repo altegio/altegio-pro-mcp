@@ -1,16 +1,15 @@
 /**
  * `FinanceApi` — the port the finance capability layer talks to (ADR-001 D5).
  *
- * It covers the money side of a location: a visit — its items, amount due and
- * the payments recorded on it — client accounts and the `deposit` operation
- * that tops one up, accounts and cash registers, financial transactions, and a
- * team member's payroll for a period.
+ * It covers the back-office money of a location: client accounts and the
+ * `deposit` operation that tops one up, accounts and cash registers,
+ * financial transactions, and a team member's payroll for a period. A visit —
+ * its items, amount due and payments — is the `VisitsApi` port
+ * (`./visits-api.ts`).
  *
- * Method names and DTOs use the product glossary — visit, payment, amount due,
- * client account, accounts and cash registers, payment item, payroll,
- * settlements, team member, products. The wire names (`document`, `sale`,
- * `deposit`, `loyalty_certificate`, `loyalty_abonement`, `prepay_hold`,
- * `expense`, `master`, `salary`, `record`, `good`, `kkm`) stop inside
+ * Method names and DTOs use the product glossary — client account, accounts
+ * and cash registers, payment item, payroll, settlements, team member. The
+ * wire names (`deposit`, `expense`, `master`, `salary`, `kkm`) stop inside
  * `./v1/finance-adapter.ts`.
  *
  * Money read back is in major units, exactly as the API reports it, and is
@@ -25,153 +24,6 @@
 
 import type { Money } from './money.js';
 import type { WriteOptions } from './write-options.js';
-
-// ========== visit: items and payments ==========
-
-/** What one visit item sells. */
-export type VisitItemKind = 'service' | 'product' | 'other';
-
-/** One visit item: a service or product line of the visit. */
-export interface VisitItem {
-  id: number;
-  appointment_id: number | null;
-  kind: VisitItemKind;
-  service_id: number | null;
-  product_id: number | null;
-  title: string | null;
-  quantity: number | null;
-  /** Catalog price of one unit, before discounts. */
-  unit_price: number | null;
-  /** Line total before the client's discount. */
-  amount_before_discount: number | null;
-  client_discount_percent: number | null;
-  /** What the client pays for the line: the line total after discounts. */
-  amount: number | null;
-}
-
-/**
- * How a payment is made, or can be made.
- *
- * `account` — money into one of the accounts and cash registers (cash or
- * non-cash); `client_account` — from the client's balance; `loyalty_card` —
- * from the balance of a loyalty card; `loyalty_program` — a loyalty program
- * applied to the visit; `gift_card`; `membership` — the visit is covered by a
- * membership; `referral_program`; `advance_payment_hold` — an advance payment
- * held for this visit is applied; `other` — a kind this build does not know.
- */
-export type PaymentMethod =
-  | 'account'
-  | 'client_account'
-  | 'loyalty_card'
-  | 'loyalty_program'
-  | 'gift_card'
-  | 'membership'
-  | 'referral_program'
-  | 'advance_payment_hold'
-  | 'other';
-
-/** One payment recorded on the visit. */
-export interface VisitPayment {
-  /**
-   * Stable payment id: `t<number>` for money into an account or cash
-   * register, `l<number>` for a payment from a client account or a loyalty
-   * instrument.
-   */
-  id: string;
-  method: PaymentMethod;
-  amount: number;
-  /** The visit item it pays, when the API attributes it to one. */
-  visit_item_id: number | null;
-  account_id: number | null;
-  account_title: string | null;
-  /** Payment method configured for the location, e.g. "Cash", "Card". */
-  payment_method_name: string | null;
-  client_account_id: number | null;
-  loyalty_card_id: number | null;
-  loyalty_program_id: number | null;
-  gift_card_id: number | null;
-  membership_id: number | null;
-}
-
-/** An advance payment held on a client account for this visit. */
-export interface AdvancePaymentHold {
-  id: number;
-  client_account_id: number | null;
-  amount: number | null;
-  /** `active`, `completed`, … as the API reports it. */
-  status: string | null;
-}
-
-/** One way the visit can be paid right now, with what it would accept. */
-export interface PaymentOption {
-  method: PaymentMethod;
-  applicable: boolean;
-  /** The most this method can pay now. */
-  applicable_amount: number | null;
-  /** false — the method must pay `applicable_amount` in one payment. */
-  partial_allowed: boolean;
-  account_id: number | null;
-  account_title: string | null;
-  /** For an account: cash (true) or non-cash settlement (false). */
-  cash: boolean | null;
-  client_account_id: number | null;
-  loyalty_card_id: number | null;
-  loyalty_card_number: string | null;
-  loyalty_program_id: number | null;
-  loyalty_program_title: string | null;
-  gift_card_id: number | null;
-  membership_id: number | null;
-  /** Gift card or membership: its number must be sent with the payment. */
-  number_required: boolean | null;
-  /** Visits a membership can still cover. */
-  applicable_visits: number | null;
-  advance_payment_hold_id: number | null;
-  /** Balance of the client account, loyalty card or gift card. */
-  balance: number | null;
-  /** The chain the instrument belongs to. */
-  chain_id: number | null;
-}
-
-/** The visit an appointment belongs to: what it sells and how it is paid. */
-export interface Visit {
-  location_id: number;
-  appointment_id: number;
-  visit_id: number | null;
-  client_id: number | null;
-  items: VisitItem[];
-  payments: VisitPayment[];
-  advance_payment_holds: AdvancePaymentHold[];
-  payment_options: PaymentOption[];
-  /** Sum of the visit item amounts. */
-  total_amount: number;
-  /** Sum of the recorded payments. */
-  paid_amount: number;
-  /** What the client still has to pay. */
-  amount_due: number;
-}
-
-/** A payment to record, by method; every id comes from `payment_options`. */
-export type PaymentRequest =
-  | { method: 'account'; account_id: number; amount: Money }
-  | { method: 'client_account'; client_account_id: number; amount: Money }
-  | { method: 'loyalty_card'; loyalty_card_id: number; amount: Money }
-  | {
-      method: 'loyalty_program';
-      loyalty_card_id: number;
-      loyalty_program_id: number;
-    }
-  | {
-      method: 'gift_card';
-      gift_card_id: number;
-      amount: Money;
-      number?: string;
-    }
-  | { method: 'membership'; membership_id: number; number?: string }
-  | {
-      method: 'advance_payment_hold';
-      advance_payment_hold_id: number;
-      amount: Money;
-    };
 
 // ========== client accounts ==========
 
@@ -347,23 +199,6 @@ export interface PayrollReport {
 // ========== the port ==========
 
 export interface FinanceApi {
-  /** The visit an appointment belongs to. */
-  getVisit(locationId: number, appointmentId: number): Promise<Visit>;
-  /** Record a payment and return the visit after it. */
-  addPayment(
-    locationId: number,
-    appointmentId: number,
-    payment: PaymentRequest,
-    options?: WriteOptions
-  ): Promise<Visit>;
-  /** Cancel one recorded payment and return the visit after it. */
-  cancelPayment(
-    locationId: number,
-    appointmentId: number,
-    paymentId: string,
-    options?: WriteOptions
-  ): Promise<Visit>;
-
   listClientAccounts(
     locationId: number,
     clientId: number

@@ -8,7 +8,8 @@
  * is normalized here into typed errors whose messages name the next action, in
  * canonical vocabulary.
  */
-import { AltegioApiError, AuthenticationError } from '../../utils/errors.js';
+import { AltegioApiError } from '../../utils/errors.js';
+import { sessionExpired } from '../../api/http-failure.js';
 import { upstreamDetail } from '../../tools/tool-result.js';
 
 /** Bad or impossible tool input. */
@@ -68,9 +69,7 @@ export function mapClientsHttpError(
   context: string
 ): AltegioApiError {
   if (status === 401) {
-    return new AuthenticationError(
-      `Session expired while trying to ${context}. Call auth_login to re-authenticate.`
-    );
+    return sessionExpired(context);
   }
   if (status === 403) {
     return new ClientsAccessError(NO_ACCESS, status);

@@ -6,6 +6,26 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — one visit port, one failure mapping, one guarded write
+
+- **`visits_add_product` and `visits_remove_product` bind the confirmation to
+  the appointment as shown.** A confirmed call is refused, before anything is
+  saved, when the appointment changed after the confirmation was shown, as
+  `appointments_set_consumables` and `financial_transactions_update` already
+  were. Before, the save guarded only the moment between its own reads.
+- **An expired session on a hosted view no longer points at `auth_login`**,
+  which hosted views do not serve: the text says to sign in again in the MCP
+  client. Stdio and deployments that serve password login keep the
+  `auth_login` wording. This reaches texts that end up in a result without the
+  tool's own error handling, such as a per-item error of a batch or a
+  read-back warning.
+- Group event refusals also quote the API's field errors; a 403 on an event
+  says "access to group events in this location".
+- Internal: the visit, its payments and its product lines are one `VisitsApi`
+  port; finance, visit, inventory and memberships share one V1 request path
+  and one failure mapping; backend class names and paths are out of the code
+  comments.
+
 ### Changed — `visits_add_product` and `visits_remove_product` lift three refusals
 
 - **Group event places.** A client's place in a group event takes a product
@@ -47,7 +67,6 @@ is declared stable.
   documented operation records one (a financial transaction names a single
   account or cash register).
 
-
 ### Changed — a lighter `tools/list` on every view
 
 `/mcp` goes from 125,389 to 119,604 bytes (−5.8 KB) with the same 95 tools,
@@ -69,7 +88,6 @@ with them. Nothing a tool accepts or refuses changes.
 - `appointments_list_tags`, `appointments_create_tag` and the
   `appointments_update` `color` are shorter; `api_search_operations`
   `include_preview` no longer names a backend version.
-
 
 ### Changed — exact money, checked against the location currency
 

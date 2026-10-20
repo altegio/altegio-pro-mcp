@@ -1,6 +1,7 @@
 /**
- * V2 adapter for the `VisitProductsApi` port: a product sold on a visit, or
- * taken off it, saved the way the web app's appointment window saves it.
+ * V2 adapter for the product-line methods of the `VisitsApi` port: a product
+ * sold on a visit, or taken off it, saved the way the web app's appointment
+ * window saves it.
  *
  * The write is `POST /locations/{id}/attendance/appointments`, a replace: each
  * record sent replaces the whole appointment — start, team member, length,
@@ -68,8 +69,8 @@ import type { AltegioHttp } from '../altegio-http.js';
 import { httpFromClient } from '../altegio-http.js';
 import type { AltegioClient } from '../../providers/altegio-client.js';
 import type { AltegioApiError } from '../../utils/errors.js';
+import { apiMessage } from '../http-failure.js';
 import {
-  apiMessage,
   FinanceAccessError,
   FinanceInputError,
   FinanceNotFoundError,
@@ -88,9 +89,9 @@ import type {
   ProductForSale,
   ProductStockForSale,
   VisitProductLine,
-  VisitProductsApi,
+  VisitProductLinesApi,
   VisitServiceLine,
-} from '../visit-products-api.js';
+} from '../visits-api.js';
 import {
   callJsonApi,
   IncludedIndex,
@@ -959,7 +960,7 @@ interface GuardedSave {
   kind: 'add' | 'reduce';
 }
 
-export class VisitProductsV2Adapter implements VisitProductsApi {
+export class VisitProductsV2Adapter implements VisitProductLinesApi {
   constructor(private readonly http: AltegioHttp) {}
 
   static forClient(client: AltegioClient): VisitProductsV2Adapter {

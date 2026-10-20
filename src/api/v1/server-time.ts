@@ -2,14 +2,13 @@
  * The V1 backend's own clock, and conversions between it and a location's.
  *
  * Financial transactions are stored in the backend server's wall time, not the
- * location's. The backend sets `Asia/Dubai` as its process time zone
- * (`autoload/init.php` in biz.erp), which has no daylight saving, so the offset
- * is +04:00 all year; the transaction list renders it explicitly
+ * location's. The backend runs in the `Asia/Dubai` time zone, which has no
+ * daylight saving, so the offset is +04:00 all year; the transaction list renders it explicitly
  * (`2026-10-15T13:00:00+0400` for an 11:00 Prague payment), while the single
  * transaction read and the visit read give the same wall time with no offset.
  *
- * The write side is not symmetric (verified live on 2026-10-19 and in
- * `TransactionController`): creating a transaction stores the `date` it is sent
+ * The write side is not symmetric (verified live on 2026-10-19 and in the
+ * backend source): creating a transaction stores the `date` it is sent
  * as server wall time, while updating one treats `date` as location wall time
  * and converts it. The adapter therefore sends a create in server time and an
  * update in location time, and every read comes back to the model in the

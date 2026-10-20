@@ -4,7 +4,7 @@
  * `payroll_*` tools actually do.
  *
  * A use case takes the tool's parsed input plus an `AltegioClient`, calls the
- * `FinanceApi` port and returns the text summary next to the structured
+ * `VisitsApi` or `FinanceApi` port (`./ports.ts`) and returns the text summary next to the structured
  * content. Money is in major units and every amount the text prints carries
  * the location's ISO currency code; one location has one currency, so a page
  * may be summed but nothing is ever summed across locations.
@@ -24,7 +24,6 @@
  * idempotency key (`../../api/write-options.ts`).
  */
 import type { AltegioClient } from '../../providers/altegio-client.js';
-import { FinanceAdapter } from '../../api/v1/finance-adapter.js';
 import {
   decimalsOf,
   currencyExponent,
@@ -47,15 +46,16 @@ import {
 import type {
   CashRegisterOrAccount,
   ClientAccount,
-  FinanceApi,
   FinancialTransaction,
   FinancialTransactionFields,
+} from '../../api/finance-api.js';
+import type {
   PaymentMethod,
   PaymentOption,
   PaymentRequest,
   Visit,
   VisitPayment,
-} from '../../api/finance-api.js';
+} from '../../api/visits-api.js';
 import { writeOptions } from '../../api/write-options.js';
 import {
   ConfirmationRefusal,
@@ -64,6 +64,8 @@ import {
   type ConfirmedCall,
 } from '../../tools/confirmation.js';
 import { FinanceInputError, FinanceNotFoundError } from './errors.js';
+import { financeApi, visitsApi } from './ports.js';
+import { planConfirmed, planForConfirmation } from '../guarded-change.js';
 import {
   paginateCollection,
   renderPage,
@@ -80,9 +82,7 @@ export interface FinanceResult {
   isError?: boolean;
 }
 
-function api(client: AltegioClient): FinanceApi {
-  return FinanceAdapter.forClient(client);
-}
+const api = financeApi;
 
 const FIELD_MAX_CHARS = 200;
 
@@ -361,7 +361,7 @@ export async function getVisit(
   input: { location_id: number; appointment_id: number }
 ): Promise<FinanceResult> {
   const [visit, currency] = await Promise.all([
-    api(client).getVisit(input.location_id, input.appointment_id),
+    visitsApi(client).getVisit(input.location_id, input.appointment_id),
     resolveLocationCurrency(client, input.location_id),
   ]);
   const next =
@@ -382,7 +382,7 @@ export async function describeVisit(
   input: { location_id: number; appointment_id: number }
 ): Promise<string | undefined> {
   const [visit, currency] = await Promise.all([
-    api(client).getVisit(input.location_id, input.appointment_id),
+    visitsApi(client).getVisit(input.location_id, input.appointment_id),
     resolveLocationCurrency(client, input.location_id),
   ]);
   return `the visit of appointment ${visit.appointment_id} at location ${visit.location_id}${visit.client_id ? ` (client ${visit.client_id})` : ''}: total amount ${amountText(visit.total_amount, currency)}, amount due ${amountText(visit.amount_due, currency)}`;
@@ -398,7 +398,7 @@ export async function checkPaymentMoney(
   input: { location_id: number; appointment_id: number; amount?: number }
 ): Promise<undefined> {
   return refuseMoneyArg(client, input, input.amount, 'amount', async () => {
-    const visit = await api(client).getVisit(
+    const visit = await visitsApi(client).getVisit(
       input.location_id,
       input.appointment_id
     );
@@ -551,9 +551,9 @@ export async function addPayment(
 ): Promise<FinanceResult> {
   // A missing id or amount is refused before anything is read.
   paymentRequest(input);
-  const finance = api(client);
+  const visits = visitsApi(client);
   const [before, currency] = await Promise.all([
-    finance.getVisit(input.location_id, input.appointment_id),
+    visits.getVisit(input.location_id, input.appointment_id),
     resolveLocationCurrency(client, input.location_id),
   ]);
   const request = paymentRequest(input, currency, [
@@ -594,7 +594,7 @@ export async function addPayment(
     }
   }
 
-  const after = await finance.addPayment(
+  const after = await visits.addPayment(
     input.location_id,
     input.appointment_id,
     request,
@@ -625,7 +625,7 @@ export async function describePayment(
   input: { location_id: number; appointment_id: number; payment_id: string }
 ): Promise<string | undefined> {
   const [visit, currency] = await Promise.all([
-    api(client).getVisit(input.location_id, input.appointment_id),
+    visitsApi(client).getVisit(input.location_id, input.appointment_id),
     resolveLocationCurrency(client, input.location_id),
   ]);
   const payment = visit.payments.find((p) => p.id === input.payment_id);
@@ -638,9 +638,9 @@ export async function cancelPayment(
   input: { location_id: number; appointment_id: number; payment_id: string },
   confirmation?: ConfirmedCall
 ): Promise<FinanceResult> {
-  const finance = api(client);
+  const visits = visitsApi(client);
   const [before, currency] = await Promise.all([
-    finance.getVisit(input.location_id, input.appointment_id),
+    visits.getVisit(input.location_id, input.appointment_id),
     resolveLocationCurrency(client, input.location_id),
   ]);
   const payment = before.payments.find((p) => p.id === input.payment_id);
@@ -649,7 +649,7 @@ export async function cancelPayment(
       `Nothing was cancelled: payment ${input.payment_id.slice(0, 40)} is not on the visit of appointment ${input.appointment_id} — it may already be cancelled. The visit lists ${before.payments.map((p) => p.id).join(', ') || 'no payments'}.`
     );
   }
-  const after = await finance.cancelPayment(
+  const after = await visits.cancelPayment(
     input.location_id,
     input.appointment_id,
     input.payment_id,
@@ -1230,17 +1230,10 @@ export async function describeTransactionChange(
   client: AltegioClient,
   input: UpdateTransactionInput
 ): Promise<ConfirmationDetail> {
-  let plan: TransactionUpdatePlan;
-  try {
-    plan = await planTransactionUpdate(client, input);
-  } catch (error) {
-    if (error instanceof FinanceInputError) {
-      throw new ConfirmationRefusal(
-        error.message.replace(/^Nothing was changed: /, '')
-      );
-    }
-    throw error;
-  }
+  const plan = await planForConfirmation(
+    () => planTransactionUpdate(client, input),
+    FinanceInputError
+  );
   const { before, fields, beforeLocal, currency } = plan;
   const none = (id: number | null) => (id === null ? 'none' : String(id));
   const changes = [
@@ -1281,18 +1274,17 @@ export async function updateFinancialTransaction(
   input: UpdateTransactionInput,
   confirmation?: ConfirmedCall
 ): Promise<FinanceResult> {
-  const plan = await planTransactionUpdate(client, input);
-  const { before, fields, currency } = plan;
   // The update replaces every field, so it must run on the transaction the
   // person saw: a change made since would be overwritten unseen.
-  if (
-    confirmation?.version !== undefined &&
-    confirmation.version !== plan.version
-  ) {
-    throw new FinanceInputError(
-      `Nothing was changed: financial transaction ${before.id} was changed after the confirmation was shown, so the change approved is no longer the change this call would make. Read it again with financial_transactions_list, then repeat the call without confirmation_token to confirm against what it holds now.`
-    );
-  }
+  const plan = await planConfirmed(
+    () => planTransactionUpdate(client, input),
+    confirmation,
+    ({ before }) =>
+      new FinanceInputError(
+        `Nothing was changed: financial transaction ${before.id} was changed after the confirmation was shown, so the change approved is no longer the change this call would make. Read it again with financial_transactions_list, then repeat the call without confirmation_token to confirm against what it holds now.`
+      )
+  );
+  const { before, fields, currency } = plan;
   const after = await api(client).updateFinancialTransaction(
     input.location_id,
     input.transaction_id,

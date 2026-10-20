@@ -1178,7 +1178,10 @@ describe('visits_add_product: custom fields', () => {
       customFieldsForbidden: true,
     });
     const calls: Call[] = [];
-    const detail = await describeSale(fakeClient(state, calls), input());
+    const { text: detail } = await describeSale(
+      fakeClient(state, calls),
+      input()
+    );
     expect(detail).toContain(
       'Its custom field values could not be read (the user lacks the right to view appointment custom fields)'
     );
@@ -1260,7 +1263,7 @@ describe('visits_add_product: the visitor', () => {
 describe('visits_add_product: the confirmation detail', () => {
   it('shows the line, the stock and the status change', async () => {
     const state = freshState({ status: 0 });
-    const detail = await describeSale(
+    const { text: detail } = await describeSale(
       fakeClient(state, []),
       input({ mark_arrived: true })
     );
@@ -1614,7 +1617,10 @@ describe('visits_remove_product: visitor, custom fields and refusals', () => {
       goods: [existingLine()],
       customFieldsForbidden: true,
     });
-    const detail = await describeRemoval(fakeClient(state, []), removal());
+    const { text: detail } = await describeRemoval(
+      fakeClient(state, []),
+      removal()
+    );
     expect(detail).toContain('Its custom field values could not be read');
   });
 
@@ -1688,7 +1694,10 @@ describe('visit product tools: wording', () => {
 describe('visits_remove_product: the confirmation detail', () => {
   it('shows the line taken off and the stock returned', async () => {
     const state = freshState({ goods: [existingLine()], loyaltyShare: 0.4 });
-    const detail = await describeRemoval(fakeClient(state, []), removal());
+    const { text: detail } = await describeRemoval(
+      fakeClient(state, []),
+      removal()
+    );
     expect(detail).toContain(
       'Takes off visit item 649590969 of product 232659 ×1 (inventory 38882, team member 3100100, 20.1 CZK each, discount 10%): item total 18.09 CZK before loyalty programs, 10.85 CZK after them, comes off the amount due.'
     );
@@ -1702,7 +1711,7 @@ describe('visits_remove_product: the confirmation detail', () => {
     const state = freshState({
       goods: [existingLine({ quantity: 3, manual_cost: 54.27, marks: [] })],
     });
-    const detail = await describeRemoval(
+    const { text: detail } = await describeRemoval(
       fakeClient(state, []),
       removal({ quantity: 1.5, expected_current_quantity: 3 })
     );
@@ -1762,12 +1771,52 @@ describe('visit product tools: the confirmed call', () => {
       }
     }
   );
+
+  it.each([
+    [
+      'visits_add_product',
+      () => freshState(),
+      () => visitsAddProductTool,
+      () => input(),
+    ],
+    [
+      'visits_remove_product',
+      () => freshState({ goods: [existingLine()] }),
+      () => visitsRemoveProductTool,
+      () => removal(),
+    ],
+  ])(
+    '%s refuses when the appointment changed after the confirmation',
+    async (_name, state, tool, args) => {
+      const calls: Call[] = [];
+      const result = await tool().createHandler(fakeClient(state(), calls))(
+        { ...args(), ...TOKEN },
+        { idempotency_key: KEY, version: 'shown-before-a-change' }
+      );
+      expect(result.isError).toBe(true);
+      expect(JSON.stringify(result.content)).toMatch(
+        /changed after the confirmation was shown/
+      );
+      expect(saves(calls)).toHaveLength(0);
+    }
+  );
+
+  it('saves when the appointment still has the version shown', async () => {
+    const state = freshState();
+    const { version } = await describeSale(fakeClient(state, []), input());
+    const calls: Call[] = [];
+    const result = await visitsAddProductTool.createHandler(
+      fakeClient(state, calls)
+    )({ ...input(), ...TOKEN }, { idempotency_key: KEY, version });
+    expect(result.isError).toBeUndefined();
+    expect(saves(calls)).toHaveLength(1);
+  });
 });
 
 describe('visit products: group events, gift cards and memberships, other appointments', () => {
   it('sells on a group event appointment, saving it as read', async () => {
     const state = freshState({ activity: 10827797 });
-    const detail = await describeSale(fakeClient(state, []), input());
+    const { text: detail } = await describeSale(fakeClient(state, []), input());
     expect(detail).toContain(
       "Appointment 678202164 is one client's place in a group event: only this appointment is saved, with its service and seats as they are; the event and its other clients do not change."
     );
@@ -1805,7 +1854,7 @@ describe('visit products: group events, gift cards and memberships, other appoin
       marks: [],
     });
     const state = freshState({ goods: [membership, giftCard] });
-    const detail = await describeSale(fakeClient(state, []), input());
+    const { text: detail } = await describeSale(fakeClient(state, []), input());
     expect(detail).toContain(
       'Gift card and membership visit items 649590971, 649590972 are sent back with their numbers and activation dates, unchanged.'
     );
@@ -1877,7 +1926,10 @@ describe('visit products: group events, gift cards and memberships, other appoin
 
     it('sells when no other item carries a loyalty discount, and says so', async () => {
       const state = freshState({ others: [{ id: 678202999, goods: [plain] }] });
-      const detail = await describeSale(fakeClient(state, []), input());
+      const { text: detail } = await describeSale(
+        fakeClient(state, []),
+        input()
+      );
       expect(detail).toContain(
         'Altegio also saves the product items of appointment 678202999 of the same visit again from their stored amounts; none carries a loyalty discount, so they keep their values.'
       );

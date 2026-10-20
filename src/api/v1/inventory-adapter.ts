@@ -8,9 +8,8 @@
  * `goods_transactions`, `technological_card`, `record`, `master`, `type_id`,
  * `for_service` and `operation_unit_type` stop here.
  *
- * Contract details verified against the backend (biz.erp, 2026-10-19/20;
- * the inventory operation spec was corrected to match in
- * biz.erp.api.docs#149):
+ * Contract details verified against the backend source (2026-10-19/20; the
+ * published inventory operation spec was corrected to match):
  *
  * - `POST /storage_operations/operation/{id}` reads `type_id`, `storage_id`,
  *   `master_id` (the spec's canonical `team_member_id` is aliased to it),
@@ -50,12 +49,9 @@
  *   `idempotency_key` of their `WriteOptions` (`../write-options.ts`).
  */
 import { majorOf } from '../money.js';
-import {
-  httpFromClient,
-  queryString,
-  type AltegioHttp,
-} from '../altegio-http.js';
+import { httpFromClient, type AltegioHttp } from '../altegio-http.js';
 import type { AltegioClient } from '../../providers/altegio-client.js';
+import { v1Read, type V1CallOptions, type V1Envelope } from './envelope.js';
 import {
   mapInventoryHttpError,
   type InventoryErrorHints,
@@ -113,8 +109,6 @@ const ATTENDANCE_FROM_WIRE: Record<number, AppointmentAttendance> = {
 // ========== value helpers ==========
 
 type Row = Record<string, unknown>;
-type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
-type QueryValue = string | number | undefined;
 
 function asRow(value: unknown): Row {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -170,16 +164,6 @@ function localDateTime(value: unknown): string | null {
   const raw = text(value);
   if (!raw) return null;
   return raw.replace(' ', 'T');
-}
-
-async function safeJson(response: Response): Promise<unknown> {
-  const body = await response.text();
-  if (!body) return undefined;
-  try {
-    return JSON.parse(body) as unknown;
-  } catch {
-    return undefined;
-  }
 }
 
 // ========== mapping ==========
@@ -299,44 +283,9 @@ export class InventoryAdapter implements InventoryApi {
   private async call(
     path: string,
     context: string,
-    options: {
-      method?: Method;
-      query?: Record<string, QueryValue>;
-      body?: unknown;
-      hints?: InventoryErrorHints;
-    } = {}
-  ): Promise<{ data: unknown; meta: Row }> {
-    if (!this.http.isAuthenticated()) {
-      throw mapInventoryHttpError(401, undefined, context);
-    }
-    const headers: Record<string, string> = {};
-    let body: string | undefined;
-    if (options.body !== undefined) {
-      headers['Content-Type'] = 'application/json';
-      body = JSON.stringify(options.body);
-    }
-    const response = await this.http.request(
-      `${path}${options.query ? queryString(options.query) : ''}`,
-      {
-        method: options.method ?? 'GET',
-        headers,
-        ...(body !== undefined ? { body } : {}),
-      }
-    );
-    const payload = await safeJson(response);
-    if (!response.ok) {
-      throw mapInventoryHttpError(
-        response.status,
-        payload,
-        context,
-        options.hints
-      );
-    }
-    const envelope = asRow(payload);
-    if (envelope.success === false) {
-      throw mapInventoryHttpError(422, payload, context, options.hints);
-    }
-    return { data: envelope.data ?? null, meta: asRow(envelope.meta) };
+    options: V1CallOptions<InventoryErrorHints> = {}
+  ): Promise<V1Envelope> {
+    return v1Read(this.http, path, context, mapInventoryHttpError, options);
   }
 
   async listInventories(locationId: number): Promise<Inventory[]> {

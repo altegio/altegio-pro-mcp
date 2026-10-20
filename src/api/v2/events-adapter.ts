@@ -10,7 +10,7 @@
  * `label`, `resource_instance`, `clients_count`, `reschedule_activity_id`,
  * `content_type`, `repeat_mode_id` — stop here.
  *
- * Contract details verified against the backend (biz.erp, 2026-09-29):
+ * Contract details verified against the backend source (2026-09-29):
  *
  * - The event list, dates and filters refuse a period that starts before "now"
  *   in the location's time zone, unless `include_deleted` is set. The list

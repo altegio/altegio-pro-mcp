@@ -14,7 +14,7 @@
  * guards the assumption.
  */
 import type { AltegioClient } from '../providers/altegio-client.js';
-import { AuthenticationError } from '../utils/errors.js';
+import { notSignedIn } from './http-failure.js';
 
 /** Everything an adapter needs from the transport. */
 export interface AltegioHttp {
@@ -58,9 +58,7 @@ export function httpFromClient(client: AltegioClient): AltegioHttp {
 /** Throw the shared authentication error when no user token is available. */
 export function requireUserToken(http: AltegioHttp, action: string): void {
   if (!http.isAuthenticated()) {
-    throw new AuthenticationError(
-      `Not authenticated. Call auth_login before trying to ${action}.`
-    );
+    throw notSignedIn(action);
   }
 }
 

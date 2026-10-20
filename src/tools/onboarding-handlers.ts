@@ -11,7 +11,7 @@ import {
   type ToolResult,
   type UntrustedField,
 } from './tool-result.js';
-import { AuthenticationError } from '../utils/errors.js';
+import { notSignedIn } from '../api/http-failure.js';
 import {
   seatChoiceRefusal,
   type MissingSeatChoice,
@@ -261,9 +261,7 @@ export class OnboardingHandlers {
 
   private requireAuth(): void {
     if (!this.client.isAuthenticated()) {
-      throw new AuthenticationError(
-        'Not authenticated. Call auth_login first.'
-      );
+      throw notSignedIn();
     }
   }
 

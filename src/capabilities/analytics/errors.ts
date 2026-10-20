@@ -11,7 +11,8 @@
  * `AltegioApiError`, so the tool factory's error wrapper passes the message
  * through unchanged.
  */
-import { AltegioApiError, AuthenticationError } from '../../utils/errors.js';
+import { AltegioApiError } from '../../utils/errors.js';
+import { sessionExpired } from '../../api/http-failure.js';
 import { upstreamDetail } from '../../tools/tool-result.js';
 
 /** Bad or impossible tool input (range too long, missing period, unknown field). */
@@ -150,9 +151,7 @@ export function mapAnalyticsHttpError(
   ) {
     // These documented routes answer a missing right with 403; their 401 is
     // a missing or expired session. Legacy charts still use 401 for access.
-    return new AuthenticationError(
-      'The Altegio session is missing or expired. Sign in again, then retry.'
-    );
+    return sessionExpired(context);
   }
   if (status === 401 || status === 403) {
     if (kind === 'forecast' && status === 403) {
