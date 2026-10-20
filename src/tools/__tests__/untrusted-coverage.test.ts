@@ -1361,6 +1361,10 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     what: 'the title of the product taken off',
     coveredBy: 'src/capabilities/finance/__tests__/visit-products.test.ts',
   },
+  payroll_record_payout: {
+    what: 'the payment item and account titles and the comment',
+    coveredBy: 'src/capabilities/payroll/__tests__/use-cases.test.ts',
+  },
 };
 
 // ===========================================================================

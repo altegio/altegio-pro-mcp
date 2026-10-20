@@ -387,6 +387,9 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   financial_transactions_update: 'finance:write',
   financial_transactions_delete: 'finance:write',
   payroll_get_calculation: 'payroll:read',
+  // A payout is a financial transaction; the V3 preview spec has no payroll
+  // write scope.
+  payroll_record_payout: 'finance:write',
 
   // --- Client base ----------------------------------------------------------
   clients_search: 'clients:read',

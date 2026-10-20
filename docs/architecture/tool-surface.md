@@ -16,13 +16,13 @@ the code disagree, which is how a surface change reaches a reviewer’s diff
 
 ## Counts
 
-**153 tools served (159 defined, 6 withheld from every view).**
+**154 tools served (160 defined, 6 withheld from every view).**
 
 | What | Count | Where |
 | --- | --- | --- |
-| Defined | 159 | 147 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
+| Defined | 160 | 148 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
 | Withheld from every view | 6 | `src/tools/disabled-tools.ts` (the report builder) |
-| **Served** | **153** | what `stdio` lists; every HTTP view is a subset |
+| **Served** | **154** | what `stdio` lists; every HTTP view is a subset |
 
 Served tools per category, in `tools/list` order:
 
@@ -41,7 +41,7 @@ Served tools per category, in `tools/list` order:
 | Location | 3 |
 | Memberships | 13 |
 | Onboarding | 12 |
-| Payroll | 1 |
+| Payroll | 2 |
 | Positions | 2 |
 | Resources | 1 |
 | Schedule | 4 |
@@ -53,17 +53,17 @@ Served tools per category, in `tools/list` order:
 
 ## Views
 
-| View | Address | Serves (of 159 defined) | `tools/list` bytes | Budget (used) | Reasons |
+| View | Address | Serves (of 160 defined) | `tools/list` bytes | Budget (used) | Reasons |
 | --- | --- | --- | --- | --- | --- |
-| `all` | stdio (no HTTP route) | 153 | 200,976 | — | all ×153, -off ×6 |
-| `default` | `/mcp` | 95 | 119,604 | 126,000 (95 %) | dflt ×91, -pack ×29, -low ×26, -off ×6, base ×3, -pwd ×2, -name ×1, xtra ×1 |
-| `readonly` | `/mcp/readonly` | 84 | 116,761 | 123,000 (95 %) | ro ×84, -write ×67, -off ×6, -pwd ×2 |
-| `ops` | `/mcp/ops` | 53 | 70,833 | 74,500 (95 %) | - ×98, pfx ×27, rule ×23, -off ×6, base ×3, -pwd ×2 |
-| `catalog` | `/mcp/catalog` | 34 | 25,511 | 27,000 (94 %) | - ×117, rule ×31, -off ×6, base ×3, -pwd ×2 |
-| `finance` | `/mcp/finance` | 57 | 97,877 | 103,000 (95 %) | - ×94, pfx ×50, -off ×6, rule ×4, base ×3, -pwd ×2 |
-| `marketing` | `/mcp/marketing` | 17 | 22,856 | 24,000 (95 %) | - ×134, pfx ×13, -off ×6, base ×3, -pwd ×2, rule ×1 |
-| `analytics` | `/mcp/analytics` | 33 | 62,445 | 66,000 (95 %) | - ×118, pfx ×30, -off ×6, base ×3, -pwd ×2 |
-| `onboarding` | `/mcp/onboarding` | 15 | 12,387 | 13,500 (92 %) | - ×136, pfx ×12, -off ×6, base ×3, -pwd ×2 |
+| `all` | stdio (no HTTP route) | 154 | 202,707 | — | all ×154, -off ×6 |
+| `default` | `/mcp` | 96 | 121,335 | 126,000 (96 %) | dflt ×92, -pack ×29, -low ×26, -off ×6, base ×3, -pwd ×2, -name ×1, xtra ×1 |
+| `readonly` | `/mcp/readonly` | 84 | 116,761 | 123,000 (95 %) | ro ×84, -write ×68, -off ×6, -pwd ×2 |
+| `ops` | `/mcp/ops` | 53 | 70,833 | 74,500 (95 %) | - ×99, pfx ×27, rule ×23, -off ×6, base ×3, -pwd ×2 |
+| `catalog` | `/mcp/catalog` | 34 | 25,511 | 27,000 (94 %) | - ×118, rule ×31, -off ×6, base ×3, -pwd ×2 |
+| `finance` | `/mcp/finance` | 58 | 99,702 | 103,000 (97 %) | - ×94, pfx ×51, -off ×6, rule ×4, base ×3, -pwd ×2 |
+| `marketing` | `/mcp/marketing` | 17 | 22,856 | 24,000 (95 %) | - ×135, pfx ×13, -off ×6, base ×3, -pwd ×2, rule ×1 |
+| `analytics` | `/mcp/analytics` | 33 | 62,445 | 66,000 (95 %) | - ×119, pfx ×30, -off ×6, base ×3, -pwd ×2 |
+| `onboarding` | `/mcp/onboarding` | 15 | 12,387 | 13,500 (92 %) | - ×137, pfx ×12, -off ×6, base ×3, -pwd ×2 |
 
 `tools/list` bytes is the serialized result the view sends in the default
 deployment — what a host that loads the whole list pays on every connection,
@@ -326,6 +326,7 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | Tool | stdio | /mcp | /readonly | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `payroll_get_calculation` | `all` | `dflt` | `ro` | `-` | `-` | `pfx` | `-` | `-` | `-` | payroll:read |
+| `payroll_record_payout` | `all` | `dflt` | `-write` | `-` | `-` | `pfx` | `-` | `-` | `-` | finance:write, confirm |
 
 ### Positions
 
