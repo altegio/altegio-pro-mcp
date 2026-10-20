@@ -7,6 +7,8 @@ import type { AltegioClient } from '../../../providers/altegio-client.js';
 import {
   addPayment,
   cancelPayment,
+  checkMoneyArg,
+  checkPaymentMoney,
   createFinancialTransaction,
   deleteFinancialTransaction,
   deposit,
@@ -1164,6 +1166,159 @@ describe('payroll_get_calculation', () => {
     const result = await getPayroll(client, input);
     expect(result.structuredContent).toMatchObject({ calculation: null });
     expect(result.text).toContain('No payroll scheme applies');
+  });
+});
+
+describe('money in the location currency', () => {
+  /** A location whose currency has no minor unit. */
+  const JPY_ROUTE: Route = [
+    'GET',
+    /\/analytics\/overall$/,
+    200,
+    ok({ income_total_stats: { currency: { iso: 'JPY' } } }),
+  ];
+  const NOW = Date.parse('2026-10-19T10:00:00Z');
+  const createRoute: Route = [
+    'POST',
+    /^\/finance_transactions\/4564$/,
+    200,
+    ok({ id: 42, expense_id: 9, account_id: 1330531, amount: -1200 }),
+  ];
+  const noneToday: Route = ['GET', /^\/transactions\/4564$/, 200, ok([])];
+
+  it('hands the port exact money, and V1 gets the major amount', async () => {
+    const spy = jest.spyOn(
+      FinanceAdapter.prototype,
+      'createFinancialTransaction'
+    );
+    try {
+      const calls: Call[] = [];
+      await createFinancialTransaction(
+        fakeClient([noneToday, createRoute], calls),
+        {
+          location_id: LOCATION,
+          payment_item_id: 9,
+          account_id: 1330531,
+          amount: 0.29,
+        },
+        NOW
+      );
+      expect((spy.mock.calls[0] as unknown[])[1]).toMatchObject({
+        amount: { minor: 29, exponent: 2, currency: 'CZK' },
+      });
+      expect(calls.at(-1)!.body).toMatchObject({ amount: 0.29 });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('refuses decimals a currency without a minor unit cannot carry', async () => {
+    const calls: Call[] = [];
+    await expect(
+      createFinancialTransaction(
+        fakeClient([JPY_ROUTE, noneToday, createRoute], calls),
+        {
+          location_id: LOCATION,
+          payment_item_id: 9,
+          account_id: 1330531,
+          amount: 1200.5,
+        },
+        NOW
+      )
+    ).rejects.toThrow(
+      'Nothing was recorded: amount 1200.5 has 1 decimal, but JPY amounts are written in whole numbers; round it.'
+    );
+    expect(calls.some((c) => c.method === 'POST')).toBe(false);
+  });
+
+  it('refuses before anyone is asked', async () => {
+    const client = fakeClient([JPY_ROUTE], []);
+    await expect(
+      checkMoneyArg(client, { location_id: LOCATION, amount: 10.5 })
+    ).rejects.toThrow(ConfirmationRefusal);
+    await expect(
+      checkMoneyArg(client, { location_id: LOCATION, amount: 10 })
+    ).resolves.toBeUndefined();
+    // CZK takes two decimals.
+    clearCurrencyCache();
+    await expect(
+      checkMoneyArg(fakeClient([], []), {
+        location_id: LOCATION,
+        amount: 10.5,
+      })
+    ).resolves.toBeUndefined();
+  });
+
+  it('refuses a deposit the currency cannot carry, before writing', async () => {
+    const calls: Call[] = [];
+    await expect(
+      deposit(fakeClient([JPY_ROUTE, clientAccountsRoute], calls), {
+        location_id: LOCATION,
+        client_id: 77,
+        client_account_id: 220,
+        amount: 99.9,
+        account_id: 35501,
+        expected_balance: 1000,
+      })
+    ).rejects.toThrow(/^Nothing was deposited: amount 99\.9 has 1 decimal/);
+    expect(calls.some((c) => c.method === 'POST')).toBe(false);
+  });
+
+  describe('a payment of an amount due Altegio reported with decimals', () => {
+    const fractional = (call?: Call) => {
+      void call;
+      return sale({ due: 1111.5 });
+    };
+    const paymentRoute: Route = [
+      'POST',
+      new RegExp(`^/locations/${LOCATION}/sale/${DOCUMENT}/payment$`),
+      200,
+      sale({
+        due: 0,
+        payments: [{ id: 1, account_id: 35501, amount: 1111.5 }],
+      }),
+    ];
+    const routes = (): Route[] => [
+      JPY_ROUTE,
+      appointmentRoute,
+      saleRoute(fractional),
+      paymentRoute,
+    ];
+    const pay = (amount: number) => ({
+      location_id: LOCATION,
+      appointment_id: APPOINTMENT,
+      method: 'account' as const,
+      account_id: 35501,
+      amount,
+      expected_amount_due: 1111.5,
+    });
+
+    it('is paid in full at the stored precision', async () => {
+      const calls: Call[] = [];
+      await addPayment(fakeClient(routes(), calls), pay(1111.5));
+      expect(calls.find((c) => c.method === 'POST')!.body).toEqual({
+        payment: {
+          method: { slug: 'account', account_id: 35501 },
+          amount: 1111.5,
+        },
+      });
+      await expect(
+        checkPaymentMoney(fakeClient(routes(), []), pay(1111.5))
+      ).resolves.toBeUndefined();
+    });
+
+    it('refuses any other fraction', async () => {
+      const calls: Call[] = [];
+      await expect(
+        addPayment(fakeClient(routes(), calls), pay(1000.5))
+      ).rejects.toThrow(
+        /^Nothing was recorded: amount 1000\.5 has 1 decimal, but JPY/
+      );
+      expect(calls.some((c) => c.method === 'POST')).toBe(false);
+      await expect(
+        checkPaymentMoney(fakeClient(routes(), []), pay(1000.5))
+      ).rejects.toThrow(ConfirmationRefusal);
+    });
   });
 });
 

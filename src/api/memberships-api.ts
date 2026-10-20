@@ -17,8 +17,11 @@
  * `./v1/memberships-adapter.ts`.
  *
  * Dates from the API pass through as RFC 3339 with the offset the API reports.
- * Money is in major units, as the API reports it.
+ * Money read back is in major units, as the API reports it; a type's prices
+ * are written as `Money` (`./money.ts`).
  */
+
+import type { Money } from './money.js';
 
 export type PeriodUnit = 'day' | 'week' | 'month' | 'year';
 
@@ -147,7 +150,7 @@ export interface AllowanceInput {
 /** Every field of a membership type the API accepts on create and update. */
 export interface MembershipTypeFields {
   title: string;
-  price: number;
+  price: Money;
   location_ids: number[];
   validity: Duration | null;
   activation: MembershipActivation;
@@ -164,7 +167,7 @@ export interface MembershipTypeFields {
   balance_edit: BalanceEditPolicy;
   online_sale_enabled: boolean;
   online_sale_title: string;
-  online_sale_price: number;
+  online_sale_price: Money;
   online_sale_description: string;
   type_category_id: number | null;
 }

@@ -48,6 +48,7 @@ import {
   type ConfirmedCall,
 } from '../../tools/confirmation.js';
 import { writeOptions } from '../../api/write-options.js';
+import { lineTotal, majorOf, moneyOf, roundMajor } from '../../api/money.js';
 import { withUntrustedBlock } from '../../tools/tool-result.js';
 import { FinanceInputError } from './errors.js';
 
@@ -78,9 +79,7 @@ export interface AddProductInput {
 
 const FIELD_MAX_CHARS = 200;
 
-function round2(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
+const round2 = (value: number): number => roundMajor(value);
 
 function round3(value: number): number {
   return Math.round((value + Number.EPSILON) * 1000) / 1000;
@@ -91,13 +90,18 @@ function money(value: number | null, currency: string | null): string {
   return `${round2(value)} ${currency ?? '(currency not reported)'}`;
 }
 
-/** The web app's line total: quantity × price less the line's discount. */
+/**
+ * The web app's line total: quantity × price less the line's discount, in
+ * minor units (`../../api/money.ts`).
+ */
 export function lineAmount(
   unitPrice: number,
   quantity: number,
   discountPercent: number
 ): number {
-  return round2((unitPrice * quantity * (100 - discountPercent)) / 100);
+  return majorOf(
+    lineTotal(quantity, moneyOf(unitPrice, null), discountPercent)
+  );
 }
 
 async function currencyOf(

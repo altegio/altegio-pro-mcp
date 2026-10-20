@@ -26,6 +26,14 @@ import type {
   MembershipsApi,
 } from '../../api/memberships-api.js';
 import { MembershipsInputError } from './errors.js';
+import { resolveLocationCurrency } from '../../api/v1/location-currency.js';
+import {
+  decimalsOf,
+  moneyInput,
+  MoneyInputError,
+  moneyOf,
+  type Money,
+} from '../../api/money.js';
 import {
   completeCollection,
   pageMetadata,
@@ -230,7 +238,7 @@ function checkAllowances(
   }
 }
 
-function checkFields(fields: MembershipTypeFields): void {
+function checkFields(fields: TypeDraft): void {
   if (!fields.title.trim()) {
     throw new MembershipsInputError('title must not be blank.');
   }
@@ -426,6 +434,49 @@ const FIELD_KEYS: readonly (keyof TypeFieldsInput)[] = [
   'type_category_id',
 ];
 
+/** The write fields of a type, with its prices still in major units. */
+type TypeDraft = Omit<MembershipTypeFields, 'price' | 'online_sale_price'> & {
+  price: number;
+  online_sale_price: number;
+};
+
+/**
+ * The draft as the port writes it. A price the caller passed is refused when
+ * the currency of the type's first location cannot carry it; one read back
+ * from the type is kept as read. The currency is read only for a price with
+ * decimals: every currency takes whole numbers.
+ */
+async function typeWrite(
+  client: AltegioClient,
+  draft: TypeDraft,
+  changed: TypeFieldsInput
+): Promise<MembershipTypeFields> {
+  const given = (['price', 'online_sale_price'] as const).filter(
+    (key) => changed[key] !== undefined && decimalsOf(draft[key]) > 0
+  );
+  const locationId = draft.location_ids[0];
+  const currency =
+    given.length > 0 && locationId !== undefined
+      ? await resolveLocationCurrency(client, locationId).catch(() => null)
+      : null;
+  const money = (key: 'price' | 'online_sale_price'): Money => {
+    if (changed[key] === undefined) return moneyOf(draft[key], currency);
+    try {
+      return moneyInput(draft[key], currency, key);
+    } catch (error) {
+      if (error instanceof MoneyInputError) {
+        throw new MembershipsInputError(error.message);
+      }
+      throw error;
+    }
+  };
+  return {
+    ...draft,
+    price: money('price'),
+    online_sale_price: money('online_sale_price'),
+  };
+}
+
 /** Only the keys the caller actually passed. */
 function passedFields(input: TypeFieldsInput): TypeFieldsInput {
   const out: Record<string, unknown> = {};
@@ -436,7 +487,7 @@ function passedFields(input: TypeFieldsInput): TypeFieldsInput {
 }
 
 /** The current type as a full write request. */
-function fieldsFromType(t: MembershipType): MembershipTypeFields {
+function fieldsFromType(t: MembershipType): TypeDraft {
   return {
     title: t.title ?? '',
     price: t.price ?? 0,
@@ -473,7 +524,7 @@ function fieldsFromType(t: MembershipType): MembershipTypeFields {
 }
 
 const DEFAULT_FIELDS: Omit<
-  MembershipTypeFields,
+  TypeDraft,
   'title' | 'price' | 'location_ids' | 'services'
 > = {
   balance_type: 'per_service',
@@ -523,7 +574,7 @@ function sameServices(
 
 /** The requested fields the saved type does not carry. */
 function fieldsNotApplied(
-  wanted: MembershipTypeFields,
+  wanted: TypeDraft,
   changed: TypeFieldsInput,
   saved: MembershipType
 ): string[] {
@@ -561,16 +612,19 @@ export async function createType(
     services: AllowanceInput[];
   }
 ): Promise<MembershipsResult> {
-  const fields: MembershipTypeFields = {
+  const fields: TypeDraft = {
     ...DEFAULT_FIELDS,
     ...passedFields(input),
     title: input.title.trim(),
     price: input.price,
     location_ids: input.location_ids,
     services: input.services,
-  } as MembershipTypeFields;
+  } as TypeDraft;
   checkFields(fields);
-  const saved = await api(client).createType(input.chain_id, fields);
+  const saved = await api(client).createType(
+    input.chain_id,
+    await typeWrite(client, fields, passedFields(input))
+  );
   const missed = fieldsNotApplied(fields, passedFields(input), saved);
   if (missed.length > 0) {
     return savedType(
@@ -604,10 +658,10 @@ export async function updateType(
       `Membership type ${input.type_id} is archived, and an archived type cannot be changed. Unarchive it with memberships_archive_type (archived: false) first.`
     );
   }
-  const fields: MembershipTypeFields = {
+  const fields: TypeDraft = {
     ...fieldsFromType(current),
     ...changes,
-  } as MembershipTypeFields;
+  } as TypeDraft;
   if (changes.title !== undefined) fields.title = changes.title.trim();
   // Switching the balance model invalidates the other model's numbers.
   if (changes.balance_type === 'shared' && current.balance_type !== 'shared') {
@@ -625,7 +679,11 @@ export async function updateType(
     fields.shared_unlimited = false;
   }
   checkFields(fields);
-  const saved = await port.updateType(input.chain_id, input.type_id, fields);
+  const saved = await port.updateType(
+    input.chain_id,
+    input.type_id,
+    await typeWrite(client, fields, changes)
+  );
   const missed = fieldsNotApplied(fields, changes, saved);
   if (missed.length > 0) {
     return savedType(

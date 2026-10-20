@@ -161,6 +161,7 @@ export const clientAccountsDepositTool = defineTool({
     target: (input) =>
       `client account ${input.client_account_id} of client ${input.client_id}`,
     resolve: (input, client) => finance.describeClientAccount(client, input),
+    detail: (input, client) => finance.checkMoneyArg(client, input),
     consequence: (input) =>
       `Records ${input.amount ?? '?'} (location currency) received from the client into account or cash register ${input.account_id ?? '?'} and adds it to the client account balance. This server has no tool to reverse a deposit; a correction is made by a person in Altegio.`,
   },
@@ -412,6 +413,7 @@ export const financialTransactionsCreateTool = defineTool({
     target: (input) =>
       `account or cash register ${input.account_id} at location ${input.location_id}`,
     resolve: (input, client) => finance.describeNewTransaction(client, input),
+    detail: (input, client) => finance.checkMoneyArg(client, input),
     consequence: (input) =>
       `Records ${input.amount ?? '?'} (location currency) under payment item ${input.payment_item_id ?? '?'} — income or expense as the payment item says — in account or cash register ${input.account_id ?? '?'}${input.date ? ` dated ${input.date}` : ', dated now'}. The account balance and the finance reports change. It can be undone with financial_transactions_delete.`,
   },

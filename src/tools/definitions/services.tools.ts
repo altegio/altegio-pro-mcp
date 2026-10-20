@@ -8,6 +8,9 @@ import { defineTool } from '../factory.js';
 import { withUntrustedBlock, type UntrustedField } from '../tool-result.js';
 import { servicesOutput, serviceEntityOutput } from '../output-schemas.js';
 import type { AltegioService } from '../../types/altegio.types.js';
+import type { AltegioClient } from '../../providers/altegio-client.js';
+import { decimalsOf, moneyInput } from '../../api/money.js';
+import { resolveLocationCurrency } from '../../api/v1/location-currency.js';
 
 const seanceLengthSchema = z
   .number()
@@ -27,6 +30,24 @@ const prepaidArg = z
   .enum(['forbidden', 'allowed', 'required'])
   .optional()
   .describe('Online advance payment.');
+
+/**
+ * Refuse a price the location's currency cannot carry (`../../api/money.ts`).
+ * Every currency takes whole numbers, so the currency is read only for a price
+ * with decimals.
+ */
+async function checkPrices(
+  client: AltegioClient,
+  locationId: number,
+  input: { price_min?: number; price_max?: number }
+): Promise<void> {
+  const given = (['price_min', 'price_max'] as const).filter(
+    (key) => input[key] !== undefined && decimalsOf(input[key]) > 0
+  );
+  if (given.length === 0) return;
+  const currency = await resolveLocationCurrency(client, locationId);
+  for (const key of given) moneyInput(input[key]!, currency, key);
+}
 
 /**
  * The service's price as a range. Altegio stores a fixed price as
@@ -225,6 +246,7 @@ export const createServiceTool = defineTool({
   outputSchema: serviceEntityOutput,
   handler: async ({ input, client }) => {
     const { location_id, duration_seconds, active, ...serviceData } = input;
+    await checkPrices(client, location_id, input);
     const service = await client.createService(location_id, {
       ...serviceData,
       ...(duration_seconds !== undefined ? { duration: duration_seconds } : {}),
@@ -277,6 +299,7 @@ export const updateServiceTool = defineTool({
   handler: async ({ input, client }) => {
     const { location_id, service_id, duration_seconds, active, ...rest } =
       input;
+    await checkPrices(client, location_id, input);
     const updateData = {
       ...rest,
       ...(duration_seconds !== undefined ? { duration: duration_seconds } : {}),

@@ -1,6 +1,7 @@
 import { ToolHandlers } from '../handlers.js';
 import { AltegioClient } from '../../providers/altegio-client.js';
 import { AuthenticationError } from '../../utils/errors.js';
+import { clearCurrencyCache } from '../../api/v1/location-currency.js';
 
 jest.mock('../../providers/altegio-client.js');
 
@@ -126,6 +127,62 @@ describe('ToolHandlers - Services CRUD', () => {
       });
 
       expect(result.content[0]?.text).toContain('Authentication required');
+    });
+  });
+
+  describe('prices with decimals', () => {
+    const currency = (iso: string) =>
+      jest.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              success: true,
+              data: { income_total_stats: { currency: { iso } } },
+            }),
+            { status: 200 }
+          )
+      );
+    beforeEach(() => clearCurrencyCache());
+
+    it('refuses a price the location currency cannot carry', async () => {
+      Object.assign(mockClient, {
+        apiRequest: currency('JPY'),
+        isAuthenticated: () => true,
+      });
+      const result = await handlers.createService({
+        location_id: 456,
+        title: 'Haircut',
+        category_id: 10,
+        price_min: 1500.5,
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toContain(
+        'price_min 1500.5 has 1 decimal, but JPY amounts are written in whole numbers; round it.'
+      );
+      expect(mockClient.createService).not.toHaveBeenCalled();
+    });
+
+    it('writes it when the currency carries it, and reads no currency for whole prices', async () => {
+      const apiRequest = currency('CZK');
+      Object.assign(mockClient, { apiRequest, isAuthenticated: () => true });
+      mockClient.updateService.mockResolvedValue({ id: 789 } as Awaited<
+        ReturnType<AltegioClient['updateService']>
+      >);
+      await handlers.updateService({
+        location_id: 456,
+        service_id: 789,
+        price_min: 99.5,
+      });
+      expect(mockClient.updateService).toHaveBeenCalledWith(456, 789, {
+        price_min: 99.5,
+      });
+      expect(apiRequest).toHaveBeenCalledTimes(1);
+      await handlers.updateService({
+        location_id: 456,
+        service_id: 789,
+        price_max: 120,
+      });
+      expect(apiRequest).toHaveBeenCalledTimes(1);
     });
   });
 

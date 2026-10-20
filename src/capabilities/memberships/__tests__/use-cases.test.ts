@@ -22,6 +22,7 @@ import {
   MembershipsInputError,
   MembershipsNotFoundError,
 } from '../errors.js';
+import { clearCurrencyCache } from '../../../api/v1/location-currency.js';
 
 interface Call {
   method: string;
@@ -388,6 +389,48 @@ describe('memberships_create_type', () => {
       message
     );
     expect(calls).toHaveLength(0);
+  });
+
+  describe('a price with decimals', () => {
+    const currencyOf = (iso: string): Route => [
+      'GET',
+      /^\/locations\/1\/analytics\/overall$/,
+      200,
+      ok({ income_total_stats: { currency: { iso } } }),
+    ];
+    const created: Route = [
+      'POST',
+      /^\/chains\/9\/loyalty\/abonement_types$/,
+      200,
+      ok(typeRow({ expiration_type_id: 2, cost: 299.5 })),
+    ];
+    beforeEach(() => clearCurrencyCache());
+
+    it('is written when the currency of the first location carries it', async () => {
+      const calls: Call[] = [];
+      await createType(fakeClient([currencyOf('CZK'), created], calls), {
+        ...input,
+        price: 299.5,
+      });
+      expect(calls.find((c) => c.method === 'POST')!.body).toMatchObject({
+        cost: 299.5,
+      });
+    });
+
+    it('is refused when it does not, before calling the API', async () => {
+      const calls: Call[] = [];
+      await expect(
+        createType(fakeClient([currencyOf('JPY'), created], calls), {
+          ...input,
+          price: 299.5,
+        })
+      ).rejects.toThrow(
+        new MembershipsInputError(
+          'price 299.5 has 1 decimal, but JPY amounts are written in whole numbers; round it.'
+        )
+      );
+      expect(calls.some((c) => c.method === 'POST')).toBe(false);
+    });
   });
 });
 

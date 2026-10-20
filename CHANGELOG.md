@@ -6,6 +6,30 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — exact money, checked against the location currency
+
+ADR-001 §5 rule 4 is amended: money stays in major units of the location's
+currency at the tool surface, and the conversion to V3 minor units belongs to
+the V3 adapter. No argument or result shape changes.
+
+- **Money arguments follow the currency's exponent.** `visits_add_payment`,
+  `client_accounts_deposit`, `financial_transactions_create` and `_update`,
+  `inventory_create_operation` (`unit_price`), `memberships_create_type` and
+  `_update_type` (`price`, `online_sale_price`) and `services_create` and
+  `_update` (`price_min`, `price_max`) refuse more decimals than the location's
+  currency takes: whole numbers for JPY or ISK, two decimals for CZK or EUR,
+  and two for three-decimal currencies such as KWD, since Altegio stores two
+  decimals for every currency. They said "at most two decimals" or nothing
+  before. A payment of the amount due Altegio reported is accepted at its two
+  stored decimals in any currency. The finance tools refuse before anyone is
+  asked to confirm.
+- **Exact money at the ports.** Finance, inventory and membership port writes
+  carry a `Money` value (integer minor units, exponent, currency) instead of a
+  JS number; the V1 adapters send the major amount. Visit totals, page sums,
+  inventory and visit-product line totals are computed in minor units, so
+  float drift no longer decides a rounding (3 × 0.35 less 50 % is 0.53, not
+  0.52; 1.005 rounds to 1.01).
+
 ### Changed — six low-use groups leave the default view
 
 `/mcp` (hosted `https://mcp.alteg.io/pro`) no longer lists 26 tools that

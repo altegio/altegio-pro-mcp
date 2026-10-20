@@ -13,14 +13,17 @@
  * `expense`, `master`, `salary`, `record`, `good`, `kkm`) stop inside
  * `./v1/finance-adapter.ts`.
  *
- * Money is in major units, exactly as the API reports and accepts it, and is
- * always read next to the location's ISO currency code. Datetimes are RFC 3339
- * in the location's own offset.
+ * Money read back is in major units, exactly as the API reports it, and is
+ * always read next to the location's ISO currency code. Money written is a
+ * `Money` (`./money.ts`): exact minor units with their exponent, which an
+ * adapter turns into its wire form. Datetimes are RFC 3339 in the location's
+ * own offset.
  *
  * Every write takes `WriteOptions`: the idempotency key a V3 adapter sends as
  * `Idempotency-Key` (see `./write-options.ts`).
  */
 
+import type { Money } from './money.js';
 import type { WriteOptions } from './write-options.js';
 
 // ========== visit: items and payments ==========
@@ -149,9 +152,9 @@ export interface Visit {
 
 /** A payment to record, by method; every id comes from `payment_options`. */
 export type PaymentRequest =
-  | { method: 'account'; account_id: number; amount: number }
-  | { method: 'client_account'; client_account_id: number; amount: number }
-  | { method: 'loyalty_card'; loyalty_card_id: number; amount: number }
+  | { method: 'account'; account_id: number; amount: Money }
+  | { method: 'client_account'; client_account_id: number; amount: Money }
+  | { method: 'loyalty_card'; loyalty_card_id: number; amount: Money }
   | {
       method: 'loyalty_program';
       loyalty_card_id: number;
@@ -160,14 +163,14 @@ export type PaymentRequest =
   | {
       method: 'gift_card';
       gift_card_id: number;
-      amount: number;
+      amount: Money;
       number?: string;
     }
   | { method: 'membership'; membership_id: number; number?: string }
   | {
       method: 'advance_payment_hold';
       advance_payment_hold_id: number;
-      amount: number;
+      amount: Money;
     };
 
 // ========== client accounts ==========
@@ -189,8 +192,8 @@ export interface ClientAccount {
 export interface ClientAccountDepositRequest {
   client_id: number;
   client_account_id: number;
-  /** Money received, in major units; above zero. */
-  amount: number;
+  /** Money received; above zero. */
+  amount: Money;
   /** Where the money is received: one of the accounts and cash registers. */
   account_id: number;
   team_member_id?: number;
@@ -261,8 +264,8 @@ export interface FinancialTransactionQuery {
 export interface FinancialTransactionFields {
   payment_item_id: number;
   account_id: number;
-  /** Major units, above zero; the payment item decides income or expense. */
-  amount: number;
+  /** Above zero; the payment item decides income or expense. */
+  amount: Money;
   /** Location-local wall time, `YYYY-MM-DD HH:MM:SS`. */
   local_date: string;
   client_id: number | null;
