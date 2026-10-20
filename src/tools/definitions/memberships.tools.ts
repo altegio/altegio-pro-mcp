@@ -40,14 +40,12 @@ const membershipId = z
     'Membership id, not its number (memberships_list_for_client, memberships_list).'
   );
 
-const unit = z
-  .enum(['day', 'week', 'month', 'year'])
-  .describe('day, week, month or year.');
+const unit = z.enum(['day', 'week', 'month', 'year']);
 
 const duration = (what: string) =>
   z
     .object({
-      length: z.number().int().min(1).max(3650).describe('How many units.'),
+      length: z.number().int().min(1).max(3650),
       unit,
     })
     .strict()

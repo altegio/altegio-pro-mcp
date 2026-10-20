@@ -6,6 +6,28 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — a lighter `tools/list` on every view
+
+`/mcp` goes from 125,389 to 119,604 bytes (−5.8 KB) with the same 95 tools,
+and every other view shrinks too (`/mcp/readonly` −3.5 KB, `/mcp/ops` −3.1 KB,
+`/mcp/finance` −3.0 KB). The budgets in `src/tools/listing-budget.ts` drop
+with them. Nothing a tool accepts or refuses changes.
+
+- The listing no longer repeats two rules the server enforces anyway:
+  `additionalProperties: false` is dropped at every depth (it was already
+  dropped at the top), and `minimum: 1` on integer ids, `*_ids` items, `page`
+  and `page_size`. A zero id or an unknown key is still refused, with the rule
+  named. The definitions keep both.
+- `confirmation_token` is described as "From confirmation_required, after the
+  user agreed."
+- Descriptions that only restated an enum lose that part: the membership
+  validity `unit`, the appointment `status`, the attendance `target_status`
+  and the client-search `match`. `appointments_create` no longer repeats in
+  prose that `session_length` is required.
+- `appointments_list_tags`, `appointments_create_tag` and the
+  `appointments_update` `color` are shorter; `api_search_operations`
+  `include_preview` no longer names a backend version.
+
 ### Changed — exact money, checked against the location currency
 
 ADR-001 §5 rule 4 is amended: money stays in major units of the location's
