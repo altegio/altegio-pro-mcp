@@ -20,8 +20,12 @@
  * The planned V3 `addVisitItem` appends one line and checks the visit's ETag;
  * an adapter over it replaces this one without changing the tools. Money is
  * in major units of the location's currency.
+ *
+ * Every write takes `WriteOptions`: the idempotency key a V3 adapter sends as
+ * `Idempotency-Key` (see `./write-options.ts`).
  */
 import type { AppointmentAttendance } from './inventory-api.js';
+import type { WriteOptions } from './write-options.js';
 
 export type { AppointmentAttendance };
 
@@ -186,7 +190,8 @@ export interface VisitProductsApi {
   addProductLine(
     locationId: number,
     appointmentId: number,
-    request: AddProductLineRequest
+    request: AddProductLineRequest,
+    options?: WriteOptions
   ): Promise<ProductLineSaveResult>;
   /**
    * Drop the line or lower its quantity; the product returns to the line's
@@ -196,6 +201,7 @@ export interface VisitProductsApi {
   reduceProductLine(
     locationId: number,
     appointmentId: number,
-    request: ReduceProductLineRequest
+    request: ReduceProductLineRequest,
+    options?: WriteOptions
   ): Promise<ProductLineSaveResult>;
 }

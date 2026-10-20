@@ -51,7 +51,8 @@
  *   403 for a status that cannot sell products or a missing right, 406 when the
  *   location forbids negative stock, 409 for a schedule conflict, 400 for a
  *   printed receipt or another refusal. The message follows `Accept-Language`, so
- *   the save asks for English and known refusals are recognized by their text.
+ *   the save asks for English and known refusals are recognized by their text. * - V2 has no idempotency header, so the writes ignore the `idempotency_key`
+ *   of their `WriteOptions` (`../write-options.ts`).
  */
 import { createHash } from 'node:crypto';
 import type { AltegioHttp } from '../altegio-http.js';

@@ -25,6 +25,9 @@
  * (`expected_current_quantity`), so a repeated confirmed call cannot take off
  * twice — and the confirmation shows the line before and after and the stock
  * that comes back.
+ *
+ * Both writes hand the port the confirmed call's idempotency key
+ * (`../../api/write-options.ts`).
  */
 import type { AltegioClient } from '../../providers/altegio-client.js';
 import { VisitProductsV2Adapter } from '../../api/v2/visit-products-adapter.js';
@@ -40,7 +43,11 @@ import type {
 } from '../../api/visit-products-api.js';
 import type { Visit } from '../../api/finance-api.js';
 import { knownInventory } from '../inventory/shared.js';
-import { ConfirmationRefusal } from '../../tools/confirmation.js';
+import {
+  ConfirmationRefusal,
+  type ConfirmedCall,
+} from '../../tools/confirmation.js';
+import { writeOptions } from '../../api/write-options.js';
 import { withUntrustedBlock } from '../../tools/tool-result.js';
 import { FinanceInputError } from './errors.js';
 
@@ -427,18 +434,24 @@ function lineStructured(l: VisitProductLine) {
 
 export async function addProduct(
   client: AltegioClient,
-  input: AddProductInput
+  input: AddProductInput,
+  confirmation?: ConfirmedCall
 ): Promise<VisitProductsResult> {
   const api = visitProductsApi(client);
   const plan = await planSale(client, api, input);
   const currency = await currencyOf(client, input.location_id);
 
   const { appointment: after, unexpected_changes: unexpected } =
-    await api.addProductLine(input.location_id, input.appointment_id, {
-      line: plan.line,
-      mark_arrived: plan.marks_arrived,
-      expected_version: plan.sale.version,
-    });
+    await api.addProductLine(
+      input.location_id,
+      input.appointment_id,
+      {
+        line: plan.line,
+        mark_arrived: plan.marks_arrived,
+        expected_version: plan.sale.version,
+      },
+      writeOptions(confirmation)
+    );
 
   const saved =
     plan.line.line_id !== null
@@ -720,7 +733,8 @@ async function visitAfter(
 
 export async function removeProduct(
   client: AltegioClient,
-  input: RemoveProductInput
+  input: RemoveProductInput,
+  confirmation?: ConfirmedCall
 ): Promise<VisitProductsResult> {
   const api = visitProductsApi(client);
   const plan = await planRemoval(api, input);
@@ -728,12 +742,17 @@ export async function removeProduct(
   const { line } = plan;
 
   const { appointment: after, unexpected_changes: unexpected } =
-    await api.reduceProductLine(input.location_id, input.appointment_id, {
-      line_id: line.id,
-      quantity: plan.quantity,
-      amount: plan.amount,
-      expected_version: plan.sale.version,
-    });
+    await api.reduceProductLine(
+      input.location_id,
+      input.appointment_id,
+      {
+        line_id: line.id,
+        quantity: plan.quantity,
+        amount: plan.amount,
+        expected_version: plan.sale.version,
+      },
+      writeOptions(confirmation)
+    );
 
   const now = after.product_lines.find((l) => l.id === line.id) ?? null;
   const applied =

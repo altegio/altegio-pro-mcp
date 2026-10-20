@@ -6,6 +6,16 @@ is declared stable.
 
 ## [Unreleased]
 
+### Fixed — visit payments and visit products carry the confirmation's key
+
+- `visits_add_payment` and `visits_cancel_payment` now hand the confirmed
+  call to their use cases, so the idempotency key derived from the
+  confirmation reaches the finance port, as `financial_transactions_*` and
+  `client_accounts_deposit` already did.
+- `visits_add_product` and `visits_remove_product` do the same: the visit
+  product port's writes take the optional `idempotency_key` too. The V2
+  adapter ignores it; a V3 adapter sends it as `Idempotency-Key`.
+
 ### Breaking changes — visit, finance and inventory tools follow the product glossary
 
 The owner decided on 2026-10-20 that there is no "bill": the visit itself is
@@ -101,9 +111,7 @@ Text the model reads changes with them:
   ports takes an optional `idempotency_key`, derived from the confirmation (a
   hash of the tool name, the canonical arguments and the token's expiry), so a
   repeat of one confirmed call carries the same key. The V1 adapters ignore it;
-  a V3 adapter sends it as `Idempotency-Key`. `visits_add_payment` and
-  `visits_cancel_payment` accept it in their use cases and are wired at the
-  tool once the concurrent visits work lands.
+  a V3 adapter sends it as `Idempotency-Key`.
 - The consumables result no longer prints "every line has a new line id:" when
   no line remains.
 - An opt-in live suite (`replay-guards-live`) drives both guards through the
