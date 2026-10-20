@@ -47,7 +47,7 @@ const RECEPTION_MONEY_TOOLS = [
   'visits_get',
 ];
 
-/** Back-office money, served on finance only. */
+/** Back-office money: finance, and the default view. */
 const BACK_OFFICE_MONEY_TOOLS = [
   'financial_transactions_create',
   'financial_transactions_delete',
@@ -408,9 +408,11 @@ describe('static views', () => {
           analyticsCount +
           DEFAULT_FACET_EXTRA_TOOLS.length -
           PASSWORD_LOGIN_TOOLS.length -
-          DEFAULT_FACET_EXCLUDED_TOOLS.length -
-          BACK_OFFICE_MONEY_TOOLS.length
+          DEFAULT_FACET_EXCLUDED_TOOLS.length
       );
+      for (const name of BACK_OFFICE_MONEY_TOOLS) {
+        expect(index.includes(DEFAULT_FACET, name)).toBe(true);
+      }
     });
 
     it('serves everything on the unfiltered view stdio uses', () => {

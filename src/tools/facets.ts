@@ -308,14 +308,15 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
  * Packs kept out of the default `/mcp` view. Everything else that exists is
  * served there, so the default endpoint keeps working exactly as it does today
  * for current users; a new pack joins it only by an explicit decision here.
+ *
+ * Back-office money (`financial_transactions_*`, `payroll_*`) is served on
+ * `/mcp`: owners are the default view's first audience (ADR-001 D2), and
+ * withholding the expense and payroll tools while serving payments and stock
+ * writes left an owner no way to record an expense from the default address.
+ * What `/mcp` may cost is a byte budget (`./listing-budget.ts`), not a list.
  */
 export const DEFAULT_FACET_EXCLUDED_PREFIXES: readonly string[] = [
   'analytics_',
-  // Back-office money: cash operations, expenses and payroll belong to the
-  // owner's finance work, not to the reception tasks `/mcp` serves (a visit's
-  // payments and client accounts stay there). They live on `/mcp/finance`.
-  'financial_transactions_',
-  'payroll_',
 ];
 
 /**
