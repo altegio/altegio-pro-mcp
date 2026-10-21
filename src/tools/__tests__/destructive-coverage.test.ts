@@ -20,6 +20,13 @@ const factoryTools = (Object.values(defs) as unknown[]).filter(
     !!tool && typeof tool === 'object' && 'toMcpTool' in tool && 'meta' in tool
 );
 
+/**
+ * The write dispatcher of `/mcp/compact` may run a deletion, so it is marked
+ * destructive, but it has no confirmation of its own: the registry runs the
+ * confirmation of the tool it dispatches to (`src/__tests__/dispatch-e2e.test.ts`).
+ */
+const DISPATCHER = 'tools_call_write';
+
 /** Every destructive tool, factory-defined or hand-written, by name. */
 const destructiveNames = [
   ...factoryTools
@@ -54,6 +61,7 @@ describe('destructive tools are gated', () => {
       'services_delete',
       'services_unlink_team_member',
       'team_members_delete',
+      'tools_call_write',
       'visits_cancel_payment',
       'visits_remove_product',
     ]);
@@ -61,7 +69,9 @@ describe('destructive tools are gated', () => {
 
   it.each(
     factoryTools.filter(
-      (tool) => tool.meta.annotations?.destructiveHint === true
+      (tool) =>
+        tool.meta.annotations?.destructiveHint === true &&
+        tool.meta.name !== DISPATCHER
     )
   )('$meta.name declares a confirmation', (tool) => {
     expect(tool.meta.confirm).toBeDefined();
@@ -79,7 +89,9 @@ describe('destructive tools are gated', () => {
 
   it.each(
     factoryTools.filter(
-      (tool) => tool.meta.annotations?.destructiveHint === true
+      (tool) =>
+        tool.meta.annotations?.destructiveHint === true &&
+        tool.meta.name !== DISPATCHER
     )
   )('$meta.name publishes an optional confirmation_token', (tool) => {
     const schema = tool.toMcpTool().inputSchema;

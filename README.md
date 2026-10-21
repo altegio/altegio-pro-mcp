@@ -6,11 +6,11 @@ A TypeScript [Model Context Protocol](https://modelcontextprotocol.io) server fo
 Altegio business owners, administrators, and team members. It provides
 administrative B2B operations, client workflows, onboarding, and analytics.
 
-**154 tools served (160 defined, 6 withheld from every view)** — see the generated
+**157 tools served (163 defined, 6 withheld from every view)** — see the generated
 [tool surface](docs/architecture/tool-surface.md) for exact membership and gates.
 The surface includes a 28-tool analytics pack, a 15-tool group events pack, a
 13-tool memberships pack, 15 visit, payment, finance and payroll tools, a 9-tool inventory
-pack, a 3-tool API explorer, and 12 onboarding wizard tools. The API explorer executes reads only; administrative
+pack, a 3-tool API explorer, a 3-tool curated-tool dispatcher, and 12 onboarding wizard tools. The API explorer executes reads only; administrative
 writes use curated tools. The six unavailable report-builder tools are withheld
 because their upstream report-data service is not usable.
 
@@ -30,6 +30,16 @@ the onboarding wizard (`onboarding`), event duplication patterns and client file
 archive/delete (`marketing`), and booking form create/delete (`catalog`).
 A call to a tool outside its view is refused. Token scopes and upstream access
 rights are enforced independently of view membership.
+
+The compact endpoint `https://mcp.alteg.io/pro/compact` lists 26 tools, about
+36 KB against about 120 KB on the default address: the most used tools plus
+`tools_search`, `tools_call_read` and `tools_call_write`, which find and run
+every other tool a generic agent may hold, the groups above and the analytics
+pack included, with the same validation, scopes and confirmations. A host that
+sends every listed tool to the model pays less than half per request there; a
+host that defers MCP tools behind its own search (Codex, Claude Code,
+claude.ai) pays about the same and reaches the tools the default address does
+not list. The [evals](evals/README.md) compare the two addresses.
 
 ## Run locally
 
@@ -61,7 +71,7 @@ npm run dev:http
 curl --fail http://localhost:3000/health
 ```
 
-The local MCP route is `/mcp`, with `/mcp/<facet>` and `/mcp/readonly` variants.
+The local MCP route is `/mcp`, with `/mcp/<facet>`, `/mcp/readonly` and `/mcp/compact` variants.
 HTTP uses the SDK's Streamable HTTP transport and session handling. All views
 share `MCP_HTTP_MAX_SESSIONS` (default 512), including pending initializes. Tune
 it against the container's JS heap budget; the internal 256 MiB old-space

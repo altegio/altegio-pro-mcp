@@ -11,7 +11,12 @@ import {
 import { AltegioClient } from '../providers/altegio-client.js';
 import { OnboardingHandlers } from './onboarding-handlers.js';
 import { OnboardingStateManager } from '../providers/onboarding-state-manager.js';
-import { servedDefinedTools } from './inventory.js';
+import { orderedToolEntries, servedDefinedTools } from './inventory.js';
+import {
+  isDispatchCall,
+  resolveDispatch,
+  type DispatchTargets,
+} from './dispatch.js';
 import {
   readOnlyRefusalMessage,
   DEFAULT_FACET,
@@ -462,6 +467,20 @@ export function registerTools(
   });
   const { facetIndex, servingView } = listing;
   const visible = new Set(facetIndex.members(facet));
+  // What this view's dispatcher runs (`./dispatch.ts`): on /mcp/compact, the
+  // tools it lists and the ones it does not; nothing on a view without it.
+  const reachable = new Set(facetIndex.reachable(facet));
+  const readOnly = new Map(
+    orderedToolEntries().map((entry) => [
+      entry.spec.name,
+      entry.spec.annotations?.readOnlyHint === true,
+    ])
+  );
+  const dispatchTargets: DispatchTargets = {
+    reaches: (name) => reachable.has(name),
+    readOnly: (name) => readOnly.get(name),
+    addressesServing: (name) => servingView.addressesServing(name),
+  };
 
   // list handler — the same list for every connection to this facet
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -482,6 +501,8 @@ export function registerTools(
     const call: {
       tool: string;
       alias?: string;
+      /** The dispatcher this call came through, for a dispatched tool. */
+      via?: string;
       errorClass?: ToolErrorClass;
       validation?: ValidationIssue[];
       confirmation?: boolean;
@@ -491,6 +512,20 @@ export function registerTools(
 
     const execute = async (): Promise<ToolResult> => {
       let name = requested;
+      // A dispatcher call runs as the tool it names, down the rest of this
+      // path: scope, confirmation and the tool's own validation, logged under
+      // the tool's name with `via`.
+      if (isDispatchCall(requested) && visible.has(requested)) {
+        call.tool = requested;
+        const dispatched = resolveDispatch(requested, args, dispatchTargets);
+        if ('refusal' in dispatched) {
+          call.errorClass = dispatched.errorClass;
+          return dispatched.refusal;
+        }
+        call.via = requested;
+        name = dispatched.target;
+        callArgs = dispatched.args;
+      }
       let handler = handlerFor(name);
       let aliasIssues: ZodError['issues'] | undefined;
       if (!handler) {
@@ -511,7 +546,9 @@ export function registerTools(
         aliasIssues = inputIssuesOf.get(target)?.(callArgs);
       }
       call.tool = name;
-      if (!visible.has(name)) {
+      // A tool the dispatcher reaches runs when named directly too: the same
+      // gates apply, and a host that lists only `tools/list` never sends it.
+      if (!visible.has(name) && !reachable.has(name)) {
         call.errorClass = 'out_of_view';
         throw outOfFacetError(name, facet, facetIndex, publicBaseUrl);
       }
@@ -550,6 +587,7 @@ export function registerTools(
           prepared,
           client,
           runtime: confirmationRuntime(server, extra.requestId),
+          ...(call.via ? { dispatcher: call.via } : {}),
         });
         if ('stop' in gate) {
           call.confirmation = true;
@@ -606,6 +644,7 @@ export function registerTools(
           rpc_method: 'tools/call',
           tool: call.tool,
           ...(call.alias ? { alias: call.alias } : {}),
+          ...(call.via ? { via: call.via } : {}),
           ...(call.tool === 'unknown' &&
           !call.alias &&
           SAFE_TOOL_NAME.test(requested)

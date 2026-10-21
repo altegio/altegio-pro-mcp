@@ -6,6 +6,37 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — `/pro/compact` and a curated-tool dispatcher
+
+- **A compact address**, `https://mcp.alteg.io/pro/compact` (`/mcp/compact`
+  locally). Its `tools/list` carries 26 tools in 36,194 bytes, against 96 tools
+  and 121,576 bytes on `/pro`: the base tools, the most used tools (about 95 %
+  of `/pro` calls over 22 days) and three new tools that reach everything
+  else.
+- **`tools_search`** finds a tool by the task in the user's words, or by a
+  name a result mentioned, and returns its description, input schema and the
+  dispatcher that runs it.
+- **`tools_call_read` / `tools_call_write`** run a tool by name with its
+  arguments. The tool's own validation, token scope and confirmation apply,
+  exactly as on a direct call; a confirmation is repeated through the same
+  dispatcher with the token inside `arguments`. `tools_call_read` runs reads
+  only, so a host may approve it without asking.
+- **It reaches more than `/pro`.** Everything `/pro` lists, plus the groups
+  `/pro` leaves out for its size: the analytics pack, the onboarding wizard,
+  client files, event duplication patterns, membership freeze, balance and
+  validity changes, membership type archive and delete, and booking form
+  create and delete. Access management stays off it, as on `/pro`.
+- `/pro` and every other address are unchanged. The `tool_call` log names a
+  dispatched call by the tool it ran, with `via` set to the dispatcher.
+- **Tool-selection evals** (`npm run eval`, `evals/`) run realistic requests
+  through a real MCP host against a local server, once per view, and score
+  whether the agent reaches the right tool with arguments it accepts. Writes
+  are chosen and scored under a read-only grant, never run. On Codex, 28 tasks
+  × 3 samples: every task whose tool `/pro` lists passed on both addresses
+  (72/72), and the four whose tool it does not passed on `/pro/compact` only
+  (12/12 against 0/12), at about the same tokens per run. ADR-001 D3 has the
+  breakdown.
+
 ### Fixed — payments Altegio does not keep, inventory dates and directions
 
 Found by the live suites on a test location and checked there after the fix.

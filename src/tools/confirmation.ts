@@ -393,8 +393,17 @@ export async function requireConfirmation(options: {
   readonly prepared: PreparedConfirmation;
   readonly client: AltegioClient;
   readonly runtime: ConfirmationRuntime;
+  /**
+   * The dispatcher the call came through (`tools_call_write`), so the token
+   * path says how to repeat it: the same dispatcher, the token inside
+   * `arguments`.
+   */
+  readonly dispatcher?: string;
 }): Promise<GateOutcome> {
-  const { toolName, args, prepared, client, runtime } = options;
+  const { toolName, args, prepared, client, runtime, dispatcher } = options;
+  const repeat = dispatcher
+    ? `call ${dispatcher} again with tool "${toolName}" and the same arguments, adding ${CONFIRMATION_TOKEN_ARG}`
+    : `call ${toolName} again with the same arguments plus ${CONFIRMATION_TOKEN_ARG}`;
 
   const supplied =
     args && typeof args === 'object'
@@ -499,7 +508,7 @@ export async function requireConfirmation(options: {
           headline,
           consequence,
           ``,
-          `Show this to the person you act for. Only if they agree, call ${toolName} again with the same arguments plus ${CONFIRMATION_TOKEN_ARG}="${token}" (valid for these arguments until ${expiresAt}). Do not retry without asking, and do not repeat a call that went through.`,
+          `Show this to the person you act for. Only if they agree, ${repeat}="${token}" (valid for these arguments until ${expiresAt}). Do not retry without asking, and do not repeat a call that went through.`,
         ].join('\n'),
       },
     ],
@@ -510,7 +519,7 @@ export async function requireConfirmation(options: {
       summary: `${headline} ${consequence}`,
       [CONFIRMATION_TOKEN_ARG]: token,
       expires_at: expiresAt,
-      next_step: `Ask the user. Only if they agree, call ${toolName} again with the same arguments plus ${CONFIRMATION_TOKEN_ARG}.`,
+      next_step: `Ask the user. Only if they agree, ${repeat}.`,
     },
   };
   return { stop };

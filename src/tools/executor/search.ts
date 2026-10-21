@@ -76,7 +76,7 @@ const SYNONYM_GROUPS: string[][] = [
   ['account', 'accounts', 'deposit', 'deposits'],
   ['receptionist', 'administrator', 'admin', 'user', 'users'],
   ['analytics', 'statistic', 'statistics', 'stats', 'report', 'reports'],
-  ['schedule', 'schedules', 'timetable'],
+  ['schedule', 'schedules', 'timetable', 'shift', 'shifts'],
   ['visit', 'visits'],
   ['service', 'services'],
   ['position', 'positions', 'role', 'roles'],
@@ -84,6 +84,8 @@ const SYNONYM_GROUPS: string[][] = [
   ['availability', 'available', 'free', 'slot', 'slots', 'seance', 'seances'],
   ['fiscal', 'fiscalization', 'kkm', 'cash', 'register', 'till', 'receipt'],
   ['inventory', 'stock', 'storage', 'storages', 'warehouse'],
+  ['retention', 'churn', 'churned', 'lost', 'returning', 'return'],
+  ['expense', 'expenses', 'transaction', 'transactions', 'cost', 'costs'],
 ];
 
 const SYNONYMS: Map<string, string[]> = (() => {
@@ -164,7 +166,7 @@ export interface SearchHit {
   tool?: string;
 }
 
-function tokenize(text: string): string[] {
+export function tokenize(text: string): string[] {
   return text
     .toLowerCase()
     .split(/[^a-z0-9]+/)
@@ -212,7 +214,7 @@ function indexOperation(op: CatalogOperation): OperationIndex {
  * of a prefix comparison must be long enough to mean something — otherwise a
  * one-letter path segment like `z_report` matches any word starting with `z`.
  */
-function termHit(tokens: Set<string>, term: string): number {
+function termHit(tokens: ReadonlySet<string>, term: string): number {
   if (tokens.has(term)) return 1;
   if (term.length < MIN_PREFIX_LENGTH) return 0;
   for (const token of tokens) {
@@ -222,23 +224,35 @@ function termHit(tokens: Set<string>, term: string): number {
   return 0;
 }
 
-/** Best evidence for one term, counting its synonyms at a discount. */
-function scoreTerm(index: OperationIndex, term: string): number {
+/**
+ * Best evidence for one term across weighted token sets, counting its synonyms
+ * at a discount. Shared with the curated-tool search (`../dispatch.ts`), so
+ * both searches speak the same business vocabulary.
+ */
+export function weightedTermScore<K extends string>(
+  fields: Readonly<Record<K, ReadonlySet<string>>>,
+  weights: Readonly<Record<K, number>>,
+  term: string
+): number {
   const variants: Array<[string, number]> = [[term, 1]];
   for (const synonym of SYNONYMS.get(term) ?? []) {
     variants.push([synonym, SYNONYM_FACTOR]);
   }
 
   let total = 0;
-  for (const [field, weight] of Object.entries(WEIGHTS)) {
-    const tokens = index[field as keyof OperationIndex];
+  for (const field of Object.keys(weights) as K[]) {
+    const tokens = fields[field];
     let best = 0;
     for (const [variant, factor] of variants) {
       best = Math.max(best, termHit(tokens, variant) * factor);
     }
-    total += best * weight;
+    total += best * weights[field];
   }
   return total;
+}
+
+function scoreTerm(index: OperationIndex, term: string): number {
+  return weightedTermScore(index, WEIGHTS, term);
 }
 
 const METHOD_RANK = new Map(

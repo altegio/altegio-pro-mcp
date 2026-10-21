@@ -9,6 +9,7 @@ import {
   demotedGroupOf,
   FACET_NAMES,
   READONLY_VIEW,
+  COMPACT_VIEW,
 } from '../tools/facets.js';
 import { orderedToolEntries } from '../tools/registry.js';
 import {
@@ -155,10 +156,11 @@ describe('HTTP server facet routes', () => {
       body: jsonRpcBody,
     });
 
-  it('serves a route for the default view, the read-only view and every facet', () => {
+  it('serves a route for the default view, the read-only and compact views and every facet', () => {
     expect(FACET_ROUTES.map((route) => route.path)).toEqual([
       '/mcp',
       `/mcp/${READONLY_VIEW}`,
+      `/mcp/${COMPACT_VIEW}`,
       ...FACET_NAMES.map((facet) => `/mcp/${facet}`),
     ]);
     // The unfiltered view is stdio-only; it gets no HTTP route.
@@ -167,7 +169,7 @@ describe('HTTP server facet routes', () => {
     );
     const { transportsByFacet } = createApp();
     expect(Object.keys(transportsByFacet).sort()).toEqual(
-      [DEFAULT_FACET, READONLY_VIEW, ...FACET_NAMES].sort()
+      [DEFAULT_FACET, READONLY_VIEW, COMPACT_VIEW, ...FACET_NAMES].sort()
     );
   });
 

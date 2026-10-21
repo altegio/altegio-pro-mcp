@@ -77,6 +77,16 @@ export function readOnlyViewInstructions(publicBaseUrl: string): string {
 }
 
 /**
+ * Extra `initialize` instructions for the compact view, prefixed to the product
+ * instructions: what its short list leaves out is still here, and how to reach
+ * it — including a tool a result names that the list does not carry.
+ */
+export const COMPACT_VIEW_INSTRUCTIONS = [
+  'This address lists the most used tools only. Every other tool (finance, payroll, inventory, memberships, analytics, onboarding…)',
+  'is found with tools_search and run with tools_call_read (reads) or tools_call_write (changes), as is any tool a result names that your list lacks.',
+].join(' ');
+
+/**
  * An environment flag that accepts the spellings a shell or `.env` file
  * produces. Unlike `z.coerce.boolean()` this reads `"false"` and `"0"` as
  * false instead of "any non-empty string is true".

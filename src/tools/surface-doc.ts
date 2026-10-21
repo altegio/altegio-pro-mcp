@@ -66,6 +66,9 @@ const REASON_CODES: Readonly<Record<SurfaceReason, string>> = {
   'default-view-extra-tool': 'xtra',
   'default-view-not-excluded': 'dflt',
   'read-only-annotation': 'ro',
+  'compact-view-listed': 'list',
+  // not listed, run through the dispatcher
+  'compact-view-dispatched': 'disp',
   // withheld
   'password-login-not-exposed': '-pwd',
   'default-view-excluded-tool': '-name',
@@ -73,6 +76,7 @@ const REASON_CODES: Readonly<Record<SurfaceReason, string>> = {
   'default-view-demoted': '-low',
   'not-in-facet-rule': '-',
   'not-read-only': '-write',
+  'dispatcher-compact-only': '-cmp',
   'disabled-everywhere': '-off',
 };
 
@@ -119,6 +123,16 @@ const REASON_LEGEND: readonly (readonly [SurfaceReason, string, string])[] = [
     'the tool’s own annotations',
   ],
   [
+    'compact-view-listed',
+    'listed on `/mcp/compact`: the most used tools and the dispatcher',
+    '`COMPACT_VIEW_TOOLS`, `DISPATCH_TOOLS`',
+  ],
+  [
+    'compact-view-dispatched',
+    'not listed on `/mcp/compact`; `tools_search` finds it, `tools_call_read` / `tools_call_write` run it',
+    '`dispatchReaches`',
+  ],
+  [
     'password-login-not-exposed',
     'a password prompt under an OAuth endpoint',
     '`PASSWORD_LOGIN_TOOLS` + `ALTEGIO_EXPOSE_PASSWORD_LOGIN`',
@@ -147,6 +161,11 @@ const REASON_LEGEND: readonly (readonly [SurfaceReason, string, string])[] = [
     'not-read-only',
     'it changes data, so the read-only address will not serve it',
     'the tool’s own annotations',
+  ],
+  [
+    'dispatcher-compact-only',
+    'the dispatcher is listed on `/mcp/compact` only',
+    '`DISPATCH_TOOLS`',
   ],
   [
     'disabled-everywhere',
@@ -417,7 +436,11 @@ export function renderSurfaceDoc(
       ['Code', 'Served?', 'Meaning', 'Declared in'],
       REASON_LEGEND.map(([reason, meaning, where]) => [
         `\`${REASON_CODES[reason]}\``,
-        REASON_CODES[reason].startsWith('-') ? 'no' : 'yes',
+        REASON_CODES[reason].startsWith('-')
+          ? 'no'
+          : reason === 'compact-view-dispatched'
+            ? 'through the dispatcher'
+            : 'yes',
         meaning,
         where,
       ])
@@ -439,6 +462,10 @@ export function renderSurfaceDoc(
     '  the full address of the complete surface and tells the model to report rather'
   );
   out.push('  than retry.');
+  out.push(
+    '- `disp` in the `/compact` column — not refused: the dispatcher runs it, and so'
+  );
+  out.push('  does a direct call by name.');
   out.push(
     '- every other column — the out-of-view error, naming the paths that do serve it'
   );

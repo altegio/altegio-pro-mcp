@@ -2548,6 +2548,11 @@ export const unmappedTools: string[] = [
   // Their drift check is `npm run catalog:check` plus the tests in
   // src/tools/executor/__tests__/.
   ...executorTools,
+  // The curated-tool dispatcher (/mcp/compact): it searches this build's own
+  // tools and runs one of them, which carries its own mapping.
+  'tools_search',
+  'tools_call_read',
+  'tools_call_write',
   'onboarding_start',
   'onboarding_resume',
   'onboarding_status',

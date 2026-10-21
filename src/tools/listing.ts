@@ -12,6 +12,7 @@ import {
   buildFacetIndex,
   facetToolsFromSpecs,
   viewUrl,
+  COMPACT_VIEW,
   DEFAULT_FACET,
   type FacetIndex,
   type FacetIndexOptions,
@@ -62,6 +63,11 @@ export function addressesServing(
     ...(index.includes(DEFAULT_FACET, name)
       ? [viewUrl(publicBaseUrl, DEFAULT_FACET)]
       : []),
+    // The dispatcher is listed on the compact view alone.
+    ...(index.includes(COMPACT_VIEW, name) &&
+    !index.includes(DEFAULT_FACET, name)
+      ? [viewUrl(publicBaseUrl, COMPACT_VIEW)]
+      : []),
   ];
 }
 
@@ -79,8 +85,11 @@ export function listView(
     }
   );
   const visible = new Set(facetIndex.members(view));
+  // What a call reaches: the list, plus what the view's dispatcher runs.
+  const reached = new Set([...visible, ...facetIndex.reachable(view)]);
   const servingView: ServingView = {
-    serves: (name) => visible.has(name),
+    serves: (name) => reached.has(name),
+    lists: (name) => visible.has(name),
     addressesServing: (name) =>
       addressesServing(name, facetIndex, publicBaseUrl),
   };

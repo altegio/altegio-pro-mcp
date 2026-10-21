@@ -38,16 +38,16 @@ ALTEGIO_E2E=1 CREDENTIALS_DIR=/tmp/altegio-mcp-live \
 Credentials and fixture ids come from the environment, never from a file in
 this public repository:
 
-| Variable | What it is |
-| --- | --- |
-| `ALTEGIO_API_TOKEN`, `ALTEGIO_USER_TOKEN` | Partner and user tokens with rights at the location |
-| `ALTEGIO_E2E_LOCATION_ID` | The disposable test location |
-| `ALTEGIO_E2E_CLIENT_ID` | A client with no reachable phone or email: arrived appointments can message the client |
-| `ALTEGIO_E2E_TEAM_MEMBER_ID`, `ALTEGIO_E2E_SERVICE_ID` | A team member who provides a priced service with no Bill of Materials |
-| `ALTEGIO_E2E_OPERATION_TEAM_MEMBER_ID` | A team member who may record inventory operations |
-| `ALTEGIO_E2E_PRODUCT_ID`, `ALTEGIO_E2E_INVENTORY_ID` | A cheap plain product and a sale inventory that holds it |
-| `ALTEGIO_E2E_CONSUMABLES_INVENTORY_ID` | The consumables inventory |
-| `ALTEGIO_E2E_ACCOUNT_ID` | A cash register used only by tests |
+| Variable                                               | What it is                                                                             |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `ALTEGIO_API_TOKEN`, `ALTEGIO_USER_TOKEN`              | Partner and user tokens with rights at the location                                    |
+| `ALTEGIO_E2E_LOCATION_ID`                              | The disposable test location                                                           |
+| `ALTEGIO_E2E_CLIENT_ID`                                | A client with no reachable phone or email: arrived appointments can message the client |
+| `ALTEGIO_E2E_TEAM_MEMBER_ID`, `ALTEGIO_E2E_SERVICE_ID` | A team member who provides a priced service with no Bill of Materials                  |
+| `ALTEGIO_E2E_OPERATION_TEAM_MEMBER_ID`                 | A team member who may record inventory operations                                      |
+| `ALTEGIO_E2E_PRODUCT_ID`, `ALTEGIO_E2E_INVENTORY_ID`   | A cheap plain product and a sale inventory that holds it                               |
+| `ALTEGIO_E2E_CONSUMABLES_INVENTORY_ID`                 | The consumables inventory                                                              |
+| `ALTEGIO_E2E_ACCOUNT_ID`                               | A cash register used only by tests                                                     |
 
 Rules the suites follow, and a new suite must follow too:
 
@@ -93,6 +93,16 @@ Run `npm run dev:http` or the container described in [CI-CD.md](CI-CD.md).
 `GET /health` checks the process. The transport integration suites exercise MCP
 initialization, sessions, tool calls, views, identity isolation, and refusals
 against a local server using the installed SDK.
+
+## Tool-selection evals
+
+`npm run eval` runs realistic owner and administrator requests through a real
+MCP host against a local server and scores whether the agent reaches the right
+tool with arguments it accepts, once per view. It is opt-in, needs a host CLI
+and the live credentials, and sends a read-only grant, so writes are chosen and
+scored but never run. See [evals/README.md](evals/README.md). A change to the
+compact view's list, the dispatcher or a description it searches attaches a
+fresh summary to its pull request.
 
 ## Release artifact checks
 

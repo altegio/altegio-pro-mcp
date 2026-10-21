@@ -8,6 +8,7 @@ import {
   DEFAULT_FACET_EXCLUDED_PREFIXES,
   DEFAULT_FACET_EXCLUDED_TOOLS,
   DEFAULT_FACET_EXTRA_TOOLS,
+  DISPATCH_TOOLS,
   FACET_BASE_TOOLS,
   FACET_NAMES,
   demotedGroupsInstruction,
@@ -131,6 +132,7 @@ describe('static views', () => {
         !PASSWORD_LOGIN_TOOLS.includes(name) &&
         !DEFAULT_FACET_EXCLUDED_TOOLS.includes(name) &&
         !demotedGroupOf(name) &&
+        !DISPATCH_TOOLS.includes(name) &&
         (!DEFAULT_FACET_EXCLUDED_PREFIXES.some((prefix) =>
           name.startsWith(prefix)
         ) ||
@@ -438,7 +440,8 @@ describe('static views', () => {
           DEFAULT_FACET_EXTRA_TOOLS.length -
           PASSWORD_LOGIN_TOOLS.length -
           DEFAULT_FACET_EXCLUDED_TOOLS.length -
-          names.filter((name) => demotedGroupOf(name)).length
+          names.filter((name) => demotedGroupOf(name)).length -
+          DISPATCH_TOOLS.length
       );
       for (const name of BACK_OFFICE_MONEY_TOOLS) {
         expect(index.includes(DEFAULT_FACET, name)).toBe(true);
@@ -546,7 +549,8 @@ describe('the read-only view', () => {
       (name) =>
         annotationSaysReadOnly(name) &&
         !PASSWORD_LOGIN_TOOLS.includes(name) &&
-        !DEFAULT_FACET_EXCLUDED_TOOLS.includes(name)
+        !DEFAULT_FACET_EXCLUDED_TOOLS.includes(name) &&
+        !DISPATCH_TOOLS.includes(name)
     );
     expect(members).toEqual(expected);
     expect(members.length).toBeGreaterThan(0);

@@ -18,13 +18,26 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 export interface ServingView {
-  /** Whether this view serves the tool. */
+  /**
+   * Whether a call on this view reaches the tool: listed, or run through the
+   * view's dispatcher (`tools_call_read` / `tools_call_write`).
+   */
   serves(toolName: string): boolean;
+  /**
+   * Whether this view's `tools/list` carries the tool. Absent means every
+   * served tool is listed, which holds for every view but `/mcp/compact`.
+   */
+  lists?(toolName: string): boolean;
   /**
    * Absolute addresses of this endpoint's other views that serve the tool,
    * the complete surface last; empty when this deployment serves it nowhere.
    */
   addressesServing(toolName: string): readonly string[];
+}
+
+/** Whether the view's `tools/list` carries the tool (`ServingView.lists`). */
+export function listedOn(view: ServingView, toolName: string): boolean {
+  return view.lists ? view.lists(toolName) : view.serves(toolName);
 }
 
 const UNFILTERED_VIEW: ServingView = {
