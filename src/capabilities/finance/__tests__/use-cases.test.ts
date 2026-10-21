@@ -1055,7 +1055,38 @@ describe('financial_transactions_update and _delete', () => {
             transaction_id: 589532167,
           });
     await expect(run).rejects.toThrow(/Nothing was changed/);
-    expect(calls.map((c) => c.method)).toEqual(['GET']);
+    // A deletion also reads the document: the payment of a product receipt
+    // is deleted here, any other document's transaction is not.
+    expect(calls.map((c) => c.method)).toEqual(
+      verb === 'edited' ? ['GET'] : ['GET', 'GET']
+    );
+  });
+
+  it('deletes the payment of a product receipt; the document stays', async () => {
+    const calls: Call[] = [];
+    const client = fakeClient(
+      [
+        single({ document_id: 88, expense_id: 2, supplier_id: 4043 }),
+        [
+          'GET',
+          /^\/storage_operations\/documents\/4564\/88$/,
+          200,
+          ok({ id: 88, type_id: 3, storage_id: 38882 }),
+        ],
+        ['DELETE', /^\/finance_transactions\/4564\/589532167$/, 202, undefined],
+      ],
+      calls
+    );
+    const result = await deleteFinancialTransaction(client, {
+      location_id: LOCATION,
+      transaction_id: 589532167,
+    });
+    expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual([
+      'GET /finance_transactions/4564/589532167',
+      'GET /storage_operations/documents/4564/88',
+      'DELETE /finance_transactions/4564/589532167',
+    ]);
+    expect(result.structuredContent).toMatchObject({ deleted: true });
   });
 
   describe('against the version the person was shown', () => {

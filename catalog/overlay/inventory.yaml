@@ -112,7 +112,55 @@ operations:
     tier: core
     facets: [finance]
     tool_name: inventory_delete_document
-    notes: Read for the delete confirmation and result.
+    notes: >
+      Read for the delete confirmation and result, and by
+      inventory_update_document and inventory_pay_document.
+  get_document_product_transactions:
+    domain: inventory
+    tier: core
+    facets: [finance]
+    tool_name: inventory_update_document
+    notes: >
+      The stored lines of a document, read before a change; the route carries
+      no location, so the document is read at its location first. Reading
+      them is inventory_list_operations with document_id.
+  get_document_financial_transactions:
+    domain: inventory
+    tier: core
+    facets: [finance]
+    tool_name: inventory_pay_document
+    notes: >
+      The payments recorded against a document, read for the amount due;
+      needs the Finances rights.
+  update_document:
+    domain: inventory
+    tier: core
+    facets: [finance]
+    tool_name: inventory_update_document
+    write_allowed: false
+    notes: >
+      A new date moves every line, a new comment does not; a new storage_id
+      relabels the document and leaves its lines and stock where they were,
+      so the curated tool never changes it.
+  update_transaction:
+    domain: inventory
+    tier: core
+    facets: [finance]
+    tool_name: inventory_update_document
+    write_allowed: false
+    notes: Replaces the whole line; an omitted Supplier or comment is cleared.
+  create_transaction:
+    domain: inventory
+    tier: core
+    facets: [finance]
+    tool_name: inventory_update_document
+    write_allowed: false
+  delete_transaction:
+    domain: inventory
+    tier: core
+    facets: [finance]
+    tool_name: inventory_update_document
+    write_allowed: false
   delete_document:
     domain: inventory
     tier: core

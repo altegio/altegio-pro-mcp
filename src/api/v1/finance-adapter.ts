@@ -170,6 +170,7 @@ function transactionBody(
     client_id: fields.client_id ?? 0,
     team_member_id: fields.team_member_id ?? 0,
     supplier_id: fields.supplier_id ?? 0,
+    ...(fields.document_id ? { document_id: fields.document_id } : {}),
   };
 }
 
@@ -436,6 +437,30 @@ export class FinanceAdapter implements FinanceApi {
         },
       }
     );
+  }
+
+  /**
+   * The route carries no location: the caller reads the document at its
+   * location first, so a document of another location never gets here.
+   */
+  async listDocumentTransactions(
+    locationId: number,
+    documentId: number
+  ): Promise<FinancialTransaction[]> {
+    const [{ data }, zone] = await Promise.all([
+      this.read(
+        `/storage_operations/documents/finance_transactions/${documentId}`,
+        `read the financial transactions of document ${documentId}`,
+        {
+          hints: {
+            forbidden:
+              'Reading the payments of a document needs the Finances access rights at the location; ask the location owner for them.',
+          },
+        }
+      ),
+      this.zoneOf(locationId),
+    ]);
+    return rows(data).map((row) => transactionFromWire(row, zone));
   }
 
   // ----- payroll -----

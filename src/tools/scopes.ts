@@ -363,6 +363,10 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   inventory_list_bills_of_materials: 'inventory:read',
   inventory_create_operation: ['inventory:operate', 'inventory:sell'],
   inventory_delete_document: 'inventory:operate',
+  // A document's lines are changed like the operation that recorded them.
+  inventory_update_document: ['inventory:operate', 'inventory:sell'],
+  // Paying a receipt is a financial transaction against the document.
+  inventory_pay_document: ['finance:write', 'inventory:read'],
   // Suppliers and Partners are finance reference data in the catalog: the
   // counterparties of financial transactions. The tool sits in the inventory
   // pack because a product receipt names its Supplier, but reading them needs

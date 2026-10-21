@@ -507,7 +507,10 @@ export interface CreateOperationInput {
   comment?: string;
 }
 
-interface PlannedLine extends Omit<OperationLineWrite, 'unit_price' | 'total'> {
+export interface PlannedLine extends Omit<
+  OperationLineWrite,
+  'unit_price' | 'total'
+> {
   /** Major units, for the text. */
   unit_price: number;
   total: number;
@@ -529,7 +532,7 @@ interface OperationPlan {
 const LOCAL_DATETIME = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(:\d{2})?$/;
 
 /** `2026-10-19T14:05` → `2026-10-19 14:05:00`, the only format the API reads. */
-function wireDate(value: string): string {
+export function wireDate(value: string): string {
   const match = LOCAL_DATETIME.exec(value);
   if (!match) {
     throw new InventoryInputError(
@@ -554,7 +557,7 @@ const DEFAULT_PURPOSE: Record<
  * total, without writing. The confirmation detail and the handler both run it,
  * so what a person approves is computed exactly the way the call will be.
  */
-async function planOperation(
+export async function planOperation(
   client: AltegioClient,
   input: CreateOperationInput
 ): Promise<OperationPlan> {

@@ -247,6 +247,55 @@ export interface MovementPage {
   more: boolean;
 }
 
+/** One stored product line of a document, as the document's line list reads it. */
+export interface DocumentLine {
+  id: number;
+  document_id: number | null;
+  /** The location the line was recorded at. */
+  location_id: number | null;
+  product_id: number | null;
+  /** Absolute quantity in the unit below. */
+  quantity: number | null;
+  unit_id: number | null;
+  unit_kind: 'sale' | 'consumable' | null;
+  unit_price: number | null;
+  discount_percent: number | null;
+  total: number | null;
+  supplier_id: number | null;
+  team_member_id: number | null;
+  client_id: number | null;
+  appointment_id: number | null;
+  comment: string | null;
+}
+
+/**
+ * One product line to store on a document: every field, because the line
+ * update replaces the whole line (an omitted Supplier or comment is cleared).
+ */
+export interface DocumentLineWrite {
+  document_id: number;
+  product_id: number;
+  quantity: number;
+  unit_id: number;
+  unit_price: Money;
+  discount_percent: number;
+  /** quantity × unit_price less the discount. */
+  total: Money;
+  supplier_id: number | null;
+  team_member_id: number | null;
+  client_id: number | null;
+  comment: string;
+}
+
+/** The document fields its header update writes. */
+export interface DocumentHeaderWrite {
+  kind: InventoryMovementKind;
+  inventory_id: number;
+  /** Wall-clock time at the location, `YYYY-MM-DD HH:MM:SS`. */
+  date_local: string;
+  comment: string;
+}
+
 export interface InventoryApi {
   listInventories(locationId: number): Promise<Inventory[]>;
   listMovements(
@@ -267,6 +316,34 @@ export interface InventoryApi {
     operation: OperationWrite,
     options?: WriteOptions
   ): Promise<CreatedOperation>;
+  /** The stored product lines of a document. */
+  getDocumentLines(
+    locationId: number,
+    documentId: number
+  ): Promise<DocumentLine[]>;
+  /** Store the header; the date also moves every line, the comment does not. */
+  updateDocument(
+    locationId: number,
+    documentId: number,
+    header: DocumentHeaderWrite,
+    options?: WriteOptions
+  ): Promise<InventoryDocument>;
+  addDocumentLine(
+    locationId: number,
+    line: DocumentLineWrite,
+    options?: WriteOptions
+  ): Promise<DocumentLine>;
+  updateDocumentLine(
+    locationId: number,
+    lineId: number,
+    line: DocumentLineWrite,
+    options?: WriteOptions
+  ): Promise<DocumentLine>;
+  deleteDocumentLine(
+    locationId: number,
+    lineId: number,
+    options?: WriteOptions
+  ): Promise<void>;
   listSuppliers(locationId: number): Promise<Supplier[]>;
   listBillsOfMaterials(
     locationId: number,

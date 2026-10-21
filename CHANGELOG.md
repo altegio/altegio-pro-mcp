@@ -6,6 +6,29 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — changing an inventory document and paying a product receipt
+
+- **`inventory_update_document`** changes a product sale, product receipt or
+  write-off after it was recorded: its date (every line moves with it) and
+  comment, the quantity, unit price or discount of a line, lines added
+  (priced like a new operation) and lines removed. Stock follows at once. A
+  changed line is sent back whole, so its Supplier, team member and comment
+  stay; Altegio clears what a line update leaves out. Lines of an appointment
+  and removing every line are refused, and the inventory is never changed
+  (Altegio would relabel the document and leave the stock where it was). The
+  confirmation shows every line before → after and the new total, and the
+  change is refused when the document or its lines moved after that. Line ids
+  come from `inventory_list_operations` with `document_id`.
+- **`inventory_pay_document`** pays a product receipt to its Supplier: a
+  financial transaction under the "Product purchase" item (or another expense
+  item), linked to the document, for the amount due unless another amount is
+  given. It is refused once the receipt is paid in full, for more than the
+  amount due, or when the same payment was just recorded.
+  `financial_transactions_delete` now deletes such a payment; the document
+  and its stock stay.
+- Both run on the documented V1 routes, ask for confirmation first, and are
+  served on `/pro/finance` and through the dispatcher on `/pro`.
+
 ### Added — the product catalog: product cards and categories, with a duplicate check
 
 - **`products_create`** creates up to 25 product cards in one confirmed call

@@ -20,6 +20,7 @@ import { defineTool } from '../factory.js';
 import { collectionSchema, pageArg, pageSizeArg } from '../pagination.js';
 import * as inventory from '../../capabilities/inventory/use-cases.js';
 import * as consumables from '../../capabilities/inventory/consumables.js';
+import * as documents from '../../capabilities/inventory/documents.js';
 
 // ========== shared input pieces ==========
 
@@ -440,6 +441,153 @@ export const inventoryDeleteDocumentTool = defineTool({
   },
   handler: async ({ input, client, confirmation }) =>
     inventory.deleteDocument(client, input, confirmation),
+});
+
+// ========== documents: read, change, pay ==========
+
+const documentId = z
+  .number()
+  .int()
+  .positive()
+  .describe('Document id (inventory_list_operations).');
+
+export const inventoryUpdateDocumentTool = defineTool({
+  name: 'inventory_update_document',
+  category: 'Inventory',
+  description:
+    'Change a product sale, product receipt or write-off document: its date (every line moves with it) and comment, the quantity, unit price or discount of a line (by line_id: the id inventory_list_operations returns with document_id), remove lines, or add lines priced like a new operation. Stock follows at once; the inventory cannot be changed, and a payment recorded for the document stays. Lines of an appointment are refused. Asks for confirmation first, showing every line before → after and the new total; refused if the document or its lines change after that.',
+  annotations: {
+    title: 'Inventory: change a document and its lines',
+    destructiveHint: true,
+    idempotentHint: false,
+    openWorldHint: true,
+  },
+  input: z.object({
+    location_id: locationId,
+    document_id: documentId,
+    date: z
+      .string()
+      .optional()
+      .describe(
+        'New date at the location: YYYY-MM-DDTHH:MM, no offset, not in the future.'
+      ),
+    comment: z.string().max(1000).optional().describe('New document comment.'),
+    lines: z
+      .array(
+        z
+          .object({
+            line_id: z
+              .number()
+              .int()
+              .positive()
+              .describe(
+                'Line id: the id inventory_list_operations returns with document_id.'
+              ),
+            quantity: z
+              .number()
+              .positive()
+              .max(1_000_000)
+              .optional()
+              .describe('New quantity, in the line’s unit.'),
+            unit_price: z
+              .number()
+              .min(0)
+              .max(100_000_000)
+              .optional()
+              .describe('New price per unit, in the location currency.'),
+            discount_percent: z
+              .number()
+              .min(0)
+              .max(100)
+              .optional()
+              .describe('New discount, 0–100.'),
+            remove: z
+              .boolean()
+              .optional()
+              .describe('true removes the line and its stock.'),
+          })
+          .strict()
+      )
+      .max(50)
+      .optional()
+      .describe('Changes to existing lines.'),
+    add_lines: z
+      .array(operationLine)
+      .max(50)
+      .optional()
+      .describe('Lines to add; priced like inventory_create_operation lines.'),
+  }),
+  confirm: {
+    action: 'Change inventory document',
+    target: (input) =>
+      `document ${input.document_id} at location ${input.location_id}`,
+    resolve: (input, client) => inventory.describeDocument(client, input),
+    consequence:
+      'The document is stored again with the changes below and stock moves with them at once. A payment recorded for the document is not changed.',
+    detail: (input, client) => documents.describeDocumentUpdate(client, input),
+  },
+  handler: async ({ input, client, confirmation }) =>
+    documents.updateDocument(client, input, confirmation),
+});
+
+export const inventoryPayDocumentTool = defineTool({
+  name: 'inventory_pay_document',
+  category: 'Inventory',
+  description:
+    'Pay a product receipt to its Supplier: records an expense against the document from account_id (accounts_and_cash_registers_list), for the amount due by default or a part of it, under the Product purchase payment item unless payment_item_id names another expense item. Refused once the receipt is paid in full, or when the same payment was just recorded. Undo with financial_transactions_delete. Asks for confirmation first.',
+  annotations: {
+    title: 'Inventory: pay a product receipt',
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: true,
+  },
+  input: z.object({
+    location_id: locationId,
+    document_id: documentId,
+    account_id: z
+      .number()
+      .int()
+      .positive()
+      .describe(
+        'The account or cash register it is paid from (accounts_and_cash_registers_list).'
+      ),
+    amount: z
+      .number()
+      .positive()
+      .max(100_000_000)
+      .optional()
+      .describe('How much, in the location currency. Default: the amount due.'),
+    payment_item_id: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'An expense payment item (financial_transactions_list_payment_items). Default: Product purchase.'
+      ),
+    date: z
+      .string()
+      .optional()
+      .describe(
+        'When it was paid, at the location: YYYY-MM-DDTHH:MM. Default: now.'
+      ),
+    comment: z
+      .string()
+      .max(1000)
+      .optional()
+      .describe('Comment on the payment.'),
+  }),
+  confirm: {
+    action: 'Pay product receipt',
+    target: (input) =>
+      `document ${input.document_id} at location ${input.location_id}`,
+    resolve: (input, client) => inventory.describeDocument(client, input),
+    consequence:
+      'An expense is recorded in the account or cash register below, linked to the receipt; its balance drops by the amount. Delete it with financial_transactions_delete to undo.',
+    detail: (input, client) => documents.describeDocumentPayment(client, input),
+  },
+  handler: async ({ input, client, confirmation }) =>
+    documents.payDocument(client, input, confirmation),
 });
 
 // ========== suppliers ==========
