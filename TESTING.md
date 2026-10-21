@@ -105,8 +105,8 @@ MCP host against a local server and scores whether the agent reaches the right
 tool with arguments it accepts, once per view. It is opt-in, needs a host CLI
 and the live credentials, and sends a read-only grant, so writes are chosen and
 scored but never run. See [evals/README.md](evals/README.md). A change to the
-compact view's list, the dispatcher or a description it searches attaches a
-fresh summary to its pull request.
+compact listing (what `/mcp` lists by default), the dispatcher or a description
+it searches attaches a fresh summary to its pull request.
 
 ## Release artifact checks
 
