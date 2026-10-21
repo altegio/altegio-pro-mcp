@@ -80,8 +80,6 @@ const INVENTORY_TOOLS = [
   'product_categories_delete',
   'products_archive',
   'products_create',
-  'products_find_matches',
-  'products_list_units',
   'products_search',
   'products_update',
   'suppliers_and_partners_list',
@@ -420,8 +418,8 @@ describe('static views', () => {
     const index = buildFacetIndex(tools);
     const demoted = names.filter((name) => demotedGroupOf(name));
 
-    it('takes 34 tools off /mcp/full', () => {
-      expect(demoted).toHaveLength(34);
+    it('takes 32 tools off /mcp/full', () => {
+      expect(demoted).toHaveLength(32);
       for (const name of demoted) {
         expect(index.includes(FULL_VIEW, name)).toBe(false);
         expect(decideView(FULL_VIEW, toolOf(name)).reason).toBe(

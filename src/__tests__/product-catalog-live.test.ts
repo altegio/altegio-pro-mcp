@@ -97,12 +97,8 @@ describeLive('product catalog tools against the test location', () => {
     ).category.id;
     expect(await categoryIds()).toEqual([made.category]);
 
-    // --- two products: one with whole-number prices in float fields ---
-    const units = await host.read<{
-      items: Array<{ id: number; short_title: string | null }>;
-    }>('products_list_units', at());
-    expect(units.items.some((u) => u.short_title === 'ml')).toBe(true);
-
+    // --- two products: one with whole-number prices in float fields, its
+    // units named rather than given by id ---
     const products = [
       {
         title: `catalog-live shampoo ${stamp}`,
@@ -141,27 +137,23 @@ describeLive('product catalog tools against the test location', () => {
     expect(repeat.isError).toBe(true);
     expect(textOf(repeat)).toMatch(/already exists/);
 
-    // --- matching an invoice line by barcode, another by title ---
-    const matched = await host.read<{
-      items: Array<{
-        exists: boolean;
-        matches: Array<{ product_id: number; match: string }>;
-      }>;
-    }>('products_find_matches', {
+    // --- the invoice again, spelled otherwise: matched by barcode and by
+    // title, so nothing is offered for creation ---
+    const again = await host.call('products_create', {
       ...at(),
-      lines: [
-        { barcode: `cl${stamp}` },
-        { title: `CATALOG-LIVE COMB ${stamp}` },
-        { title: `catalog-live nothing ${stamp}` },
+      skip_existing: true,
+      products: [
+        {
+          title: `catalog-live other name ${stamp}`,
+          category_id: made.category,
+          barcode: `cl${stamp}`,
+        },
+        { title: `CATALOG-LIVE COMB ${stamp}`, category_id: made.category },
       ],
     });
-    expect(matched.items[0]!.matches[0]).toEqual(
-      expect.objectContaining({ product_id: created[0]!.id, match: 'barcode' })
+    expect(textOf(again)).toContain(
+      `every line already exists (line 1: product ${created[0]!.id}; line 2: product ${created[1]!.id})`
     );
-    expect(matched.items[1]!.matches[0]).toEqual(
-      expect.objectContaining({ product_id: created[1]!.id, match: 'title' })
-    );
-    expect(matched.items[2]!.exists).toBe(false);
 
     // --- a price and a ratio change, read back ---
     await confirmedRun('products_update', {

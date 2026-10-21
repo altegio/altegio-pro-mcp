@@ -35,7 +35,9 @@ const categoryId = z
 
 const unitRef = z
   .union([z.number().int().positive(), z.string().min(1).max(40)])
-  .describe('Unit id or short title (products_list_units), such as pcs or ml.');
+  .describe(
+    'Unit id or short title, such as pcs or ml; api_call_operation list_product_units lists them.'
+  );
 
 const READ_ONLY = { readOnlyHint: true, openWorldHint: true } as const;
 
@@ -95,7 +97,6 @@ const productFields = {
 // ========== output schemas ==========
 
 const int = { type: ['integer', 'null'] as const };
-const num = { type: ['number', 'null'] as const };
 const str = { type: ['string', 'null'] as const };
 const bool = { type: 'boolean' as const };
 const integer = { type: 'integer' as const };
@@ -104,24 +105,6 @@ const categorySchema = {
   type: 'object' as const,
   properties: { id: integer, title: str, parent_id: int, chain_category: bool },
   required: ['id', 'title', 'parent_id', 'chain_category'],
-};
-
-const matchSchema = {
-  type: 'object' as const,
-  properties: {
-    product_id: integer,
-    title: str,
-    match: {
-      type: 'string' as const,
-      enum: ['barcode', 'article', 'title', 'similar_title'],
-    },
-    category_id: int,
-    article: str,
-    barcode: str,
-    sale_price: num,
-    cost_price: num,
-  },
-  required: ['product_id', 'match'],
 };
 
 // ========== product categories ==========
@@ -231,77 +214,7 @@ export const productCategoriesDeleteTool = defineTool({
     catalog.deleteProductCategory(client, input, confirmation),
 });
 
-// ========== units ==========
-
-export const productsListUnitsTool = defineTool({
-  name: 'products_list_units',
-  category: 'Inventory',
-  description:
-    'The units products can be counted in at a location (piece, bottle, millilitre, gram…): id, title and short title, for sale_unit and consumable_unit of products_create and products_update. Paged: follow pagination.next_page.',
-  annotations: { title: 'Inventory: list product units', ...READ_ONLY },
-  input: z.object({
-    location_id: locationId,
-    page: pageArg,
-    page_size: pageSizeArg(100, 100),
-  }),
-  outputSchema: collectionSchema(
-    {
-      type: 'object' as const,
-      properties: { id: integer, title: str, short_title: str },
-      required: ['id', 'title', 'short_title'],
-    },
-    { location_id: integer }
-  ),
-  handler: async ({ input, client }) => catalog.listProductUnits(client, input),
-});
-
-// ========== matching and creating ==========
-
-const matchLine = z
-  .object({
-    title: z.string().max(255).optional().describe('Product name.'),
-    article: z.string().max(100).optional().describe('Article number.'),
-    barcode: z.string().max(100).optional().describe('Barcode.'),
-  })
-  .strict();
-
-export const productsFindMatchesTool = defineTool({
-  name: 'products_find_matches',
-  category: 'Inventory',
-  description:
-    'Check incoming lines — a supplier invoice, a price list — against the location’s products before creating any: per line, the existing products with the same barcode, article number or title, then similar titles, with their prices. An exact match means the product exists: receive it with inventory_create_operation rather than creating it again. Archived products are not found.',
-  annotations: { title: 'Inventory: match lines to products', ...READ_ONLY },
-  input: z.object({
-    location_id: locationId,
-    lines: z
-      .array(matchLine)
-      .min(1)
-      .max(25)
-      .describe('Lines to check; each needs a title, article or barcode.'),
-  }),
-  outputSchema: {
-    type: 'object' as const,
-    properties: {
-      location_id: integer,
-      currency: str,
-      items: {
-        type: 'array' as const,
-        items: {
-          type: 'object' as const,
-          properties: {
-            line: integer,
-            exists: bool,
-            matches: { type: 'array' as const, items: matchSchema },
-          },
-          required: ['line', 'exists', 'matches'],
-        },
-      },
-    },
-    required: ['location_id', 'items'],
-  },
-  handler: async ({ input, client }) =>
-    catalog.findProductMatches(client, input),
-});
+// ========== creating ==========
 
 const newProduct = z
   .object({
@@ -315,7 +228,7 @@ export const productsCreateTool = defineTool({
   name: 'products_create',
   category: 'Inventory',
   description:
-    'Create one or more product cards (up to 25, such as the new lines of a supplier invoice): name, product category, sale and cost price in the location currency, sale and consumable units, article number, barcode. Each line is first checked against the existing products (products_find_matches): a same barcode, article number or title refuses the call, or with skip_existing only skips that line, so a repeated call creates nothing twice. Stock is not changed: record a product receipt with inventory_create_operation. Asks for confirmation first.',
+    'Create one or more product cards (up to 25, such as the new lines of a supplier invoice): name, product category, sale and cost price in the location currency, sale and consumable units, article number, barcode. Each line is first checked against the existing products: a same barcode, article number or title refuses the call and names the product, or with skip_existing only skips that line, so a repeated call creates nothing twice; products_search finds similar names. Stock is not changed: record a product receipt with inventory_create_operation. Asks for confirmation first.',
   annotations: {
     title: 'Inventory: create products',
     destructiveHint: false,

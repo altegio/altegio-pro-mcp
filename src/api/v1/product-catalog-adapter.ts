@@ -145,7 +145,7 @@ function productBody(product: ProductCardWrite): Row {
 
 const PRODUCT_WRITE_HINTS = {
   invalid:
-    'Check the category id with product_categories_list and the unit ids with products_list_units; sale and cost prices are in the location currency.',
+    'Check the category id with product_categories_list and the unit ids with api_call_operation list_product_units; sale and cost prices are in the location currency.',
   notFound:
     'Check the product id with products_search and the category id with product_categories_list.',
   forbidden:

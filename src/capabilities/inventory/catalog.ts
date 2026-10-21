@@ -1,7 +1,6 @@
 /**
  * Product catalog use cases — what the `products_create`, `products_update`,
- * `products_archive`, `products_find_matches`, `products_list_units` and
- * `product_categories_*` tools do.
+ * `products_archive` and `product_categories_*` tools do.
  *
  * A product card names the product, files it under a product category,
  * counts it in a sale unit (pcs, bottle) and a consumable unit (ml, g), and
@@ -361,47 +360,9 @@ export async function deleteProductCategory(
 
 // ========== units ==========
 
-export async function listProductUnits(
-  client: AltegioClient,
-  input: { location_id: number } & PageInput
-): Promise<InventoryResult> {
-  // The V2 list can repeat a unit; one id is listed once.
-  const all = [
-    ...new Map(
-      (await productsApi(client).listUnits(input.location_id)).map((u) => [
-        u.id,
-        u,
-      ])
-    ).values(),
-  ];
-  const { items, pagination } = paginateCollection(all, input);
-  const lines = [
-    `${all.length} unit(s) products can be counted in at location ${input.location_id}; page ${pagination.page} shows ${items.length}. Use an id, or its short title, as sale_unit or consumable_unit of products_create and products_update.`,
-    ...items.map((u) => `- ${u.id}`),
-  ];
-  if (pagination.has_more)
-    lines.push(
-      `More follow: request page ${pagination.next_page} with page_size ${pagination.page_size}.`
-    );
-  return {
-    text: fenced(
-      lines,
-      items.flatMap((u) => [
-        { label: `unit ${u.id} title`, value: u.title },
-        { label: `unit ${u.id} short title`, value: u.short_title },
-      ])
-    ),
-    structuredContent: {
-      location_id: input.location_id,
-      items: items.map((u) => ({
-        id: u.id,
-        title: u.title,
-        short_title: u.short_title,
-      })),
-      pagination,
-    },
-  };
-}
+/** Units have no curated list: the executor reads them. */
+const UNITS_HINT =
+  'List the units with api_call_operation list_product_units and pass an id.';
 
 /** A unit by id, or by its short title or title, case-insensitively. */
 function resolveUnit(
@@ -413,7 +374,7 @@ function resolveUnit(
     const unit = units.find((u) => u.id === ref);
     if (!unit) {
       throw new InventoryInputError(
-        `${where}: unit ${ref} is not a unit of this location. List them with products_list_units.`
+        `${where}: unit ${ref} is not a unit of this location. ${UNITS_HINT}`
       );
     }
     return unit;
@@ -433,7 +394,7 @@ function resolveUnit(
   if (matches.length === 1) return matches[0]!;
   throw new InventoryInputError(
     matches.length === 0
-      ? `${where}: no unit is called that. List the units with products_list_units and pass an id.`
+      ? `${where}: no unit is called that. ${UNITS_HINT}`
       : `${where}: ${matches.length} units are called that (ids ${matches.map((u) => u.id).join(', ')}); pass an id.`
   );
 }
@@ -528,66 +489,6 @@ async function matchesFor(
 /** An exact match by barcode, article number or title blocks a create. */
 function isDuplicate(match: ProductMatch): boolean {
   return match.match !== 'similar_title';
-}
-
-function matchesUntrusted(matches: readonly ProductMatch[]): UntrustedField[] {
-  const seen = new Set<number>();
-  return matches.flatMap((m) => {
-    if (seen.has(m.product_id)) return [];
-    seen.add(m.product_id);
-    return [
-      { label: `product ${m.product_id} title`, value: m.title },
-      { label: `product ${m.product_id} article number`, value: m.article },
-      { label: `product ${m.product_id} barcode`, value: m.barcode },
-    ];
-  });
-}
-
-export async function findProductMatches(
-  client: AltegioClient,
-  input: { location_id: number; lines: MatchQuery[] }
-): Promise<InventoryResult> {
-  input.lines.forEach((line, index) => {
-    if (!line.title && !line.article && !line.barcode) {
-      throw new InventoryInputError(
-        `Line ${index + 1} needs a title, an article number or a barcode.`
-      );
-    }
-  });
-  const [currency, results] = await Promise.all([
-    locationCurrency(client, input.location_id),
-    mapWithConcurrency(input.lines, 2, (line) =>
-      matchesFor(client, input.location_id, line)
-    ),
-  ]);
-  const lines = [
-    `Existing products for ${input.lines.length} line(s) at location ${input.location_id}, closest first (barcode, article number, title, then similar titles; archived products are not found):`,
-    ...results.map((matches, index) => {
-      if (matches.length === 0) return `- line ${index + 1}: no product found`;
-      const exact = matches.filter(isDuplicate);
-      return `- line ${index + 1}: ${exact.length ? `already exists as ${exact.map((m) => `product ${m.product_id} (same ${m.match.replace('_', ' ')})`).join(', ')}` : 'no exact match'}${
-        matches.length > exact.length
-          ? `; similar: ${matches
-              .filter((m) => !isDuplicate(m))
-              .map((m) => `product ${m.product_id}`)
-              .join(', ')}`
-          : ''
-      }`;
-    }),
-    'An exact match means products_create would refuse that line: receive the existing product (inventory_create_operation) instead.',
-  ];
-  return {
-    text: fenced(lines, matchesUntrusted(results.flat())),
-    structuredContent: {
-      location_id: input.location_id,
-      currency,
-      items: results.map((matches, index) => ({
-        line: index + 1,
-        exists: matches.some(isDuplicate),
-        matches,
-      })),
-    },
-  };
 }
 
 // ========== product cards: create ==========

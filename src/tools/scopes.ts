@@ -375,8 +375,6 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   product_categories_create: 'products:write',
   product_categories_update: 'products:write',
   product_categories_delete: 'products:write',
-  products_list_units: 'products:read',
-  products_find_matches: 'inventory:read',
   products_create: 'products:write',
   products_update: 'products:write',
   products_archive: 'products:write',

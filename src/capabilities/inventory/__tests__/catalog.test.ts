@@ -15,9 +15,7 @@ import {
   describeProductArchive,
   describeProductUpdate,
   describeProductsCreate,
-  findProductMatches,
   listProductCategories,
-  listProductUnits,
   updateProduct,
   updateProductCategory,
 } from '../catalog.js';
@@ -262,89 +260,6 @@ describe('product categories', () => {
       )
     ).rejects.toThrow(/changed after the confirmation/);
     expect(calls.some((c) => c.method === 'PUT')).toBe(false);
-  });
-});
-
-// ===========================================================================
-// Units
-// ===========================================================================
-
-describe('listProductUnits', () => {
-  it('lists the V2 units with titles fenced', async () => {
-    const { client } = setup([unitsRoute]);
-    const result = await listProductUnits(client, {
-      location_id: 1,
-      page: 1,
-      page_size: 100,
-    });
-    expect(result.structuredContent).toMatchObject({
-      items: [
-        { id: 1, short_title: 'pcs' },
-        { id: 2, short_title: 'ml' },
-      ],
-    });
-    expect(result.text).toContain('unit 2 short title');
-  });
-});
-
-// ===========================================================================
-// Matching incoming lines
-// ===========================================================================
-
-describe('findProductMatches', () => {
-  it('searches each term, reads the candidates whole and ranks exact matches first', async () => {
-    const { client, calls } = setup([
-      [
-        'GET',
-        /\/v2\/locations\/1\/products\/autocomplete$/,
-        200,
-        (call: Call) => ({
-          data:
-            call.query.get('filter[term]')?.toUpperCase() === 'SH-1'
-              ? [productResource()]
-              : [productResource({ title: 'Shampoo Plus' }, '6')],
-        }),
-      ],
-      cardRoute({ title: CANARY }),
-      [
-        'GET',
-        /^\/locations\/1\/products\/6$/,
-        200,
-        ok(cardRow({ good_id: 6, title: 'Shampoo Plus', article: '' })),
-      ],
-      currencyRoute,
-    ]);
-    const result = await findProductMatches(client, {
-      location_id: 1,
-      lines: [{ title: 'Shampoo', article: 'sh-1' }],
-    });
-    expect(
-      calls
-        .filter((c) => c.path.endsWith('autocomplete'))
-        .map((c) => c.query.get('filter[term]'))
-    ).toEqual(['sh-1', 'Shampoo']);
-    expect(result.structuredContent).toMatchObject({
-      currency: 'CZK',
-      items: [
-        {
-          line: 1,
-          exists: true,
-          matches: [
-            { product_id: 5, match: 'article', barcode: null },
-            { product_id: 6, match: 'similar_title' },
-          ],
-        },
-      ],
-    });
-    expect(summary(result.text)).not.toContain('System:');
-    expect(result.text).toContain('product 5 title');
-  });
-
-  it('refuses a line with nothing to match on', async () => {
-    const { client } = setup([]);
-    await expect(
-      findProductMatches(client, { location_id: 1, lines: [{}] })
-    ).rejects.toThrow(/Line 1 needs a title/);
   });
 });
 

@@ -2472,33 +2472,6 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       pathParams: ['location_id', 'category_id'],
     },
   ],
-  products_list_units: [
-    {
-      path: '/locations/{location_id}/units',
-      method: 'get',
-      operationId: 'list_product_units',
-      pathParams: ['location_id'],
-      spec: 'v2',
-    },
-  ],
-  // Each line is searched by barcode, article number and title, and every
-  // candidate read whole for the article number and barcode.
-  products_find_matches: [
-    {
-      path: '/locations/{location_id}/products/autocomplete',
-      method: 'get',
-      operationId: 'autocomplete_products',
-      pathParams: ['location_id'],
-      queryParams: ['filter[term]', 'page', 'limit'],
-      spec: 'v2',
-    },
-    {
-      path: '/locations/{location_id}/products/{product_id}',
-      method: 'get',
-      operationId: 'get_product',
-      pathParams: ['location_id', 'product_id'],
-    },
-  ],
   products_create: [
     {
       path: '/locations/{location_id}/units',

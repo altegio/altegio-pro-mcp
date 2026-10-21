@@ -6,7 +6,7 @@ is declared stable.
 
 ## [Unreleased]
 
-### Added — the product catalog: product cards, categories, units, invoice matching
+### Added — the product catalog: product cards and categories, with a duplicate check
 
 - **`products_create`** creates up to 25 product cards in one confirmed call
   — the new lines of a supplier invoice — with category, sale and cost price,
@@ -15,9 +15,6 @@ is declared stable.
   products first: a same barcode, article number or title refuses the call,
   or with `skip_existing` only skips that line, so a repeated confirmed call
   creates nothing twice. Stock is not changed.
-- **`products_find_matches`** checks incoming lines against the location's
-  products before anything is created: per line, the products with the same
-  barcode, article number or title, then similar titles.
 - **`products_update`** changes a card — name, category, prices, units,
   article number, barcode, receipt name, comment, critical and desired stock —
   and sends the rest back unchanged; a unit change carries the conversion
@@ -25,8 +22,10 @@ is declared stable.
   product, naming the stock it still holds; a repeat answers "already
   archived".
 - **`product_categories_list`, `_create`, `_update`, `_delete`** manage the
-  product categories, and **`products_list_units`** lists the units a product
-  is counted in, from V2 instead of guessing them from existing products.
+  product categories. Units are named by short title or id and resolved from
+  V2's unit list, instead of guessed from existing products; that list stays
+  an executor read (`api_call_operation` `list_product_units`), and similar
+  product names stay with `products_search`.
 - Every write asks for confirmation first; changes show before → after and
   are refused if the card or category moved after that. The writes run on the
   documented V1 routes (V2 reads products, categories and units but writes

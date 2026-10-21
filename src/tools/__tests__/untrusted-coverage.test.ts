@@ -1371,11 +1371,6 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
         ['product_categories_list', 'product category titles'],
         ['product_categories_create', 'the new category title'],
         ['product_categories_update', 'the category titles before and after'],
-        ['products_list_units', 'unit titles'],
-        [
-          'products_find_matches',
-          'product titles, article numbers and barcodes',
-        ],
         ['products_create', 'the product titles created'],
         ['products_update', 'the product title'],
       ] as const

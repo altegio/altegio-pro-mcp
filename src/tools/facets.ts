@@ -472,15 +472,12 @@ export const DEFAULT_FACET_DEMOTED_GROUPS: readonly DemotedGroup[] = [
     // New on 2026-10-21 for back-office product management (supplier invoice
     // intake); not measured yet, so it starts on its facet like the groups
     // above rather than growing the flat list.
-    summary:
-      'creating, changing and archiving products and product categories, product units and matching invoice lines to products',
+    summary: 'creating, changing and archiving products and product categories',
     facet: 'finance',
     tools: [
       'products_create',
       'products_update',
       'products_archive',
-      'products_find_matches',
-      'products_list_units',
       'product_categories_create',
       'product_categories_update',
       'product_categories_delete',
