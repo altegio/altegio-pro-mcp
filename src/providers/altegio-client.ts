@@ -1341,6 +1341,50 @@ export class AltegioClient {
     return tag;
   }
 
+  async getPosition(
+    companyId: number,
+    positionId: number
+  ): Promise<AltegioPosition> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      v2Path(`/locations/${companyId}/positions/${positionId}`)
+    );
+    const position = positionFromJsonApi(
+      await this.handleJsonApiData(response, 'fetch position')
+    );
+    if (!position) {
+      throw new AltegioApiError(
+        unexpectedResponseMessage('fetch position', undefined),
+        response.status
+      );
+    }
+    return position;
+  }
+
+  /**
+   * Replace a position's title and description. The V2 PUT clears a
+   * description it is not sent (live 2026-10-21), so callers send both; the
+   * same path on V1 answers 404.
+   */
+  async updatePosition(
+    companyId: number,
+    positionId: number,
+    data: { title: string; description: string }
+  ): Promise<void> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      v2Path(`/locations/${companyId}/positions/${positionId}`),
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }
+    );
+    await this.handleVoidResponse(response, 'update position');
+  }
+
   async deletePosition(companyId: number, positionId: number): Promise<void> {
     this.requireAuth();
 
@@ -1626,6 +1670,47 @@ export class AltegioClient {
     return this.handleResponse<AltegioServiceCategory>(
       response,
       'create category'
+    );
+  }
+
+  async getServiceCategory(
+    companyId: number,
+    categoryId: number
+  ): Promise<AltegioServiceCategory> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      `/service_category/${companyId}/${categoryId}`
+    );
+    return this.handleResponse<AltegioServiceCategory>(
+      response,
+      'fetch service category'
+    );
+  }
+
+  /**
+   * Change a service category. V2 has no service category write; V1 needs the
+   * title on every call and keeps the weight and team members a call leaves
+   * out (live 2026-10-21).
+   */
+  async updateServiceCategory(
+    companyId: number,
+    categoryId: number,
+    data: { title: string; weight?: number }
+  ): Promise<AltegioServiceCategory> {
+    this.requireAuth();
+
+    const response = await this.apiRequest(
+      `/service_category/${companyId}/${categoryId}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }
+    );
+    return this.handleResponse<AltegioServiceCategory>(
+      response,
+      'update service category'
     );
   }
 

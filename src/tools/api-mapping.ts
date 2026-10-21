@@ -475,6 +475,15 @@ export const apiMapping: Record<string, ApiMapping> = {
     pathParams: ['location_id', 'id'],
     queryParams: ['page', 'count'],
   },
+  // Read first (get_service_category), then sent with the title: V1 needs it
+  // on every call.
+  service_categories_update: {
+    path: '/service_category/{location_id}/{id}',
+    method: 'put',
+    operationId: 'update_service_category',
+    pathParams: ['location_id', 'id'],
+    bodyParams: ['title', 'weight'],
+  },
   service_categories_delete: {
     path: '/service_category/{location_id}/{id}',
     method: 'delete',
@@ -498,6 +507,23 @@ export const apiMapping: Record<string, ApiMapping> = {
     operationId: 'create_position',
     pathParams: ['company_id'],
     bodyParams: ['title', 'description'],
+    spec: 'v2',
+  },
+  // Read first (get_position), then sent whole: the PUT clears a description
+  // it is not sent.
+  positions_update: {
+    path: '/locations/{company_id}/positions/{position_id}',
+    method: 'put',
+    operationId: 'update_position',
+    pathParams: ['company_id', 'position_id'],
+    bodyParams: ['title', 'description'],
+    spec: 'v2',
+  },
+  positions_delete: {
+    path: '/locations/{company_id}/positions/{position_id}',
+    method: 'delete',
+    operationId: 'delete_position',
+    pathParams: ['company_id', 'position_id'],
     spec: 'v2',
   },
   // ==========================================

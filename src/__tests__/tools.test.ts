@@ -69,6 +69,8 @@ describe('Tool Registration', () => {
     // Position management tools
     expect(toolNames).toContain('positions_list');
     expect(toolNames).toContain('positions_create');
+    expect(toolNames).toContain('positions_update');
+    expect(toolNames).toContain('positions_delete');
     expect(toolNames).toContain('appointments_list_tags');
     expect(toolNames).toContain('appointments_create_tag');
     expect(toolNames).not.toContain('update_position');
@@ -89,6 +91,7 @@ describe('Tool Registration', () => {
     // Service delete + service ↔ team member links
     expect(toolNames).toContain('services_delete');
     expect(toolNames).toContain('service_categories_delete');
+    expect(toolNames).toContain('service_categories_update');
     expect(toolNames).toContain('services_link_team_member');
     expect(toolNames).toContain('services_update_team_member_link');
     expect(toolNames).toContain('services_unlink_team_member');
@@ -129,7 +132,7 @@ describe('Tool Registration', () => {
     }
 
     // Total: 84 served factory-defined + 12 onboarding = 96 tools
-    expect(toolNames.length).toBe(163);
+    expect(toolNames.length).toBe(166);
     // stdio lists every tool, so it carries no dispatcher.
     expect(toolNames).not.toContain('tools_search');
   });

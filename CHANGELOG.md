@@ -6,6 +6,22 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — changing and deleting positions, changing service categories
+
+- **`positions_update`** renames a position or changes its description, and
+  **`positions_delete`** deletes one, naming the team members who hold it.
+  Both run on the documented V2 routes (`PUT` and `DELETE`
+  `/locations/{id}/positions/{id}`); the `update_position` and
+  `delete_position` tools removed on 2026-09-10 called a V1 path that does
+  not exist. The V2 `PUT` clears a description it is not sent, so the change
+  is merged onto a fresh read. A repeated delete answers "already deleted".
+- **`service_categories_update`** renames a service category or changes its
+  sort weight; V1 needs the title on every call and keeps the weight and
+  team members a call leaves out. V2 has no service category write. Creating
+  categories stays with `onboarding_add_categories`.
+- All three ask for confirmation first; the changes show before → after and
+  are refused if the position or category changed after that.
+
 ### Added — changing an inventory document and paying a product receipt
 
 - **`inventory_update_document`** changes a product sale, product receipt or

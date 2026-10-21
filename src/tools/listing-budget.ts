@@ -53,7 +53,9 @@ export const LISTING_BUDGETS: Readonly<Record<HttpViewKey, number>> = {
   // more tools and `tools_call_destructive`; 36,194 and 26 before. Reaches 155.
   compact: 53_500,
   ops: 74_500, // 71,074 bytes, 53 tools
-  catalog: 27_000, // 25,511 bytes, 34 tools
+  // 25,511 bytes, 34 tools; 28,061 and 37 with position and service category
+  // updates on 2026-10-21.
+  catalog: 30_000,
   // 99,943 bytes, 58 tools; 109,499 and 65 with the product catalog (product
   // cards and categories) on 2026-10-21; 114,188 and 67 with editing and
   // paying inventory documents the same day.

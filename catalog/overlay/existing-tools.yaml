@@ -143,6 +143,23 @@ operations:
     write_allowed: false
     notes: >
       Supersedes the deprecated V1 quick create; the curated tool calls it.
+  update_position:
+    domain: positions
+    tier: core
+    facets: [catalog, onboarding]
+    tool_name: positions_update
+    write_allowed: false
+    notes: >
+      Replaces title and description together: a description left out is
+      cleared (live 2026-10-21), so the curated tool merges onto a fresh read.
+      The same path on the V1 base answers 404.
+  delete_position:
+    domain: positions
+    tier: core
+    facets: [catalog, onboarding]
+    tool_name: positions_delete
+    write_allowed: false
+    notes: A repeat answers 404 (live 2026-10-21).
 
   # --- services ------------------------------------------------------------
   # V2 lists services at its own path. The V1 list stays only as a fallback
@@ -180,6 +197,15 @@ operations:
     notes: >
       PUT is replacement-shaped. The curated client reads and merges the
       current service so unchanged fields and team-member links survive.
+  update_service_category:
+    domain: services
+    tier: core
+    facets: [catalog, onboarding]
+    tool_name: service_categories_update
+    write_allowed: false
+    notes: >
+      Needs title on every call (422 without it); weight and staff are kept
+      when left out (live 2026-10-21).
   delete_service_category:
     domain: services
     tier: core
