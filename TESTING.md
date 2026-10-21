@@ -48,6 +48,10 @@ this public repository:
 | `ALTEGIO_E2E_PRODUCT_ID`, `ALTEGIO_E2E_INVENTORY_ID`   | A cheap plain product and a sale inventory that holds it                               |
 | `ALTEGIO_E2E_CONSUMABLES_INVENTORY_ID`                 | The consumables inventory                                                              |
 | `ALTEGIO_E2E_ACCOUNT_ID`                               | A cash register used only by tests                                                     |
+| `ALTEGIO_E2E_EVENT_SERVICE_ID`                         | Optional: a service the team member runs as group events                               |
+| `ALTEGIO_E2E_MEMBERSHIP_PRODUCT_ID`                    | Optional: a product that sells a membership activated on the first visit               |
+
+Without an optional id, the runs that need it are skipped.
 
 Rules the suites follow, and a new suite must follow too:
 
