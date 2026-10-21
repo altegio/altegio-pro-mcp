@@ -375,6 +375,25 @@ describe('catalog build', () => {
       };
     }
 
+    it('keeps a failures map in the curation', () => {
+      if (!specAvailable) return;
+      const result = buildWith('failures-ok', [
+        '  list_team_members:',
+        "    failures: { '416': No scheme applies. }",
+      ]);
+      expect(result.status).toBe(0);
+      const built = JSON.parse(fs.readFileSync(result.out, 'utf8')) as {
+        operations: Array<{
+          operationId: string;
+          curation?: { failures?: Record<string, string> };
+        }>;
+      };
+      expect(
+        built.operations.find((o) => o.operationId === 'list_team_members')
+          ?.curation?.failures
+      ).toEqual({ '416': 'No scheme applies.' });
+    });
+
     it('retires a declared twin and records it under superseded', () => {
       if (!specAvailable) return;
       const result = buildWith('supersedes-ok', [
@@ -474,6 +493,21 @@ describe('catalog build', () => {
         'a malformed supersedes list',
         ['  list_events:', '    supersedes: search_events'],
         'invalid supersedes list',
+      ],
+      [
+        'a failures entry for a status that is not an error',
+        ['  list_events:', "    failures: { '200': Fine. }"],
+        'invalid failures map',
+      ],
+      [
+        'a failures entry for 401',
+        ['  list_events:', "    failures: { '401': Sign in again. }"],
+        'invalid failures map',
+      ],
+      [
+        'an empty failures sentence',
+        ['  list_events:', "    failures: { '416': '' }"],
+        'invalid failures map',
       ],
     ])('fails the build on %s', (name, overlay, message) => {
       if (!specAvailable) return;

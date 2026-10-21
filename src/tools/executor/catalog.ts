@@ -48,6 +48,8 @@ export interface CatalogCuration {
   write_allowed?: boolean;
   /** V1 operationIds this operation replaces (they are not in the catalog). */
   supersedes?: string[];
+  /** Error status → what it means here and the next step, said first. */
+  failures?: Record<string, string>;
   notes?: string;
 }
 

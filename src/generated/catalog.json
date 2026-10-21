@@ -21264,6 +21264,9 @@
           "finance"
         ],
         "tool_name": "payroll_get_calculation",
+        "failures": {
+          "416": "No payroll scheme applies to this team member in this period, so there is nothing to compute. The request is valid and the same team member and period give the same answer: report no payroll for them. Payroll schemes are assigned to team members in Altegio."
+        },
         "notes": "Answers 416 when no payroll scheme applies; the tool reports no calculation."
       }
     },

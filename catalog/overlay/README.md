@@ -78,6 +78,12 @@ that is the drift signal when the spec repository renames or drops an operation.
   its V1 fallback (`company_links.price_min` next to `price_min`).
 - **`projection` keeps results inside the size budget** (ADR-001 D8). Prefer a
   short allowlist of fields with ids over a whole API object.
+- **`failures` explains a status the number alone gets wrong.** When an
+  operation answers an error status that sends a caller after the wrong fix —
+  often one the spec does not document, such as 416 from the payroll period
+  read when no payroll scheme applies — map it to one sentence of ours: what it
+  means and what to do next. `api_call_operation` says it first, names the
+  curated tool, and quotes the API's message after it. Never 401.
 
 ## Workflow
 
