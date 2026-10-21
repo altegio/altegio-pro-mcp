@@ -365,7 +365,7 @@ export const visitsAddProductTool = defineTool({
       .number()
       .min(0)
       .describe(
-        'Quantity of this product already on the visit, from visits_get (0 if none).'
+        'Quantity of this product already on this appointment: the sum of its visit items with this appointment_id in visits_get (0 if none). Items of other appointments in the visit do not count.'
       ),
     inventory_id: optionalId(
       'Inventory to take it from (inventory_list). Default: as Altegio picks.'
