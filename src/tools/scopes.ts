@@ -276,6 +276,8 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   team_members_delete: 'team_members:write',
   positions_list: 'team_members:read',
   positions_create: 'team_members:write',
+  positions_update: 'team_members:write',
+  positions_delete: 'team_members:write',
   schedules_get: 'team_members:read',
   schedules_create: 'team_members:write',
   schedules_update: 'team_members:write',
@@ -295,6 +297,7 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   services_unlink_team_member: 'services:write',
   service_categories_list: 'services:read',
   service_categories_delete: 'services:write',
+  service_categories_update: 'services:write',
 
   // --- Appointments ---------------------------------------------------------
   appointments_list: 'appointments:read',

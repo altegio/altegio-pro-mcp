@@ -35,7 +35,7 @@
     "staff_id": "team_member_id"
   },
   "operationCount": 359,
-  "curatedCount": 119,
+  "curatedCount": 122,
   "domains": [
     {
       "domain": "altegio_plan",
@@ -139,7 +139,7 @@
     },
     {
       "domain": "positions",
-      "operations": 7
+      "operations": 9
     },
     {
       "domain": "products",
@@ -171,7 +171,7 @@
     },
     {
       "domain": "team_members",
-      "operations": 27
+      "operations": 25
     },
     {
       "domain": "users",
@@ -31560,6 +31560,17 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "services",
+        "tier": "core",
+        "facets": [
+          "catalog",
+          "onboarding"
+        ],
+        "tool_name": "service_categories_update",
+        "write_allowed": false,
+        "notes": "Needs title on every call (422 without it); weight and staff are kept when left out (live 2026-10-21).\n"
       }
     },
     {
@@ -40631,7 +40642,7 @@
       "tags": [
         "Team Members"
       ],
-      "domain": "team_members",
+      "domain": "positions",
       "deprecated": false,
       "security": {
         "required": true,
@@ -40686,6 +40697,17 @@
       },
       "response": {
         "statusCode": "204"
+      },
+      "curation": {
+        "domain": "positions",
+        "tier": "core",
+        "facets": [
+          "catalog",
+          "onboarding"
+        ],
+        "tool_name": "positions_update",
+        "write_allowed": false,
+        "notes": "Replaces title and description together: a description left out is cleared (live 2026-10-21), so the curated tool merges onto a fresh read. The same path on the V1 base answers 404.\n"
       }
     },
     {
@@ -40699,7 +40721,7 @@
       "tags": [
         "Team Members"
       ],
-      "domain": "team_members",
+      "domain": "positions",
       "deprecated": false,
       "security": {
         "required": true,
@@ -40730,6 +40752,17 @@
       ],
       "response": {
         "statusCode": "204"
+      },
+      "curation": {
+        "domain": "positions",
+        "tier": "core",
+        "facets": [
+          "catalog",
+          "onboarding"
+        ],
+        "tool_name": "positions_delete",
+        "write_allowed": false,
+        "notes": "A repeat answers 404 (live 2026-10-21)."
       }
     },
     {

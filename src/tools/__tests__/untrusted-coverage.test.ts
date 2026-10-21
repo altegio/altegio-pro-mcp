@@ -501,6 +501,15 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     },
   },
 
+  positions_update: {
+    what: 'the position title and description before and after',
+    coveredBy: 'src/tools/__tests__/positions-categories.test.ts',
+  },
+  service_categories_update: {
+    what: 'the category title before and after',
+    coveredBy: 'src/tools/__tests__/positions-categories.test.ts',
+  },
+
   positions_list: {
     what: 'position title and description',
     canary: {
@@ -1467,6 +1476,7 @@ const NO_FREE_TEXT: Record<string, string> = {
   team_members_delete: 'ids',
   services_delete: 'ids',
   service_categories_delete: 'ids',
+  positions_delete: 'ids',
   appointments_delete: 'ids',
   booking_forms_delete: 'ids',
   clients_delete: 'ids',
