@@ -6,6 +6,15 @@ is declared stable.
 
 ## [Unreleased]
 
+## [0.7.0-alpha.0] - 2026-10-21
+
+### Changed — `initialize` names the build's commit
+
+- **`serverInfo.version` carries the commit** a build was made from as semver
+  build metadata, for example `0.7.0-alpha.0+119c705a8b9e`, so a hosted
+  rollout can be checked over MCP. A build without a commit reports the
+  package version alone.
+
 ### Fixed — search ranking, a quantity guard's wording, where secrets go
 
 - **`tools_search` ranks the tier a query asks for first** among matches
