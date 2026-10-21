@@ -1365,6 +1365,23 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     what: 'the payment item and account titles and the comment',
     coveredBy: 'src/capabilities/payroll/__tests__/use-cases.test.ts',
   },
+  ...Object.fromEntries(
+    (
+      [
+        ['product_categories_list', 'product category titles'],
+        ['product_categories_create', 'the new category title'],
+        ['product_categories_update', 'the category titles before and after'],
+        ['products_create', 'the product titles created'],
+        ['products_update', 'the product title'],
+      ] as const
+    ).map(([name, what]) => [
+      name,
+      {
+        what,
+        coveredBy: 'src/capabilities/inventory/__tests__/catalog.test.ts',
+      },
+    ])
+  ),
 };
 
 // ===========================================================================
@@ -1379,6 +1396,8 @@ const NO_FREE_TEXT: Record<string, string> = {
     'counts, amounts, dates and statuses of the team member’s payroll only',
   // --- group events ---
   events_delete: 'the event and location ids only',
+  product_categories_delete: 'the category and location ids only',
+  products_archive: 'the product and location ids and the outcome only',
   memberships_delete_type: 'the membership type and chain ids only',
   events_duplicate: 'ids, start times and seat counts of the copies only',
   events_delete_duplication_strategy: 'the pattern and location ids only',

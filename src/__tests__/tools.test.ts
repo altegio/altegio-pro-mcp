@@ -129,7 +129,7 @@ describe('Tool Registration', () => {
     }
 
     // Total: 84 served factory-defined + 12 onboarding = 96 tools
-    expect(toolNames.length).toBe(154);
+    expect(toolNames.length).toBe(161);
     // stdio lists every tool, so it carries no dispatcher.
     expect(toolNames).not.toContain('tools_search');
   });

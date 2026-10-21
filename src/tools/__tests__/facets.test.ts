@@ -74,7 +74,14 @@ const INVENTORY_TOOLS = [
   'inventory_list',
   'inventory_list_bills_of_materials',
   'inventory_list_operations',
+  'product_categories_list',
+  'product_categories_create',
+  'product_categories_update',
+  'product_categories_delete',
+  'products_archive',
+  'products_create',
   'products_search',
+  'products_update',
   'suppliers_and_partners_list',
 ];
 
@@ -411,8 +418,8 @@ describe('static views', () => {
     const index = buildFacetIndex(tools);
     const demoted = names.filter((name) => demotedGroupOf(name));
 
-    it('takes 26 tools off /mcp/full', () => {
-      expect(demoted).toHaveLength(26);
+    it('takes 32 tools off /mcp/full', () => {
+      expect(demoted).toHaveLength(32);
       for (const name of demoted) {
         expect(index.includes(FULL_VIEW, name)).toBe(false);
         expect(decideView(FULL_VIEW, toolOf(name)).reason).toBe(
@@ -523,7 +530,7 @@ describe('static views', () => {
       ).toBe(true);
       for (const name of INVENTORY_TOOLS) {
         expect(index.includes('finance', name)).toBe(true);
-        expect(index.includes(FULL_VIEW, name)).toBe(true);
+        expect(index.includes(FULL_VIEW, name)).toBe(!demotedGroupOf(name));
       }
       expect(index.includes('ops', 'analytics_get_overview')).toBe(false);
     });

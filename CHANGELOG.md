@@ -6,6 +6,35 @@ is declared stable.
 
 ## [Unreleased]
 
+### Added — the product catalog: product cards and categories, with a duplicate check
+
+- **`products_create`** creates up to 25 product cards in one confirmed call
+  — the new lines of a supplier invoice — with category, sale and cost price,
+  sale and consumable units (by id or short title, such as `pcs` or `ml`),
+  article number and barcode. Each line is checked against the existing
+  products first: a same barcode, article number or title refuses the call,
+  or with `skip_existing` only skips that line, so a repeated confirmed call
+  creates nothing twice. Stock is not changed.
+- **`products_update`** changes a card — name, category, prices, units,
+  article number, barcode, receipt name, comment, critical and desired stock —
+  and sends the rest back unchanged; a unit change carries the conversion
+  rules Altegio needs once stock has moved. **`products_archive`** archives a
+  product, naming the stock it still holds; a repeat answers "already
+  archived".
+- **`product_categories_list`, `_create`, `_update`, `_delete`** manage the
+  product categories. Units are named by short title or id and resolved from
+  V2's unit list, instead of guessed from existing products; that list stays
+  an executor read (`api_call_operation` `list_product_units`), and similar
+  product names stay with `products_search`.
+- Every write asks for confirmation first; changes show before → after and
+  are refused if the card or category moved after that. The writes run on the
+  documented V1 routes (V2 reads products, categories and units but writes
+  none) and send float fields with a decimal point, which V1 requires
+  (`10.0`, not `10`). The new tools are served on `/pro/finance` and reached
+  through the dispatcher on `/pro`; the flat `/pro/full` list keeps
+  `product_categories_list` only.
+- `src/generated/catalog.json` is rebuilt against the current specification.
+
 ### Fixed — `api_call_operation` says what a payroll 416 means
 
 - **A payroll period read that no payroll scheme covers is explained.** Altegio

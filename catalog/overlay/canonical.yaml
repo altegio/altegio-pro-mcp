@@ -1,4 +1,4 @@
-# V2 operations that supersede a V1 twin and have no curated tool yet.
+# V2 operations that supersede a V1 twin.
 #
 # Format: catalog/overlay/_schema.yaml. Where V1 and V2 describe the same
 # operation, V2 is canonical (product owner, 2026-09-29) and the V1 twin leaves
@@ -46,6 +46,9 @@ operations:
     supersedes: [search_product]
   list_product_categories:
     domain: products
+    tier: core
+    facets: [finance]
+    tool_name: product_categories_list
     supersedes: [get_product_category_list, get_product_category_list_by_ids]
 
   # --- custom fields ---------------------------------------------------------

@@ -16,13 +16,13 @@ the code disagree, which is how a surface change reaches a reviewer’s diff
 
 ## Counts
 
-**158 tools served (164 defined, 6 withheld from every view).**
+**165 tools served (171 defined, 6 withheld from every view).**
 
 | What | Count | Where |
 | --- | --- | --- |
-| Defined | 164 | 152 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
+| Defined | 171 | 159 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
 | Withheld from every view | 6 | `src/tools/disabled-tools.ts` (the report builder) |
-| **Served** | **158** | what some view serves; `stdio` lists all of it but the dispatcher, which only the compact listing lists |
+| **Served** | **165** | what some view serves; `stdio` lists all of it but the dispatcher, which only the compact listing lists |
 
 Served tools per category, in `tools/list` order:
 
@@ -37,7 +37,7 @@ Served tools per category, in `tools/list` order:
 | Events | 15 |
 | Feedback | 1 |
 | Finance | 8 |
-| Inventory | 7 |
+| Inventory | 14 |
 | Location | 3 |
 | Memberships | 13 |
 | Onboarding | 12 |
@@ -54,19 +54,19 @@ Served tools per category, in `tools/list` order:
 
 ## Views
 
-| View | Address | Lists (of 164 defined) | Reaches | `tools/list` bytes | Budget (used) | Reasons |
+| View | Address | Lists (of 171 defined) | Reaches | `tools/list` bytes | Budget (used) | Reasons |
 | --- | --- | --- | --- | --- | --- | --- |
-| `all` | stdio (no HTTP route) | 154 | 154 | 203,100 | — | all ×154, -off ×6, -cmp ×4 |
-| `default` | `/mcp` | 37 | 155 | 50,770 | 53,500 (95 %) | disp ×118, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
-| `full` | `/mcp/full` | 96 | 96 | 121,728 | 126,000 (97 %) | dflt ×92, -pack ×29, -low ×26, -off ×6, -cmp ×4, base ×3, -pwd ×2, -name ×1, xtra ×1 |
-| `readonly` | `/mcp/readonly` | 84 | 84 | 116,761 | 123,000 (95 %) | ro ×84, -write ×68, -off ×6, -cmp ×4, -pwd ×2 |
-| `compact` | `/mcp/compact` | 37 | 155 | 50,770 | 53,500 (95 %) | disp ×118, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
-| `ops` | `/mcp/ops` | 53 | 53 | 71,186 | 74,500 (96 %) | - ×99, pfx ×27, rule ×23, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
-| `catalog` | `/mcp/catalog` | 34 | 34 | 25,551 | 27,000 (95 %) | - ×118, rule ×31, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
-| `finance` | `/mcp/finance` | 58 | 58 | 100,055 | 103,000 (97 %) | - ×94, pfx ×51, -off ×6, -cmp ×4, rule ×4, base ×3, -pwd ×2 |
-| `marketing` | `/mcp/marketing` | 17 | 17 | 22,856 | 24,000 (95 %) | - ×135, pfx ×13, -off ×6, -cmp ×4, base ×3, -pwd ×2, rule ×1 |
-| `analytics` | `/mcp/analytics` | 33 | 33 | 62,445 | 66,000 (95 %) | - ×119, pfx ×30, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
-| `onboarding` | `/mcp/onboarding` | 15 | 15 | 12,387 | 13,500 (92 %) | - ×137, pfx ×12, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
+| `all` | stdio (no HTTP route) | 161 | 161 | 212,689 | — | all ×161, -off ×6, -cmp ×4 |
+| `default` | `/mcp` | 37 | 162 | 50,915 | 53,500 (95 %) | disp ×125, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
+| `full` | `/mcp/full` | 97 | 97 | 122,780 | 126,000 (97 %) | dflt ×93, -low ×32, -pack ×29, -off ×6, -cmp ×4, base ×3, -pwd ×2, -name ×1, xtra ×1 |
+| `readonly` | `/mcp/readonly` | 85 | 85 | 117,813 | 123,000 (96 %) | ro ×85, -write ×74, -off ×6, -cmp ×4, -pwd ×2 |
+| `compact` | `/mcp/compact` | 37 | 162 | 50,915 | 53,500 (95 %) | disp ×125, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
+| `ops` | `/mcp/ops` | 53 | 53 | 71,186 | 74,500 (96 %) | - ×106, pfx ×27, rule ×23, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
+| `catalog` | `/mcp/catalog` | 34 | 34 | 25,551 | 27,000 (95 %) | - ×125, rule ×31, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
+| `finance` | `/mcp/finance` | 65 | 65 | 109,499 | 114,000 (96 %) | - ×94, pfx ×58, -off ×6, -cmp ×4, rule ×4, base ×3, -pwd ×2 |
+| `marketing` | `/mcp/marketing` | 17 | 17 | 22,856 | 24,000 (95 %) | - ×142, pfx ×13, -off ×6, -cmp ×4, base ×3, -pwd ×2, rule ×1 |
+| `analytics` | `/mcp/analytics` | 33 | 33 | 62,445 | 66,000 (95 %) | - ×126, pfx ×30, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
+| `onboarding` | `/mcp/onboarding` | 15 | 15 | 12,387 | 13,500 (92 %) | - ×144, pfx ×12, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
 
 `tools/list` bytes is the serialized result the view sends in the default
 deployment — what a host that loads the whole list pays on every connection,
@@ -96,6 +96,7 @@ compact listing reaches them through its dispatcher. The full list’s
 | membership freeze, balance and validity changes | `/mcp/marketing` | `memberships_freeze`, `memberships_set_balance`, `memberships_set_validity`, `memberships_unfreeze` |
 | archiving or deleting a membership type | `/mcp/marketing` | `memberships_archive_type`, `memberships_delete_type` |
 | creating or deleting a booking form | `/mcp/catalog` | `booking_forms_create`, `booking_forms_delete` |
+| creating, changing and archiving products and product categories | `/mcp/finance` | `product_categories_create`, `product_categories_delete`, `product_categories_update`, `products_archive`, `products_create`, `products_update` |
 
 ## Legend
 
@@ -289,7 +290,14 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | `inventory_list` | `all` | `disp` | `dflt` | `ro` | `disp` | `-` | `-` | `pfx` | `-` | `-` | `-` | inventory:read |
 | `inventory_list_bills_of_materials` | `all` | `disp` | `dflt` | `ro` | `disp` | `-` | `-` | `pfx` | `-` | `-` | `-` | inventory:read |
 | `inventory_list_operations` | `all` | `disp` | `dflt` | `ro` | `disp` | `-` | `-` | `pfx` | `-` | `-` | `-` | inventory:read |
+| `product_categories_create` | `all` | `disp` | `-low` | `-write` | `disp` | `-` | `-` | `pfx` | `-` | `-` | `-` | products:write, confirm |
+| `product_categories_delete` | `all` | `disp` | `-low` | `-write` | `disp` | `-` | `-` | `pfx` | `-` | `-` | `-` | products:write, confirm |
+| `product_categories_list` | `all` | `disp` | `dflt` | `ro` | `disp` | `-` | `-` | `pfx` | `-` | `-` | `-` | products:read |
+| `product_categories_update` | `all` | `disp` | `-low` | `-write` | `disp` | `-` | `-` | `pfx` | `-` | `-` | `-` | products:write, confirm |
+| `products_archive` | `all` | `disp` | `-low` | `-write` | `disp` | `-` | `-` | `pfx` | `-` | `-` | `-` | products:write, confirm |
+| `products_create` | `all` | `disp` | `-low` | `-write` | `disp` | `-` | `-` | `pfx` | `-` | `-` | `-` | products:write, confirm |
 | `products_search` | `all` | `disp` | `dflt` | `ro` | `disp` | `rule` | `-` | `pfx` | `-` | `-` | `-` | inventory:read |
+| `products_update` | `all` | `disp` | `-low` | `-write` | `disp` | `-` | `-` | `pfx` | `-` | `-` | `-` | products:write, confirm |
 | `suppliers_and_partners_list` | `all` | `disp` | `dflt` | `ro` | `disp` | `-` | `-` | `rule` | `-` | `-` | `-` | finance:read |
 
 ### Location
@@ -443,5 +451,5 @@ compact listing on `/mcp`. Two environment switches change it.
 
 `MCP_DEFAULT_VIEW=full` (a deployment that turns `/mcp` back): `/mcp` serves
 what the `/full` column shows, without the dispatcher, and refuses the rest
-with the addresses that serve it — 63 more tools listed, 4 fewer.
+with the addresses that serve it — 64 more tools listed, 4 fewer.
 

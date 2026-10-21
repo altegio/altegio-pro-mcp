@@ -12,7 +12,12 @@ import {
  */
 describe('api_search_operations ranking', () => {
   const cases: Array<{ query: string; expect: string }> = [
-    { query: 'team member schedule', expect: 'get_team_member_schedule' },
+    // Since the spec named it "Get team member schedules" (2026-10), the
+    // location-wide read outranks the one-team-member legacy route.
+    {
+      query: 'team member schedule',
+      expect: 'get_team_member_schedule_list',
+    },
     { query: 'staff list', expect: 'list_team_members' },
     { query: 'list of services', expect: 'list_services' },
     {
