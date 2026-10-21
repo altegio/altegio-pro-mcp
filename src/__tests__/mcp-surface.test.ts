@@ -22,8 +22,11 @@ import {
 import { ONBOARDING_WALKTHROUGH_PROMPT } from '../prompts/index.js';
 import {
   COMPACT_VIEW,
+  COMPACT_VIEW_TOOLS,
+  DEFAULT_FACET,
   DEFAULT_FACET_EXTRA_TOOLS,
   DISPATCH_TOOLS,
+  FULL_VIEW,
   demotedGroupOf,
   demotedGroupsInstruction,
 } from '../tools/facets.js';
@@ -92,8 +95,24 @@ function resourceText(contents: ReadResourceResult['contents']): string {
 }
 
 describe('tools/list per facet', () => {
-  it('serves every non-pack tool plus the analytics entry points on the default view, in the registry order', async () => {
+  it('serves the compact listing on the default view, in the registry order', async () => {
     const client = await connect();
+    const { tools } = await client.listTools();
+    expect(tools.map((tool) => tool.name)).toEqual(
+      orderedToolEntries()
+        .map((entry) => entry.spec.name)
+        .filter(
+          (name) =>
+            FACET_BASE_TOOLS.includes(name) ||
+            COMPACT_VIEW_TOOLS.includes(name) ||
+            DISPATCH_TOOLS.includes(name)
+        )
+    );
+    await client.close();
+  });
+
+  it('serves every non-pack tool plus the analytics entry points on the full list, in the registry order', async () => {
+    const client = await connect(FULL_VIEW);
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name)).toEqual(
       orderedToolEntries()
@@ -106,7 +125,7 @@ describe('tools/list per facet', () => {
             !DEFAULT_FACET_EXCLUDED_TOOLS.includes(name) &&
             // Low-use groups live on their facet only.
             !demotedGroupOf(name) &&
-            // The dispatcher lives on /mcp/compact.
+            // The dispatcher lives on the compact listing.
             !DISPATCH_TOOLS.includes(name) &&
             (!DEFAULT_FACET_EXCLUDED_PREFIXES.some((prefix) =>
               name.startsWith(prefix)
@@ -332,15 +351,15 @@ describe('tools/call outside the facet', () => {
     await client.close();
   });
 
-  it('refuses a demoted tool on the default view and names its facet', async () => {
-    const client = await connect();
+  it('refuses a demoted tool on the full list and names its facet and /pro', async () => {
+    const client = await connect(FULL_VIEW);
     await expect(
       client.callTool({
         name: 'memberships_set_balance',
         arguments: { chain_id: 1, membership_id: 2, balance: 3 },
       })
     ).rejects.toThrow(
-      /not served by the "default" view.*https:\/\/mcp\.alteg\.io\/pro\/marketing/s
+      /not served by the "full" view.*https:\/\/mcp\.alteg\.io\/pro\/marketing or https:\/\/mcp\.alteg\.io\/pro\./s
     );
     await client.close();
   });
@@ -476,14 +495,20 @@ describe('server instructions', () => {
     await client.close();
   });
 
-  it('names the demoted groups and their addresses on the default view only', async () => {
-    const client = await connect();
+  it('names the demoted groups and their addresses on the full list only', async () => {
+    const client = await connect(FULL_VIEW);
     expect(client.getInstructions()).toContain(demotedGroupsInstruction());
     expect(client.getInstructions()).toContain(
       'the first-time setup wizard (/onboarding)'
     );
     await client.close();
-    for (const view of ['ops', 'readonly', 'all'] as const) {
+    for (const view of [
+      DEFAULT_FACET,
+      COMPACT_VIEW,
+      'ops',
+      'readonly',
+      'all',
+    ] as const) {
       const other = await connect(view);
       expect(other.getInstructions()).not.toContain('narrower address');
       await other.close();
@@ -695,6 +720,61 @@ describe('prompts', () => {
   });
 });
 
+describe('the MCP_DEFAULT_VIEW switch', () => {
+  const setListing = (value?: string): void => {
+    if (value === undefined) {
+      delete process.env.MCP_DEFAULT_VIEW;
+    } else {
+      process.env.MCP_DEFAULT_VIEW = value;
+    }
+    ConfigLoader.getInstance().reset();
+  };
+
+  afterEach(() => setListing());
+
+  const namesOn = async (facet?: FacetKey) => {
+    const client = await connect(facet);
+    const names = (await client.listTools()).tools.map((tool) => tool.name);
+    const instructions = client.getInstructions() ?? '';
+    await client.close();
+    return { names, instructions };
+  };
+
+  it('serves the full list on /mcp, with its instructions, when the deployment says full', async () => {
+    const full = await namesOn(FULL_VIEW);
+    setListing('full');
+    const onDefault = await namesOn();
+    expect(onDefault.names).toEqual(full.names);
+    expect(onDefault.instructions).toBe(full.instructions);
+    expect(onDefault.names).not.toContain('tools_search');
+  });
+
+  it('refuses on /mcp, with the address, what the full list does not serve', async () => {
+    setListing('full');
+    const client = await connect();
+    await expect(
+      client.callTool({
+        name: 'analytics_get_daily_series',
+        arguments: { location_id: 1 },
+      })
+    ).rejects.toThrow(
+      /not served by the "default" view.*https:\/\/mcp\.alteg\.io\/pro\/analytics.*https:\/\/mcp\.alteg\.io\/pro\/compact/s
+    );
+    await client.close();
+  });
+
+  it('leaves every other address as it is', async () => {
+    const before = await namesOn(COMPACT_VIEW);
+    setListing('full');
+    expect((await namesOn(COMPACT_VIEW)).names).toEqual(before.names);
+  });
+
+  it('accepts compact and full only', () => {
+    setListing('flat');
+    expect(() => ConfigLoader.getInstance().load()).toThrow(/MCP_DEFAULT_VIEW/);
+  });
+});
+
 describe('the ALTEGIO_EXPOSE_PASSWORD_LOGIN switch', () => {
   /**
    * The env flag reaches the served tool list through createServer, so drive it
@@ -761,13 +841,11 @@ describe('names on a view', () => {
     for (const view of VIEW_KEYS) {
       const client = await connect(view);
       const { tools } = await client.listTools();
-      // On the compact view a name its dispatcher runs needs no note: the
+      // On the compact listing a name its dispatcher runs needs no note: the
       // instructions say how to run it.
       const served = new Set([
         ...tools.map((tool) => tool.name),
-        ...(view === COMPACT_VIEW
-          ? listView(COMPACT_VIEW).facetIndex.reachable(COMPACT_VIEW)
-          : []),
+        ...listView(view).facetIndex.reachable(view),
       ]);
       for (const tool of tools) {
         const description = tool.description ?? '';

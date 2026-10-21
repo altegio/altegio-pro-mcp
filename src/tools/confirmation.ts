@@ -394,9 +394,9 @@ export async function requireConfirmation(options: {
   readonly client: AltegioClient;
   readonly runtime: ConfirmationRuntime;
   /**
-   * The dispatcher the call came through (`tools_call_write`), so the token
-   * path says how to repeat it: the same dispatcher, the token inside
-   * `arguments`.
+   * The dispatcher the call came through (`tools_call_write` or
+   * `tools_call_destructive`), so the token path says how to repeat it: the
+   * same dispatcher, the token inside `arguments`.
    */
   readonly dispatcher?: string;
 }): Promise<GateOutcome> {

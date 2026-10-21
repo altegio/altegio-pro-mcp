@@ -2,6 +2,7 @@ import { describe, it, expect } from '@jest/globals';
 import {
   ALL_TOOLS_FACET,
   buildFacetIndex,
+  COMPACT_VIEW,
   decideView,
   DEFAULT_FACET,
   DEFAULT_FACET_DEMOTED_GROUPS,
@@ -11,6 +12,7 @@ import {
   DISPATCH_TOOLS,
   FACET_BASE_TOOLS,
   FACET_NAMES,
+  FULL_VIEW,
   demotedGroupsInstruction,
   demotedGroupOf,
   facetToolsFromSpecs,
@@ -125,7 +127,7 @@ describe('static views', () => {
     expect(isFacetName('nope')).toBe(false);
   });
 
-  it('keeps every non-pack tool on the default view plus the named analytics entry points', () => {
+  it('keeps every non-pack tool on the full list plus the named analytics entry points', () => {
     const index = buildFacetIndex(tools);
     const expected = names.filter(
       (name) =>
@@ -138,7 +140,7 @@ describe('static views', () => {
         ) ||
           DEFAULT_FACET_EXTRA_TOOLS.includes(name))
     );
-    expect(index.members(DEFAULT_FACET)).toEqual(expected);
+    expect(index.members(FULL_VIEW)).toEqual(expected);
   });
 
   it('gives every facet the location tools', () => {
@@ -249,7 +251,7 @@ describe('static views', () => {
       [...FACET_BASE_TOOLS].sort()
     );
     for (const extra of DEFAULT_FACET_EXTRA_TOOLS) {
-      expect(index.includes(DEFAULT_FACET, extra)).toBe(false);
+      expect(index.includes(FULL_VIEW, extra)).toBe(false);
     }
   });
 
@@ -313,7 +315,12 @@ describe('static views', () => {
       const withoutLogin = (list: readonly string[]) =>
         list.filter((name) => !PASSWORD_LOGIN_TOOLS.includes(name));
 
-      for (const key of [DEFAULT_FACET, ...FACET_NAMES] as const) {
+      for (const key of [
+        DEFAULT_FACET,
+        FULL_VIEW,
+        COMPACT_VIEW,
+        ...FACET_NAMES,
+      ] as const) {
         expect(off.members(key)).toEqual(withoutLogin(on.members(key)));
       }
     });
@@ -341,11 +348,49 @@ describe('static views', () => {
     });
 
     it('stays excluded whatever the other switches say', () => {
-      for (const options of [{}, { exposePasswordLogin: true }]) {
+      for (const options of [
+        {},
+        { exposePasswordLogin: true },
+        { defaultListing: 'full' as const },
+      ]) {
         const index = buildFacetIndex(tools, options);
         for (const name of DEFAULT_FACET_EXCLUDED_TOOLS) {
-          expect(index.includes(DEFAULT_FACET, name)).toBe(false);
+          for (const view of [
+            DEFAULT_FACET,
+            FULL_VIEW,
+            COMPACT_VIEW,
+          ] as const) {
+            expect(index.serves(view, name)).toBe(false);
+          }
         }
+      }
+    });
+  });
+
+  describe('what /mcp lists (MCP_DEFAULT_VIEW)', () => {
+    it('lists the compact listing by default, and reaches what it reaches', () => {
+      const index = buildFacetIndex(tools);
+      expect(index.members(DEFAULT_FACET)).toEqual(index.members(COMPACT_VIEW));
+      expect(index.reachable(DEFAULT_FACET)).toEqual(
+        index.reachable(COMPACT_VIEW)
+      );
+      for (const name of index.members(FULL_VIEW)) {
+        expect(index.serves(DEFAULT_FACET, name)).toBe(true);
+      }
+    });
+
+    it('lists the full list, with no dispatcher, when the deployment says full', () => {
+      const compact = buildFacetIndex(tools);
+      const full = buildFacetIndex(tools, { defaultListing: 'full' });
+      expect(full.members(DEFAULT_FACET)).toEqual(full.members(FULL_VIEW));
+      expect(full.reachable(DEFAULT_FACET)).toEqual([]);
+      for (const name of DISPATCH_TOOLS) {
+        expect(full.includes(DEFAULT_FACET, name)).toBe(false);
+      }
+      // Every other address is the same either way.
+      for (const key of full.keys.filter((key) => key !== DEFAULT_FACET)) {
+        expect(full.members(key)).toEqual(compact.members(key));
+        expect(full.reachable(key)).toEqual(compact.reachable(key));
       }
     });
   });
@@ -362,15 +407,15 @@ describe('static views', () => {
     });
   });
 
-  describe('the groups demoted from the default view', () => {
+  describe('the groups demoted from the full list', () => {
     const index = buildFacetIndex(tools);
     const demoted = names.filter((name) => demotedGroupOf(name));
 
-    it('takes 26 tools off /mcp', () => {
+    it('takes 26 tools off /mcp/full', () => {
       expect(demoted).toHaveLength(26);
       for (const name of demoted) {
-        expect(index.includes(DEFAULT_FACET, name)).toBe(false);
-        expect(decideView(DEFAULT_FACET, toolOf(name)).reason).toBe(
+        expect(index.includes(FULL_VIEW, name)).toBe(false);
+        expect(decideView(FULL_VIEW, toolOf(name)).reason).toBe(
           'default-view-demoted'
         );
       }
@@ -421,20 +466,18 @@ describe('static views', () => {
       expect(analyticsCount).toBe(30);
     });
 
-    it('admits only the named entry points to the default view', () => {
+    it('admits only the named entry points to the full list', () => {
       const index = buildFacetIndex(tools);
-      expect(index.includes(DEFAULT_FACET, 'analytics_get_overview')).toBe(
-        true
-      );
+      expect(index.includes(FULL_VIEW, 'analytics_get_overview')).toBe(true);
       // The report-builder entry points are gone from every view.
-      expect(index.includes(DEFAULT_FACET, 'analytics_run_report')).toBe(false);
+      expect(index.includes(FULL_VIEW, 'analytics_run_report')).toBe(false);
       expect(
-        index.includes(DEFAULT_FACET, 'analytics_delete_assistant_report')
+        index.includes(FULL_VIEW, 'analytics_delete_assistant_report')
       ).toBe(false);
-      expect(index.includes(DEFAULT_FACET, 'analytics_get_daily_series')).toBe(
+      expect(index.includes(FULL_VIEW, 'analytics_get_daily_series')).toBe(
         false
       );
-      expect(index.members(DEFAULT_FACET)).toHaveLength(
+      expect(index.members(FULL_VIEW)).toHaveLength(
         names.length -
           analyticsCount +
           DEFAULT_FACET_EXTRA_TOOLS.length -
@@ -444,7 +487,7 @@ describe('static views', () => {
           DISPATCH_TOOLS.length
       );
       for (const name of BACK_OFFICE_MONEY_TOOLS) {
-        expect(index.includes(DEFAULT_FACET, name)).toBe(true);
+        expect(index.includes(FULL_VIEW, name)).toBe(true);
       }
     });
 
@@ -452,7 +495,7 @@ describe('static views', () => {
       const index = buildFacetIndex(tools);
       expect(index.members(ALL_TOOLS_FACET)).toEqual(names);
       // Which is strictly more than the default HTTP view holds back to.
-      expect(index.members(DEFAULT_FACET)).not.toEqual(names);
+      expect(index.members(FULL_VIEW)).not.toEqual(names);
       expect(
         index.includes(ALL_TOOLS_FACET, 'analytics_get_daily_series')
       ).toBe(true);
@@ -476,7 +519,7 @@ describe('static views', () => {
       ).toBe(true);
       for (const name of INVENTORY_TOOLS) {
         expect(index.includes('finance', name)).toBe(true);
-        expect(index.includes(DEFAULT_FACET, name)).toBe(true);
+        expect(index.includes(FULL_VIEW, name)).toBe(true);
       }
       expect(index.includes('ops', 'analytics_get_overview')).toBe(false);
     });
@@ -601,7 +644,7 @@ describe('the read-only view', () => {
     }
   });
 
-  it('serves the whole analytics pack, which the default view holds back', () => {
+  it('serves the whole analytics pack, which the full list holds back', () => {
     // Chain-wide analytics is a named audience for this address, and every
     // analytics tool only reads.
     const analytics = names.filter((name) => name.startsWith('analytics_'));
@@ -610,7 +653,7 @@ describe('the read-only view', () => {
       expect(index.includes(READONLY_VIEW, name)).toBe(true);
     }
     expect(
-      index.members(DEFAULT_FACET).filter((n) => analytics.includes(n)).length
+      index.members(FULL_VIEW).filter((n) => analytics.includes(n)).length
     ).toBeLessThan(analytics.length);
   });
 

@@ -1406,6 +1406,8 @@ const NO_FREE_TEXT: Record<string, string> = {
     'nothing of its own: the result is the dispatched tool’s, classified under that tool’s name',
   tools_call_write:
     'nothing of its own: the result is the dispatched tool’s, classified under that tool’s name',
+  tools_call_destructive:
+    'nothing of its own: the result is the dispatched tool’s, classified under that tool’s name',
 
   // --- the catalog half of the executor ---
   api_search_operations:

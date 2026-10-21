@@ -99,11 +99,12 @@ describe('the map covers every tool', () => {
       .map((tool) => tool.meta.name)
       .sort();
     // The two password-login tools obtain the credential itself, and the
-    // write dispatcher is authorised per call by the scopes of the tool it
-    // runs (`../registry.ts`).
+    // write dispatchers are authorised per call by the scopes of the tool
+    // they run (`../registry.ts`).
     expect(ungatedWrites).toEqual([
       'auth_login',
       'auth_logout',
+      'tools_call_destructive',
       'tools_call_write',
     ]);
   });

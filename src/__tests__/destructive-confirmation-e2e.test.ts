@@ -382,14 +382,15 @@ describe('tools/list stays identical for both hosts (ADR-001 D7)', () => {
       const b = await without.client.listTools();
       expect(a.tools).toEqual(b.tools);
 
-      const deleteStaff = a.tools.find(
-        (tool) => tool.name === 'team_members_delete'
+      // A destructive tool the default view lists.
+      const deleteAppointment = a.tools.find(
+        (tool) => tool.name === 'appointments_delete'
       );
-      const properties = deleteStaff?.inputSchema.properties as
+      const properties = deleteAppointment?.inputSchema.properties as
         Record<string, unknown> | undefined;
       // Present on every connection, never negotiated per client.
       expect(properties).toHaveProperty(CONFIRMATION_TOKEN_ARG);
-      expect(deleteStaff?.inputSchema.required).not.toContain(
+      expect(deleteAppointment?.inputSchema.required).not.toContain(
         CONFIRMATION_TOKEN_ARG
       );
     } finally {

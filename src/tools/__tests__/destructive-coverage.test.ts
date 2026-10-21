@@ -21,11 +21,12 @@ const factoryTools = (Object.values(defs) as unknown[]).filter(
 );
 
 /**
- * The write dispatcher of `/mcp/compact` may run a deletion, so it is marked
- * destructive, but it has no confirmation of its own: the registry runs the
- * confirmation of the tool it dispatches to (`src/__tests__/dispatch-e2e.test.ts`).
+ * The destructive dispatcher of the compact listing runs deletions, so it is
+ * marked destructive, but it has no confirmation of its own: the registry
+ * runs the confirmation of the tool it dispatches to
+ * (`src/__tests__/dispatch-e2e.test.ts`).
  */
-const DISPATCHER = 'tools_call_write';
+const DISPATCHER = 'tools_call_destructive';
 
 /** Every destructive tool, factory-defined or hand-written, by name. */
 const destructiveNames = [
@@ -61,7 +62,7 @@ describe('destructive tools are gated', () => {
       'services_delete',
       'services_unlink_team_member',
       'team_members_delete',
-      'tools_call_write',
+      'tools_call_destructive',
       'visits_cancel_payment',
       'visits_remove_product',
     ]);

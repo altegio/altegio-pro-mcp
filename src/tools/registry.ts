@@ -13,14 +13,17 @@ import { OnboardingHandlers } from './onboarding-handlers.js';
 import { OnboardingStateManager } from '../providers/onboarding-state-manager.js';
 import { orderedToolEntries, servedDefinedTools } from './inventory.js';
 import {
+  dispatcherFor,
   isDispatchCall,
   resolveDispatch,
+  type Dispatcher,
   type DispatchTargets,
 } from './dispatch.js';
 import {
   readOnlyRefusalMessage,
   DEFAULT_FACET,
   READONLY_VIEW,
+  type DefaultViewListing,
   type FacetKey,
   type FacetIndex,
 } from './facets.js';
@@ -89,6 +92,8 @@ export interface RegisterToolsOptions {
    * Off by default; the unfiltered `all` view stdio uses always has them.
    */
   readonly exposePasswordLogin?: boolean;
+  /** What `/mcp` lists (config switch `MCP_DEFAULT_VIEW`); compact by default. */
+  readonly defaultListing?: DefaultViewListing;
   /**
    * Public base URL this deployment is reached at, used to name the complete
    * surface in the read-only view's refusal. Defaults to the published public
@@ -463,22 +468,24 @@ export function registerTools(
   const publicBaseUrl = options.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL;
   const listing = listView(facet, {
     exposePasswordLogin: options.exposePasswordLogin,
+    defaultListing: options.defaultListing,
     publicBaseUrl,
   });
   const { facetIndex, servingView } = listing;
   const visible = new Set(facetIndex.members(facet));
-  // What this view's dispatcher runs (`./dispatch.ts`): on /mcp/compact, the
-  // tools it lists and the ones it does not; nothing on a view without it.
+  // What this view's dispatcher runs (`./dispatch.ts`): on the compact
+  // listing, the tools it lists and the ones it does not; nothing on a view
+  // without it.
   const reachable = new Set(facetIndex.reachable(facet));
-  const readOnly = new Map(
+  const tiers = new Map<string, Dispatcher>(
     orderedToolEntries().map((entry) => [
       entry.spec.name,
-      entry.spec.annotations?.readOnlyHint === true,
+      dispatcherFor(entry.spec),
     ])
   );
   const dispatchTargets: DispatchTargets = {
     reaches: (name) => reachable.has(name),
-    readOnly: (name) => readOnly.get(name),
+    dispatcherOf: (name) => tiers.get(name),
     addressesServing: (name) => servingView.addressesServing(name),
   };
 

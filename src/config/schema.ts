@@ -9,7 +9,12 @@ import {
   PACKAGE_NAME,
   PACKAGE_VERSION,
 } from '../package-metadata.js';
-import { DEFAULT_FACET, viewUrl } from '../tools/facets.js';
+import {
+  DEFAULT_FACET,
+  DEFAULT_VIEW_LISTING,
+  DEFAULT_VIEW_LISTINGS,
+  viewUrl,
+} from '../tools/facets.js';
 
 /**
  * Public address of the complete surface — the URL a customer pastes, without a
@@ -77,13 +82,16 @@ export function readOnlyViewInstructions(publicBaseUrl: string): string {
 }
 
 /**
- * Extra `initialize` instructions for the compact view, prefixed to the product
- * instructions: what its short list leaves out is still here, and how to reach
- * it — including a tool a result names that the list does not carry.
+ * Extra `initialize` instructions for the compact listing (`/mcp` by default,
+ * and `/mcp/compact`), prefixed to the product instructions: what its short
+ * list leaves out is still here, and how to reach it — including a tool a
+ * result names that the list does not carry — through the dispatcher of the
+ * right risk tier.
  */
 export const COMPACT_VIEW_INSTRUCTIONS = [
   'This address lists the most used tools only. Every other tool (finance, payroll, inventory, memberships, analytics, onboarding…)',
-  'is found with tools_search and run with tools_call_read (reads) or tools_call_write (changes), as is any tool a result names that your list lacks.',
+  'is found with tools_search and run with tools_call_read (reads), tools_call_write (changes) or tools_call_destructive (deletions),',
+  'as is any tool a result names that your list lacks.',
 ].join(' ');
 
 /**
@@ -161,6 +169,12 @@ export const EnvSchema = z.object({
   // still needs a password login to obtain a V1 user token. stdio serves the
   // unfiltered `all` view and always has both tools.
   ALTEGIO_EXPOSE_PASSWORD_LOGIN: BooleanFlagSchema,
+
+  // What /mcp lists: `compact` (the most used tools and a dispatcher that
+  // reaches the rest) or `full` (every tool, flat, as /mcp/full serves). The
+  // address and what a direct call reaches do not change; `full` turns a
+  // deployment back without a code change.
+  MCP_DEFAULT_VIEW: z.enum(DEFAULT_VIEW_LISTINGS).default(DEFAULT_VIEW_LISTING),
 
   // Rate limiting
   RATE_LIMIT_REQUESTS: z.coerce.number().min(1).default(200),
@@ -286,6 +300,7 @@ export class ConfigLoader {
         ALTEGIO_DOCS_DIR: env.ALTEGIO_DOCS_DIR,
         REQUIRE_DELEGATED_IDENTITY: env.REQUIRE_DELEGATED_IDENTITY,
         ALTEGIO_EXPOSE_PASSWORD_LOGIN: env.ALTEGIO_EXPOSE_PASSWORD_LOGIN,
+        MCP_DEFAULT_VIEW: env.MCP_DEFAULT_VIEW,
         RATE_LIMIT_REQUESTS: env.RATE_LIMIT_REQUESTS,
         RATE_LIMIT_WINDOW_MS: env.RATE_LIMIT_WINDOW_MS,
         MAX_RETRY_ATTEMPTS: env.MAX_RETRY_ATTEMPTS,

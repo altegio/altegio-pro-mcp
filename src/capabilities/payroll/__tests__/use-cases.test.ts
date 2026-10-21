@@ -14,6 +14,7 @@ import {
   buildFacetIndex,
   DEFAULT_FACET,
   facetToolsFromSpecs,
+  FULL_VIEW,
   READONLY_VIEW,
 } from '../../../tools/facets.js';
 import { orderedToolEntries } from '../../../tools/registry.js';
@@ -347,7 +348,9 @@ describe('payroll_record_payout', () => {
     const index = buildFacetIndex(
       facetToolsFromSpecs(orderedToolEntries().map((entry) => entry.spec))
     );
-    expect(index.includes(DEFAULT_FACET, 'payroll_record_payout')).toBe(true);
+    // Listed on the full list, run through the dispatcher on /mcp.
+    expect(index.includes(FULL_VIEW, 'payroll_record_payout')).toBe(true);
+    expect(index.serves(DEFAULT_FACET, 'payroll_record_payout')).toBe(true);
     expect(index.includes('finance', 'payroll_record_payout')).toBe(true);
     expect(index.includes(READONLY_VIEW, 'payroll_record_payout')).toBe(false);
   });

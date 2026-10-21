@@ -3,9 +3,11 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { registerTools } from './tools/registry.js';
 import {
   COMPACT_VIEW,
-  DEFAULT_FACET,
+  FULL_VIEW,
   READONLY_VIEW,
+  DEFAULT_FACET,
   demotedGroupsInstruction,
+  effectiveView,
   type FacetKey,
 } from './tools/facets.js';
 import { registerResources, resourceModules } from './resources/index.js';
@@ -38,19 +40,22 @@ export function createServer(options: CreateServerOptions = {}): MCPServer {
   const config = loadConfig();
   const facet = options.facet ?? DEFAULT_FACET;
   const publicBaseUrl = config.env.MCP_PUBLIC_BASE_URL;
+  const defaultListing = config.env.MCP_DEFAULT_VIEW;
+  // `/mcp` follows the compact view or the full list, as the deployment says.
+  const listing = effectiveView(facet, { defaultListing });
 
   // The read-only view says so up front, before the product description invites
-  // the model to manage anything; the compact view says up front how to reach
-  // what it does not list. The default view names the groups it no longer
-  // lists and where they are served. All are added around the product text
+  // the model to manage anything; the compact listing says up front how to
+  // reach what it does not list. The full list names the groups it does not
+  // list and where they are served. All are added around the product text
   // rather than replacing it, so a deployment's `MCP_SERVER_INSTRUCTIONS`
   // override still gets them.
   const instructions =
-    facet === READONLY_VIEW
+    listing === READONLY_VIEW
       ? `${readOnlyViewInstructions(publicBaseUrl)} ${config.server.instructions}`
-      : facet === COMPACT_VIEW
+      : listing === COMPACT_VIEW
         ? `${COMPACT_VIEW_INSTRUCTIONS} ${config.server.instructions}`
-        : facet === DEFAULT_FACET
+        : listing === FULL_VIEW
           ? `${config.server.instructions} ${demotedGroupsInstruction()}`
           : config.server.instructions;
 
@@ -85,6 +90,7 @@ export function createServer(options: CreateServerOptions = {}): MCPServer {
   registerTools(server, altegioClient, {
     facet,
     exposePasswordLogin: config.env.ALTEGIO_EXPOSE_PASSWORD_LOGIN,
+    defaultListing,
     publicBaseUrl,
   });
 

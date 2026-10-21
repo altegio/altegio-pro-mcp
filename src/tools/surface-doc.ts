@@ -109,12 +109,12 @@ const REASON_LEGEND: readonly (readonly [SurfaceReason, string, string])[] = [
   ],
   [
     'default-view-extra-tool',
-    're-admitted to `/mcp` despite an excluded prefix',
+    're-admitted to the full list despite an excluded prefix',
     '`DEFAULT_FACET_EXTRA_TOOLS`',
   ],
   [
     'default-view-not-excluded',
-    'on `/mcp` because nothing excludes it',
+    'on the full list because nothing excludes it',
     '(the default)',
   ],
   [
@@ -124,12 +124,12 @@ const REASON_LEGEND: readonly (readonly [SurfaceReason, string, string])[] = [
   ],
   [
     'compact-view-listed',
-    'listed on `/mcp/compact`: the most used tools and the dispatcher',
+    'on the compact listing: the most used tools and the dispatcher',
     '`COMPACT_VIEW_TOOLS`, `DISPATCH_TOOLS`',
   ],
   [
     'compact-view-dispatched',
-    'not listed on `/mcp/compact`; `tools_search` finds it, `tools_call_read` / `tools_call_write` run it',
+    'not on the compact listing; `tools_search` finds it, `tools_call_read`, `tools_call_write` or `tools_call_destructive` runs it',
     '`dispatchReaches`',
   ],
   [
@@ -144,7 +144,7 @@ const REASON_LEGEND: readonly (readonly [SurfaceReason, string, string])[] = [
   ],
   [
     'default-view-excluded-prefix',
-    'a whole pack held back from `/mcp`’s byte budget',
+    'a whole pack held back from the full list’s byte budget',
     '`DEFAULT_FACET_EXCLUDED_PREFIXES`',
   ],
   [
@@ -164,7 +164,7 @@ const REASON_LEGEND: readonly (readonly [SurfaceReason, string, string])[] = [
   ],
   [
     'dispatcher-compact-only',
-    'the dispatcher is listed on `/mcp/compact` only',
+    'the dispatcher is listed on the compact listing only',
     '`DISPATCH_TOOLS`',
   ],
   [
@@ -233,6 +233,20 @@ function switchDelta(
   return lines.length > 0 ? lines : ['- nothing moves'];
 }
 
+/** How many tools a switch adds to and removes from `/mcp`, in one clause. */
+function switchSummary(
+  entries: readonly ToolInventoryEntry[],
+  options: FacetIndexOptions
+): string {
+  const before = new Set(buildSurfaceTable(entries).servedOn(DEFAULT_FACET));
+  const after = new Set(
+    buildSurfaceTable(entries, options).servedOn(DEFAULT_FACET)
+  );
+  const added = [...after].filter((name) => !before.has(name)).length;
+  const removed = [...before].filter((name) => !after.has(name)).length;
+  return `${added} more tools listed, ${removed} fewer`;
+}
+
 /** `147705` → `147,705`, without the host's locale. */
 function groupDigits(value: number): string {
   return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -285,7 +299,7 @@ export function renderSurfaceDoc(
   );
   out.push('');
   out.push(
-    'Six mechanisms decide where a tool appears and two more decide whether the'
+    'Several mechanisms decide where a tool appears and two more decide whether the'
   );
   out.push(
     'call it receives there runs. Each is justified on its own terms and none is'
@@ -362,7 +376,8 @@ export function renderSurfaceDoc(
       [
         'View',
         'Address',
-        `Serves (of ${counts.defined} defined)`,
+        `Lists (of ${counts.defined} defined)`,
+        'Reaches',
         '`tools/list` bytes',
         'Budget (used)',
         'Reasons',
@@ -371,6 +386,13 @@ export function renderSurfaceDoc(
         `\`${view}\``,
         viewAddress(view),
         String(surface.servedOn(view).length),
+        String(
+          surface
+            .forView(view)
+            .filter(
+              (cell) => cell.served || cell.reason === 'compact-view-dispatched'
+            ).length
+        ),
         sizeCell(sizeOf(view)),
         budgetCell(sizeOf(view)),
         reasonBreakdown(surface.forView(view)),
@@ -388,10 +410,18 @@ export function renderSurfaceDoc(
     'roughly 4 bytes per token. The budgets are in `src/tools/listing-budget.ts`;'
   );
   out.push(
-    `the tests and \`npm run surface:check\` fail above them. \`/mcp\` is headed for`
+    `the tests and \`npm run surface:check\` fail above them. \`/mcp\` stays under`
+  );
+  out.push(`${groupDigits(DEFAULT_VIEW_TARGET_BYTES)} bytes (ADR-001 D3).`);
+  out.push('');
+  out.push(
+    '`/mcp` serves the compact listing by default: the `/mcp` column equals the'
   );
   out.push(
-    `${groupDigits(DEFAULT_VIEW_TARGET_BYTES)} bytes or less by demotion and schema trims (ADR-001 D3).`
+    '`/compact` column. `/full` is the flat list `/mcp` served before, for gateways'
+  );
+  out.push(
+    'that want every tool up front; `MCP_DEFAULT_VIEW=full` makes `/mcp` serve it.'
   );
   out.push('');
   out.push(
@@ -404,14 +434,15 @@ export function renderSurfaceDoc(
   out.push('');
 
   // ---- demoted groups ----------------------------------------------------
-  out.push('## Demoted from `/mcp`');
+  out.push('## Demoted from the full list');
   out.push('');
   out.push(
-    'Low-use groups served on their facet only (`-low` in the `/mcp` column).'
+    'Low-use groups served on their facet only (`-low` in the `/full` column); the'
   );
   out.push(
-    'The default view’s `initialize` instructions name each group and its address.'
+    'compact listing reaches them through its dispatcher. The full list’s'
   );
+  out.push('`initialize` instructions name each group and its address.');
   out.push('');
   out.push(
     table(
@@ -463,9 +494,10 @@ export function renderSurfaceDoc(
   );
   out.push('  than retry.');
   out.push(
-    '- `disp` in the `/compact` column — not refused: the dispatcher runs it, and so'
+    '- `disp` in the `/mcp` and `/compact` columns — not refused: the dispatcher of'
   );
-  out.push('  does a direct call by name.');
+  out.push('  its risk tier runs it (`tools_call_read`, `tools_call_write`,');
+  out.push('  `tools_call_destructive`), and so does a direct call by name.');
   out.push(
     '- every other column — the out-of-view error, naming the paths that do serve it'
   );
@@ -527,15 +559,25 @@ export function renderSurfaceDoc(
   out.push('## Deployment switches');
   out.push('');
   out.push(
-    'The table above describes the default configuration, password login off.'
+    'The table above describes the default configuration: password login off, the'
   );
-  out.push('One environment switch changes it.');
+  out.push('compact listing on `/mcp`. Two environment switches change it.');
   out.push('');
   out.push(
     '`ALTEGIO_EXPOSE_PASSWORD_LOGIN=true` (the closed staff deployment):'
   );
   out.push('');
   out.push(...switchDelta(entries, { exposePasswordLogin: true }));
+  out.push('');
+  out.push(
+    '`MCP_DEFAULT_VIEW=full` (a deployment that turns `/mcp` back): `/mcp` serves'
+  );
+  out.push(
+    'what the `/full` column shows, without the dispatcher, and refuses the rest'
+  );
+  out.push(
+    `with the addresses that serve it — ${switchSummary(entries, { defaultListing: 'full' })}.`
+  );
   out.push('');
 
   return `${out.join('\n')}\n`;

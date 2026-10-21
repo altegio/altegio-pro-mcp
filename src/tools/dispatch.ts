@@ -1,7 +1,8 @@
 /**
- * The curated-tool dispatcher behind `/mcp/compact` (ADR-001 D3, amended
- * 2026-10-21): `tools_search` finds a tool the view does not list, and
- * `tools_call_read` / `tools_call_write` run it by name.
+ * The curated-tool dispatcher of the compact listing (`/mcp`, `/mcp/compact`;
+ * ADR-001 D3): `tools_search` finds a tool the view does not list, and
+ * `tools_call_read`, `tools_call_write` and `tools_call_destructive` run it by
+ * name, one per risk tier.
  *
  * What it dispatches to is a curated tool, never a raw operation, which is
  * what answers the two objections ADR-001 §8.5 raised against writes through
@@ -17,6 +18,7 @@
  * tools, which is what makes the evals in `evals/` repeatable.
  */
 import {
+  DISPATCH_DESTRUCTIVE_TOOL,
   DISPATCH_READ_TOOL,
   DISPATCH_TOOLS,
   DISPATCH_WRITE_TOOL,
@@ -28,18 +30,34 @@ import { legacyAliasTargets } from './legacy-aliases.js';
 import { currentView, listedOn, listedOnView } from './serving-view.js';
 import type { ToolResult } from './tool-result.js';
 
-/** The dispatcher that runs a tool: by what the tool's own annotation says. */
+/** A dispatcher that runs a tool: one per risk tier. */
+export type Dispatcher =
+  | typeof DISPATCH_READ_TOOL
+  | typeof DISPATCH_WRITE_TOOL
+  | typeof DISPATCH_DESTRUCTIVE_TOOL;
+
+/**
+ * The dispatcher that runs a tool, by what the tool's own annotations say: a
+ * read, a change, or a destructive change. A change counts as destructive
+ * unless it says `destructiveHint: false`, which is MCP's default and keeps a
+ * tool that forgot the hint behind the tier a host asks about.
+ */
 export function dispatcherFor(spec: {
-  annotations?: { readOnlyHint?: boolean };
-}): typeof DISPATCH_READ_TOOL | typeof DISPATCH_WRITE_TOOL {
-  return spec.annotations?.readOnlyHint === true
-    ? DISPATCH_READ_TOOL
-    : DISPATCH_WRITE_TOOL;
+  annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean };
+}): Dispatcher {
+  if (spec.annotations?.readOnlyHint === true) return DISPATCH_READ_TOOL;
+  return spec.annotations?.destructiveHint === false
+    ? DISPATCH_WRITE_TOOL
+    : DISPATCH_DESTRUCTIVE_TOOL;
 }
 
-/** Whether a tool name is one of the two dispatchers that run a tool. */
-export function isDispatchCall(name: string): boolean {
-  return name === DISPATCH_READ_TOOL || name === DISPATCH_WRITE_TOOL;
+/** Whether a tool name is one of the dispatchers that run a tool. */
+export function isDispatchCall(name: string): name is Dispatcher {
+  return (
+    name === DISPATCH_READ_TOOL ||
+    name === DISPATCH_WRITE_TOOL ||
+    name === DISPATCH_DESTRUCTIVE_TOOL
+  );
 }
 
 // ==========================================================================
@@ -98,7 +116,7 @@ function servedEntries(): SearchableTool[] {
 export interface ToolMatch {
   readonly name: string;
   /** The dispatcher that runs it on this address. */
-  readonly call_with: typeof DISPATCH_READ_TOOL | typeof DISPATCH_WRITE_TOOL;
+  readonly call_with: Dispatcher;
   /** In this address's `tools/list` too, so it can also be called directly. */
   readonly listed: boolean;
   /** Stops for a person's approval before it changes anything. */
@@ -205,7 +223,7 @@ export function searchText(result: ToolSearchResult): string {
 }
 
 // ==========================================================================
-// tools_call_read / tools_call_write
+// tools_call_read / tools_call_write / tools_call_destructive
 // ==========================================================================
 
 /** What a dispatcher call resolves to: the target and its arguments. */
@@ -233,24 +251,39 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
+/** Why a tool belongs to another tier, as the refusal says it. */
+const TIER_REASON: Readonly<Record<Dispatcher, string>> = {
+  [DISPATCH_READ_TOOL]: 'only reads',
+  [DISPATCH_WRITE_TOOL]: 'changes data without deleting or overwriting any',
+  [DISPATCH_DESTRUCTIVE_TOOL]: 'deletes or overwrites data',
+};
+
+/** What each dispatcher runs, as the refusal says it. */
+const TIER_RUNS: Readonly<Record<Dispatcher, string>> = {
+  [DISPATCH_READ_TOOL]: 'reads only',
+  [DISPATCH_WRITE_TOOL]: 'changes that delete or overwrite nothing',
+  [DISPATCH_DESTRUCTIVE_TOOL]: 'deletions and other destructive changes',
+};
+
 export interface DispatchTargets {
   /** Whether this view's dispatcher runs the tool. */
   reaches(name: string): boolean;
-  /** Whether the tool only reads (`readOnlyHint`); undefined when unknown. */
-  readOnly(name: string): boolean | undefined;
+  /** The dispatcher that runs the tool (`dispatcherFor`); undefined when unknown. */
+  dispatcherOf(name: string): Dispatcher | undefined;
   /** Addresses of other views that serve it, for a tool out of reach. */
   addressesServing(name: string): readonly string[];
 }
 
 /**
- * Which tool a `tools_call_read` / `tools_call_write` call runs, with which
- * arguments — or the refusal the caller reads instead. Refuses a read through
- * `tools_call_write` and a change through `tools_call_read`, so a host that
- * approves `tools_call_read` without asking never runs a change. A
+ * Which tool a `tools_call_read` / `tools_call_write` / `tools_call_destructive`
+ * call runs, with which arguments — or the refusal the caller reads instead.
+ * Each dispatcher runs its own tier only and names the one that runs the tool,
+ * so a host that approves `tools_call_read`, or `tools_call_write`, without
+ * asking never runs a change, or a deletion, through it. A
  * `confirmation_token` sent beside `arguments` is moved into them.
  */
 export function resolveDispatch(
-  dispatcher: string,
+  dispatcher: Dispatcher,
   raw: unknown,
   targets: DispatchTargets
 ): Dispatch {
@@ -314,16 +347,11 @@ export function resolveDispatch(
         );
   }
 
-  const readOnly = targets.readOnly(name) === true;
-  if (dispatcher === DISPATCH_READ_TOOL && !readOnly) {
+  // Unknown means not annotated: the destructive tier, as `dispatcherFor`.
+  const tier = targets.dispatcherOf(name) ?? DISPATCH_DESTRUCTIVE_TOOL;
+  if (tier !== dispatcher) {
     return refuse(
-      `Nothing was run: ${name} changes data, and ${DISPATCH_READ_TOOL} runs reads only. Run it with ${DISPATCH_WRITE_TOOL}.`,
-      'validation'
-    );
-  }
-  if (dispatcher === DISPATCH_WRITE_TOOL && readOnly) {
-    return refuse(
-      `Nothing was run: ${name} only reads. Run it with ${DISPATCH_READ_TOOL}.`,
+      `Nothing was run: ${name} ${TIER_REASON[tier]}, and ${dispatcher} runs ${TIER_RUNS[dispatcher]}. Run it with ${tier}.`,
       'validation'
     );
   }
