@@ -18,12 +18,8 @@ import {
   DISPATCH_SEARCH_TOOL,
   DISPATCH_WRITE_TOOL,
 } from '../facets.js';
-import {
-  DEFAULT_SEARCH_LIMIT,
-  MAX_SEARCH_LIMIT,
-  searchText,
-  searchTools,
-} from '../dispatch.js';
+import { DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT } from '../dispatch-limits.js';
+import { searchText, searchTools } from '../dispatch.js';
 
 const searchOutput = {
   type: 'object' as const,

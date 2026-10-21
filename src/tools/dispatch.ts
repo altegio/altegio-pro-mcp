@@ -24,6 +24,7 @@ import {
   DISPATCH_WRITE_TOOL,
 } from './facets.js';
 import { CONFIRMATION_TOKEN_ARG } from './confirmation.js';
+import { DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT } from './dispatch-limits.js';
 import { queryTerms, tokenize, weightedTermScore } from './executor/search.js';
 import { allToolEntries, type ToolEntry } from './inventory.js';
 import { legacyAliasTargets } from './legacy-aliases.js';
@@ -63,9 +64,6 @@ export function isDispatchCall(name: string): name is Dispatcher {
 // ==========================================================================
 // tools_search
 // ==========================================================================
-
-export const DEFAULT_SEARCH_LIMIT = 5;
-export const MAX_SEARCH_LIMIT = 10;
 
 /** A hit under this share of the best one is word overlap, not a candidate. */
 const RELEVANCE_FLOOR = 0.4;
