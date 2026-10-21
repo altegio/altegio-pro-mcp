@@ -17,7 +17,7 @@
  *
  *   ALTEGIO_API_TOKEN=… ALTEGIO_USER_TOKEN=… \
  *   ALTEGIO_EVAL_LOCATION_ID=… ALTEGIO_EVAL_TEAM_MEMBER_ID=… \
- *     npm run eval -- [--host codex|gemini] [--views default,compact]
+ *     npm run eval -- [--host codex|gemini] [--views default,full]
  *       [--tasks id,id] [--repeat 1] [--concurrency 3] [--model <id>]
  *       [--effort medium]
  *
@@ -30,17 +30,14 @@ import { createServer as createNetServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
-  COMPACT_VIEW,
   DEFAULT_FACET,
+  FULL_VIEW,
   type FacetKey,
 } from '../src/tools/facets.js';
 import { listingBytes, listView } from '../src/tools/listing.js';
-import { servedDefinedTools } from '../src/tools/inventory.js';
-import {
-  DISPATCH_READ_TOOL,
-  DISPATCH_SEARCH_TOOL,
-  DISPATCH_WRITE_TOOL,
-} from '../src/tools/facets.js';
+import { allToolEntries, servedDefinedTools } from '../src/tools/inventory.js';
+import { DISPATCH_SEARCH_TOOL } from '../src/tools/facets.js';
+import { dispatcherFor, isDispatchCall } from '../src/tools/dispatch.js';
 import { CONFIRMATION_TOKEN_ARG } from '../src/tools/confirmation.js';
 import { TASKS, type EvalTask } from './tasks.js';
 
@@ -67,7 +64,7 @@ function requireEnv(name: string): string {
 }
 
 const ROOT = resolve(import.meta.dirname, '..');
-const VIEWS = flag('views', `${DEFAULT_FACET},${COMPACT_VIEW}`)
+const VIEWS = flag('views', `${DEFAULT_FACET},${FULL_VIEW}`)
   .split(',')
   .map((view) => view.trim()) as FacetKey[];
 const ONLY = flag('tasks', '')
@@ -103,22 +100,24 @@ const tasks = TASKS.filter(
 // ==========================================================================
 
 const listings = new Map(VIEWS.map((view) => [view, listView(view)]));
-const compact = listView(COMPACT_VIEW);
-const defaultView = listView(DEFAULT_FACET);
+/** `/mcp` as the server under test lists it: the compact listing. */
+const compact = listView(DEFAULT_FACET);
+const full = listView(FULL_VIEW);
 
 function groupOf(task: Task): Group {
   if (
-    task.expect.some((name) => compact.facetIndex.includes(COMPACT_VIEW, name))
+    task.expect.some((name) => compact.facetIndex.includes(DEFAULT_FACET, name))
   )
     return 'core';
-  if (
-    task.expect.some((name) =>
-      defaultView.facetIndex.includes(DEFAULT_FACET, name)
-    )
-  )
+  if (task.expect.some((name) => full.facetIndex.includes(FULL_VIEW, name)))
     return 'dispatched';
   return 'beyond';
 }
+
+/** The dispatcher of each tool's risk tier (`dispatcherFor`). */
+const tierOf = new Map(
+  allToolEntries().map((entry) => [entry.spec.name, dispatcherFor(entry.spec)])
+);
 
 /** The tool's own input validation, to score a call the read grant refused. */
 const inputIssues = new Map(
@@ -215,6 +214,8 @@ interface Run {
   readonly searches: number;
   /** Dispatcher calls refused before reaching a tool (wrong tier, name). */
   readonly dispatchRefusals: number;
+  /** Dispatcher calls naming a tool of another tier. */
+  readonly wrongTier: number;
   readonly inputTokens: number;
   readonly cachedInputTokens: number;
   readonly outputTokens: number;
@@ -258,8 +259,7 @@ interface HostOutput {
 
 function callOf(raw: HostCall): Call {
   const { tool, args } = raw;
-  const dispatched =
-    tool === DISPATCH_READ_TOOL || tool === DISPATCH_WRITE_TOOL;
+  const dispatched = isDispatchCall(tool);
   const target = dispatched ? String(args.tool ?? '') : tool;
   const targetArgs = dispatched
     ? isRecord(args.arguments)
@@ -294,8 +294,14 @@ function score(
   seconds: number
 ): Run {
   const calls = output.calls.map(callOf);
-  const reachedAt = calls.findIndex((call) =>
-    task.expect.includes(call.target)
+  // Through a dispatcher, only the dispatcher of the tool's tier runs it; the
+  // host may refuse a write before the server can, so judge the tier here.
+  const wrongTier = (call: Call) =>
+    isDispatchCall(call.tool) &&
+    tierOf.has(call.target) &&
+    tierOf.get(call.target) !== call.tool;
+  const reachedAt = calls.findIndex(
+    (call) => task.expect.includes(call.target) && !wrongTier(call)
   );
   const valid = reachedAt >= 0 && validFor(calls[reachedAt]!);
   return {
@@ -310,13 +316,13 @@ function score(
     searches: calls.filter((call) => call.tool === DISPATCH_SEARCH_TOOL).length,
     dispatchRefusals: calls.filter(
       (call) =>
-        (call.tool === DISPATCH_READ_TOOL ||
-          call.tool === DISPATCH_WRITE_TOOL) &&
+        isDispatchCall(call.tool) &&
         call.isError &&
         /^(Nothing was run|No tool|tools_call_\w+ (needs|takes|runs|does not))/.test(
           call.text
         )
     ).length,
+    wrongTier: calls.filter(wrongTier).length,
     inputTokens: output.inputTokens,
     cachedInputTokens: output.cachedInputTokens,
     outputTokens: output.outputTokens,
@@ -558,9 +564,9 @@ function summary(runs: readonly Run[]): string {
   );
   out.push('');
   out.push(
-    '| View | Listing bytes | Tools listed | Pass | core | dispatched | beyond | Calls to reach | tools_search | Dispatch refusals | Input tokens / run | Seconds / run |'
+    '| View | Listing bytes | Tools listed | Pass | core | dispatched | beyond | Calls to reach | tools_search | Dispatch refusals | Wrong tier | Input tokens / run | Seconds / run |'
   );
-  out.push('|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|');
+  out.push('|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|');
   for (const view of VIEWS) {
     const mine = runs.filter((run) => run.view === view);
     const listing = listings.get(view)!;
@@ -570,12 +576,12 @@ function summary(runs: readonly Run[]): string {
     };
     const reached = mine.filter((run) => run.reachedAt >= 0);
     out.push(
-      `| ${view === DEFAULT_FACET ? '/mcp' : `/mcp/${view}`} | ${thousands(listingBytes(listing.tools))} | ${listing.tools.length} | ${pct(mine.filter((run) => run.pass).length, mine.length)} | ${inGroup('core')} | ${inGroup('dispatched')} | ${inGroup('beyond')} | ${mean(reached.map((run) => run.reachedAt + 1)).toFixed(1)} | ${mean(mine.map((run) => run.searches)).toFixed(1)} | ${mine.reduce((sum, run) => sum + run.dispatchRefusals, 0)} | ${thousands(mean(mine.map((run) => run.inputTokens)))} | ${Math.round(mean(mine.map((run) => run.seconds)))} |`
+      `| ${view === DEFAULT_FACET ? '/mcp' : `/mcp/${view}`} | ${thousands(listingBytes(listing.tools))} | ${listing.tools.length} | ${pct(mine.filter((run) => run.pass).length, mine.length)} | ${inGroup('core')} | ${inGroup('dispatched')} | ${inGroup('beyond')} | ${mean(reached.map((run) => run.reachedAt + 1)).toFixed(1)} | ${mean(mine.map((run) => run.searches)).toFixed(1)} | ${mine.reduce((sum, run) => sum + run.dispatchRefusals, 0)} | ${mine.reduce((sum, run) => sum + run.wrongTier, 0)} | ${thousands(mean(mine.map((run) => run.inputTokens)))} | ${Math.round(mean(mine.map((run) => run.seconds)))} |`
     );
   }
   out.push('');
   out.push(
-    '"Calls to reach" counts tool calls up to and including the first one that reaches an expected tool, among runs that reached one.'
+    '"Calls to reach" counts tool calls up to and including the first one that reaches an expected tool, among runs that reached one. A dispatched call reaches its tool only through the dispatcher of the tool\'s risk tier; "Wrong tier" counts the calls that named another.'
   );
   out.push('');
   out.push(
@@ -596,7 +602,7 @@ function summary(runs: readonly Run[]): string {
                     : `${call.tool}→${call.target}`
                 )
                 .join(', ')}`
-            : `✗ ${run.failure ?? (run.reachedAt >= 0 ? 'invalid arguments' : run.calls.map((call) => call.target || call.tool).join(', ') || 'no call')}`
+            : `✗ ${run.failure ?? (run.reachedAt >= 0 ? 'invalid arguments' : run.calls.map((call) => (call.tool === call.target || !call.target ? call.tool : `${call.tool}→${call.target}`)).join(', ') || 'no call')}`
         )
         .join('<br>')
     );

@@ -8,9 +8,14 @@
  * is scored. `{location}` and `{team_member}` are filled from the environment.
  *
  * The runner derives each task's group from the views themselves:
- * - core: the tool is listed on `/mcp` and on `/mcp/compact`;
- * - dispatched: listed on `/mcp`, run through the dispatcher on `/mcp/compact`;
- * - beyond: not on `/mcp` at all, run through the dispatcher on `/mcp/compact`.
+ * - core: the tool is on the compact listing `/mcp` serves, and on `/mcp/full`;
+ * - dispatched: listed on `/mcp/full`, run through the dispatcher on `/mcp`;
+ * - beyond: not on `/mcp/full` at all, run through the dispatcher on `/mcp`.
+ *
+ * The last four ask for a deletion, which `/mcp` runs only through
+ * `tools_call_destructive`: the runner scores a dispatched call as reaching
+ * its tool only through the dispatcher of the tool's risk tier. The ids are
+ * made up; the read-only grant refuses the call before it reaches Altegio.
  */
 export interface EvalTask {
   readonly id: string;
@@ -178,5 +183,29 @@ export const TASKS: readonly EvalTask[] = [
     id: 'onboarding-status',
     prompt: 'Where did the setup wizard stop for location {location}?',
     expect: ['onboarding_status', 'onboarding_resume'],
+  },
+  {
+    id: 'delete-transaction',
+    prompt:
+      'Financial transaction 1 at location {location} was recorded by mistake. Delete it.',
+    expect: ['financial_transactions_delete'],
+  },
+  {
+    id: 'delete-category',
+    prompt:
+      'We no longer use service category 1 at location {location}. Delete that category.',
+    expect: ['service_categories_delete'],
+  },
+  {
+    id: 'unlink-service',
+    prompt:
+      'Team member {team_member} no longer provides service 1 at location {location}. Take that service off them.',
+    expect: ['services_unlink_team_member'],
+  },
+  {
+    id: 'day-off',
+    prompt:
+      'Team member {team_member} at location {location} is off next Monday. Remove their work hours for that day.',
+    expect: ['schedules_delete'],
   },
 ];

@@ -10,21 +10,27 @@ once per view, and scores what the host called.
 
 1. Starts this build's HTTP server on a free local port.
 2. Runs every task in [`tasks.ts`](tasks.ts) through the host CLI, connected to
-   each view (`/mcp` and `/mcp/compact` by default).
+   each view (`/mcp`, which serves the compact listing, and `/mcp/full` by
+   default).
 3. Scores each run from the host's own event stream. A run **passes** when the
-   agent reaches one of the task's expected tools, directly or through
-   `tools_call_read` / `tools_call_write`, with arguments that tool's own
-   validation accepts.
+   agent reaches one of the task's expected tools, directly or through the
+   dispatcher of the tool's risk tier (`tools_call_read`, `tools_call_write`,
+   `tools_call_destructive`), with arguments that tool's own validation
+   accepts. A dispatcher call naming a tool of another tier does not count,
+   and the summary counts it under "Wrong tier".
 4. Writes one JSON per run and `summary.md` to `evals/out/<timestamp>-<host>/`
    (not committed).
 
 Tasks fall into three groups, derived from the views:
 
-| Group      | Expected tool                                                             |
-| ---------- | ------------------------------------------------------------------------- |
-| core       | listed on `/mcp` and on `/mcp/compact`                                    |
-| dispatched | listed on `/mcp`; on `/mcp/compact`, found and run through the dispatcher |
-| beyond     | not on `/mcp` at all; reachable only through the compact dispatcher       |
+| Group      | Expected tool                                                        |
+| ---------- | -------------------------------------------------------------------- |
+| core       | on the compact listing `/mcp` serves, and on `/mcp/full`             |
+| dispatched | listed on `/mcp/full`; on `/mcp`, found and run through a dispatcher |
+| beyond     | not on `/mcp/full` at all; reachable only through the dispatcher     |
+
+Four tasks ask for a deletion, which `/mcp` runs only through
+`tools_call_destructive`.
 
 ## Safety
 
@@ -44,27 +50,29 @@ ALTEGIO_EVAL_LOCATION_ID=… ALTEGIO_EVAL_TEAM_MEMBER_ID=… \
   npm run eval -- --host codex
 ```
 
-| Flag            | Default           | Meaning                                          |
-| --------------- | ----------------- | ------------------------------------------------ |
-| `--host`        | `codex`           | `codex` (`codex exec`) or `gemini` (`gemini -p`) |
-| `--views`       | `default,compact` | views to compare                                 |
-| `--tasks`       | all               | comma-separated task ids                         |
-| `--model`       | host default      | the host's model id                              |
-| `--effort`      | `medium`          | Codex reasoning effort                           |
-| `--repeat`      | `1`               | runs per task and view                           |
-| `--concurrency` | `3`               | parallel runs                                    |
+| Flag            | Default        | Meaning                                          |
+| --------------- | -------------- | ------------------------------------------------ |
+| `--host`        | `codex`        | `codex` (`codex exec`) or `gemini` (`gemini -p`) |
+| `--views`       | `default,full` | views to compare                                 |
+| `--tasks`       | all            | comma-separated task ids                         |
+| `--model`       | host default   | the host's model id                              |
+| `--effort`      | `medium`       | Codex reasoning effort                           |
+| `--repeat`      | `1`            | runs per task and view                           |
+| `--concurrency` | `3`            | parallel runs                                    |
 
 `CODEX_BIN` and `GEMINI_BIN` name the binaries when they are not on `PATH`.
 
 ## Hosts differ in what a listing costs
 
 - **Codex** defers MCP tools behind its own tool search: a request carries the
-  same tokens with no server, `/mcp` or `/mcp/compact` connected (17,373 in a
-  measured one-word reply, Codex 0.162). A smaller listing saves it nothing.
+  same tokens with no server, the full list or the compact listing connected
+  (17,373 in a measured one-word reply, Codex 0.162). A smaller listing saves
+  it nothing.
 - **Gemini CLI** sends every listed tool with every request, as hosts without
   tool search do. This is where the listing's size shows up: a one-call task
-  cost 95–97k input tokens on `/mcp` and 42–44k on `/mcp/compact`. A free-tier
-  key allows about 20 requests a day per model, too few for a full run.
+  cost 95–97k input tokens on the full list and 42–44k on the 26-tool compact
+  listing (2026-10-21). A free-tier key allows about 20 requests a day per
+  model, too few for a full run.
 - **Claude Code** defers MCP tools too (ADR-001 §1.3). Its CLI can be added as
   a host the same way.
 
@@ -74,6 +82,6 @@ nothing.
 
 ## When to attach a summary
 
-Any change to the compact view's list, the dispatcher, the server
-instructions, or a description or schema of a tool the evals reach: run the
-affected tasks on both views and paste `summary.md` into the pull request.
+Any change to the compact listing, the dispatcher, the server instructions, or
+a description or schema of a tool the evals reach: run the affected tasks on
+both views and paste `summary.md` into the pull request.
