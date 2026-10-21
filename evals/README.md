@@ -62,7 +62,9 @@ ALTEGIO_EVAL_LOCATION_ID=… ALTEGIO_EVAL_TEAM_MEMBER_ID=… \
   same tokens with no server, `/mcp` or `/mcp/compact` connected (17,373 in a
   measured one-word reply, Codex 0.162). A smaller listing saves it nothing.
 - **Gemini CLI** sends every listed tool with every request, as hosts without
-  tool search do. This is where the listing's size shows up.
+  tool search do. This is where the listing's size shows up: a one-call task
+  cost 95–97k input tokens on `/mcp` and 42–44k on `/mcp/compact`. A free-tier
+  key allows about 20 requests a day per model, too few for a full run.
 - **Claude Code** defers MCP tools too (ADR-001 §1.3). Its CLI can be added as
   a host the same way.
 

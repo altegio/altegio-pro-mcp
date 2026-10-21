@@ -32,9 +32,10 @@ export type HttpViewKey = Exclude<FacetKey, typeof ALL_TOOLS_FACET>;
 
 /**
  * Where `/mcp` is headed: about 25k tokens, which a host that loads the whole
- * list (ChatGPT, Codex) can afford next to a conversation. Reached by moving
- * rarely used packs to their facet and trimming the heaviest schemas — not by
- * raising the budget. Not enforced; the budget below is.
+ * list (ChatGPT) can afford next to a conversation. Reached by moving
+ * rarely used packs to their facet and trimming the heaviest schemas, or by
+ * adopting the compact view's listing (ADR-001 D3, step 2) — not by raising
+ * the budget. Not enforced; the budget below is.
  */
 export const DEFAULT_VIEW_TARGET_BYTES = 100_000;
 

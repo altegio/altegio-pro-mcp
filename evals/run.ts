@@ -2,9 +2,10 @@
  * Tool-selection evals: does an agent reach the right tool on a view?
  *
  * Starts this build's HTTP server locally, then runs each task in
- * `evals/tasks.ts` through a real MCP host — Codex (`codex exec`), the host
- * that sends most `/pro` traffic — once per view, and scores what the host
- * called. A task passes when the agent reaches one of its expected tools,
+ * `evals/tasks.ts` through a real MCP host once per view, and scores what the
+ * host called. Hosts: Codex (`codex exec`, the default), which sends most
+ * `/pro` traffic and defers MCP tools behind its own search, and Gemini CLI
+ * (`gemini -p`, `--host gemini`), which sends every listed tool. A task passes when the agent reaches one of its expected tools,
  * directly or through the dispatcher, with arguments that tool accepts.
  *
  * Safety: every request carries the proxy's read-only grant
@@ -16,10 +17,11 @@
  *
  *   ALTEGIO_API_TOKEN=… ALTEGIO_USER_TOKEN=… \
  *   ALTEGIO_EVAL_LOCATION_ID=… ALTEGIO_EVAL_TEAM_MEMBER_ID=… \
- *     npm run eval -- [--views default,compact] [--tasks id,id] [--repeat 1]
- *       [--concurrency 3] [--model <codex model>] [--effort medium]
+ *     npm run eval -- [--host codex|gemini] [--views default,compact]
+ *       [--tasks id,id] [--repeat 1] [--concurrency 3] [--model <id>]
+ *       [--effort medium]
  *
- * `CODEX_BIN` names the codex binary when it is not on PATH. Results go to
+ * `CODEX_BIN` and `GEMINI_BIN` name the binaries when they are not on PATH. Results go to
  * `evals/out/<timestamp>/`: one JSON per run and `summary.md`.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
