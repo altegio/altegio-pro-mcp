@@ -174,6 +174,7 @@ const OVERLAY_FIELDS = [
   'projection',
   'write_allowed',
   'supersedes',
+  'failures',
   'notes',
 ];
 const OVERLAY_TIERS = new Set(['core', 'pack', 'executor-only']);
@@ -229,6 +230,7 @@ const KEY_ORDER = [
   'projection',
   'write_allowed',
   'supersedes',
+  'failures',
   'notes',
   // superseded entry
   'supersededBy',
@@ -250,6 +252,7 @@ const UNRANKED_SUBTREES = new Set([
   'schema',
   'properties',
   'param_renames',
+  'failures',
   'canonicalAliases',
 ]);
 
@@ -728,6 +731,27 @@ function readSpec({ source, rel }, docsRoot, warnings) {
 // ---------------------------------------------------------------------------
 
 /**
+ * A `failures` map: HTTP error statuses to the sentence the executor says for
+ * them. 401 is left out: a lapsed sign-in is answered the same way everywhere.
+ */
+function validFailures(failures) {
+  if (!failures || typeof failures !== 'object' || Array.isArray(failures)) {
+    return false;
+  }
+  const entries = Object.entries(failures);
+  return (
+    entries.length > 0 &&
+    entries.every(
+      ([status, sentence]) =>
+        /^[45]\d\d$/.test(status) &&
+        status !== '401' &&
+        typeof sentence === 'string' &&
+        sentence.trim() !== ''
+    )
+  );
+}
+
+/**
  * Load `catalog/overlay/*.yaml` (files starting with `_` are format docs, not
  * data) into `operationId → curation` entries. Unknown fields and bad tiers
  * fail the build so a typo in the overlay never silently disappears.
@@ -768,6 +792,11 @@ export function loadOverlay(overlayDir) {
       ) {
         throw new Error(
           `${file}: operation "${operationId}" has an invalid supersedes list (expected a non-empty list of operationIds)`
+        );
+      }
+      if (raw.failures !== undefined && !validFailures(raw.failures)) {
+        throw new Error(
+          `${file}: operation "${operationId}" has an invalid failures map (expected an HTTP 4xx or 5xx status other than 401, each to a sentence)`
         );
       }
       if (curation.has(operationId)) {

@@ -109,6 +109,21 @@ operation_entry:
         Allowed only on a V2 operation; each listed id must be a V1 operation
         that carries no curation of its own and that nothing else retires.
 
+    failures:
+      type: object
+      propertyNames: { pattern: '^[45][0-9][0-9]$', not: { const: '401' } }
+      additionalProperties: { type: string, minLength: 1 }
+      description: >
+        What an error status of this operation means and what to do next, in
+        the product's words (ADR-001 D8), for a status whose number alone sends
+        the caller after the wrong fix — often one the spec does not document.
+        `api_call_operation` says the sentence first in its error, names the
+        curated tool `tool_name` where the view serves it, and quotes the API's
+        own message after both. 401 is not allowed: a lapsed sign-in is
+        answered the same way for every operation.
+      examples:
+        - { '416': 'No payroll scheme applies to this team member in this period, so there is nothing to compute.' }
+
     notes:
       type: string
       description: >

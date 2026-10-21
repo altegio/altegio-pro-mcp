@@ -10,8 +10,13 @@
  * continuation (D5, D8).
  */
 import type { AltegioClient } from '../../providers/altegio-client.js';
-import { ExecutorRefusalError } from '../../utils/errors.js';
 import {
+  AltegioApiError,
+  AuthenticationError,
+  ExecutorRefusalError,
+} from '../../utils/errors.js';
+import {
+  curatedToolFor,
   fallbacksFor,
   isLiveSource,
   resolveOperation,
@@ -20,6 +25,7 @@ import {
 } from './catalog.js';
 import { isLocationMetadataRead } from '../../providers/location-read-policy.js';
 import { v2Path } from '../../api/altegio-http.js';
+import { apiMessage } from '../../api/http-failure.js';
 import {
   applyProjection,
   enforceBudget,
@@ -31,8 +37,10 @@ import {
   sanitizeUntrustedDeep,
   untrustedBlock,
   UNTRUSTED_NOTE,
+  upstreamDetail,
   type UntrustedField,
 } from '../tool-result.js';
+import { elsewhereClause } from '../serving-view.js';
 import { CONTACTS_WITHHELD_NOTICE } from '../contacts.js';
 import {
   QUERY_ALIASES,
@@ -686,6 +694,44 @@ function pageNumber(value: unknown): number | undefined {
   return Number.isInteger(n) && n > 0 ? n : undefined;
 }
 
+/**
+ * Say what a failed call means for this operation before the API's own words
+ * (ADR-001 D8). A status the overlay explains under `failures` gets its
+ * sentence, then the curated tool that covers the operation — or where that
+ * tool is served, when this view does not serve it — then the API's message,
+ * quoted as data. The bare number sends a caller after the wrong fix: 416 from
+ * a payroll read means no payroll scheme applies, not a bad argument.
+ */
+export function explainedFailure(
+  op: CatalogOperation,
+  endpoint: string,
+  error: unknown
+): unknown {
+  if (
+    !(error instanceof AltegioApiError) ||
+    error instanceof AuthenticationError ||
+    error.statusCode === undefined
+  ) {
+    return error;
+  }
+  const meaning = op.curation?.failures?.[String(error.statusCode)];
+  if (!meaning) return error;
+  const curated = curatedToolFor(op);
+  const elsewhere = curated ? elsewhereClause(curated) : undefined;
+  const pointer = !curated
+    ? ''
+    : elsewhere === undefined
+      ? ` The curated tool \`${curated}\` covers this operation: prefer it.`
+      : ` The curated tool \`${curated}\` covers this operation, but this address does not serve it; ${elsewhere}.`;
+  const detail = upstreamDetail(apiMessage(error.response));
+  return new AltegioApiError(
+    `Failed to call ${op.method} ${endpoint} (HTTP ${error.statusCode}). ${meaning}${pointer}` +
+      (detail ? ` ${detail}` : ''),
+    error.statusCode,
+    error.response
+  );
+}
+
 export async function callOperation(
   client: AltegioClient,
   operationId: string,
@@ -738,12 +784,11 @@ export async function callOperation(
   const endpoint =
     (route.source === 'v2' ? v2Path(built.path) : built.path) +
     (search ? `?${search}` : '');
-  const response = await client.request(
-    'GET',
-    endpoint,
-    undefined,
-    scopedCompany
-  );
+  const response = await client
+    .request('GET', endpoint, undefined, scopedCompany)
+    .catch((error: unknown) => {
+      throw explainedFailure(op, endpoint, error);
+    });
   const {
     data,
     meta,

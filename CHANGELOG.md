@@ -6,6 +6,19 @@ is declared stable.
 
 ## [Unreleased]
 
+### Fixed — `api_call_operation` says what a payroll 416 means
+
+- **A payroll period read that no payroll scheme covers is explained.** Altegio
+  answers `search_team_member_period_salary` with HTTP 416 when no payroll
+  scheme applies to the team member in the period, which its spec does not
+  document. `api_call_operation` returned only "Failed … (HTTP 416)" and the
+  API's message, with no next step. It now says that the request is valid,
+  that the same team member and period give the same answer, and to report no
+  payroll; it names `payroll_get_calculation`, which reports the case with the
+  period's settlements.
+- **The overlay field `failures`** maps an error status of an operation to that
+  sentence, for any status a number alone gets wrong.
+
 ## [0.7.0-alpha.0] - 2026-10-21
 
 ### Changed — `initialize` names the build's commit
