@@ -81,6 +81,101 @@ const WEIGHTS = {
 
 type ToolIndex = Record<keyof typeof WEIGHTS, ReadonlySet<string>>;
 
+/**
+ * Words that ask for a deletion, and words that ask for a change. A query
+ * with neither asks to read: among tools that match it about as well, a read
+ * then outranks a change, and a change outranks a deletion. A query that asks
+ * for a change still ranks a deletion lower; one that asks for a deletion
+ * ranks every tier alike. The factors only reorder near-ties.
+ */
+const DELETION_WORDS: ReadonlySet<string> = new Set([
+  'delete',
+  'remove',
+  'cancel',
+  'unlink',
+  'refund',
+  'void',
+  'erase',
+  'clear',
+  'revoke',
+  'drop',
+  'discard',
+]);
+const CHANGE_WORDS: ReadonlySet<string> = new Set([
+  'add',
+  'create',
+  'new',
+  'book',
+  'record',
+  'sell',
+  'set',
+  'update',
+  'change',
+  'edit',
+  'move',
+  'reschedule',
+  'link',
+  'assign',
+  'freeze',
+  'unfreeze',
+  'deposit',
+  'pay',
+  'payout',
+  'top',
+  'open',
+  'archive',
+  'unarchive',
+  'duplicate',
+  'copy',
+  'upload',
+  'attach',
+  'import',
+  'rename',
+  'mark',
+  'apply',
+  'correct',
+  'extend',
+  'start',
+  'make',
+  'save',
+  'replace',
+  'enable',
+  'disable',
+  'send',
+  'register',
+]);
+const WRITE_FACTOR = 0.93;
+const DESTRUCTIVE_FACTOR = 0.88;
+
+/** How much a match of this tier counts for a query of these terms. */
+function tierFactor(terms: readonly string[], tier: Dispatcher): number {
+  if (terms.some((term) => DELETION_WORDS.has(term))) return 1;
+  if (tier === DISPATCH_DESTRUCTIVE_TOOL) return DESTRUCTIVE_FACTOR;
+  if (
+    tier === DISPATCH_WRITE_TOOL &&
+    !terms.some((term) => CHANGE_WORDS.has(term))
+  ) {
+    return WRITE_FACTOR;
+  }
+  return 1;
+}
+
+/** One form per word: "appointments" and "categories" match "appointment", "category". */
+function singular(token: string): string {
+  if (token.length > 4 && token.endsWith('ies'))
+    return `${token.slice(0, -3)}y`;
+  if (token.length > 3 && token.endsWith('s') && !token.endsWith('ss')) {
+    return token.slice(0, -1);
+  }
+  return token;
+}
+
+/** A field's tokens, each also in its singular form. */
+function tokenSet(text: string): ReadonlySet<string> {
+  const tokens = tokenize(text);
+  return new Set([...tokens, ...tokens.map(singular)]);
+}
+
 /** The first sentence of a description: what the tool does. */
 function leadOf(description: string): string {
   const match = /^.*?[.!?](\s|$)/s.exec(description);
@@ -93,11 +188,13 @@ function indexTool(entry: ToolEntry): ToolIndex {
     entry.spec.inputSchema as { properties?: Record<string, unknown> }
   ).properties;
   return {
-    name: new Set(tokenize(entry.spec.name)),
-    lead: new Set(tokenize(leadOf(description))),
-    category: new Set(tokenize(entry.category)),
-    parameters: new Set(Object.keys(properties ?? {}).flatMap(tokenize)),
-    description: new Set(tokenize(description)),
+    name: tokenSet(entry.spec.name),
+    lead: tokenSet(leadOf(description)),
+    category: tokenSet(entry.category),
+    parameters: new Set(
+      Object.keys(properties ?? {}).flatMap((key) => [...tokenSet(key)])
+    ),
+    description: tokenSet(description),
   };
 }
 
@@ -134,7 +231,8 @@ export interface ToolSearchResult {
 /**
  * Tools the running call's view reaches, best match first. A tool named in
  * the query outranks everything else: a model that read a tool name in a
- * result looks it up by that name.
+ * result looks it up by that name. Among matches about as good, the tier the
+ * query asks for comes first (`tierFactor`).
  */
 export function searchTools(
   query: string,
@@ -146,7 +244,7 @@ export function searchTools(
     (entry) =>
       view.serves(entry.spec.name) && !DISPATCH_TOOLS.includes(entry.spec.name)
   );
-  const terms = queryTerms(query);
+  const terms = [...new Set(queryTerms(query).map(singular))];
   const named = new Set(
     (query.toLowerCase().match(/[a-z0-9_]+/g) ?? []).flatMap((word) => [
       word,
@@ -165,6 +263,7 @@ export function searchTools(
       score += termScore;
     }
     if (terms.length > 0) score += (matched / terms.length) * COVERAGE_BONUS;
+    score *= tierFactor(terms, dispatcherFor(entry.spec));
     if (named.has(entry.spec.name)) score += 100;
     if (score > 0) scored.push({ entry, score });
   }
