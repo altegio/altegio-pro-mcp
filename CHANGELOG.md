@@ -6,6 +6,37 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — the dispatchers run only what a view does not list
+
+- **A dispatcher refuses a tool its view lists**, whatever the tier, and says
+  to call it directly. A host's allow, ask or deny setting for a listed tool —
+  `appointments_delete`, say — now holds: it can no longer be side-stepped
+  through the tool's dispatcher. `tools_search` gives a listed match no
+  `call_with` and says it is in the tool list.
+- **stdio no longer lists the dispatcher.** Its unfiltered view lists every
+  tool, so the dispatcher had nothing left to run.
+- **The tiers are described as they are.** `tools_call_write` runs changes
+  that delete nothing; `tools_call_destructive` runs deletions and changes
+  that are hard to undo. "Delete or overwrite nothing" was untrue of every
+  update the write tier runs, `schedules_update` among them.
+- **Each view's server instructions say only what is true there.**
+  `/pro/readonly` no longer describes booking or write confirmations, and
+  only the flat listing of the default view names the narrower addresses for
+  hosts that cap tools.
+- **Gated on the tool-selection eval** (Codex, 32 tasks × 3): `/pro` passed
+  89/96 and `/pro/full` 78/96, against 87/96 and 79/96 before. No dispatcher
+  call named a listed tool. ADR-001 D3 has the amendment.
+
+### Fixed — a location missing from the location list gets its own time zone
+
+- **Finance dates and writes use the location's own time zone** when the
+  location list omits that location. Before, its dates showed in the server's
+  time zone, and finance writes and payroll payouts were refused for it.
+- **The report-builder live tests are marked as a known upstream defect**, so
+  the nightly live run fails on new defects only.
+- **`tools_search` keeps the maximum of its `limit`** whichever module loads
+  first.
+
 ### Changed — `/pro` lists the compact listing; the flat list moves to `/pro/full`
 
 - **`/pro` lists 37 tools in 50,528 bytes**, against 96 tools and 121,576
