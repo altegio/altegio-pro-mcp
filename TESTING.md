@@ -94,6 +94,16 @@ Run `npm run dev:http` or the container described in [CI-CD.md](CI-CD.md).
 initialization, sessions, tool calls, views, identity isolation, and refusals
 against a local server using the installed SDK.
 
+## Tool-selection evals
+
+`npm run eval` runs realistic owner and administrator requests through a real
+MCP host against a local server and scores whether the agent reaches the right
+tool with arguments it accepts, once per view. It is opt-in, needs a host CLI
+and the live credentials, and sends a read-only grant, so writes are chosen and
+scored but never run. See [evals/README.md](evals/README.md). A change to the
+compact view's list, the dispatcher or a description it searches attaches a
+fresh summary to its pull request.
+
 ## Release artifact checks
 
 After a clean build, inspect `npm pack --dry-run --json`. The package must contain

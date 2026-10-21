@@ -32,6 +32,7 @@ import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import type { Server as HttpServer } from 'node:http';
 import { createApp } from '../http-server.js';
+import { createLogger } from '../utils/logger.js';
 
 interface ToolCallPayload {
   result?: {
@@ -229,6 +230,27 @@ describe('the curated-tool dispatcher, end to end', () => {
     expect(change.result?.isError).toBe(true);
     expect(textOf(change)).toContain('Run it with tools_call_write');
     expect(upstreamCalls).toEqual([]);
+  });
+
+  it('logs a dispatched call under the tool it ran, with the dispatcher as via', async () => {
+    const toolLog = jest.spyOn(createLogger('tool-calls'), 'info');
+    const session = await openSession('/mcp/compact', FULL_GRANT);
+    await session.call('tools_call_read', {
+      tool: 'positions_list',
+      arguments: { location_id: 4564 },
+    });
+    const lines = toolLog.mock.calls.map(
+      ([fields]) => fields as unknown as Record<string, unknown>
+    );
+    expect(lines).toContainEqual(
+      expect.objectContaining({
+        event: 'tool_call',
+        tool: 'positions_list',
+        via: 'tools_call_read',
+        route: '/mcp/compact',
+        outcome: 'success',
+      })
+    );
   });
 
   it('answers a dispatched call with the tool’s own validation', async () => {

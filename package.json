@@ -73,7 +73,8 @@
     "catalog:build": "node scripts/catalog/build.mjs",
     "catalog:check": "node scripts/catalog/build.mjs --check",
     "surface:build": "tsx scripts/surface/build.ts",
-    "surface:check": "tsx scripts/surface/build.ts --check"
+    "surface:check": "tsx scripts/surface/build.ts --check",
+    "eval": "tsx evals/run.ts"
   },
   "dependencies": {
     "@e965/xlsx": "^0.20.3",

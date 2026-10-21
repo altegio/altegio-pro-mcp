@@ -60,3 +60,6 @@ test-*.sh
 /BUILD.md
 /.claude/
 /.agents/
+
+# Tool-selection eval output (npm run eval)
+evals/out/
