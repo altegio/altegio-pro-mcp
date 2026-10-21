@@ -810,6 +810,74 @@ describe('V1AnalyticsAdapter — report builder', () => {
     expect(calls).toHaveLength(1);
   });
 
+  it('reports the new route’s rejection when the legacy fallback fails too', async () => {
+    const { api, calls } = adapter([
+      [
+        /analytics_constructor\/reports\/.+\/data/,
+        {
+          status: 422,
+          body: {
+            success: false,
+            meta: {
+              message: 'Validation error',
+              errors: {
+                '[filters][0][operator]': [
+                  'The value you selected is invalid.',
+                ],
+              },
+            },
+          },
+        },
+      ],
+      [/\/ac\/.+\/data/, { status: 404, body: { success: false } }],
+    ]);
+
+    const run = api.runReport({
+      location_id: 4564,
+      report_id: 'r-owned',
+      filters: [],
+      allow_stored_period_fallback: true,
+    });
+
+    await expect(run).rejects.toBeInstanceOf(AnalyticsInputError);
+    await expect(run).rejects.toThrow(/operator: The value you selected/);
+    await expect(run).rejects.not.toThrow(/report builder is unavailable/);
+    expect(calls.map((call) => call.path)).toEqual([
+      '/company/4564/analytics_constructor/reports/r-owned/data',
+      '/company/4564/ac/r-owned/data',
+    ]);
+  });
+
+  it('reads a report-data 404 as missing data, not a switched-off builder', async () => {
+    const { api } = adapter([
+      [
+        /analytics_constructor\/reports\/.+\/data/,
+        {
+          status: 404,
+          body: { success: false, meta: { message: 'Not found' } },
+        },
+      ],
+      [/\/ac\/.+\/data/, { status: 404, body: { success: false } }],
+    ]);
+
+    const run = api.runReport({
+      location_id: 4564,
+      report_id: 'r-owned',
+      filters: [
+        {
+          filter_id: 'rf-1',
+          operator: 'BETWEEN',
+          value: { from: '2026-08-01', to: '2026-08-03' },
+        },
+      ],
+      allow_stored_period_fallback: true,
+    });
+
+    await expect(run).rejects.toBeInstanceOf(AnalyticsUnavailableError);
+    await expect(run).rejects.toThrow(/returned no data for it/);
+    await expect(run).rejects.not.toThrow(/subscription/);
+  });
+
   it('reads the builder 404 as a missing access right, not a missing report', async () => {
     const { api } = adapter([
       [/analytics_constructor/, { status: 404, body: { success: false } }],
