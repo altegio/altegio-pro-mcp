@@ -26,7 +26,7 @@
  * `evals/out/<timestamp>/`: one JSON per run and `summary.md`.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer as createNetServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -377,16 +377,32 @@ function spawnHost(
 
 /** The headers the proxy would send: the read-only grant, the test location. */
 const HEADERS = {
-  'x-altegio-user-token': userToken,
   'x-altegio-company-id': location,
   'x-mcp-auth-scope': 'mcp:pro:read',
 };
+
+/**
+ * The user token reaches a host as an environment variable it reads the
+ * header from: never in its arguments, which `ps` shows other local users,
+ * nor in a file it is given.
+ */
+const TOKEN_HEADER = 'x-altegio-user-token';
+const TOKEN_ENV = 'ALTEGIO_EVAL_USER_TOKEN';
+
+/** A host's environment: the token under its own name, no other Altegio value. */
+function hostEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const inherited = Object.fromEntries(
+    Object.entries(process.env).filter(([name]) => !name.startsWith('ALTEGIO_'))
+  );
+  return { ...inherited, [TOKEN_ENV]: userToken, ...extra };
+}
 
 /** Codex (`codex exec --json`), which defers MCP tools behind its own search. */
 async function codexRun(url: string, prompt: string): Promise<HostOutput> {
   const table = Object.entries(HEADERS)
     .map(([key, value]) => `"${key}"=${JSON.stringify(value)}`)
     .join(',');
+  const cwd = mkdtempSync(join(tmpdir(), 'altegio-eval-run-'));
   const { out, code } = await spawnHost(
     CODEX,
     [
@@ -403,11 +419,14 @@ async function codexRun(url: string, prompt: string): Promise<HostOutput> {
       `mcp_servers.altegio.url="${url}"`,
       '-c',
       `mcp_servers.altegio.http_headers={${table}}`,
+      '-c',
+      `mcp_servers.altegio.env_http_headers={"${TOKEN_HEADER}"="${TOKEN_ENV}"}`,
       ...(MODEL ? ['-m', MODEL] : []),
       prompt,
     ],
-    mkdtempSync(join(tmpdir(), 'altegio-eval-run-'))
-  );
+    cwd,
+    hostEnv()
+  ).finally(() => rmSync(cwd, { recursive: true, force: true }));
   const calls: HostCall[] = [];
   let answer = '';
   let inputTokens = 0;
@@ -453,7 +472,14 @@ async function geminiRun(url: string, prompt: string): Promise<HostOutput> {
   writeFileSync(
     join(cwd, '.gemini', 'settings.json'),
     JSON.stringify({
-      mcpServers: { altegio: { httpUrl: url, headers: HEADERS, trust: true } },
+      mcpServers: {
+        altegio: {
+          httpUrl: url,
+          // Gemini CLI reads `${NAME}` in its settings from the environment.
+          headers: { ...HEADERS, [TOKEN_HEADER]: `\${${TOKEN_ENV}}` },
+          trust: true,
+        },
+      },
       tools: {
         exclude: [
           'run_shell_command',
@@ -477,8 +503,8 @@ async function geminiRun(url: string, prompt: string): Promise<HostOutput> {
       ...(MODEL ? ['-m', MODEL] : []),
     ],
     cwd,
-    { ...process.env, GEMINI_CLI_TRUST_WORKSPACE: 'true' }
-  );
+    hostEnv({ GEMINI_CLI_TRUST_WORKSPACE: 'true' })
+  ).finally(() => rmSync(cwd, { recursive: true, force: true }));
   const prefix = 'mcp_altegio_';
   const pending = new Map<
     string,
