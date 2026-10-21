@@ -58,6 +58,22 @@
  *   location's zone.
  * - The create answer's line amounts are unsigned; a write-off or sale line
  *   moves stock out.
+ *
+ * Document edits, verified live on the test location (2026-10-21):
+ *
+ * - `GET /storage_operations/documents/goods_transactions/{doc}` lists the
+ *   document's stored lines with unsigned amounts; the route carries no
+ *   location, so the use case reads the document at its location first and
+ *   the adapter keeps only lines of that location.
+ * - `PUT /storage_operations/documents/{id}/{doc}` needs `type_id`,
+ *   `storage_id` and `create_date`. A new date moves every line; a new
+ *   comment does not reach the lines; a new `storage_id` relabels the
+ *   document but leaves its lines, and their stock, in the old inventory, so
+ *   the port never changes it.
+ * - `PUT /storage_operations/goods_transactions/{id}/{line}` replaces the
+ *   whole line: an omitted Supplier or comment is cleared. Stock follows the
+ *   new quantity at once. `POST` adds a line to the document, `DELETE`
+ *   removes one (202, also for a line removed before) and its stock.
  */
 import { majorOf } from '../money.js';
 import { httpFromClient, type AltegioHttp } from '../altegio-http.js';
@@ -77,6 +93,9 @@ import type {
   ConsumableLine,
   ConsumableWrite,
   CreatedOperation,
+  DocumentHeaderWrite,
+  DocumentLine,
+  DocumentLineWrite,
   Inventory,
   InventoryApi,
   InventoryDocument,
@@ -104,6 +123,13 @@ const KIND_FROM_WIRE: Record<number, InventoryMovementKind> = {
   3: 'receipt',
   4: 'write_off',
   5: 'transfer',
+};
+
+const DOCUMENT_KIND_TO_WIRE: Partial<Record<InventoryMovementKind, number>> = {
+  sale: 1,
+  receipt: 3,
+  write_off: 4,
+  transfer: 5,
 };
 
 const SUPPLIER_TYPE_FROM_WIRE: Record<number, SupplierType> = {
@@ -294,6 +320,53 @@ function documentFromWire(row: Row): InventoryDocument {
     comment: text(row.comment),
   };
 }
+
+function documentLineFromWire(row: Row): DocumentLine {
+  const amount = num(row.amount);
+  const unitType = num(row.operation_unit_type);
+  return {
+    id: id(row.id) ?? 0,
+    document_id: id(row.document_id),
+    location_id: id(row.company_id),
+    product_id: id(row.good_id ?? asRow(row.good).id),
+    quantity: amount === null ? null : Math.abs(amount),
+    unit_id: id(row.unit_id),
+    unit_kind: unitType === 1 ? 'sale' : unitType === 2 ? 'consumable' : null,
+    unit_price: num(row.cost_per_unit),
+    discount_percent: num(row.discount),
+    total: num(row.cost),
+    supplier_id: id(row.supplier_id),
+    team_member_id: id(row.master_id),
+    client_id: id(row.client_id),
+    appointment_id: id(row.record_id),
+    comment: text(row.comment),
+  };
+}
+
+function documentLineBody(line: DocumentLineWrite): Row {
+  return {
+    document_id: line.document_id,
+    product_id: line.product_id,
+    amount: line.quantity,
+    unit_id: line.unit_id,
+    cost_per_unit: majorOf(line.unit_price),
+    discount: line.discount_percent,
+    cost: majorOf(line.total),
+    supplier_id: line.supplier_id ?? 0,
+    team_member_id: line.team_member_id ?? 0,
+    client_id: line.client_id ?? 0,
+    comment: line.comment,
+  };
+}
+
+const LINE_WRITE_HINTS = {
+  forbidden:
+    'Changing inventory operations is a separate access right at the location; ask the location owner for it.',
+  invalid:
+    'Check the product id and quantity; when the location forbids negative stock, the inventory must hold enough of the product.',
+  notFound:
+    'Check the line and document ids with inventory_list_operations and document_id; a deleted line is gone.',
+};
 
 function supplierFromWire(row: Row): Supplier {
   const type = num(row.type_id);
@@ -486,6 +559,93 @@ export class InventoryAdapter implements InventoryApi {
         }
       ),
     };
+  }
+
+  async getDocumentLines(
+    locationId: number,
+    documentId: number
+  ): Promise<DocumentLine[]> {
+    const { data } = await this.call(
+      `/storage_operations/documents/goods_transactions/${documentId}`,
+      `read the lines of document ${documentId}`
+    );
+    return rows(data)
+      .filter((row) => !flag(row.deleted))
+      .map(documentLineFromWire)
+      .filter(
+        (line) => line.location_id === null || line.location_id === locationId
+      );
+  }
+
+  async updateDocument(
+    locationId: number,
+    documentId: number,
+    header: DocumentHeaderWrite
+  ): Promise<InventoryDocument> {
+    const type = DOCUMENT_KIND_TO_WIRE[header.kind];
+    if (type === undefined) {
+      throw mapInventoryHttpError(
+        422,
+        undefined,
+        `change document ${documentId}`,
+        {
+          invalid:
+            'Only sale, receipt, write-off and transfer documents can be changed.',
+        }
+      );
+    }
+    const { data } = await this.call(
+      `/storage_operations/documents/${locationId}/${documentId}`,
+      `change document ${documentId} of location ${locationId}`,
+      {
+        method: 'PUT',
+        body: {
+          type_id: type,
+          storage_id: header.inventory_id,
+          create_date: header.date_local,
+          comment: header.comment,
+        },
+        hints: {
+          ...LINE_WRITE_HINTS,
+          invalid:
+            'The date must be the time at the location and not in the future.',
+        },
+      }
+    );
+    return documentFromWire(asRow(data));
+  }
+
+  async addDocumentLine(
+    locationId: number,
+    line: DocumentLineWrite
+  ): Promise<DocumentLine> {
+    const { data } = await this.call(
+      `/storage_operations/goods_transactions/${locationId}`,
+      `add a line to document ${line.document_id}`,
+      { method: 'POST', body: documentLineBody(line), hints: LINE_WRITE_HINTS }
+    );
+    return documentLineFromWire(asRow(data));
+  }
+
+  async updateDocumentLine(
+    locationId: number,
+    lineId: number,
+    line: DocumentLineWrite
+  ): Promise<DocumentLine> {
+    const { data } = await this.call(
+      `/storage_operations/goods_transactions/${locationId}/${lineId}`,
+      `change line ${lineId} of document ${line.document_id}`,
+      { method: 'PUT', body: documentLineBody(line), hints: LINE_WRITE_HINTS }
+    );
+    return documentLineFromWire(asRow(data));
+  }
+
+  async deleteDocumentLine(locationId: number, lineId: number): Promise<void> {
+    await this.call(
+      `/storage_operations/goods_transactions/${locationId}/${lineId}`,
+      `remove line ${lineId}`,
+      { method: 'DELETE', hints: LINE_WRITE_HINTS }
+    );
   }
 
   async listSuppliers(locationId: number): Promise<Supplier[]> {

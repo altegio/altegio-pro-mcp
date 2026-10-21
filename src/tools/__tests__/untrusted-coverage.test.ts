@@ -1368,6 +1368,23 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
   ...Object.fromEntries(
     (
       [
+        [
+          'inventory_update_document',
+          'the inventory, product and comment texts of the changed document',
+        ],
+        ['inventory_pay_document', 'the payment comment'],
+      ] as const
+    ).map(([name, what]) => [
+      name,
+      {
+        what,
+        coveredBy: 'src/capabilities/inventory/__tests__/documents.test.ts',
+      },
+    ])
+  ),
+  ...Object.fromEntries(
+    (
+      [
         ['product_categories_list', 'product category titles'],
         ['product_categories_create', 'the new category title'],
         ['product_categories_update', 'the category titles before and after'],

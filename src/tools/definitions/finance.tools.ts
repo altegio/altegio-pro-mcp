@@ -469,7 +469,7 @@ export const financialTransactionsDeleteTool = defineTool({
   name: 'financial_transactions_delete',
   category: 'Finance',
   description:
-    'Delete a financial transaction recorded outside a visit. Transactions a visit payment, product sale or client account deposit recorded are refused — cancel a visit payment with visits_cancel_payment. Asks for confirmation first.',
+    'Delete a financial transaction recorded outside a visit, or the payment of a product receipt (inventory_pay_document). Transactions a visit payment, product sale or client account deposit recorded are refused — cancel a visit payment with visits_cancel_payment. Asks for confirmation first.',
   annotations: {
     title: 'Finance: delete a financial transaction',
     destructiveHint: true,

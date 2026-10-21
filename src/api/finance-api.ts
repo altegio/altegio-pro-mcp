@@ -124,6 +124,11 @@ export interface FinancialTransactionFields {
   team_member_id: number | null;
   supplier_id: number | null;
   comment: string;
+  /**
+   * The inventory operation document the transaction pays, on a create only:
+   * the payment of a product receipt to its Supplier.
+   */
+  document_id?: number;
 }
 
 /**
@@ -243,6 +248,11 @@ export interface FinanceApi {
     transactionId: number,
     options?: WriteOptions
   ): Promise<void>;
+  /** The financial transactions recorded against one document. */
+  listDocumentTransactions(
+    locationId: number,
+    documentId: number
+  ): Promise<FinancialTransaction[]>;
 
   getPayroll(
     locationId: number,

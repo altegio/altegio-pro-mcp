@@ -23,6 +23,7 @@
  * the money twice. Each write also hands the port the confirmed call's
  * idempotency key (`../../api/write-options.ts`).
  */
+import { InventoryAdapter } from '../../api/v1/inventory-adapter.js';
 import type { AltegioClient } from '../../providers/altegio-client.js';
 import {
   decimalsOf,
@@ -1080,6 +1081,33 @@ async function requireZone(
   return zone;
 }
 
+/**
+ * Whether a document-linked transaction pays a product receipt to its
+ * Supplier (inventory_pay_document): the one document payment that is
+ * deleted on its own, leaving the receipt and its stock in place.
+ */
+async function paysProductReceipt(
+  client: AltegioClient,
+  locationId: number,
+  t: FinancialTransaction
+): Promise<boolean> {
+  if (
+    t.document_id === null ||
+    t.appointment_id !== null ||
+    t.visit_id !== null
+  )
+    return false;
+  try {
+    const document = await InventoryAdapter.forClient(client).getDocument(
+      locationId,
+      t.document_id
+    );
+    return document.kind === 'receipt';
+  } catch {
+    return false;
+  }
+}
+
 /** A transaction a visit, sale or deposit recorded is changed where it was made. */
 function refuseLinked(t: FinancialTransaction, verb: string): void {
   if (
@@ -1214,13 +1242,12 @@ export async function describeTransactionDeletion(
   input: { location_id: number; transaction_id: number }
 ): Promise<undefined> {
   try {
-    refuseLinked(
-      await api(client).getFinancialTransaction(
-        input.location_id,
-        input.transaction_id
-      ),
-      'deleted'
+    const t = await api(client).getFinancialTransaction(
+      input.location_id,
+      input.transaction_id
     );
+    if (!(await paysProductReceipt(client, input.location_id, t)))
+      refuseLinked(t, 'deleted');
   } catch (error) {
     if (error instanceof FinanceNotFoundError) {
       throw new ConfirmationRefusal(
@@ -1439,7 +1466,8 @@ export async function deleteFinancialTransaction(
     finance.getFinancialTransaction(input.location_id, input.transaction_id),
     resolveLocationCurrency(client, input.location_id),
   ]);
-  refuseLinked(before, 'deleted');
+  if (!(await paysProductReceipt(client, input.location_id, before)))
+    refuseLinked(before, 'deleted');
   await finance.deleteFinancialTransaction(
     input.location_id,
     input.transaction_id,

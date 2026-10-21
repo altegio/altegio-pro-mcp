@@ -470,9 +470,10 @@ export const DEFAULT_FACET_DEMOTED_GROUPS: readonly DemotedGroup[] = [
   },
   {
     // New on 2026-10-21 for back-office product management (supplier invoice
-    // intake); not measured yet, so it starts on its facet like the groups
-    // above rather than growing the flat list.
-    summary: 'creating, changing and archiving products and product categories',
+    // intake) and the receipt it records; not measured yet, so it starts on
+    // its facet like the groups above rather than growing the flat list.
+    summary:
+      'managing products and product categories, editing inventory documents and paying product receipts',
     facet: 'finance',
     tools: [
       'products_create',
@@ -481,6 +482,8 @@ export const DEFAULT_FACET_DEMOTED_GROUPS: readonly DemotedGroup[] = [
       'product_categories_create',
       'product_categories_update',
       'product_categories_delete',
+      'inventory_update_document',
+      'inventory_pay_document',
     ],
     prefixes: [],
   },

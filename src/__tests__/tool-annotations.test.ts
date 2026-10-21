@@ -138,6 +138,9 @@ describe('tool annotations', () => {
       // Runs any destructive tool, a read-modify-write included, so a repeat
       // may change the environment again.
       'tools_call_destructive',
+      // Removes document lines and adds others in one call, so a repeat adds
+      // the new lines again.
+      'inventory_update_document',
     ]);
     const plainDeletes = specs
       .filter((spec) => annotationsOf(spec).destructiveHint === true)
