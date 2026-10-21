@@ -819,6 +819,54 @@ describe('analytics_run_saved_report', () => {
     });
     expect(result.structuredContent).toMatchObject({ row_count: 3 });
   });
+
+  it('sends the period as BETWEEN from/to whatever the stored filter says', async () => {
+    // The builder now returns the stored date filter with an empty operator
+    // and a comma-joined value; the run route accepts only BETWEEN {from, to}.
+    const stored = fixture('constructor-report') as {
+      data: Record<string, unknown>;
+    };
+    const report = {
+      ...stored,
+      data: {
+        ...stored.data,
+        report_filters: [
+          {
+            id: 'rf-1',
+            column_id: 'c-sales-date',
+            operator: '',
+            value: '2026-08-01,2026-08-03',
+          },
+        ],
+      },
+    };
+    const { result, calls } = await call(
+      'analytics_run_saved_report',
+      {
+        location_id: 4564,
+        report_id: 'r-owned',
+        date_from: '2026-08-01',
+        date_to: '2026-08-03',
+      },
+      [
+        [/analytics_constructor\/columns/, 'constructor-columns'],
+        [/analytics_constructor\/reports\/r-owned\?/, report],
+        [/reports\/[^/]+\/data/, 'constructor-report-data'],
+      ]
+    );
+
+    expect(result.isError).toBeUndefined();
+    const dataCall = calls.find((c) => c.path.includes('/data'))!;
+    expect(dataCall.body).toEqual({
+      filters: [
+        {
+          id: 'rf-1',
+          operator: 'BETWEEN',
+          value: { from: '2026-08-01', to: '2026-08-03' },
+        },
+      ],
+    });
+  });
 });
 
 describe('analytics_list_saved_reports', () => {

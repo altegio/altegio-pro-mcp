@@ -51,6 +51,7 @@ export type AnalyticsEndpointKind =
   | 'team_workload'
   | 'client_visits'
   | 'report_builder'
+  | 'report_data'
   | 'loyalty'
   | 'appointments';
 
@@ -81,6 +82,12 @@ const FORECAST_OFF =
 const BUILDER_OFF =
   'The report builder is unavailable for this location: it needs an active subscription and the Analytics access right. ' +
   'Use analytics_get_overview, analytics_get_daily_series or analytics_get_day_end_report instead.';
+
+// A report is always read before it is run, so the builder and the access
+// right are known to work when the data route answers 404.
+const REPORT_DATA_MISSING =
+  'The report builder has the report but returned no data for it: its prepared data is not available on the Altegio side. ' +
+  'This is an upstream builder failure, not a missing access right; retry later, and meanwhile use analytics_get_overview, analytics_get_daily_series or analytics_get_day_end_report instead.';
 
 function accessMessage(kind: AnalyticsEndpointKind): string {
   switch (kind) {
@@ -163,6 +170,9 @@ export function mapAnalyticsHttpError(
   if (status === 404) {
     if (kind === 'report_builder') {
       return new AnalyticsUnavailableError(BUILDER_OFF, status);
+    }
+    if (kind === 'report_data') {
+      return new AnalyticsUnavailableError(REPORT_DATA_MISSING, status);
     }
     if (kind === 'forecast') {
       return new AnalyticsUnavailableError(FORECAST_OFF, status);

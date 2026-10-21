@@ -1082,7 +1082,7 @@ export class V1AnalyticsAdapter implements AnalyticsApi {
           `/reports/${encodeURIComponent(query.report_id)}/data`
         ),
         {
-          kind: 'report_builder',
+          kind: 'report_data',
           context: 'run the report',
           method: 'POST',
           body: {
@@ -1101,16 +1101,23 @@ export class V1AnalyticsAdapter implements AnalyticsApi {
       // Some locations do not have the new report-data feature flag. Their
       // legacy rows endpoint can safely be used only for the period already
       // stored in the report; the capability layer verifies that condition.
-      const rows = await callEnveloped<unknown[][]>(
-        this.http,
-        `/company/${query.location_id}/ac/${encodeURIComponent(query.report_id)}/data`,
-        {
-          kind: 'report_builder',
-          context: 'run the saved report for its stored period',
-          method: 'POST',
-          body: { report_columns: [] },
-        }
-      );
+      // When the legacy endpoint fails too, the new route's answer is the one
+      // that explains the failure, so it is the one reported.
+      let rows: unknown[][];
+      try {
+        rows = await callEnveloped<unknown[][]>(
+          this.http,
+          `/company/${query.location_id}/ac/${encodeURIComponent(query.report_id)}/data`,
+          {
+            kind: 'report_data',
+            context: 'run the saved report for its stored period',
+            method: 'POST',
+            body: { report_columns: [] },
+          }
+        );
+      } catch {
+        throw error;
+      }
       return toLegacyReportTable(rows);
     }
   }
