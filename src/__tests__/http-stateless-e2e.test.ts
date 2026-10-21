@@ -316,6 +316,13 @@ describe('sessionless tool calls, end to end', () => {
       error_class: 'validation',
       validation_issues: [{ code: 'too_big', path: 'page_size' }],
     });
-    expect(JSON.stringify(fields)).not.toContain('300');
+    // The request id and latency are random and may contain "300" by chance.
+    expect(
+      JSON.stringify({
+        ...fields,
+        request_id: undefined,
+        latency_ms: undefined,
+      })
+    ).not.toContain('300');
   });
 });
