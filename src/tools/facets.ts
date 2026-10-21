@@ -45,10 +45,11 @@ export type FacetName = (typeof FACET_NAMES)[number];
 export const DEFAULT_FACET = 'default';
 
 /**
- * Key of the unfiltered view: every registered tool, no exclusions. stdio uses
- * it — a desktop host connects to one process and must see the whole surface,
- * including packs the default HTTP view holds back, the password login tools
- * and access management. It has no HTTP route.
+ * Key of the unfiltered view: every registered tool but the dispatcher, which
+ * runs what a view does not list. stdio uses it — a desktop host connects to
+ * one process and must see the whole surface, including packs the default
+ * HTTP view holds back, the password login tools and access management. It
+ * has no HTTP route.
  */
 export const ALL_TOOLS_FACET = 'all';
 
@@ -472,8 +473,8 @@ export const DEFAULT_FACET_DEMOTED_GROUPS: readonly DemotedGroup[] = [
  * through one of three tools by risk — the tiers of Atlassian Rovo's
  * `executeRead` / `executeWrite` / `executeDestructive`, so a host can approve
  * reads and ordinary writes without asking and still stop before a deletion.
- * Listed on the compact listing (`/mcp`, `/mcp/compact`) and on stdio's
- * unfiltered view, nowhere else.
+ * Listed on the compact listing (`/mcp`, `/mcp/compact`) only. A tool that
+ * listing carries is called directly, so a host's setting for it holds.
  */
 export const DISPATCH_SEARCH_TOOL = 'tools_search';
 export const DISPATCH_READ_TOOL = 'tools_call_read';
@@ -653,7 +654,7 @@ export type ViewWithholdReason =
    * `tools_call_write` or `tools_call_destructive` (`dispatchReaches`).
    */
   | 'compact-view-dispatched'
-  /** A dispatcher tool: only the compact listing and stdio list it. */
+  /** A dispatcher tool: only the compact listing lists it. */
   | 'dispatcher-compact-only';
 
 export type ViewDecision =
@@ -695,7 +696,10 @@ export function decideView(
 
   if (view === ALL_TOOLS_FACET) {
     // stdio's view: never filtered, not even by the password-login switch.
-    return admit('unfiltered-view');
+    // It lists every tool, so the dispatcher would have nothing to run.
+    return DISPATCH_TOOLS.includes(name)
+      ? withhold('dispatcher-compact-only')
+      : admit('unfiltered-view');
   }
 
   // Withheld from every HTTP view by the deployment, ahead of every admitting
@@ -781,9 +785,10 @@ export const VIEW_KEYS: readonly FacetKey[] = [
 /**
  * Whether a view's dispatcher (`tools_call_read`, `tools_call_write`,
  * `tools_call_destructive`) runs a tool: on the compact listing, every tool it
- * lists or dispatches; on stdio's unfiltered view, every tool; elsewhere
- * nothing, since no other view lists the dispatcher. Never a dispatcher tool
- * itself.
+ * reaches without listing it; elsewhere nothing, since no other view lists the
+ * dispatcher. A listed tool is called directly, so a host's allow, ask or deny
+ * setting for it cannot be side-stepped through its tier's dispatcher. Never a
+ * dispatcher tool itself.
  */
 export function dispatchReaches(
   view: FacetKey,
@@ -791,10 +796,8 @@ export function dispatchReaches(
   options: FacetIndexOptions = {}
 ): boolean {
   if (DISPATCH_TOOLS.includes(tool.name)) return false;
-  if (view === ALL_TOOLS_FACET) return true;
   if (effectiveView(view, options) !== COMPACT_VIEW) return false;
-  const decision = decideView(view, tool, options);
-  return decision.served || decision.reason === 'compact-view-dispatched';
+  return decideView(view, tool, options).reason === 'compact-view-dispatched';
 }
 
 /**

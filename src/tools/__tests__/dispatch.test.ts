@@ -54,9 +54,10 @@ describe('the compact listing', () => {
   });
 
   it('reaches everything the full list lists, and the packs it leaves out for size', () => {
+    const listed = new Set(index.members(DEFAULT_FACET));
     const reach = new Set(index.reachable(DEFAULT_FACET));
     for (const name of index.members(FULL_VIEW)) {
-      expect(reach.has(name)).toBe(true);
+      expect(listed.has(name) || reach.has(name)).toBe(true);
     }
     // Demoted groups and the analytics pack, which the full list holds back
     // for bytes.
@@ -68,6 +69,15 @@ describe('the compact listing', () => {
     ]) {
       expect(index.includes(FULL_VIEW, name)).toBe(false);
       expect(reach.has(name)).toBe(true);
+    }
+  });
+
+  it('runs no tool it lists, so a host setting for a listed tool holds', () => {
+    for (const view of [DEFAULT_FACET, COMPACT_VIEW] as const) {
+      const reach = new Set(index.reachable(view));
+      for (const name of index.members(view)) {
+        expect(reach.has(name)).toBe(false);
+      }
     }
   });
 
@@ -83,10 +93,9 @@ describe('the compact listing', () => {
   });
 
   it('is the only listing that lists or runs the dispatcher', () => {
+    // stdio's unfiltered view included: it lists every tool already.
     for (const view of index.keys) {
-      if (view === DEFAULT_FACET || view === COMPACT_VIEW || view === 'all') {
-        continue;
-      }
+      if (view === DEFAULT_FACET || view === COMPACT_VIEW) continue;
       for (const name of DISPATCH_TOOLS) {
         expect(index.includes(view, name)).toBe(false);
       }
@@ -184,19 +193,23 @@ describe('tools_search', () => {
     expect(payout.input_schema).toMatchObject({
       properties: { team_member_id: {}, amount: {} },
     });
-    const calculation = matches.find(
-      (m) => m.name === 'payroll_get_calculation'
+    const chains = search('membership chains').matches.find(
+      (m) => m.name === 'memberships_list_chains'
     )!;
-    expect(calculation.call_with).toBe('tools_call_read');
+    expect(chains.call_with).toBe('tools_call_read');
   });
 
-  it('marks a tool the host already lists and leaves its schema out', () => {
-    const { matches } = search('appointments_create');
-    expect(matches[0]).toMatchObject({
+  it('marks a tool the host already lists, to be called directly, with no schema or dispatcher', () => {
+    const result = search('appointments_create');
+    expect(result.matches[0]).toMatchObject({
       name: 'appointments_create',
       listed: true,
     });
-    expect(matches[0]).not.toHaveProperty('input_schema');
+    expect(result.matches[0]).not.toHaveProperty('input_schema');
+    expect(result.matches[0]).not.toHaveProperty('call_with');
+    expect(searchText(result)).toContain(
+      'appointments_create (in your tool list: call it directly'
+    );
   });
 
   it('never returns the dispatcher, or a tool out of reach', () => {
@@ -226,6 +239,7 @@ describe('tools_search', () => {
 });
 
 describe('resolveDispatch', () => {
+  const listed = new Set(index.members(COMPACT_VIEW));
   const reach = new Set(index.reachable(COMPACT_VIEW));
   const tiers = new Map(
     orderedToolEntries().map((entry) => [
@@ -234,6 +248,7 @@ describe('resolveDispatch', () => {
     ])
   );
   const targets: DispatchTargets = {
+    lists: (name) => listed.has(name),
     reaches: (name) => reach.has(name),
     dispatcherOf: (name) => tiers.get(name),
     addressesServing: (name) =>
@@ -286,7 +301,7 @@ describe('resolveDispatch', () => {
     );
     expect(deletion).toMatchObject({ errorClass: 'validation' });
     expect(textOf(deletion)).toBe(
-      'Nothing was run: services_delete deletes or overwrites data, and tools_call_write runs changes that delete or overwrite nothing. Run it with tools_call_destructive.'
+      'Nothing was run: services_delete deletes data or makes a change that is hard to undo, and tools_call_write runs changes that delete nothing. Run it with tools_call_destructive.'
     );
 
     const change = resolveDispatch(
@@ -295,7 +310,7 @@ describe('resolveDispatch', () => {
       targets
     );
     expect(textOf(change)).toBe(
-      'Nothing was run: memberships_freeze changes data without deleting or overwriting any, and tools_call_destructive runs deletions and other destructive changes. Run it with tools_call_write.'
+      'Nothing was run: memberships_freeze creates or changes data and deletes nothing, and tools_call_destructive runs deletions and changes that are hard to undo. Run it with tools_call_write.'
     );
 
     const read = resolveDispatch(
@@ -312,6 +327,24 @@ describe('resolveDispatch', () => {
         targets
       )
     ).toEqual({ target: 'services_delete', args: { location_id: 1 } });
+  });
+
+  it('refuses a tool the view lists, whatever the tier, to be called directly', () => {
+    for (const dispatcher of [
+      'tools_call_read',
+      'tools_call_write',
+      'tools_call_destructive',
+    ] as const) {
+      const dispatch = resolveDispatch(
+        dispatcher,
+        { tool: 'appointments_delete', arguments: { location_id: 1 } },
+        targets
+      );
+      expect(dispatch).toMatchObject({ errorClass: 'validation' });
+      expect(textOf(dispatch)).toBe(
+        'Nothing was run: appointments_delete is in your tool list, so call it directly with these arguments.'
+      );
+    }
   });
 
   it('moves a confirmation_token sent beside the arguments into them', () => {

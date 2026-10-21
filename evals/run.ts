@@ -6,7 +6,8 @@
  * host called. Hosts: Codex (`codex exec`, the default), which sends most
  * `/pro` traffic and defers MCP tools behind its own search, and Gemini CLI
  * (`gemini -p`, `--host gemini`), which sends every listed tool. A task passes when the agent reaches one of its expected tools,
- * directly or through the dispatcher, with arguments that tool accepts.
+ * directly or, when the view does not list it, through the dispatcher of its
+ * tier, with arguments that tool accepts.
  *
  * Safety: every request carries the proxy's read-only grant
  * (`x-mcp-auth-scope: mcp:pro:read`) and the test location as the only
@@ -300,8 +301,15 @@ function score(
     isDispatchCall(call.tool) &&
     tierOf.has(call.target) &&
     tierOf.get(call.target) !== call.tool;
+  // The dispatcher refuses a tool the view lists, which is called directly.
+  const listing = listings.get(view)!;
+  const listedThroughDispatcher = (call: Call) =>
+    isDispatchCall(call.tool) && listing.facetIndex.includes(view, call.target);
   const reachedAt = calls.findIndex(
-    (call) => task.expect.includes(call.target) && !wrongTier(call)
+    (call) =>
+      task.expect.includes(call.target) &&
+      !wrongTier(call) &&
+      !listedThroughDispatcher(call)
   );
   const valid = reachedAt >= 0 && validFor(calls[reachedAt]!);
   return {
@@ -581,7 +589,7 @@ function summary(runs: readonly Run[]): string {
   }
   out.push('');
   out.push(
-    '"Calls to reach" counts tool calls up to and including the first one that reaches an expected tool, among runs that reached one. A dispatched call reaches its tool only through the dispatcher of the tool\'s risk tier; "Wrong tier" counts the calls that named another.'
+    '"Calls to reach" counts tool calls up to and including the first one that reaches an expected tool, among runs that reached one. A dispatched call reaches its tool only through the dispatcher of the tool\'s risk tier, and only when the view does not list the tool; "Wrong tier" counts the calls that named another tier.'
   );
   out.push('');
   out.push(

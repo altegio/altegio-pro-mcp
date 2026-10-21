@@ -16,6 +16,7 @@ import { AltegioClient } from './providers/altegio-client.js';
 import {
   COMPACT_VIEW_INSTRUCTIONS,
   loadConfig,
+  productInstructionsFor,
   readOnlyViewInstructions,
 } from './config/schema.js';
 
@@ -49,15 +50,20 @@ export function createServer(options: CreateServerOptions = {}): MCPServer {
   // reach what it does not list. The full list names the groups it does not
   // list and where they are served. All are added around the product text
   // rather than replacing it, so a deployment's `MCP_SERVER_INSTRUCTIONS`
-  // override still gets them.
+  // override still gets them. The product text itself leaves out what is not
+  // true on the view (`productInstructionsFor`).
+  const product = productInstructionsFor(config.server.instructions, {
+    writes: listing !== READONLY_VIEW,
+    narrowerViews: facet === DEFAULT_FACET && listing === FULL_VIEW,
+  });
   const instructions =
     listing === READONLY_VIEW
-      ? `${readOnlyViewInstructions(publicBaseUrl)} ${config.server.instructions}`
+      ? `${readOnlyViewInstructions(publicBaseUrl)} ${product}`
       : listing === COMPACT_VIEW
-        ? `${COMPACT_VIEW_INSTRUCTIONS} ${config.server.instructions}`
+        ? `${COMPACT_VIEW_INSTRUCTIONS} ${product}`
         : listing === FULL_VIEW
-          ? `${config.server.instructions} ${demotedGroupsInstruction()}`
-          : config.server.instructions;
+          ? `${product} ${demotedGroupsInstruction()}`
+          : product;
 
   const server = new Server(
     {

@@ -44,13 +44,7 @@ const searchOutput = {
           description: { type: 'string' as const },
           input_schema: { type: 'object' as const },
         },
-        required: [
-          'name',
-          'call_with',
-          'listed',
-          'asks_confirmation',
-          'description',
-        ],
+        required: ['name', 'listed', 'asks_confirmation', 'description'],
       },
     },
     total_matches: { type: 'integer' as const },
@@ -107,9 +101,10 @@ export const toolsCallReadTool = defineTool({
   name: DISPATCH_READ_TOOL,
   category: 'Tools',
   description:
-    'Run a read-only tool by name, with its arguments; find it with tools_search. It validates ' +
-    'and answers exactly as if called directly. Refuses a tool that changes data: run that with ' +
-    'the dispatcher tools_search names.',
+    'Run a read-only tool your tool list lacks, by name, with its arguments; find it with ' +
+    'tools_search. It validates and answers exactly as if called directly. Refuses a listed ' +
+    'tool (call it directly) and a tool that changes data: run that with the dispatcher ' +
+    'tools_search names.',
   annotations: {
     title: 'Run a Read Tool',
     readOnlyHint: true,
@@ -128,10 +123,10 @@ export const toolsCallWriteTool = defineTool({
   name: DISPATCH_WRITE_TOOL,
   category: 'Tools',
   description:
-    'Run a tool that changes data without deleting or overwriting any (create, update, link, ' +
-    `record), by name, with its arguments; find it with tools_search. ${CONFIRMATION_REPEAT} ` +
-    `Refuses a read (run it with ${DISPATCH_READ_TOOL}) and a destructive change (run it with ` +
-    `${DISPATCH_DESTRUCTIVE_TOOL}).`,
+    'Run a tool your tool list lacks that creates or changes data and deletes nothing (create, ' +
+    'update, link, record), by name, with its arguments; find it with tools_search. ' +
+    `${CONFIRMATION_REPEAT} Refuses a listed tool (call it directly), a read (run it with ` +
+    `${DISPATCH_READ_TOOL}) and a destructive change (run it with ${DISPATCH_DESTRUCTIVE_TOOL}).`,
   // Its tier's annotations: no deletion runs through it, so a host may let it
   // run without asking and still stop before `tools_call_destructive`.
   annotations: {
@@ -149,9 +144,11 @@ export const toolsCallDestructiveTool = defineTool({
   name: DISPATCH_DESTRUCTIVE_TOOL,
   category: 'Tools',
   description:
-    'Run a tool that deletes or overwrites data (delete, cancel, unlink, replace), by name, with ' +
-    `its arguments; find it with tools_search. ${CONFIRMATION_REPEAT} Refuses any other tool: ` +
-    `run a read with ${DISPATCH_READ_TOOL} and another change with ${DISPATCH_WRITE_TOOL}.`,
+    'Run a tool your tool list lacks that deletes data or makes a change that is hard to undo ' +
+    '(delete, cancel, unlink, correct a balance), by name, with its arguments; find it with ' +
+    `tools_search. ${CONFIRMATION_REPEAT} Refuses a listed tool (call it directly) and any ` +
+    `other tool: run a read with ${DISPATCH_READ_TOOL} and another change with ` +
+    `${DISPATCH_WRITE_TOOL}.`,
   // It has no confirmation of its own: the tool it runs asks for its own,
   // through the registry, so a second prompt for the dispatcher would only
   // ask twice.

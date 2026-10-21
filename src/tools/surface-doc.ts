@@ -349,7 +349,7 @@ export function renderSurfaceDoc(
         [
           '**Served**',
           `**${counts.served}**`,
-          'what `stdio` lists; every HTTP view is a subset',
+          'what some view serves; `stdio` lists all of it but the dispatcher, which only the compact listing lists',
         ],
       ]
     )
