@@ -285,9 +285,9 @@ describe('tool counts', () => {
     );
   });
 
-  it('counts what the unfiltered view serves', () => {
+  it('counts what the unfiltered view serves: every tool but the dispatcher', () => {
     expect(buildSurfaceTable(entries).servedOn('all')).toHaveLength(
-      counts.served
+      counts.served - DISPATCH_TOOLS.length
     );
   });
 

@@ -96,7 +96,7 @@ export const createScheduleTool = defineTool({
   name: 'schedules_create',
   category: 'Schedule',
   description:
-    "Set a team member's working hours: the given intervals apply to every listed date. Use it to open the booking grid for new dates.",
+    "Set a team member's working hours: the given intervals apply to every listed date, replacing the hours a date already has. Use it to open the booking grid for new dates.",
   annotations: {
     title: 'Create Schedule',
     destructiveHint: false,

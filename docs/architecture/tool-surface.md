@@ -22,7 +22,7 @@ the code disagree, which is how a surface change reaches a reviewer’s diff
 | --- | --- | --- |
 | Defined | 164 | 152 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
 | Withheld from every view | 6 | `src/tools/disabled-tools.ts` (the report builder) |
-| **Served** | **158** | what `stdio` lists; every HTTP view is a subset |
+| **Served** | **158** | what some view serves; `stdio` lists all of it but the dispatcher, which only the compact listing lists |
 
 Served tools per category, in `tools/list` order:
 
@@ -56,13 +56,13 @@ Served tools per category, in `tools/list` order:
 
 | View | Address | Lists (of 164 defined) | Reaches | `tools/list` bytes | Budget (used) | Reasons |
 | --- | --- | --- | --- | --- | --- | --- |
-| `all` | stdio (no HTTP route) | 158 | 158 | 206,092 | — | all ×158, -off ×6 |
-| `default` | `/mcp` | 37 | 155 | 50,528 | 53,500 (94 %) | disp ×118, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
-| `full` | `/mcp/full` | 96 | 96 | 121,576 | 126,000 (96 %) | dflt ×92, -pack ×29, -low ×26, -off ×6, -cmp ×4, base ×3, -pwd ×2, -name ×1, xtra ×1 |
+| `all` | stdio (no HTTP route) | 154 | 154 | 202,988 | — | all ×154, -off ×6, -cmp ×4 |
+| `default` | `/mcp` | 37 | 155 | 50,770 | 53,500 (95 %) | disp ×118, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
+| `full` | `/mcp/full` | 96 | 96 | 121,616 | 126,000 (97 %) | dflt ×92, -pack ×29, -low ×26, -off ×6, -cmp ×4, base ×3, -pwd ×2, -name ×1, xtra ×1 |
 | `readonly` | `/mcp/readonly` | 84 | 84 | 116,761 | 123,000 (95 %) | ro ×84, -write ×68, -off ×6, -cmp ×4, -pwd ×2 |
-| `compact` | `/mcp/compact` | 37 | 155 | 50,528 | 53,500 (94 %) | disp ×118, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
+| `compact` | `/mcp/compact` | 37 | 155 | 50,770 | 53,500 (95 %) | disp ×118, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
 | `ops` | `/mcp/ops` | 53 | 53 | 71,074 | 74,500 (95 %) | - ×99, pfx ×27, rule ×23, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
-| `catalog` | `/mcp/catalog` | 34 | 34 | 25,511 | 27,000 (94 %) | - ×118, rule ×31, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
+| `catalog` | `/mcp/catalog` | 34 | 34 | 25,551 | 27,000 (95 %) | - ×118, rule ×31, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
 | `finance` | `/mcp/finance` | 58 | 58 | 99,943 | 103,000 (97 %) | - ×94, pfx ×51, -off ×6, -cmp ×4, rule ×4, base ×3, -pwd ×2 |
 | `marketing` | `/mcp/marketing` | 17 | 17 | 22,856 | 24,000 (95 %) | - ×135, pfx ×13, -off ×6, -cmp ×4, base ×3, -pwd ×2, rule ×1 |
 | `analytics` | `/mcp/analytics` | 33 | 33 | 62,445 | 66,000 (95 %) | - ×119, pfx ×30, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
@@ -402,10 +402,10 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 
 | Tool | stdio | /mcp | /full | /readonly | /compact | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `tools_call_destructive` | `all` | `list` | `-cmp` | `-cmp` | `list` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | — |
-| `tools_call_read` | `all` | `list` | `-cmp` | `-cmp` | `list` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | — |
-| `tools_call_write` | `all` | `list` | `-cmp` | `-cmp` | `list` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | — |
-| `tools_search` | `all` | `list` | `-cmp` | `-cmp` | `list` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | — |
+| `tools_call_destructive` | `-cmp` | `list` | `-cmp` | `-cmp` | `list` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | — |
+| `tools_call_read` | `-cmp` | `list` | `-cmp` | `-cmp` | `list` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | — |
+| `tools_call_write` | `-cmp` | `list` | `-cmp` | `-cmp` | `list` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | — |
+| `tools_search` | `-cmp` | `list` | `-cmp` | `-cmp` | `list` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | `-cmp` | — |
 
 ### Users
 

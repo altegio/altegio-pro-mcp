@@ -292,8 +292,11 @@ describe('the read-only view', () => {
     // Only if the user wants it — never as a way around a refusal.
     expect(instructions).toMatch(/only if the user wants/i);
     expect(instructions).toMatch(/not propose\s+switching as a way around/);
-    // The product description is still there.
+    // The product description is still there, without the sentences about
+    // changing data: nothing here does.
     expect(instructions).toContain('Altegio Pro');
+    expect(instructions).not.toContain('confirmation_required');
+    expect(instructions).not.toContain('appointments_create');
     await client.close();
   });
 
@@ -471,10 +474,9 @@ describe('server instructions', () => {
 
     expect(instructions).toContain('Altegio Pro');
     expect(instructions).toContain('auth_login');
-    // Views are named relative to the server's own address, so the text is
-    // right on the short customer address and on the internal /mcp lane.
-    expect(instructions).toContain('same address plus');
-    expect(instructions).toContain('/analytics, /onboarding');
+    // The compact listing reaches every tool itself, so it names no narrower
+    // address; `/mcp` serving the flat list does (the MCP_DEFAULT_VIEW tests).
+    expect(instructions).not.toContain('same address plus');
     expect(instructions).not.toContain('/mcp/');
     // The report builder is withheld until the backend works, so the
     // instructions must not point at it (src/tools/disabled-tools.ts).
@@ -745,8 +747,19 @@ describe('the MCP_DEFAULT_VIEW switch', () => {
     setListing('full');
     const onDefault = await namesOn();
     expect(onDefault.names).toEqual(full.names);
-    expect(onDefault.instructions).toBe(full.instructions);
     expect(onDefault.names).not.toContain('tools_search');
+    // The same text, and on /mcp the narrower addresses too: they hang off
+    // /mcp, and are named relative to it, so the text is right on the short
+    // customer address and on the internal /mcp lane.
+    expect(onDefault.instructions).toContain(
+      'Hosts that cap tools: the same address plus /ops'
+    );
+    expect(onDefault.instructions).toContain('/analytics, /onboarding');
+    expect(onDefault.instructions).not.toContain('/mcp/');
+    expect(full.instructions).not.toContain('same address plus');
+    expect(
+      onDefault.instructions.replace(/Hosts that cap tools: [^.]*\. /, '')
+    ).toBe(full.instructions);
   });
 
   it('refuses on /mcp, with the address, what the full list does not serve', async () => {

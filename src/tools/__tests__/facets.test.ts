@@ -491,9 +491,13 @@ describe('static views', () => {
       }
     });
 
-    it('serves everything on the unfiltered view stdio uses', () => {
+    it('serves everything but the dispatcher on the unfiltered view stdio uses', () => {
       const index = buildFacetIndex(tools);
-      expect(index.members(ALL_TOOLS_FACET)).toEqual(names);
+      // It lists every tool, so the dispatcher would have nothing to run.
+      expect(index.members(ALL_TOOLS_FACET)).toEqual(
+        names.filter((name) => !DISPATCH_TOOLS.includes(name))
+      );
+      expect(index.reachable(ALL_TOOLS_FACET)).toEqual([]);
       // Which is strictly more than the default HTTP view holds back to.
       expect(index.members(FULL_VIEW)).not.toEqual(names);
       expect(

@@ -474,8 +474,8 @@ export function registerTools(
   const { facetIndex, servingView } = listing;
   const visible = new Set(facetIndex.members(facet));
   // What this view's dispatcher runs (`./dispatch.ts`): on the compact
-  // listing, the tools it lists and the ones it does not; nothing on a view
-  // without it.
+  // listing, the tools it does not list; nothing on a view without it. A
+  // listed tool is called directly.
   const reachable = new Set(facetIndex.reachable(facet));
   const tiers = new Map<string, Dispatcher>(
     orderedToolEntries().map((entry) => [
@@ -484,6 +484,7 @@ export function registerTools(
     ])
   );
   const dispatchTargets: DispatchTargets = {
+    lists: (name) => visible.has(name),
     reaches: (name) => reachable.has(name),
     dispatcherOf: (name) => tiers.get(name),
     addressesServing: (name) => servingView.addressesServing(name),

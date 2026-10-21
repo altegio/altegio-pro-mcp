@@ -113,9 +113,9 @@ function servedEntries(): SearchableTool[] {
 
 export interface ToolMatch {
   readonly name: string;
-  /** The dispatcher that runs it on this address. */
-  readonly call_with: Dispatcher;
-  /** In this address's `tools/list` too, so it can also be called directly. */
+  /** The dispatcher that runs it on this address; absent for a listed tool. */
+  readonly call_with?: Dispatcher;
+  /** In this address's `tools/list`, so it is called directly. */
   readonly listed: boolean;
   /** Stops for a person's approval before it changes anything. */
   readonly asks_confirmation: boolean;
@@ -182,7 +182,7 @@ export function searchTools(
     const shown = listedOnView(entry.spec, view, toolNames);
     return {
       name: entry.spec.name,
-      call_with: dispatcherFor(entry.spec),
+      ...(listed ? {} : { call_with: dispatcherFor(entry.spec) }),
       listed,
       asks_confirmation: entry.requiresConfirmation === true,
       description: shown.description ?? '',
@@ -199,7 +199,7 @@ export function searchText(result: ToolSearchResult): string {
   }
   const lines = result.matches.map((match) => {
     const how = match.listed
-      ? `in your tool list; also runs with ${match.call_with}`
+      ? 'in your tool list: call it directly'
       : `run with ${match.call_with}`;
     const gate = match.asks_confirmation ? '; asks for confirmation' : '';
     const schema =
@@ -213,7 +213,7 @@ export function searchText(result: ToolSearchResult): string {
       ? `\n${result.total_matches - result.matches.length} more matched; raise limit or narrow the query.`
       : '';
   return [
-    `Tools for "${result.query}", best first. Run one as {"tool": "<name>", "arguments": {…}} with the dispatcher named.`,
+    `Tools for "${result.query}", best first. Call a listed one directly; run any other as {"tool": "<name>", "arguments": {…}} with the dispatcher named.`,
     ...lines,
   ]
     .join('\n')
@@ -252,18 +252,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** Why a tool belongs to another tier, as the refusal says it. */
 const TIER_REASON: Readonly<Record<Dispatcher, string>> = {
   [DISPATCH_READ_TOOL]: 'only reads',
-  [DISPATCH_WRITE_TOOL]: 'changes data without deleting or overwriting any',
-  [DISPATCH_DESTRUCTIVE_TOOL]: 'deletes or overwrites data',
+  [DISPATCH_WRITE_TOOL]: 'creates or changes data and deletes nothing',
+  [DISPATCH_DESTRUCTIVE_TOOL]:
+    'deletes data or makes a change that is hard to undo',
 };
 
 /** What each dispatcher runs, as the refusal says it. */
 const TIER_RUNS: Readonly<Record<Dispatcher, string>> = {
   [DISPATCH_READ_TOOL]: 'reads only',
-  [DISPATCH_WRITE_TOOL]: 'changes that delete or overwrite nothing',
-  [DISPATCH_DESTRUCTIVE_TOOL]: 'deletions and other destructive changes',
+  [DISPATCH_WRITE_TOOL]: 'changes that delete nothing',
+  [DISPATCH_DESTRUCTIVE_TOOL]: 'deletions and changes that are hard to undo',
 };
 
 export interface DispatchTargets {
+  /** Whether this view lists the tool, so it is called directly. */
+  lists(name: string): boolean;
   /** Whether this view's dispatcher runs the tool. */
   reaches(name: string): boolean;
   /** The dispatcher that runs the tool (`dispatcherFor`); undefined when unknown. */
@@ -277,8 +280,9 @@ export interface DispatchTargets {
  * call runs, with which arguments — or the refusal the caller reads instead.
  * Each dispatcher runs its own tier only and names the one that runs the tool,
  * so a host that approves `tools_call_read`, or `tools_call_write`, without
- * asking never runs a change, or a deletion, through it. A
- * `confirmation_token` sent beside `arguments` is moved into them.
+ * asking never runs a change, or a deletion, through it. A tool the view
+ * lists is refused, to be called directly, so a host's setting for that tool
+ * holds. A `confirmation_token` sent beside `arguments` is moved into them.
  */
 export function resolveDispatch(
   dispatcher: Dispatcher,
@@ -322,6 +326,12 @@ export function resolveDispatch(
   if (DISPATCH_TOOLS.includes(name)) {
     return refuse(
       `${dispatcher} runs a tool, not another dispatcher: call ${name} directly.`,
+      'validation'
+    );
+  }
+  if (targets.lists(name)) {
+    return refuse(
+      `Nothing was run: ${name} is in your tool list, so call it directly with these arguments.`,
       'validation'
     );
   }

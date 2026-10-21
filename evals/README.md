@@ -17,7 +17,9 @@ once per view, and scores what the host called.
    dispatcher of the tool's risk tier (`tools_call_read`, `tools_call_write`,
    `tools_call_destructive`), with arguments that tool's own validation
    accepts. A dispatcher call naming a tool of another tier does not count,
-   and the summary counts it under "Wrong tier".
+   and the summary counts it under "Wrong tier"; nor does one naming a tool
+   the view lists, which the dispatcher refuses so that it is called
+   directly.
 4. Writes one JSON per run and `summary.md` to `evals/out/<timestamp>-<host>/`
    (not committed).
 

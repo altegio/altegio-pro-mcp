@@ -26,11 +26,11 @@ interactive calls) plus a dispatcher that reaches every other tool a generic
 agent may hold. `tools_search` finds a tool by the task in the user's words and
 returns its schema and the dispatcher that runs it, one per risk tier:
 
-| Dispatcher               | Runs                                     | Annotations              |
-| ------------------------ | ---------------------------------------- | ------------------------ |
-| `tools_call_read`        | reads                                    | `readOnlyHint: true`     |
-| `tools_call_write`       | changes that delete or overwrite nothing | `destructiveHint: false` |
-| `tools_call_destructive` | deletions and other destructive changes  | `destructiveHint: true`  |
+| Dispatcher               | Runs                                        | Annotations              |
+| ------------------------ | ------------------------------------------- | ------------------------ |
+| `tools_call_read`        | reads                                       | `readOnlyHint: true`     |
+| `tools_call_write`       | changes that delete nothing                 | `destructiveHint: false` |
+| `tools_call_destructive` | deletions and changes that are hard to undo | `destructiveHint: true`  |
 
 Each refuses a tool of another tier and names the right one, so a host can
 approve reads, or reads and ordinary writes, without asking and still stop
@@ -47,7 +47,9 @@ scripts that want the whole list up front.
 boundary, enforced by the server on every call. A host's per-tool allow and
 deny toggles apply to the tools it lists, so on `/pro` they see the three
 dispatchers, not the tools dispatched through them: approve or block a
-dispatcher to approve or block its tier. To keep an agent from changing data
+dispatcher to approve or block its tier. A tool `/pro` lists runs only when
+called directly — its dispatcher refuses it — so a toggle for that tool holds.
+To keep an agent from changing data
 at all, connect it to `/pro/readonly` or grant it a read-only token.
 
 Named views are available at `https://mcp.alteg.io/pro/<facet>`:
