@@ -142,8 +142,9 @@ describe('company-scope enforcement (analytics early gate)', () => {
 
   it('is unaffected when no scope is declared', async () => {
     const { client } = fakeClient([]);
-    // No set ⇒ no guard; 720441 is not in the fake location list, so it falls
-    // back to UTC rather than throwing (which is what an out-of-scope id does).
+    // No set ⇒ no guard; 720441 is neither in the fake location list nor
+    // readable on its own, so it falls back to UTC rather than throwing (which
+    // is what an out-of-scope id does).
     const tz = await resolveLocationTimezone(client, 720441);
     expect(tz).toBe('UTC');
   });

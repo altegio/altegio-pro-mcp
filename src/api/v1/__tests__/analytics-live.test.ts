@@ -370,75 +370,88 @@ describeLive('analytics endpoints against the demo location', () => {
     ]);
   }, 60_000);
 
-  it('runs a ready assistant-owned report without mutating the builder', async () => {
-    const api = new V1AnalyticsAdapter(httpFromClient(client), { timezone });
-    const saved = await api.listSavedReports({
-      location_id: DEMO_LOCATION_ID,
-    });
-    const owned = saved.filter((report) =>
-      report.name.startsWith('[Altegio Assistant]')
-    );
-    const detailed = await Promise.all(
-      owned.map((report) =>
-        api.getSavedReport({
-          location_id: DEMO_LOCATION_ID,
-          report_id: report.report_id,
-        })
-      )
-    );
-    const ready = detailed.find((report) => report.status === 'success');
-    expect(ready).toBeDefined();
-    const full = await api.getSavedReport({
-      location_id: DEMO_LOCATION_ID,
-      report_id: ready!.report_id,
-    });
-    const storedPeriod = (full.filters ?? [])
-      .map((filter) => filter.value)
-      .find((value) =>
-        typeof value === 'string'
-          ? /^\d{4}-\d{2}-\d{2},\d{4}-\d{2}-\d{2}$/.test(value)
-          : false
+  // Known defect, upstream: the report builder's data endpoint returns no data
+  // for a report whose prepared data reports success, which is why its tools
+  // are disabled (`src/tools/disabled-tools.ts`). When this test fails, the
+  // defect is fixed: make it a plain `it` and re-enable the tools.
+  it.failing(
+    'runs a ready assistant-owned report without mutating the builder',
+    async () => {
+      const api = new V1AnalyticsAdapter(httpFromClient(client), { timezone });
+      const saved = await api.listSavedReports({
+        location_id: DEMO_LOCATION_ID,
+      });
+      const owned = saved.filter((report) =>
+        report.name.startsWith('[Altegio Assistant]')
       );
-    expect(storedPeriod).toBeDefined();
-    const [dateFrom, dateTo] = storedPeriod!.split(',');
-    const result = await runSavedReport(client, {
-      location_id: DEMO_LOCATION_ID,
-      report_id: full.report_id,
-      date_from: dateFrom!,
-      date_to: dateTo!,
-    });
-    const table = result.structuredContent as {
-      row_count: number;
-      columns: unknown[];
-    };
-    expect(table.row_count).toBeGreaterThan(0);
-    expect(table.columns).not.toHaveLength(0);
-  }, 120_000);
+      const detailed = await Promise.all(
+        owned.map((report) =>
+          api.getSavedReport({
+            location_id: DEMO_LOCATION_ID,
+            report_id: report.report_id,
+          })
+        )
+      );
+      const ready = detailed.find((report) => report.status === 'success');
+      expect(ready).toBeDefined();
+      const full = await api.getSavedReport({
+        location_id: DEMO_LOCATION_ID,
+        report_id: ready!.report_id,
+      });
+      const storedPeriod = (full.filters ?? [])
+        .map((filter) => filter.value)
+        .find((value) =>
+          typeof value === 'string'
+            ? /^\d{4}-\d{2}-\d{2},\d{4}-\d{2}-\d{2}$/.test(value)
+            : false
+        );
+      expect(storedPeriod).toBeDefined();
+      const [dateFrom, dateTo] = storedPeriod!.split(',');
+      const result = await runSavedReport(client, {
+        location_id: DEMO_LOCATION_ID,
+        report_id: full.report_id,
+        date_from: dateFrom!,
+        date_to: dateTo!,
+      });
+      const table = result.structuredContent as {
+        row_count: number;
+        columns: unknown[];
+      };
+      expect(table.row_count).toBeGreaterThan(0);
+      expect(table.columns).not.toHaveLength(0);
+    },
+    120_000
+  );
 
-  it('runs a template through the complete use case', async () => {
-    const api = new V1AnalyticsAdapter(httpFromClient(client), { timezone });
-    const templates = await api.listReportTemplates({
-      location_id: DEMO_LOCATION_ID,
-    });
-    const template = templates.find(
-      (candidate) => candidate.name === 'Revenue by team member'
-    );
-    expect(template).toBeDefined();
+  // Known defect, upstream: the same report builder data endpoint as above.
+  it.failing(
+    'runs a template through the complete use case',
+    async () => {
+      const api = new V1AnalyticsAdapter(httpFromClient(client), { timezone });
+      const templates = await api.listReportTemplates({
+        location_id: DEMO_LOCATION_ID,
+      });
+      const template = templates.find(
+        (candidate) => candidate.name === 'Revenue by team member'
+      );
+      expect(template).toBeDefined();
 
-    const result = await runReport(client, {
-      location_id: DEMO_LOCATION_ID,
-      template_id: template!.template_id,
-      ...PERIOD,
-    });
-    const table = result.structuredContent as {
-      row_count: number;
-      columns: unknown[];
-      reused_existing_report: boolean;
-    };
-    expect(table.row_count).toBeGreaterThan(0);
-    expect(table.columns).not.toHaveLength(0);
-    expect(table.reused_existing_report).toBe(true);
-  }, 120_000);
+      const result = await runReport(client, {
+        location_id: DEMO_LOCATION_ID,
+        template_id: template!.template_id,
+        ...PERIOD,
+      });
+      const table = result.structuredContent as {
+        row_count: number;
+        columns: unknown[];
+        reused_existing_report: boolean;
+      };
+      expect(table.row_count).toBeGreaterThan(0);
+      expect(table.columns).not.toHaveLength(0);
+      expect(table.reused_existing_report).toBe(true);
+    },
+    120_000
+  );
 });
 
 describe('sanitize', () => {
