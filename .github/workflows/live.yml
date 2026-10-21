@@ -53,6 +53,9 @@ jobs:
       ALTEGIO_E2E_INVENTORY_ID: ${{ secrets.ALTEGIO_E2E_INVENTORY_ID }}
       ALTEGIO_E2E_CONSUMABLES_INVENTORY_ID: ${{ secrets.ALTEGIO_E2E_CONSUMABLES_INVENTORY_ID }}
       ALTEGIO_E2E_ACCOUNT_ID: ${{ secrets.ALTEGIO_E2E_ACCOUNT_ID }}
+      # Optional: without them the runs that need them are skipped.
+      ALTEGIO_E2E_EVENT_SERVICE_ID: ${{ secrets.ALTEGIO_E2E_EVENT_SERVICE_ID }}
+      ALTEGIO_E2E_MEMBERSHIP_PRODUCT_ID: ${{ secrets.ALTEGIO_E2E_MEMBERSHIP_PRODUCT_ID }}
     steps:
       - uses: actions/checkout@v5
         with:
