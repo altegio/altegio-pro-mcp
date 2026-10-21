@@ -57,6 +57,8 @@ describe('destructive tools are gated', () => {
       'memberships_set_balance',
       'memberships_set_validity',
       'onboarding_rollback_phase',
+      'product_categories_delete',
+      'products_archive',
       'schedules_delete',
       'service_categories_delete',
       'services_delete',
@@ -133,14 +135,21 @@ describe('destructive tools are gated', () => {
    * Recording money or stock is additive — nothing is overwritten, so
    * `destructiveHint` stays false — but a payment, a client account deposit, a
    * cash operation, a payroll payout, an inventory operation or a product sold on a visit moves
-   * money or stock a person has to stand behind, so these ask first too. The list is explicit so the gate
-   * does not spread to ordinary creates.
+   * money or stock a person has to stand behind, so these ask first too. So
+   * do product cards and categories: sales, receipts and consumables all read
+   * the one product list, and an agent creating them in bulk from an invoice
+   * should not do so unseen. The list is explicit so the gate does not spread
+   * to ordinary creates.
    */
   const CONFIRMED_ADDITIVE = [
     'client_accounts_deposit',
     'financial_transactions_create',
     'inventory_create_operation',
     'payroll_record_payout',
+    'product_categories_create',
+    'product_categories_update',
+    'products_create',
+    'products_update',
     'visits_add_payment',
     'visits_add_product',
   ];

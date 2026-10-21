@@ -54,7 +54,9 @@ export const LISTING_BUDGETS: Readonly<Record<HttpViewKey, number>> = {
   compact: 53_500,
   ops: 74_500, // 71,074 bytes, 53 tools
   catalog: 27_000, // 25,511 bytes, 34 tools
-  finance: 103_000, // 99,943 bytes, 58 tools
+  // 99,943 bytes, 58 tools; 111,171 and 67 with the product catalog (product
+  // cards, categories, units, invoice matching) on 2026-10-21.
+  finance: 114_000,
   marketing: 24_000, // 22,856 bytes, 17 tools
   analytics: 66_000, // 62,445 bytes, 33 tools
   onboarding: 13_500, // 12,387 bytes, 15 tools

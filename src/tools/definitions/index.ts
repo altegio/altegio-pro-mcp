@@ -31,3 +31,4 @@ export * from './attendance.tools.js';
 export * from './availability.tools.js';
 export * from './feedback.tools.js';
 export * from './dispatch.tools.js';
+export * from './product-catalog.tools.js';

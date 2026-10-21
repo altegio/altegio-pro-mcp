@@ -11,7 +11,7 @@ describe('factory tool definitions', () => {
   // the nine inventory tools, visits_add_product and visits_remove_product,
   // and the four tools of the curated-tool dispatcher.
   it('exposes all factory-defined tools', () => {
-    expect(tools.length).toBe(152);
+    expect(tools.length).toBe(161);
   });
 
   it('every tool produces a valid MCP spec', () => {

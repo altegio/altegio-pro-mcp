@@ -314,3 +314,93 @@ export interface ProductsApi {
   ): Promise<ProductWithStock>;
   listUnits(locationId: number): Promise<ProductUnit[]>;
 }
+
+// ========== the product catalog: product cards and categories ==========
+
+/** A product category; every product is filed under one. */
+export interface ProductCategory {
+  id: number;
+  title: string | null;
+  /** The category it is nested in; null at the top level. */
+  parent_id: number | null;
+  /** The category belongs to the chain's shared product catalog. */
+  chain_category: boolean;
+}
+
+export interface ProductCategoryWrite {
+  title: string;
+  /** Null: a top-level category. */
+  parent_id: number | null;
+}
+
+/** A product card with every field the product form holds. */
+export interface ProductCard extends Product {
+  article: string | null;
+  barcode: string | null;
+  comment: string | null;
+  /** Stock, in the sale unit, under which the product counts as running out. */
+  critical_quantity: number | null;
+  /** Stock, in the sale unit, the location wants to hold. */
+  desired_quantity: number | null;
+}
+
+/** A product card to store; a create sends it whole, an update merged. */
+export interface ProductCardWrite {
+  title: string;
+  category_id: number;
+  sale_unit_id: number;
+  consumable_unit_id: number;
+  consumable_units_per_sale_unit: number;
+  sale_price?: Money;
+  cost_price?: Money;
+  article?: string;
+  barcode?: string;
+  /** The name printed on the receipt; Altegio never reads it back. */
+  print_title?: string;
+  comment?: string;
+  critical_quantity?: number;
+  desired_quantity?: number;
+}
+
+export interface ProductCatalogApi {
+  listCategories(locationId: number): Promise<ProductCategory[]>;
+  createCategory(
+    locationId: number,
+    category: ProductCategoryWrite,
+    options?: WriteOptions
+  ): Promise<ProductCategory>;
+  updateCategory(
+    locationId: number,
+    categoryId: number,
+    category: ProductCategoryWrite,
+    options?: WriteOptions
+  ): Promise<ProductCategory>;
+  deleteCategory(
+    locationId: number,
+    categoryId: number,
+    options?: WriteOptions
+  ): Promise<void>;
+  /** The whole card; an archived product still reads here. */
+  getProductCard(locationId: number, productId: number): Promise<ProductCard>;
+  createProduct(
+    locationId: number,
+    product: ProductCardWrite,
+    options?: WriteOptions
+  ): Promise<ProductCard>;
+  /**
+   * Store the whole card. `unit_change` sends the unit conversion rules that a
+   * unit change needs once the product's stock has moved.
+   */
+  updateProduct(
+    locationId: number,
+    productId: number,
+    product: ProductCardWrite,
+    options?: WriteOptions & { unit_change?: boolean }
+  ): Promise<ProductCard>;
+  /** `already_archived` when the product was archived before. */
+  archiveProduct(
+    locationId: number,
+    productId: number,
+    options?: WriteOptions
+  ): Promise<'archived' | 'already_archived'>;
+}

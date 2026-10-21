@@ -2413,6 +2413,219 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       spec: 'v2',
     },
   ],
+  // --- Inventory: the product catalog. V2 reads categories, units and the
+  // live products; V2 writes neither, so product cards and categories are
+  // written and read whole on V1. ---
+  product_categories_list: [
+    {
+      path: '/locations/{location_id}/product_categories',
+      method: 'get',
+      operationId: 'list_product_categories',
+      pathParams: ['location_id'],
+      spec: 'v2',
+    },
+  ],
+  product_categories_create: [
+    {
+      path: '/locations/{location_id}/product_categories',
+      method: 'get',
+      operationId: 'list_product_categories',
+      pathParams: ['location_id'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/product_categories',
+      method: 'post',
+      operationId: 'create_product_category',
+      pathParams: ['location_id'],
+      bodyParams: ['title', 'parent_category_id'],
+    },
+  ],
+  product_categories_update: [
+    {
+      path: '/locations/{location_id}/product_categories',
+      method: 'get',
+      operationId: 'list_product_categories',
+      pathParams: ['location_id'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/product_categories/{category_id}',
+      method: 'put',
+      operationId: 'update_product_category',
+      pathParams: ['location_id', 'category_id'],
+      bodyParams: ['title', 'parent_category_id'],
+    },
+  ],
+  product_categories_delete: [
+    {
+      path: '/locations/{location_id}/product_categories',
+      method: 'get',
+      operationId: 'list_product_categories',
+      pathParams: ['location_id'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/product_categories/{category_id}',
+      method: 'delete',
+      operationId: 'delete_product_category',
+      pathParams: ['location_id', 'category_id'],
+    },
+  ],
+  products_list_units: [
+    {
+      path: '/locations/{location_id}/units',
+      method: 'get',
+      operationId: 'list_product_units',
+      pathParams: ['location_id'],
+      spec: 'v2',
+    },
+  ],
+  // Each line is searched by barcode, article number and title, and every
+  // candidate read whole for the article number and barcode.
+  products_find_matches: [
+    {
+      path: '/locations/{location_id}/products/autocomplete',
+      method: 'get',
+      operationId: 'autocomplete_products',
+      pathParams: ['location_id'],
+      queryParams: ['filter[term]', 'page', 'limit'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/products/{product_id}',
+      method: 'get',
+      operationId: 'get_product',
+      pathParams: ['location_id', 'product_id'],
+    },
+  ],
+  products_create: [
+    {
+      path: '/locations/{location_id}/units',
+      method: 'get',
+      operationId: 'list_product_units',
+      pathParams: ['location_id'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/product_categories',
+      method: 'get',
+      operationId: 'list_product_categories',
+      pathParams: ['location_id'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/products/autocomplete',
+      method: 'get',
+      operationId: 'autocomplete_products',
+      pathParams: ['location_id'],
+      queryParams: ['filter[term]', 'page', 'limit'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/products/{product_id}',
+      method: 'get',
+      operationId: 'get_product',
+      pathParams: ['location_id', 'product_id'],
+    },
+    {
+      path: '/locations/{location_id}/products',
+      method: 'post',
+      operationId: 'create_product',
+      pathParams: ['location_id'],
+      bodyParams: [
+        'title',
+        'category_id',
+        'sale_unit_id',
+        'service_unit_id',
+        'unit_equals',
+        'cost',
+        'actual_cost',
+        'article',
+        'barcode',
+        'print_title',
+        'comment',
+        'critical_amount',
+        'desired_amount',
+      ],
+    },
+  ],
+  // The card is read whole and sent back merged: V1 needs the category and
+  // both units on every update.
+  products_update: [
+    {
+      path: '/locations/{location_id}/products/{product_id}',
+      method: 'get',
+      operationId: 'get_product',
+      pathParams: ['location_id', 'product_id'],
+      queryParams: ['include'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/products/{product_id}',
+      method: 'get',
+      operationId: 'get_product',
+      pathParams: ['location_id', 'product_id'],
+    },
+    {
+      path: '/locations/{location_id}/units',
+      method: 'get',
+      operationId: 'list_product_units',
+      pathParams: ['location_id'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/product_categories',
+      method: 'get',
+      operationId: 'list_product_categories',
+      pathParams: ['location_id'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/products/{product_id}',
+      method: 'put',
+      operationId: 'update_product',
+      pathParams: ['location_id', 'product_id'],
+      bodyParams: [
+        'title',
+        'category_id',
+        'sale_unit_id',
+        'service_unit_id',
+        'unit_equals',
+        'cost',
+        'actual_cost',
+        'article',
+        'barcode',
+        'print_title',
+        'comment',
+        'critical_amount',
+        'desired_amount',
+        'correction_rules',
+      ],
+    },
+  ],
+  products_archive: [
+    {
+      path: '/locations/{location_id}/products/{product_id}',
+      method: 'get',
+      operationId: 'get_product',
+      pathParams: ['location_id', 'product_id'],
+      queryParams: ['include'],
+      spec: 'v2',
+    },
+    {
+      path: '/locations/{location_id}/products/{product_id}',
+      method: 'get',
+      operationId: 'get_product',
+      pathParams: ['location_id', 'product_id'],
+    },
+    {
+      path: '/locations/{location_id}/products/{product_id}',
+      method: 'delete',
+      operationId: 'delete_product',
+      pathParams: ['location_id', 'product_id'],
+    },
+  ],
   // The document and its lines are read for the confirmation and the result.
   inventory_delete_document: [
     {

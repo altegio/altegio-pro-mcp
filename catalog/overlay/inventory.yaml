@@ -35,6 +35,58 @@ operations:
     tool_name: products_search
     notes: Unit names for products_search and the two write tools.
 
+  # --- the product catalog: product cards and categories ---------------------
+  # V2 has no product or category write, so these run on V1
+  # (src/api/v1/product-catalog-adapter.ts); the curated tools ask first.
+  create_product:
+    domain: products
+    tier: core
+    facets: [finance]
+    tool_name: products_create
+    write_allowed: false
+    notes: >
+      Float fields (cost, actual_cost, unit_equals, critical_amount,
+      desired_amount) are refused as integers with 422 (live 2026-10-21).
+  update_product:
+    domain: products
+    tier: core
+    facets: [finance]
+    tool_name: products_update
+    write_allowed: false
+    notes: >
+      Needs title, category_id, sale_unit_id and service_unit_id on every call;
+      fields left out keep their value. correction_rules is sent on a unit
+      change.
+  delete_product:
+    domain: products
+    tier: core
+    facets: [finance]
+    tool_name: products_archive
+    write_allowed: false
+    notes: >
+      Archives the product (204); a second DELETE answers 404. The V1 read
+      still answers for an archived product, the V2 read does not.
+  create_product_category:
+    domain: products
+    tier: core
+    facets: [finance]
+    tool_name: product_categories_create
+    write_allowed: false
+  update_product_category:
+    domain: products
+    tier: core
+    facets: [finance]
+    tool_name: product_categories_update
+    write_allowed: false
+    notes: Needs title on every call; a parent left out is kept.
+  delete_product_category:
+    domain: products
+    tier: core
+    facets: [finance]
+    tool_name: product_categories_delete
+    write_allowed: false
+    notes: Refused with 400 while the category holds products or categories.
+
   # --- inventory operations and documents -------------------------------------
   search_for_product_transactions:
     domain: inventory

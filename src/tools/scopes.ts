@@ -69,6 +69,7 @@ const V3_CATALOG_SCOPES = [
   'appointments:write',
   'loyalty:read',
   'products:read',
+  'products:write',
   'inventory:read',
   'inventory:operate',
   'inventory:sell',
@@ -367,6 +368,18 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   // pack because a product receipt names its Supplier, but reading them needs
   // the Finances rights, so the scope is `finance:read`.
   suppliers_and_partners_list: 'finance:read',
+  // The product catalog: the V3 preview declares `products:read` and
+  // `products:write` on its product operations. Matching incoming lines
+  // returns cost prices, like products_search, so it needs `inventory:read`.
+  product_categories_list: 'products:read',
+  product_categories_create: 'products:write',
+  product_categories_update: 'products:write',
+  product_categories_delete: 'products:write',
+  products_list_units: 'products:read',
+  products_find_matches: 'inventory:read',
+  products_create: 'products:write',
+  products_update: 'products:write',
+  products_archive: 'products:write',
   appointments_get_consumables: ['appointments:read', 'inventory:read'],
   appointments_set_consumables: ['appointments:write', 'inventory:operate'],
 

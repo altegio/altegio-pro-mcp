@@ -8,6 +8,7 @@
  * path. The readers are those the finance and visit adapters share: V1 sends
  * numbers as numbers or numeric strings, and 0 for "no id".
  */
+import { randomUUID } from 'node:crypto';
 import { queryString, type AltegioHttp } from '../altegio-http.js';
 import type { AltegioApiError } from '../../utils/errors.js';
 
@@ -70,10 +71,41 @@ export type FailureMapper<H> = (
   hints?: H
 ) => AltegioApiError;
 
+/**
+ * JSON with the named top-level fields written as floats: `10` becomes
+ * `10.0`. Some V1 writes check the JSON token type, not the value, and refuse
+ * an integer in a float field with 422 "The value type must be float"
+ * (product create and update, verified live 2026-10-21).
+ */
+export function jsonWithFloats(
+  body: Row,
+  floatFields: readonly string[]
+): string {
+  const marks = new Map<string, string>();
+  const marked: Row = { ...body };
+  // A fresh nonce, so no string value of the body can spell a mark.
+  const nonce = randomUUID();
+  for (const field of floatFields) {
+    const value = marked[field];
+    if (typeof value !== 'number' || !Number.isFinite(value)) continue;
+    const mark = `float:${nonce}:${marks.size}`;
+    marks.set(
+      JSON.stringify(mark),
+      Number.isInteger(value) ? `${value}.0` : String(value)
+    );
+    marked[field] = mark;
+  }
+  let json = JSON.stringify(marked);
+  for (const [mark, float] of marks) json = json.replace(mark, float);
+  return json;
+}
+
 export interface V1CallOptions<H> {
   method?: Method;
   query?: Record<string, QueryValue>;
   body?: unknown;
+  /** Top-level body fields sent as floats (`jsonWithFloats`). */
+  floatFields?: readonly string[];
   hints?: H;
   /** Statuses answered with `null` instead of an error. */
   tolerate?: readonly number[];
@@ -102,7 +134,9 @@ export async function v1Call<H>(
   let body: string | undefined;
   if (options.body !== undefined) {
     headers['Content-Type'] = 'application/json';
-    body = JSON.stringify(options.body);
+    body = options.floatFields?.length
+      ? jsonWithFloats(asRow(options.body), options.floatFields)
+      : JSON.stringify(options.body);
   }
   const response = await http.request(
     `${path}${options.query ? queryString(options.query) : ''}`,

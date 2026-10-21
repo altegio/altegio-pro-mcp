@@ -294,8 +294,9 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
    * registers, financial transactions, payroll, inventory, and the analytics
    * pack. Inventory is stock valued at cost price, bought from Suppliers and
    * Partners and sold or used up — the money side of products, next to the
-   * product-sales and reorder-risk analytics. The `inventory_` and `products_`
-   * packs join by prefix, Suppliers and the appointment consumables by name.
+   * product-sales and reorder-risk analytics. The `inventory_`, `products_`
+   * and `product_categories_` packs join by prefix, Suppliers and the
+   * appointment consumables by name.
    * Still partial: fund transfers between accounts and cash registers (no
    * documented operation) and fiscalization are not built.
    */
@@ -315,6 +316,7 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
       'analytics_',
       'inventory_',
       'products_',
+      'product_categories_',
     ],
   },
 
@@ -464,6 +466,25 @@ export const DEFAULT_FACET_DEMOTED_GROUPS: readonly DemotedGroup[] = [
     summary: 'creating or deleting a booking form',
     facet: 'catalog',
     tools: ['booking_forms_create', 'booking_forms_delete'],
+    prefixes: [],
+  },
+  {
+    // New on 2026-10-21 for back-office product management (supplier invoice
+    // intake); not measured yet, so it starts on its facet like the groups
+    // above rather than growing the flat list.
+    summary:
+      'creating, changing and archiving products and product categories, product units and matching invoice lines to products',
+    facet: 'finance',
+    tools: [
+      'products_create',
+      'products_update',
+      'products_archive',
+      'products_find_matches',
+      'products_list_units',
+      'product_categories_create',
+      'product_categories_update',
+      'product_categories_delete',
+    ],
     prefixes: [],
   },
 ];
