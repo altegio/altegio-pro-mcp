@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { ConfigurationError } from '../utils/errors.js';
 import {
+  buildVersion,
   PACKAGE_DESCRIPTION,
   PACKAGE_NAME,
   PACKAGE_VERSION,
@@ -355,7 +356,7 @@ export class ConfigLoader {
       // Build server config
       const serverConfig = ServerConfigSchema.parse({
         name: env.npm_package_name || PACKAGE_NAME,
-        version: env.npm_package_version || PACKAGE_VERSION,
+        version: buildVersion(env.npm_package_version || PACKAGE_VERSION),
         description: env.npm_package_description || PACKAGE_DESCRIPTION,
         instructions: envConfig.MCP_SERVER_INSTRUCTIONS,
       });
