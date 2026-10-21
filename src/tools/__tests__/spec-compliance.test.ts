@@ -520,6 +520,7 @@ describe('Spec Compliance', () => {
         expect(
           tool === 'auth_logout' ||
             tool === 'feedback_submit' ||
+            tool.startsWith('tools_') ||
             tool.startsWith('onboarding_')
         ).toBe(true);
       }

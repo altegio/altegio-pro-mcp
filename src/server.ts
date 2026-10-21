@@ -2,6 +2,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { registerTools } from './tools/registry.js';
 import {
+  COMPACT_VIEW,
   DEFAULT_FACET,
   READONLY_VIEW,
   demotedGroupsInstruction,
@@ -10,7 +11,11 @@ import {
 import { registerResources, resourceModules } from './resources/index.js';
 import { registerPrompts, promptModules } from './prompts/index.js';
 import { AltegioClient } from './providers/altegio-client.js';
-import { loadConfig, readOnlyViewInstructions } from './config/schema.js';
+import {
+  COMPACT_VIEW_INSTRUCTIONS,
+  loadConfig,
+  readOnlyViewInstructions,
+} from './config/schema.js';
 
 export interface MCPServer extends Server {
   name: string;
@@ -35,16 +40,19 @@ export function createServer(options: CreateServerOptions = {}): MCPServer {
   const publicBaseUrl = config.env.MCP_PUBLIC_BASE_URL;
 
   // The read-only view says so up front, before the product description invites
-  // the model to manage anything. The default view names the groups it no
-  // longer lists and where they are served. Both are added around the product
-  // text rather than replacing it, so a deployment's `MCP_SERVER_INSTRUCTIONS`
+  // the model to manage anything; the compact view says up front how to reach
+  // what it does not list. The default view names the groups it no longer
+  // lists and where they are served. All are added around the product text
+  // rather than replacing it, so a deployment's `MCP_SERVER_INSTRUCTIONS`
   // override still gets them.
   const instructions =
     facet === READONLY_VIEW
       ? `${readOnlyViewInstructions(publicBaseUrl)} ${config.server.instructions}`
-      : facet === DEFAULT_FACET
-        ? `${config.server.instructions} ${demotedGroupsInstruction()}`
-        : config.server.instructions;
+      : facet === COMPACT_VIEW
+        ? `${COMPACT_VIEW_INSTRUCTIONS} ${config.server.instructions}`
+        : facet === DEFAULT_FACET
+          ? `${config.server.instructions} ${demotedGroupsInstruction()}`
+          : config.server.instructions;
 
   const server = new Server(
     {

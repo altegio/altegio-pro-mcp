@@ -1399,6 +1399,14 @@ const NO_FREE_TEXT: Record<string, string> = {
   feedback_submit:
     'a report id and a count of masked values; the submitted text is not echoed',
 
+  // --- the curated-tool dispatcher ---
+  tools_search:
+    'tool names, descriptions and input schemas of this build — reviewed in PRs, not business data',
+  tools_call_read:
+    'nothing of its own: the result is the dispatched tool’s, classified under that tool’s name',
+  tools_call_write:
+    'nothing of its own: the result is the dispatched tool’s, classified under that tool’s name',
+
   // --- the catalog half of the executor ---
   api_search_operations:
     'summaries and paths from src/generated/catalog.json — a committed build artifact reviewed in PRs, not business data',

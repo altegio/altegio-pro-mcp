@@ -46,6 +46,7 @@ export const LISTING_BUDGETS: Readonly<Record<HttpViewKey, number>> = {
   // 96 tools, inside the headroom. Target: DEFAULT_VIEW_TARGET_BYTES.
   [DEFAULT_FACET]: 126_000,
   readonly: 123_000, // 116,761 bytes, 84 tools on 2026-10-20
+  compact: 38_500, // 36,194 bytes, 26 tools on 2026-10-21; reaches 155
   ops: 74_500, // 70,833 bytes, 53 tools
   catalog: 27_000, // 25,511 bytes, 34 tools
   finance: 103_000, // 97,877 bytes, 57 tools; 99,702 and 58 with the payout

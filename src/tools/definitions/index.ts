@@ -30,3 +30,4 @@ export * from './client-card.tools.js';
 export * from './attendance.tools.js';
 export * from './availability.tools.js';
 export * from './feedback.tools.js';
+export * from './dispatch.tools.js';

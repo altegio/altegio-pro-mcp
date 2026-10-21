@@ -11,6 +11,7 @@ import {
 import { createServer } from './server.js';
 import { loadConfig } from './config/schema.js';
 import {
+  COMPACT_VIEW,
   DEFAULT_FACET,
   FACET_NAMES,
   READONLY_VIEW,
@@ -67,15 +68,16 @@ function rpcMessages(body: unknown): Array<Record<string, unknown>> {
 /**
  * Every path this app serves MCP on, and the view each one exposes.
  *
- * `/mcp/readonly` is listed here, next to the facets, for one reason: these
- * routes are all registered before the catch-all below, and a path that is not
- * in this list falls into it and answers 404. It is still a different kind of
- * view — a policy, not a context budget — which is why it is not a member of
- * `FACET_NAMES`.
+ * `/mcp/readonly` and `/mcp/compact` are listed here, next to the facets, for
+ * one reason: these routes are all registered before the catch-all below, and
+ * a path that is not in this list falls into it and answers 404. They are
+ * still different kinds of view — a policy, and a listing size with a
+ * dispatcher — which is why neither is a member of `FACET_NAMES`.
  */
 const FACET_ROUTES: ReadonlyArray<{ path: string; facet: FacetKey }> = [
   { path: '/mcp', facet: DEFAULT_FACET },
   { path: `/mcp/${READONLY_VIEW}`, facet: READONLY_VIEW },
+  { path: `/mcp/${COMPACT_VIEW}`, facet: COMPACT_VIEW },
   ...FACET_NAMES.map((facet) => ({ path: `/mcp/${facet}`, facet })),
 ];
 

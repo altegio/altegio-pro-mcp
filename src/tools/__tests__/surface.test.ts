@@ -14,6 +14,7 @@ import { describe, it, expect } from '@jest/globals';
 import {
   buildFacetIndex,
   DEFAULT_FACET,
+  DISPATCH_TOOLS,
   FACET_NAMES,
   PASSWORD_LOGIN_TOOLS,
   READONLY_VIEW,
@@ -131,6 +132,11 @@ describe('the reasons', () => {
       if (entry.disabled) continue;
       const cell = surface.cell(entry.name, READONLY_VIEW)!;
       if (PASSWORD_LOGIN_TOOLS.includes(entry.name)) continue;
+      // The dispatcher belongs to the compact view, read-only or not.
+      if (DISPATCH_TOOLS.includes(entry.name)) {
+        expect(cell.reason).toBe('dispatcher-compact-only');
+        continue;
+      }
       expect(cell.served).toBe(entry.readOnly);
       expect(cell.reason).toBe(
         entry.readOnly ? 'read-only-annotation' : 'not-read-only'
@@ -171,6 +177,13 @@ describe('the gates', () => {
   it('states the refusal a caller reads wherever a tool is withheld', () => {
     for (const cell of surface.cells) {
       if (cell.served) continue;
+      // Not listed, but run through the dispatcher: the usual gates apply.
+      if (cell.reason === 'compact-view-dispatched') {
+        expect(cell.gates.some((gate) => gate.kind === 'not-served')).toBe(
+          false
+        );
+        continue;
+      }
       const gate = cell.gates[0];
       expect(gate).toEqual({
         kind: 'not-served',
@@ -204,7 +217,10 @@ describe('the gates', () => {
       expect(confirms).toBe(entry.requiresConfirmation);
       // `destructive-coverage.test.ts` owns the other direction in full; this
       // keeps the table from claiming a gate a destructive tool does not have.
-      if (entry.destructive) expect(confirms).toBe(true);
+      // The write dispatcher runs the confirmation of the tool it runs.
+      if (entry.destructive && entry.name !== 'tools_call_write') {
+        expect(confirms).toBe(true);
+      }
     }
   });
 

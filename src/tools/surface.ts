@@ -170,7 +170,13 @@ export function buildSurfaceTable(
         view,
         served: decision.served,
         reason: decision.reason,
-        gates: gatesFor(entry, view, decision.served),
+        // A dispatched tool is not listed, yet a call reaches it through the
+        // view's dispatcher, past the same gates as a listed one.
+        gates: gatesFor(
+          entry,
+          view,
+          decision.served || decision.reason === 'compact-view-dispatched'
+        ),
       });
     }
   }

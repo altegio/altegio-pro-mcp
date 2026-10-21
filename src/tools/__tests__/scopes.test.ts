@@ -98,8 +98,14 @@ describe('the map covers every tool', () => {
       )
       .map((tool) => tool.meta.name)
       .sort();
-    // Only the two password-login tools: they obtain the credential itself.
-    expect(ungatedWrites).toEqual(['auth_login', 'auth_logout']);
+    // The two password-login tools obtain the credential itself, and the
+    // write dispatcher is authorised per call by the scopes of the tool it
+    // runs (`../registry.ts`).
+    expect(ungatedWrites).toEqual([
+      'auth_login',
+      'auth_logout',
+      'tools_call_write',
+    ]);
   });
 
   it('reaches the tool definition through the factory, not the definition file', () => {

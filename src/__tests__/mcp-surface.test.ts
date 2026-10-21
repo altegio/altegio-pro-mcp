@@ -21,10 +21,13 @@ import {
 } from '../resources/index.js';
 import { ONBOARDING_WALKTHROUGH_PROMPT } from '../prompts/index.js';
 import {
+  COMPACT_VIEW,
   DEFAULT_FACET_EXTRA_TOOLS,
+  DISPATCH_TOOLS,
   demotedGroupOf,
   demotedGroupsInstruction,
 } from '../tools/facets.js';
+import { listView } from '../tools/listing.js';
 import {
   COVERAGE_URI as ANALYTICS_COVERAGE_URI,
   GLOSSARY_URI as ANALYTICS_GLOSSARY_URI,
@@ -103,6 +106,8 @@ describe('tools/list per facet', () => {
             !DEFAULT_FACET_EXCLUDED_TOOLS.includes(name) &&
             // Low-use groups live on their facet only.
             !demotedGroupOf(name) &&
+            // The dispatcher lives on /mcp/compact.
+            !DISPATCH_TOOLS.includes(name) &&
             (!DEFAULT_FACET_EXCLUDED_PREFIXES.some((prefix) =>
               name.startsWith(prefix)
             ) ||
@@ -219,7 +224,8 @@ describe('the read-only view', () => {
         .filter(
           (name) =>
             !PASSWORD_LOGIN_TOOLS.includes(name) &&
-            !DEFAULT_FACET_EXCLUDED_TOOLS.includes(name)
+            !DEFAULT_FACET_EXCLUDED_TOOLS.includes(name) &&
+            !DISPATCH_TOOLS.includes(name)
         )
     );
     await client.close();
@@ -755,7 +761,14 @@ describe('names on a view', () => {
     for (const view of VIEW_KEYS) {
       const client = await connect(view);
       const { tools } = await client.listTools();
-      const served = new Set(tools.map((tool) => tool.name));
+      // On the compact view a name its dispatcher runs needs no note: the
+      // instructions say how to run it.
+      const served = new Set([
+        ...tools.map((tool) => tool.name),
+        ...(view === COMPACT_VIEW
+          ? listView(COMPACT_VIEW).facetIndex.reachable(COMPACT_VIEW)
+          : []),
+      ]);
       for (const tool of tools) {
         const description = tool.description ?? '';
         const noteAt = description.indexOf(NOTE);
