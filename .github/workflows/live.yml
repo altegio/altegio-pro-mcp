@@ -13,6 +13,9 @@ name: Live
 # The log and the job summary of a public repository are public: tool logs are
 # off, Jest runs silent, and the reporter prints test names and short masked
 # failure lines only. Run a failing suite locally for its details.
+#
+# The secrets are in the environment of the step that runs the suites only, so
+# no install script of a dependency sees them.
 
 on:
   schedule:
@@ -40,22 +43,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: live-e2e
-    env:
-      ALTEGIO_E2E: '1'
-      ALTEGIO_API_TOKEN: ${{ secrets.ALTEGIO_E2E_PARTNER_TOKEN }}
-      ALTEGIO_USER_TOKEN: ${{ secrets.ALTEGIO_E2E_USER_TOKEN }}
-      ALTEGIO_E2E_LOCATION_ID: ${{ secrets.ALTEGIO_E2E_LOCATION_ID }}
-      ALTEGIO_E2E_CLIENT_ID: ${{ secrets.ALTEGIO_E2E_CLIENT_ID }}
-      ALTEGIO_E2E_TEAM_MEMBER_ID: ${{ secrets.ALTEGIO_E2E_TEAM_MEMBER_ID }}
-      ALTEGIO_E2E_OPERATION_TEAM_MEMBER_ID: ${{ secrets.ALTEGIO_E2E_OPERATION_TEAM_MEMBER_ID }}
-      ALTEGIO_E2E_SERVICE_ID: ${{ secrets.ALTEGIO_E2E_SERVICE_ID }}
-      ALTEGIO_E2E_PRODUCT_ID: ${{ secrets.ALTEGIO_E2E_PRODUCT_ID }}
-      ALTEGIO_E2E_INVENTORY_ID: ${{ secrets.ALTEGIO_E2E_INVENTORY_ID }}
-      ALTEGIO_E2E_CONSUMABLES_INVENTORY_ID: ${{ secrets.ALTEGIO_E2E_CONSUMABLES_INVENTORY_ID }}
-      ALTEGIO_E2E_ACCOUNT_ID: ${{ secrets.ALTEGIO_E2E_ACCOUNT_ID }}
-      # Optional: without them the runs that need them are skipped.
-      ALTEGIO_E2E_EVENT_SERVICE_ID: ${{ secrets.ALTEGIO_E2E_EVENT_SERVICE_ID }}
-      ALTEGIO_E2E_MEMBERSHIP_PRODUCT_ID: ${{ secrets.ALTEGIO_E2E_MEMBERSHIP_PRODUCT_ID }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -70,7 +57,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check the secrets are set
+      - name: Run the live suites
+        env:
+          ALTEGIO_E2E: '1'
+          CREDENTIALS_DIR: ${{ runner.temp }}/altegio-live
+          ALTEGIO_API_TOKEN: ${{ secrets.ALTEGIO_E2E_PARTNER_TOKEN }}
+          ALTEGIO_USER_TOKEN: ${{ secrets.ALTEGIO_E2E_USER_TOKEN }}
+          ALTEGIO_E2E_LOCATION_ID: ${{ secrets.ALTEGIO_E2E_LOCATION_ID }}
+          ALTEGIO_E2E_CLIENT_ID: ${{ secrets.ALTEGIO_E2E_CLIENT_ID }}
+          ALTEGIO_E2E_TEAM_MEMBER_ID: ${{ secrets.ALTEGIO_E2E_TEAM_MEMBER_ID }}
+          ALTEGIO_E2E_OPERATION_TEAM_MEMBER_ID: ${{ secrets.ALTEGIO_E2E_OPERATION_TEAM_MEMBER_ID }}
+          ALTEGIO_E2E_SERVICE_ID: ${{ secrets.ALTEGIO_E2E_SERVICE_ID }}
+          ALTEGIO_E2E_PRODUCT_ID: ${{ secrets.ALTEGIO_E2E_PRODUCT_ID }}
+          ALTEGIO_E2E_INVENTORY_ID: ${{ secrets.ALTEGIO_E2E_INVENTORY_ID }}
+          ALTEGIO_E2E_CONSUMABLES_INVENTORY_ID: ${{ secrets.ALTEGIO_E2E_CONSUMABLES_INVENTORY_ID }}
+          ALTEGIO_E2E_ACCOUNT_ID: ${{ secrets.ALTEGIO_E2E_ACCOUNT_ID }}
+          # Optional: without them the runs that need them are skipped.
+          ALTEGIO_E2E_EVENT_SERVICE_ID: ${{ secrets.ALTEGIO_E2E_EVENT_SERVICE_ID }}
+          ALTEGIO_E2E_MEMBERSHIP_PRODUCT_ID: ${{ secrets.ALTEGIO_E2E_MEMBERSHIP_PRODUCT_ID }}
         run: |
           missing=""
           for name in ALTEGIO_API_TOKEN ALTEGIO_USER_TOKEN \
@@ -85,11 +89,6 @@ jobs:
             echo "::error::Not set in the live-e2e environment:$missing"
             exit 1
           fi
-
-      - name: Run the live suites
-        env:
-          CREDENTIALS_DIR: ${{ runner.temp }}/altegio-live
-        run: >-
-          npx jest --runInBand --silent --coverage=false
-          --testPathPatterns='-live\.test\.ts$'
-          --reporters=./src/__tests__/helpers/live-reporter.cjs
+          npx jest --runInBand --silent --coverage=false \
+            --testPathPatterns='-live\.test\.ts$' \
+            --reporters=./src/__tests__/helpers/live-reporter.cjs

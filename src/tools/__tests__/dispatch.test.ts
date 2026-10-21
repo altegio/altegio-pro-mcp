@@ -172,6 +172,14 @@ describe('tools_search', () => {
     ['client files', 'clients_list_files'],
     ['start onboarding', 'onboarding_start'],
     ['link a service to a team member', 'services_link_team_member'],
+    // A query that asks for no change ranks a read first among near-ties…
+    ['membership type details', 'memberships_get_type'],
+    ['show payroll for last month', 'payroll_get_calculation'],
+    ['inventory stock balance', 'inventory_list'],
+    ['client visit history', 'clients_get_visit_history'],
+    // …one that asks for a deletion does not, and a plural names its tool.
+    ['delete an appointment', 'appointments_delete'],
+    ['unlink service from team member', 'services_unlink_team_member'],
   ])('"%s" ranks %s first', (query, expected) => {
     expect(search(query).matches[0]?.name).toBe(expected);
   });

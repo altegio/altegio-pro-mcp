@@ -56,14 +56,14 @@ Served tools per category, in `tools/list` order:
 
 | View | Address | Lists (of 164 defined) | Reaches | `tools/list` bytes | Budget (used) | Reasons |
 | --- | --- | --- | --- | --- | --- | --- |
-| `all` | stdio (no HTTP route) | 154 | 154 | 202,988 | — | all ×154, -off ×6, -cmp ×4 |
+| `all` | stdio (no HTTP route) | 154 | 154 | 203,100 | — | all ×154, -off ×6, -cmp ×4 |
 | `default` | `/mcp` | 37 | 155 | 50,770 | 53,500 (95 %) | disp ×118, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
-| `full` | `/mcp/full` | 96 | 96 | 121,616 | 126,000 (97 %) | dflt ×92, -pack ×29, -low ×26, -off ×6, -cmp ×4, base ×3, -pwd ×2, -name ×1, xtra ×1 |
+| `full` | `/mcp/full` | 96 | 96 | 121,728 | 126,000 (97 %) | dflt ×92, -pack ×29, -low ×26, -off ×6, -cmp ×4, base ×3, -pwd ×2, -name ×1, xtra ×1 |
 | `readonly` | `/mcp/readonly` | 84 | 84 | 116,761 | 123,000 (95 %) | ro ×84, -write ×68, -off ×6, -cmp ×4, -pwd ×2 |
 | `compact` | `/mcp/compact` | 37 | 155 | 50,770 | 53,500 (95 %) | disp ×118, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
-| `ops` | `/mcp/ops` | 53 | 53 | 71,074 | 74,500 (95 %) | - ×99, pfx ×27, rule ×23, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
+| `ops` | `/mcp/ops` | 53 | 53 | 71,186 | 74,500 (96 %) | - ×99, pfx ×27, rule ×23, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
 | `catalog` | `/mcp/catalog` | 34 | 34 | 25,551 | 27,000 (95 %) | - ×118, rule ×31, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
-| `finance` | `/mcp/finance` | 58 | 58 | 99,943 | 103,000 (97 %) | - ×94, pfx ×51, -off ×6, -cmp ×4, rule ×4, base ×3, -pwd ×2 |
+| `finance` | `/mcp/finance` | 58 | 58 | 100,055 | 103,000 (97 %) | - ×94, pfx ×51, -off ×6, -cmp ×4, rule ×4, base ×3, -pwd ×2 |
 | `marketing` | `/mcp/marketing` | 17 | 17 | 22,856 | 24,000 (95 %) | - ×135, pfx ×13, -off ×6, -cmp ×4, base ×3, -pwd ×2, rule ×1 |
 | `analytics` | `/mcp/analytics` | 33 | 33 | 62,445 | 66,000 (95 %) | - ×119, pfx ×30, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
 | `onboarding` | `/mcp/onboarding` | 15 | 15 | 12,387 | 13,500 (92 %) | - ×137, pfx ×12, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
