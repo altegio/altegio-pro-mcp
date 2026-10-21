@@ -9,9 +9,9 @@ const tools = (Object.values(defs) as unknown[]).filter(
 describe('factory tool definitions', () => {
   // Includes the temporary legacy reports, five decision-ready analytics tools
   // the nine inventory tools, visits_add_product and visits_remove_product,
-  // and the three tools of the curated-tool dispatcher.
+  // and the four tools of the curated-tool dispatcher.
   it('exposes all factory-defined tools', () => {
-    expect(tools.length).toBe(151);
+    expect(tools.length).toBe(152);
   });
 
   it('every tool produces a valid MCP spec', () => {

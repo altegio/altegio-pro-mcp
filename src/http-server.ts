@@ -14,6 +14,7 @@ import {
   COMPACT_VIEW,
   DEFAULT_FACET,
   FACET_NAMES,
+  FULL_VIEW,
   READONLY_VIEW,
   type FacetKey,
 } from './tools/facets.js';
@@ -68,14 +69,16 @@ function rpcMessages(body: unknown): Array<Record<string, unknown>> {
 /**
  * Every path this app serves MCP on, and the view each one exposes.
  *
- * `/mcp/readonly` and `/mcp/compact` are listed here, next to the facets, for
- * one reason: these routes are all registered before the catch-all below, and
- * a path that is not in this list falls into it and answers 404. They are
- * still different kinds of view — a policy, and a listing size with a
- * dispatcher — which is why neither is a member of `FACET_NAMES`.
+ * `/mcp/full`, `/mcp/readonly` and `/mcp/compact` are listed here, next to the
+ * facets, for one reason: these routes are all registered before the
+ * catch-all below, and a path that is not in this list falls into it and
+ * answers 404. They are still different kinds of view — a listing size, a
+ * policy, a listing size with a dispatcher — which is why none is a member of
+ * `FACET_NAMES`.
  */
 const FACET_ROUTES: ReadonlyArray<{ path: string; facet: FacetKey }> = [
   { path: '/mcp', facet: DEFAULT_FACET },
+  { path: `/mcp/${FULL_VIEW}`, facet: FULL_VIEW },
   { path: `/mcp/${READONLY_VIEW}`, facet: READONLY_VIEW },
   { path: `/mcp/${COMPACT_VIEW}`, facet: COMPACT_VIEW },
   ...FACET_NAMES.map((facet) => ({ path: `/mcp/${facet}`, facet })),

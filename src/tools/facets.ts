@@ -73,26 +73,52 @@ export const ALL_TOOLS_FACET = 'all';
 export const READONLY_VIEW = 'readonly';
 
 /**
- * Key of the compact view served on `/mcp/compact`.
+ * Key of the compact view served on `/mcp/compact`, and what `/mcp` lists by
+ * default (`DEFAULT_VIEW_LISTINGS`).
  *
- * It reaches what `/mcp` reaches and more, with about a third of its listing:
- * `tools/list` carries the most used tools (`COMPACT_VIEW_TOOLS`) and the
- * curated-tool dispatcher (`DISPATCH_TOOLS`), and every other tool a generic
- * agent may hold — the packs and groups `/mcp` leaves out for its byte budget
- * included — is found with `tools_search` and run through `tools_call_read` or
- * `tools_call_write`, with that tool's own validation, scope and confirmation.
- * The list is still static per address (ADR-001 D7); only what one tool call
- * dispatches to varies. Like the read-only view it is a view, not a facet: it
- * answers "how much does a host pay up front", not "which domain".
+ * It reaches what the full list reaches and more, with about two fifths of its
+ * listing: `tools/list` carries the most used tools (`COMPACT_VIEW_TOOLS`) and
+ * the curated-tool dispatcher (`DISPATCH_TOOLS`), and every other tool a
+ * generic agent may hold — the packs and groups the full list leaves out for
+ * its byte budget included — is found with `tools_search` and run through
+ * `tools_call_read`, `tools_call_write` or `tools_call_destructive`, with that
+ * tool's own validation, scope and confirmation. The list is still static per
+ * address (ADR-001 D7); only what one tool call dispatches to varies. Like the
+ * read-only view it is a view, not a facet: it answers "how much does a host
+ * pay up front", not "which domain".
  */
 export const COMPACT_VIEW = 'compact';
+
+/**
+ * Key of the full flat view served on `/mcp/full`: every tool the default view
+ * served before it adopted the compact listing, listed one by one, with no
+ * dispatcher. It is for gateways and scripts that want the whole list up
+ * front; `DEFAULT_FACET_EXCLUDED_PREFIXES`, `DEFAULT_FACET_EXTRA_TOOLS` and
+ * `DEFAULT_FACET_DEMOTED_GROUPS` shape it. A sub-path, not a query parameter
+ * or a header, because ADR-001 D7 wants one static `tools/list` per address.
+ */
+export const FULL_VIEW = 'full';
+
+/**
+ * What `/mcp` lists, a deployment switch (`MCP_DEFAULT_VIEW`): the compact
+ * listing with the dispatcher, or the full flat list. Either way `/mcp` keeps
+ * its address and a direct call by name to anything the listing reaches runs;
+ * `full` is the way back for a deployment without a code change.
+ */
+export const DEFAULT_VIEW_LISTINGS = ['compact', 'full'] as const;
+
+export type DefaultViewListing = (typeof DEFAULT_VIEW_LISTINGS)[number];
+
+/** What `/mcp` lists when the deployment does not say. */
+export const DEFAULT_VIEW_LISTING: DefaultViewListing = 'compact';
 
 export type FacetKey =
   | FacetName
   | typeof DEFAULT_FACET
   | typeof ALL_TOOLS_FACET
   | typeof READONLY_VIEW
-  | typeof COMPACT_VIEW;
+  | typeof COMPACT_VIEW
+  | typeof FULL_VIEW;
 
 export function isFacetName(value: string): value is FacetName {
   return (FACET_NAMES as readonly string[]).includes(value);
@@ -321,9 +347,10 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
 };
 
 /**
- * Packs kept out of the default `/mcp` view. Everything else that exists is
- * served there, so the default endpoint keeps working exactly as it does today
- * for current users; a new pack joins it only by an explicit decision here.
+ * Packs kept out of the full flat list (`/mcp/full`, and `/mcp` when the
+ * deployment lists it in full). Everything else that exists is served there; a
+ * new pack joins it only by an explicit decision here. The compact listing
+ * reaches these packs through its dispatcher.
  *
  * Back-office money (`financial_transactions_*`, `payroll_*`) is served on
  * `/mcp`: owners are the default view's first audience (ADR-001 D2), and
@@ -382,14 +409,14 @@ export interface DemotedGroup {
 }
 
 /**
- * Groups demoted from `/mcp` to their facet by measured use. On 2026-10-20
- * these 26 tools carried 442 of about 164,600 calls to the hosted default
- * view over 22 days (0.27 %) and 23 KB of its listing. A call to one on `/mcp`
- * is refused with the address that serves it, and the default view's
+ * Groups demoted from the full list to their facet by measured use. On
+ * 2026-10-20 these 26 tools carried 442 of about 164,600 calls to the hosted
+ * default view over 22 days (0.27 %) and 23 KB of its listing. A call to one
+ * on the full list is refused with the address that serves it, and its
  * `initialize` instructions name each group and its facet
  * (`demotedGroupsInstruction`), so a model can still tell the user where to
- * find it. Promote a group back by removing it here, as a reviewed change to
- * the listing budget.
+ * find it. The compact listing reaches them through its dispatcher. Promote a
+ * group back by removing it here, as a reviewed change to the listing budget.
  */
 export const DEFAULT_FACET_DEMOTED_GROUPS: readonly DemotedGroup[] = [
   {
@@ -441,26 +468,39 @@ export const DEFAULT_FACET_DEMOTED_GROUPS: readonly DemotedGroup[] = [
 ];
 
 /**
- * The curated-tool dispatcher: search, then run a tool the view does not list.
- * Listed on `/mcp/compact` (and stdio's unfiltered view), nowhere else.
+ * The curated-tool dispatcher: search, then run a tool the view does not list,
+ * through one of three tools by risk — the tiers of Atlassian Rovo's
+ * `executeRead` / `executeWrite` / `executeDestructive`, so a host can approve
+ * reads and ordinary writes without asking and still stop before a deletion.
+ * Listed on the compact listing (`/mcp`, `/mcp/compact`) and on stdio's
+ * unfiltered view, nowhere else.
  */
 export const DISPATCH_SEARCH_TOOL = 'tools_search';
 export const DISPATCH_READ_TOOL = 'tools_call_read';
 export const DISPATCH_WRITE_TOOL = 'tools_call_write';
+export const DISPATCH_DESTRUCTIVE_TOOL = 'tools_call_destructive';
 export const DISPATCH_TOOLS: readonly string[] = [
   DISPATCH_SEARCH_TOOL,
   DISPATCH_READ_TOOL,
   DISPATCH_WRITE_TOOL,
+  DISPATCH_DESTRUCTIVE_TOOL,
 ];
 
 /**
- * What `/mcp/compact` lists besides `FACET_BASE_TOOLS` and the dispatcher: the
- * daily core of ADR-001 D2 — the journal, free slots, booking, the client
- * card, the team, schedules, services and the sales summary — and every tool
- * with more than about 700 calls to the hosted default view in the 22 days to
- * 2026-10-20, which together carried about 95 % of those calls. The executor
- * stays listed: it reads what no curated tool covers, and its search names the
- * curated tool where one exists.
+ * What the compact listing carries besides `FACET_BASE_TOOLS` and the
+ * dispatcher.
+ *
+ * The first twenty: the daily core of ADR-001 D2 — the journal, free slots,
+ * booking, the client card, the team, schedules, services and the sales
+ * summary — and every tool with more than about 700 calls to the hosted
+ * default view in the 22 days to 2026-10-20, which together carried about
+ * 95 % of those calls. The executor stays listed: it reads what no curated
+ * tool covers, and its search names the curated tool where one exists.
+ *
+ * The last ten: the most called tools beyond those on interactive hosts
+ * (claude.ai, Codex, ChatGPT, Claude Code, Cursor), 2026-10-16..21, in that
+ * order. With them the listed tools answer about 96.5 % of interactive calls
+ * directly, against 91.5 % without.
  */
 export const COMPACT_VIEW_TOOLS: readonly string[] = [
   'api_search_operations',
@@ -483,6 +523,16 @@ export const COMPACT_VIEW_TOOLS: readonly string[] = [
   'clients_list_profiles',
   'clients_list_comments',
   'events_get',
+  'services_create',
+  'clients_lookup',
+  'events_book_clients',
+  'services_link_team_member',
+  'payroll_get_calculation',
+  'memberships_create_type',
+  'team_members_link_services',
+  'memberships_get_type',
+  'schedules_create',
+  'financial_transactions_list',
 ];
 
 /** The demoted group a tool belongs to, if any. */
@@ -493,9 +543,9 @@ export function demotedGroupOf(name: string): DemotedGroup | undefined {
 }
 
 /**
- * One sentence for the default view's `initialize` instructions: each demoted
- * group and the address that serves it, relative to the server's own address
- * like the rest of the instructions.
+ * One sentence for the full list's `initialize` instructions: each demoted
+ * group and the address that serves it, relative to the complete surface's
+ * address like the rest of the instructions.
  */
 export function demotedGroupsInstruction(): string {
   const byFacet = new Map<FacetName, string[]>();
@@ -519,6 +569,24 @@ export interface FacetIndexOptions {
    * carries them.
    */
   readonly exposePasswordLogin?: boolean;
+  /**
+   * What `/mcp` lists (`MCP_DEFAULT_VIEW`); `DEFAULT_VIEW_LISTING` when unset.
+   */
+  readonly defaultListing?: DefaultViewListing;
+}
+
+/**
+ * The view whose rule a view follows: `/mcp` follows the compact view or the
+ * full list, as the deployment says; every other view its own.
+ */
+export function effectiveView(
+  view: FacetKey,
+  options: FacetIndexOptions = {}
+): Exclude<FacetKey, typeof DEFAULT_FACET> {
+  if (view !== DEFAULT_FACET) return view;
+  return (options.defaultListing ?? DEFAULT_VIEW_LISTING) === 'full'
+    ? FULL_VIEW
+    : COMPACT_VIEW;
 }
 
 export interface FacetIndex {
@@ -532,6 +600,8 @@ export interface FacetIndex {
   facetsProviding(toolName: string): readonly FacetName[];
   /** Tool names a view's dispatcher runs (`dispatchReaches`), in order. */
   reachable(facet: FacetKey): readonly string[];
+  /** Whether a call on a view reaches a tool: listed, or dispatched. */
+  serves(facet: FacetKey, toolName: string): boolean;
 }
 
 function matchesPrefix(name: string, prefixes: readonly string[]): boolean {
@@ -557,11 +627,11 @@ export type ViewAdmitReason =
   | 'facet-rule-prefix'
   /** In `DEFAULT_FACET_EXTRA_TOOLS`: re-admitted despite an excluded prefix. */
   | 'default-view-extra-tool'
-  /** On `/mcp` because nothing excludes it — the default for everything. */
+  /** On the full list because nothing excludes it — the default for everything. */
   | 'default-view-not-excluded'
   /** On `/mcp/readonly` because its own `readOnlyHint` says it only reads. */
   | 'read-only-annotation'
-  /** Listed on `/mcp/compact`: `COMPACT_VIEW_TOOLS` or the dispatcher. */
+  /** On the compact listing: `COMPACT_VIEW_TOOLS` or the dispatcher. */
   | 'compact-view-listed';
 
 /** Why a view withholds a tool. Machine values, same contract as above. */
@@ -579,11 +649,11 @@ export type ViewWithholdReason =
   /** Not annotated `readOnlyHint: true`, so `/mcp/readonly` will not serve it. */
   | 'not-read-only'
   /**
-   * Not listed on `/mcp/compact`, and reached there through
-   * `tools_call_read` / `tools_call_write` (`dispatchReaches`).
+   * Not on the compact listing, and reached there through `tools_call_read`,
+   * `tools_call_write` or `tools_call_destructive` (`dispatchReaches`).
    */
   | 'compact-view-dispatched'
-  /** A dispatcher tool: only `/mcp/compact` and stdio list it. */
+  /** A dispatcher tool: only the compact listing and stdio list it. */
   | 'dispatcher-compact-only';
 
 export type ViewDecision =
@@ -612,11 +682,13 @@ const withhold = (reason: ViewWithholdReason): ViewDecision => ({
  * the registry at all, so that exclusion sits one level up, in `./surface.ts`.
  */
 export function decideView(
-  view: FacetKey,
+  address: FacetKey,
   tool: FacetTool,
   options: FacetIndexOptions = {}
 ): ViewDecision {
   const { name } = tool;
+  // `/mcp` is decided by the rule of the listing it serves.
+  const view = effectiveView(address, options);
   const exposePasswordLogin = options.exposePasswordLogin ?? false;
   const isPasswordLogin = PASSWORD_LOGIN_TOOLS.includes(name);
   const isBase = FACET_BASE_TOOLS.includes(name);
@@ -669,7 +741,7 @@ export function decideView(
     return admit('read-only-annotation');
   }
 
-  if (view === DEFAULT_FACET) {
+  if (view === FULL_VIEW) {
     if (DEFAULT_FACET_EXCLUDED_TOOLS.includes(name)) {
       return withhold('default-view-excluded-tool');
     }
@@ -700,16 +772,18 @@ export function decideView(
 export const VIEW_KEYS: readonly FacetKey[] = [
   ALL_TOOLS_FACET,
   DEFAULT_FACET,
+  FULL_VIEW,
   READONLY_VIEW,
   COMPACT_VIEW,
   ...FACET_NAMES,
 ];
 
 /**
- * Whether a view's dispatcher (`tools_call_read` / `tools_call_write`) runs a
- * tool: on `/mcp/compact`, every tool it lists or dispatches; on stdio's
- * unfiltered view, every tool; elsewhere nothing, since no other view lists
- * the dispatcher. Never a dispatcher tool itself.
+ * Whether a view's dispatcher (`tools_call_read`, `tools_call_write`,
+ * `tools_call_destructive`) runs a tool: on the compact listing, every tool it
+ * lists or dispatches; on stdio's unfiltered view, every tool; elsewhere
+ * nothing, since no other view lists the dispatcher. Never a dispatcher tool
+ * itself.
  */
 export function dispatchReaches(
   view: FacetKey,
@@ -718,7 +792,7 @@ export function dispatchReaches(
 ): boolean {
   if (DISPATCH_TOOLS.includes(tool.name)) return false;
   if (view === ALL_TOOLS_FACET) return true;
-  if (view !== COMPACT_VIEW) return false;
+  if (effectiveView(view, options) !== COMPACT_VIEW) return false;
   const decision = decideView(view, tool, options);
   return decision.served || decision.reason === 'compact-view-dispatched';
 }
@@ -749,13 +823,13 @@ export function buildFacetIndex(
   }
 
   const reach = new Map<FacetKey, readonly string[]>();
+  const reachSets = new Map<FacetKey, ReadonlySet<string>>();
   for (const view of VIEW_KEYS) {
-    reach.set(
-      view,
-      tools
-        .filter((tool) => dispatchReaches(view, tool, options))
-        .map((tool) => tool.name)
-    );
+    const names = tools
+      .filter((tool) => dispatchReaches(view, tool, options))
+      .map((tool) => tool.name);
+    reach.set(view, names);
+    reachSets.set(view, new Set(names));
   }
 
   return {
@@ -765,6 +839,9 @@ export function buildFacetIndex(
     facetsProviding: (toolName) =>
       FACET_NAMES.filter((facet) => sets.get(facet)?.has(toolName)),
     reachable: (facet) => reach.get(facet) ?? [],
+    serves: (facet, toolName) =>
+      (sets.get(facet)?.has(toolName) ?? false) ||
+      (reachSets.get(facet)?.has(toolName) ?? false),
   };
 }
 

@@ -80,9 +80,9 @@ describe('tools/list byte budget', () => {
     expect(budgetViolations([size])).toEqual([]);
   });
 
-  it('keeps the default view’s target below its budget', () => {
-    expect(DEFAULT_VIEW_TARGET_BYTES).toBeLessThan(
-      LISTING_BUDGETS[DEFAULT_FACET]
+  it('keeps the default view’s budget under its target', () => {
+    expect(LISTING_BUDGETS[DEFAULT_FACET]).toBeLessThanOrEqual(
+      DEFAULT_VIEW_TARGET_BYTES
     );
   });
 

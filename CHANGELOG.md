@@ -6,6 +6,48 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — `/pro` lists the compact listing; the flat list moves to `/pro/full`
+
+- **`/pro` lists 37 tools in 50,528 bytes**, against 96 tools and 121,576
+  bytes before: the base tools, the most used tools — the twenty of
+  `/pro/compact` and the ten next most called on interactive hosts
+  (`services_create`, `clients_lookup`, `events_book_clients`,
+  `services_link_team_member`, `payroll_get_calculation`,
+  `memberships_create_type`, `team_members_link_services`,
+  `memberships_get_type`, `schedules_create`, `financial_transactions_list`),
+  about 96 % of interactive calls — and the dispatcher. The address does not
+  change for anyone.
+- **`/pro` reaches more than before.** Everything it listed, plus the analytics
+  pack and the low-use groups it had demoted, through `tools_search` and the
+  dispatcher. Access management and password login stay off it.
+- **A tool called by name runs whether `/pro` lists it or not**, past the same
+  validation, scope and confirmation: hosts that cached the old list and
+  scripts that call tools by name keep working.
+- **`https://mcp.alteg.io/pro/full`** (`/mcp/full`) serves the flat list `/pro`
+  served until now, byte for byte, with no dispatcher: for gateways and
+  scripts that want every tool up front.
+- **`/pro/compact`** serves the same listing as `/pro`.
+- **`MCP_DEFAULT_VIEW`** (`compact` | `full`, default `compact`) sets what
+  `/mcp` lists for a deployment; `full` turns it back without a code change.
+- **Gated on the tool-selection eval** (Codex, 32 tasks × 3): `/pro` passed
+  87/96 and `/pro/full` 79/96, at the same input tokens per run. Every task
+  whose tool `/pro/full` does not list passed on `/pro` only (11/12 against
+  0/12), and no dispatched call named the wrong tier. ADR-001 D3, step 3, has
+  the breakdown.
+
+### Added — a destructive tier for the dispatcher
+
+- **`tools_call_destructive`** runs tools annotated `destructiveHint: true`
+  (deletions, cancellations, unlinks, list replacements).
+  **`tools_call_write`** now runs only changes that delete or overwrite
+  nothing, and is annotated `destructiveHint: false`. Each dispatcher refuses
+  a tool of another tier and names the one that runs it, so a host can
+  approve reads, or reads and ordinary writes, without asking and still stop
+  before a deletion. `tools_search` names each tool's dispatcher.
+- **What restricts an agent is unchanged:** `/pro/readonly` and the token's
+  scope, enforced by the server. A host's per-tool allow and deny toggles see
+  the dispatchers, not the tools run through them.
+
 ### Added — `/pro/compact` and a curated-tool dispatcher
 
 - **A compact address**, `https://mcp.alteg.io/pro/compact` (`/mcp/compact`

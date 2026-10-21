@@ -133,6 +133,27 @@ describe('Configuration Schema', () => {
     });
   });
 
+  describe('MCP_DEFAULT_VIEW', () => {
+    it('lists the compact listing on /mcp when unset', () => {
+      const result = EnvSchema.parse({ ALTEGIO_API_TOKEN: 'test-token' });
+      expect(result.MCP_DEFAULT_VIEW).toBe('compact');
+    });
+
+    it('reaches the loaded config, and accepts compact and full only', () => {
+      const config = loadConfig({
+        ALTEGIO_API_TOKEN: 'test-token',
+        MCP_DEFAULT_VIEW: 'full',
+      } as NodeJS.ProcessEnv);
+      expect(config.env.MCP_DEFAULT_VIEW).toBe('full');
+      expect(() =>
+        EnvSchema.parse({
+          ALTEGIO_API_TOKEN: 'test-token',
+          MCP_DEFAULT_VIEW: 'all',
+        })
+      ).toThrow();
+    });
+  });
+
   describe('REQUIRE_DELEGATED_IDENTITY', () => {
     it('uses the same explicit boolean spellings as the other HTTP flags', () => {
       const parse = (value: unknown) =>

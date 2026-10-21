@@ -20,12 +20,13 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 export interface ServingView {
   /**
    * Whether a call on this view reaches the tool: listed, or run through the
-   * view's dispatcher (`tools_call_read` / `tools_call_write`).
+   * view's dispatcher (`tools_call_read`, `tools_call_write`,
+   * `tools_call_destructive`).
    */
   serves(toolName: string): boolean;
   /**
    * Whether this view's `tools/list` carries the tool. Absent means every
-   * served tool is listed, which holds for every view but `/mcp/compact`.
+   * served tool is listed, which holds for every view but the compact listing.
    */
   lists?(toolName: string): boolean;
   /**

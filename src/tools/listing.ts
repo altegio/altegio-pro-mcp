@@ -48,7 +48,8 @@ export interface ViewListing {
  * Absolute addresses of this endpoint's views that serve a tool the current
  * view does not: the named facets first, then the complete surface. Absolute,
  * because a relative /mcp/<view> is wrong on the short customer address, where
- * /pro/mcp/… is the internal lane.
+ * /pro/mcp/… is the internal lane. "Serve" means a call there runs it, listed
+ * or through the dispatcher.
  */
 export function addressesServing(
   name: string,
@@ -59,15 +60,15 @@ export function addressesServing(
     ...index.facetsProviding(name).map((f) => viewUrl(publicBaseUrl, f)),
     // Only offer the complete surface when it actually serves the tool: a tool
     // withheld from the default view (access management, password login) must
-    // not be advertised back to the caller as available one path up.
-    ...(index.includes(DEFAULT_FACET, name)
+    // not be advertised back to the caller as available one path up. When
+    // `/mcp` lists in full, the compact view still reaches the packs and
+    // groups the full list leaves out; the full view never serves more than
+    // `/mcp`, so it is never the answer.
+    ...(index.serves(DEFAULT_FACET, name)
       ? [viewUrl(publicBaseUrl, DEFAULT_FACET)]
-      : []),
-    // The dispatcher is listed on the compact view alone.
-    ...(index.includes(COMPACT_VIEW, name) &&
-    !index.includes(DEFAULT_FACET, name)
-      ? [viewUrl(publicBaseUrl, COMPACT_VIEW)]
-      : []),
+      : index.serves(COMPACT_VIEW, name)
+        ? [viewUrl(publicBaseUrl, COMPACT_VIEW)]
+        : []),
   ];
 }
 
@@ -82,6 +83,7 @@ export function listView(
     facetToolsFromSpecs(entries.map((entry) => entry.spec)),
     {
       exposePasswordLogin: options.exposePasswordLogin,
+      defaultListing: options.defaultListing,
     }
   );
   const visible = new Set(facetIndex.members(view));

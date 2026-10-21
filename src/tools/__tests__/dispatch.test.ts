@@ -1,7 +1,8 @@
 /**
- * The compact view and its curated-tool dispatcher, below the transport: what
- * `/mcp/compact` lists, what its dispatcher reaches, how `tools_search` ranks,
- * and which tool a dispatcher call resolves to. The call path itself — scope,
+ * The compact listing and its curated-tool dispatcher, below the transport:
+ * what `/mcp` and `/mcp/compact` list, what their dispatcher reaches, how
+ * `tools_search` ranks, and which tool a dispatcher call of which risk tier
+ * resolves to. The call path itself — scope,
  * confirmation, the tool's own validation — is pinned end to end in
  * `src/__tests__/dispatch-e2e.test.ts`.
  */
@@ -14,6 +15,7 @@ import {
   DEFAULT_FACET_EXCLUDED_TOOLS,
   DISPATCH_TOOLS,
   FACET_BASE_TOOLS,
+  FULL_VIEW,
   PASSWORD_LOGIN_TOOLS,
   READONLY_VIEW,
   facetToolsFromSpecs,
@@ -22,9 +24,11 @@ import { orderedToolEntries } from '../inventory.js';
 import { listView } from '../listing.js';
 import { runOnView } from '../serving-view.js';
 import {
+  dispatcherFor,
   resolveDispatch,
   searchText,
   searchTools,
+  type Dispatcher,
   type DispatchTargets,
 } from '../dispatch.js';
 import { COMPACT_VIEW_INSTRUCTIONS } from '../../config/schema.js';
@@ -34,32 +38,35 @@ const index = buildFacetIndex(
 );
 const names = orderedToolEntries().map((entry) => entry.spec.name);
 
-describe('the compact view', () => {
+describe('the compact listing', () => {
   it('lists the base tools, the most used tools and the dispatcher, nothing else', () => {
-    const listed = index.members(COMPACT_VIEW);
-    expect([...listed].sort()).toEqual(
-      [...FACET_BASE_TOOLS, ...COMPACT_VIEW_TOOLS, ...DISPATCH_TOOLS].sort()
-    );
-    // Every listed tool but the dispatcher is one `/mcp` lists too.
-    for (const name of listed) {
-      if (DISPATCH_TOOLS.includes(name)) continue;
-      expect(index.includes(DEFAULT_FACET, name)).toBe(true);
+    for (const view of [DEFAULT_FACET, COMPACT_VIEW] as const) {
+      const listed = index.members(view);
+      expect([...listed].sort()).toEqual(
+        [...FACET_BASE_TOOLS, ...COMPACT_VIEW_TOOLS, ...DISPATCH_TOOLS].sort()
+      );
+      // Every listed tool but the dispatcher is one the full list has too.
+      for (const name of listed) {
+        if (DISPATCH_TOOLS.includes(name)) continue;
+        expect(index.includes(FULL_VIEW, name)).toBe(true);
+      }
     }
   });
 
-  it('reaches everything /mcp lists, and the packs /mcp leaves out for size', () => {
-    const reach = new Set(index.reachable(COMPACT_VIEW));
-    for (const name of index.members(DEFAULT_FACET)) {
+  it('reaches everything the full list lists, and the packs it leaves out for size', () => {
+    const reach = new Set(index.reachable(DEFAULT_FACET));
+    for (const name of index.members(FULL_VIEW)) {
       expect(reach.has(name)).toBe(true);
     }
-    // Demoted groups and the analytics pack, which /mcp holds back for bytes.
+    // Demoted groups and the analytics pack, which the full list holds back
+    // for bytes.
     for (const name of [
       'onboarding_start',
       'memberships_freeze',
       'clients_upload_file',
       'analytics_get_daily_series',
     ]) {
-      expect(index.includes(DEFAULT_FACET, name)).toBe(false);
+      expect(index.includes(FULL_VIEW, name)).toBe(false);
       expect(reach.has(name)).toBe(true);
     }
   });
@@ -75,9 +82,11 @@ describe('the compact view', () => {
     }
   });
 
-  it('is the only HTTP view that lists or runs the dispatcher', () => {
+  it('is the only listing that lists or runs the dispatcher', () => {
     for (const view of index.keys) {
-      if (view === COMPACT_VIEW || view === 'all') continue;
+      if (view === DEFAULT_FACET || view === COMPACT_VIEW || view === 'all') {
+        continue;
+      }
       for (const name of DISPATCH_TOOLS) {
         expect(index.includes(view, name)).toBe(false);
       }
@@ -91,6 +100,52 @@ describe('the compact view', () => {
     expect(COMPACT_VIEW_INSTRUCTIONS).toContain('tools_search');
     expect(COMPACT_VIEW_INSTRUCTIONS).toContain('tools_call_read');
     expect(COMPACT_VIEW_INSTRUCTIONS).toContain('tools_call_write');
+    expect(COMPACT_VIEW_INSTRUCTIONS).toContain('tools_call_destructive');
+  });
+});
+
+describe('the risk tiers', () => {
+  const entries = orderedToolEntries();
+  const tierOf = (name: string): Dispatcher =>
+    dispatcherFor(entries.find((entry) => entry.spec.name === name)!.spec);
+
+  it('runs a read with tools_call_read, a change with tools_call_write and a destructive change with tools_call_destructive', () => {
+    for (const entry of entries) {
+      const { readOnlyHint, destructiveHint } = entry.spec.annotations ?? {};
+      expect(dispatcherFor(entry.spec)).toBe(
+        readOnlyHint === true
+          ? 'tools_call_read'
+          : destructiveHint === true
+            ? 'tools_call_destructive'
+            : 'tools_call_write'
+      );
+    }
+    expect(tierOf('services_create')).toBe('tools_call_write');
+    expect(tierOf('services_delete')).toBe('tools_call_destructive');
+    expect(tierOf('services_list')).toBe('tools_call_read');
+  });
+
+  it('treats a change with no destructiveHint as destructive, as MCP does', () => {
+    expect(dispatcherFor({ annotations: { readOnlyHint: false } })).toBe(
+      'tools_call_destructive'
+    );
+    expect(dispatcherFor({})).toBe('tools_call_destructive');
+  });
+
+  it('annotates each dispatcher with its own tier', () => {
+    const annotations = (name: string) =>
+      entries.find((entry) => entry.spec.name === name)!.spec.annotations;
+    expect(annotations('tools_call_read')).toMatchObject({
+      readOnlyHint: true,
+    });
+    expect(annotations('tools_call_write')).toMatchObject({
+      readOnlyHint: false,
+      destructiveHint: false,
+    });
+    expect(annotations('tools_call_destructive')).toMatchObject({
+      readOnlyHint: false,
+      destructiveHint: true,
+    });
   });
 });
 
@@ -116,7 +171,7 @@ describe('tools_search', () => {
     const { matches } = search('financial_transactions_delete');
     expect(matches[0]).toMatchObject({
       name: 'financial_transactions_delete',
-      call_with: 'tools_call_write',
+      call_with: 'tools_call_destructive',
       listed: false,
       asks_confirmation: true,
     });
@@ -172,15 +227,15 @@ describe('tools_search', () => {
 
 describe('resolveDispatch', () => {
   const reach = new Set(index.reachable(COMPACT_VIEW));
-  const readOnly = new Map(
+  const tiers = new Map(
     orderedToolEntries().map((entry) => [
       entry.spec.name,
-      entry.spec.annotations?.readOnlyHint === true,
+      dispatcherFor(entry.spec),
     ])
   );
   const targets: DispatchTargets = {
     reaches: (name) => reach.has(name),
-    readOnly: (name) => readOnly.get(name),
+    dispatcherOf: (name) => tiers.get(name),
     addressesServing: (name) =>
       listView(COMPACT_VIEW).servingView.addressesServing(name),
   };
@@ -208,12 +263,55 @@ describe('resolveDispatch', () => {
     expect(change).toMatchObject({ errorClass: 'validation' });
     expect(textOf(change)).toContain('Run it with tools_call_write');
 
+    const deletion = resolveDispatch(
+      'tools_call_read',
+      { tool: 'services_delete', arguments: {} },
+      targets
+    );
+    expect(textOf(deletion)).toContain('Run it with tools_call_destructive');
+
     const read = resolveDispatch(
       'tools_call_write',
       { tool: 'memberships_list_chains' },
       targets
     );
     expect(textOf(read)).toContain('Run it with tools_call_read');
+  });
+
+  it('refuses a destructive change through tools_call_write, and the reverse', () => {
+    const deletion = resolveDispatch(
+      'tools_call_write',
+      { tool: 'services_delete', arguments: { location_id: 1 } },
+      targets
+    );
+    expect(deletion).toMatchObject({ errorClass: 'validation' });
+    expect(textOf(deletion)).toBe(
+      'Nothing was run: services_delete deletes or overwrites data, and tools_call_write runs changes that delete or overwrite nothing. Run it with tools_call_destructive.'
+    );
+
+    const change = resolveDispatch(
+      'tools_call_destructive',
+      { tool: 'memberships_freeze', arguments: {} },
+      targets
+    );
+    expect(textOf(change)).toBe(
+      'Nothing was run: memberships_freeze changes data without deleting or overwriting any, and tools_call_destructive runs deletions and other destructive changes. Run it with tools_call_write.'
+    );
+
+    const read = resolveDispatch(
+      'tools_call_destructive',
+      { tool: 'memberships_list_chains' },
+      targets
+    );
+    expect(textOf(read)).toContain('Run it with tools_call_read');
+
+    expect(
+      resolveDispatch(
+        'tools_call_destructive',
+        { tool: 'services_delete', arguments: { location_id: 1 } },
+        targets
+      )
+    ).toEqual({ target: 'services_delete', args: { location_id: 1 } });
   });
 
   it('moves a confirmation_token sent beside the arguments into them', () => {
@@ -286,21 +384,18 @@ describe('resolveDispatch', () => {
   });
 
   it('resolves every reachable tool to exactly one dispatcher', () => {
+    const dispatchers: readonly Dispatcher[] = [
+      'tools_call_read',
+      'tools_call_write',
+      'tools_call_destructive',
+    ];
     for (const name of names) {
       if (!reach.has(name)) continue;
-      const viaRead = resolveDispatch(
-        'tools_call_read',
-        { tool: name },
-        targets
+      const runs = dispatchers.filter(
+        (dispatcher) =>
+          'target' in resolveDispatch(dispatcher, { tool: name }, targets)
       );
-      const viaWrite = resolveDispatch(
-        'tools_call_write',
-        { tool: name },
-        targets
-      );
-      expect(
-        ['target' in viaRead, 'target' in viaWrite].filter(Boolean)
-      ).toEqual([true]);
+      expect(runs).toEqual([tiers.get(name)]);
     }
   });
 });

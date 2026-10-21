@@ -8,6 +8,7 @@ import {
   DEFAULT_FACET,
   demotedGroupOf,
   FACET_NAMES,
+  FULL_VIEW,
   READONLY_VIEW,
   COMPACT_VIEW,
 } from '../tools/facets.js';
@@ -156,9 +157,10 @@ describe('HTTP server facet routes', () => {
       body: jsonRpcBody,
     });
 
-  it('serves a route for the default view, the read-only and compact views and every facet', () => {
+  it('serves a route for the default view, the full, read-only and compact views and every facet', () => {
     expect(FACET_ROUTES.map((route) => route.path)).toEqual([
       '/mcp',
+      `/mcp/${FULL_VIEW}`,
       `/mcp/${READONLY_VIEW}`,
       `/mcp/${COMPACT_VIEW}`,
       ...FACET_NAMES.map((facet) => `/mcp/${facet}`),
@@ -169,7 +171,13 @@ describe('HTTP server facet routes', () => {
     );
     const { transportsByFacet } = createApp();
     expect(Object.keys(transportsByFacet).sort()).toEqual(
-      [DEFAULT_FACET, READONLY_VIEW, COMPACT_VIEW, ...FACET_NAMES].sort()
+      [
+        DEFAULT_FACET,
+        FULL_VIEW,
+        READONLY_VIEW,
+        COMPACT_VIEW,
+        ...FACET_NAMES,
+      ].sort()
     );
   });
 
@@ -341,7 +349,7 @@ describe('HTTP server facet wiring, end to end', () => {
     return payload.result.tools.map((tool) => tool.name);
   };
 
-  it('serves the ops view on /mcp/ops and the whole surface on /mcp', async () => {
+  it('serves the ops view on /mcp/ops and the full list on /mcp/full', async () => {
     const { app } = createApp();
     const server = app.listen(0);
     try {
@@ -404,9 +412,9 @@ describe('HTTP server facet wiring, end to end', () => {
         'visits_remove_product',
       ]);
 
-      const all = await toolNamesOn(port, '/mcp');
+      const all = await toolNamesOn(port, '/mcp/full');
       expect(all.length).toBeGreaterThan(ops.length);
-      // The default view serves every ops tool except the demoted groups,
+      // The full list serves every ops tool except the demoted groups,
       // which stay on /mcp/ops, and none of the onboarding wizard.
       for (const name of ops) {
         if (demotedGroupOf(name)) expect(all).not.toContain(name);

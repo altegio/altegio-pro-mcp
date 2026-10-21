@@ -235,13 +235,14 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   api_describe_operation: null,
   api_call_operation: 'api:read',
 
-  // --- Curated-tool dispatcher (/mcp/compact) --------------------------------
-  // The search reads tool metadata only. The two dispatchers require nothing
+  // --- Curated-tool dispatcher (the compact listing) -------------------------
+  // The search reads tool metadata only. The three dispatchers require nothing
   // themselves: the registry checks the scopes of the tool they run, so a
   // dispatched call is authorised exactly as a direct one.
   tools_search: null,
   tools_call_read: null,
   tools_call_write: null,
+  tools_call_destructive: null,
 
   // --- The caller's own profile ---------------------------------------------
   // Reads nothing but the identity the credential already proves; a v3 scope

@@ -14,6 +14,7 @@ import { describe, it, expect } from '@jest/globals';
 import {
   buildFacetIndex,
   DEFAULT_FACET,
+  FULL_VIEW,
   DISPATCH_TOOLS,
   FACET_NAMES,
   PASSWORD_LOGIN_TOOLS,
@@ -96,9 +97,8 @@ describe('the reasons', () => {
     }
   });
 
-  it('names the mechanism that withheld each tool from `/mcp`', () => {
-    const reasonOn = (name: string) =>
-      surface.cell(name, DEFAULT_FACET)?.reason;
+  it('names the mechanism that withheld each tool from the full list', () => {
+    const reasonOn = (name: string) => surface.cell(name, FULL_VIEW)?.reason;
     expect(reasonOn('locations_remove_user')).toBe(
       'default-view-excluded-tool'
     );
@@ -110,6 +110,31 @@ describe('the reasons', () => {
     expect(reasonOn('locations_list')).toBe('facet-base-tool');
     expect(reasonOn('team_members_list')).toBe('default-view-not-excluded');
     expect(reasonOn('analytics_run_report')).toBe('disabled-everywhere');
+  });
+
+  it('answers `/mcp` with the compact listing, and with the full list when the deployment says so', () => {
+    const reasonOn = (name: string) =>
+      surface.cell(name, DEFAULT_FACET)?.reason;
+    expect(reasonOn('team_members_list')).toBe('compact-view-listed');
+    expect(reasonOn('tools_call_destructive')).toBe('compact-view-listed');
+    expect(reasonOn('analytics_get_daily_series')).toBe(
+      'compact-view-dispatched'
+    );
+    expect(reasonOn('locations_remove_user')).toBe(
+      'default-view-excluded-tool'
+    );
+    // Dispatched is not refused: the gates are those of a served tool.
+    expect(
+      surface.cell('services_delete', DEFAULT_FACET)?.gates.map((g) => g.kind)
+    ).toContain('human-confirmation');
+
+    const full = buildSurfaceTable(entries, { defaultListing: 'full' });
+    for (const entry of entries) {
+      expect(full.cell(entry.name, DEFAULT_FACET)).toEqual({
+        ...full.cell(entry.name, FULL_VIEW),
+        view: DEFAULT_FACET,
+      });
+    }
   });
 
   it('names the mechanism that admitted each tool to a facet', () => {
@@ -145,7 +170,7 @@ describe('the reasons', () => {
   });
 
   it('shows a demoted group as its own reason, not as a pack exclusion', () => {
-    expect(surface.cell('onboarding_start', DEFAULT_FACET)?.reason).toBe(
+    expect(surface.cell('onboarding_start', FULL_VIEW)?.reason).toBe(
       'default-view-demoted'
     );
     expect(surface.cell('onboarding_start', 'onboarding')?.served).toBe(true);
@@ -217,8 +242,8 @@ describe('the gates', () => {
       expect(confirms).toBe(entry.requiresConfirmation);
       // `destructive-coverage.test.ts` owns the other direction in full; this
       // keeps the table from claiming a gate a destructive tool does not have.
-      // The write dispatcher runs the confirmation of the tool it runs.
-      if (entry.destructive && entry.name !== 'tools_call_write') {
+      // The destructive dispatcher runs the confirmation of the tool it runs.
+      if (entry.destructive && entry.name !== 'tools_call_destructive') {
         expect(confirms).toBe(true);
       }
     }

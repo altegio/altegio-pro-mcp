@@ -1,7 +1,7 @@
 /**
  * **The surface table: one place that answers "why is tool X on address Y".**
  *
- * Six mechanisms decide where a tool appears, and two more decide whether the
+ * Several mechanisms decide where a tool appears, and two more decide whether the
  * call it receives there actually runs. Each was introduced for its own reason
  * and each of those reasons is still good, so this module does not collapse
  * them — it *joins* them. For every tool × every view it produces one cell:
@@ -11,7 +11,9 @@
  * | Mechanism | Lives in | Question it answers |
  * |---|---|---|
  * | `DISABLED_TOOL_NAMES` | `./disabled-tools.ts` | Does this tool work at all? |
- * | `DEFAULT_FACET_EXCLUDED_PREFIXES` | `./facets.ts` | Does this pack fit in `/mcp`'s budget? |
+ * | `MCP_DEFAULT_VIEW` | `../config/schema.ts` | Does `/mcp` list the compact listing or the full list? |
+ * | `COMPACT_VIEW_TOOLS` + `DISPATCH_TOOLS` | `./facets.ts` | What does a host pay up front for the compact listing? |
+ * | `DEFAULT_FACET_EXCLUDED_PREFIXES` | `./facets.ts` | Does this pack fit in the full list's budget? |
  * | `DEFAULT_FACET_EXCLUDED_TOOLS` | `./facets.ts` | May a generic agent hold this right? |
  * | `DEFAULT_FACET_EXTRA_TOOLS` | `./facets.ts` | Does a session need this entry point? |
  * | `PASSWORD_LOGIN_TOOLS` + the switch | `./facets.ts` | Does this deployment ever need a password? |
@@ -98,7 +100,7 @@ export interface SurfaceCell {
 }
 
 export interface SurfaceTable {
-  /** Views in render order: `all`, `default`, `readonly`, then the facets. */
+  /** Views in render order (`VIEW_KEYS`): `all`, `default`, `full`, `readonly`, `compact`, then the facets. */
   readonly views: readonly FacetKey[];
   /** Every defined tool, `tools/list` order, disabled ones included. */
   readonly tools: readonly ToolInventoryEntry[];

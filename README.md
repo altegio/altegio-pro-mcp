@@ -6,11 +6,11 @@ A TypeScript [Model Context Protocol](https://modelcontextprotocol.io) server fo
 Altegio business owners, administrators, and team members. It provides
 administrative B2B operations, client workflows, onboarding, and analytics.
 
-**157 tools served (163 defined, 6 withheld from every view)** — see the generated
+**158 tools served (164 defined, 6 withheld from every view)** — see the generated
 [tool surface](docs/architecture/tool-surface.md) for exact membership and gates.
 The surface includes a 28-tool analytics pack, a 15-tool group events pack, a
 13-tool memberships pack, 15 visit, payment, finance and payroll tools, a 9-tool inventory
-pack, a 3-tool API explorer, a 3-tool curated-tool dispatcher, and 12 onboarding wizard tools. The API explorer executes reads only; administrative
+pack, a 3-tool API explorer, a 4-tool curated-tool dispatcher, and 12 onboarding wizard tools. The API explorer executes reads only; administrative
 writes use curated tools. The six unavailable report-builder tools are withheld
 because their upstream report-data service is not usable.
 
@@ -21,25 +21,46 @@ server in your host and complete Altegio sign-in. Password-login tools are hidde
 on HTTP by default. The read-only endpoint is
 `https://mcp.alteg.io/pro/readonly`.
 
+`/pro` lists 37 tools, about 50 KB: the most used tools (about 96 % of
+interactive calls) plus a dispatcher that reaches every other tool a generic
+agent may hold. `tools_search` finds a tool by the task in the user's words and
+returns its schema and the dispatcher that runs it, one per risk tier:
+
+| Dispatcher               | Runs                                     | Annotations              |
+| ------------------------ | ---------------------------------------- | ------------------------ |
+| `tools_call_read`        | reads                                    | `readOnlyHint: true`     |
+| `tools_call_write`       | changes that delete or overwrite nothing | `destructiveHint: false` |
+| `tools_call_destructive` | deletions and other destructive changes  | `destructiveHint: true`  |
+
+Each refuses a tool of another tier and names the right one, so a host can
+approve reads, or reads and ordinary writes, without asking and still stop
+before a deletion. The tool's own validation, token scope and confirmation
+apply exactly as on a direct call, and a tool called directly by name runs
+whether `/pro` lists it or not. The same listing is served at
+`https://mcp.alteg.io/pro/compact`.
+
+`https://mcp.alteg.io/pro/full` lists every tool flat (96 tools, about 120 KB)
+with no dispatcher: what `/pro` listed until 2026-10-21, for gateways and
+scripts that want the whole list up front.
+
+**What restricts an agent.** `/pro/readonly` and the token's scope are the
+boundary, enforced by the server on every call. A host's per-tool allow and
+deny toggles apply to the tools it lists, so on `/pro` they see the three
+dispatchers, not the tools dispatched through them: approve or block a
+dispatcher to approve or block its tier. To keep an agent from changing data
+at all, connect it to `/pro/readonly` or grant it a read-only token.
+
 Named views are available at `https://mcp.alteg.io/pro/<facet>`:
 `ops`, `catalog`, `finance`, `marketing`, `analytics`, and `onboarding`.
 Views reduce the advertised tool set; they do not grant additional permissions.
-A few low-use groups are served only on their view, not on the default address:
-the onboarding wizard (`onboarding`), event duplication patterns and client files
+A few low-use groups are served only on their view, not on `/pro/full`: the
+onboarding wizard (`onboarding`), event duplication patterns and client files
 (`ops`), membership freeze, balance and validity changes and membership type
-archive/delete (`marketing`), and booking form create/delete (`catalog`).
-A call to a tool outside its view is refused. Token scopes and upstream access
-rights are enforced independently of view membership.
-
-The compact endpoint `https://mcp.alteg.io/pro/compact` lists 26 tools, about
-36 KB against about 120 KB on the default address: the most used tools plus
-`tools_search`, `tools_call_read` and `tools_call_write`, which find and run
-every other tool a generic agent may hold, the groups above and the analytics
-pack included, with the same validation, scopes and confirmations. A host that
-sends every listed tool to the model pays less than half per request there; a
-host that defers MCP tools behind its own search (Codex, Claude Code,
-claude.ai) pays about the same and reaches the tools the default address does
-not list. The [evals](evals/README.md) compare the two addresses.
+archive/delete (`marketing`), and booking form create/delete (`catalog`); `/pro`
+reaches them through its dispatcher. A call to a tool outside its view is
+refused with the addresses that serve it. Token scopes and upstream access
+rights are enforced independently of view membership. The
+[evals](evals/README.md) compare `/pro` with `/pro/full`.
 
 ## Run locally
 
@@ -71,7 +92,7 @@ npm run dev:http
 curl --fail http://localhost:3000/health
 ```
 
-The local MCP route is `/mcp`, with `/mcp/<facet>`, `/mcp/readonly` and `/mcp/compact` variants.
+The local MCP route is `/mcp`, with `/mcp/<facet>`, `/mcp/full`, `/mcp/readonly` and `/mcp/compact` variants.
 HTTP uses the SDK's Streamable HTTP transport and session handling. All views
 share `MCP_HTTP_MAX_SESSIONS` (default 512), including pending initializes. Tune
 it against the container's JS heap budget; the internal 256 MiB old-space
@@ -96,8 +117,10 @@ unauthenticated public service.
 `MCP_PUBLIC_BASE_URL` names the externally reachable full MCP endpoint in tool
 hints. For a local deployment this may be `http://localhost:3000/mcp`; it does not
 configure routing or authentication. `ALTEGIO_EXPOSE_PASSWORD_LOGIN` defaults to
-false for HTTP. `REQUIRE_DELEGATED_IDENTITY` can require proxy identity when the
-chosen authentication flow supplies it.
+false for HTTP. `MCP_DEFAULT_VIEW` sets what `/mcp` lists: `compact` (the
+default) or `full`, the flat list `/mcp/full` serves; the address and what a
+direct call reaches stay the same. `REQUIRE_DELEGATED_IDENTITY` can require
+proxy identity when the chosen authentication flow supplies it.
 
 See [.env.example](.env.example), the authoritative
 [configuration schema](src/config/schema.ts), and [deployment](CI-CD.md).

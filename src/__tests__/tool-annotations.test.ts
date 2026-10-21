@@ -135,8 +135,9 @@ describe('tool annotations', () => {
       // Consumes its checkpoint on success and retries the leftovers after a
       // partial failure, so a repeat can still change the environment.
       'onboarding_rollback_phase',
-      // Runs any write, a create included, so a repeat may add another one.
-      'tools_call_write',
+      // Runs any destructive tool, a read-modify-write included, so a repeat
+      // may change the environment again.
+      'tools_call_destructive',
     ]);
     const plainDeletes = specs
       .filter((spec) => annotationsOf(spec).destructiveHint === true)

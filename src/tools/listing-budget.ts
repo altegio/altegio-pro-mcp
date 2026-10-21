@@ -15,8 +15,8 @@
  * budget in the same change, so the headroom stays about 5 %.
  *
  * The sizes are for the default deployment: password login withheld, the
- * published public address. stdio's unfiltered view
- * has no budget; it is the complete surface by definition.
+ * compact listing on `/mcp`, the published public address. stdio's unfiltered
+ * view has no budget; it is the complete surface by definition.
  */
 import {
   ALL_TOOLS_FACET,
@@ -31,26 +31,30 @@ import { listingBytes, listView } from './listing.js';
 export type HttpViewKey = Exclude<FacetKey, typeof ALL_TOOLS_FACET>;
 
 /**
- * Where `/mcp` is headed: about 25k tokens, which a host that loads the whole
- * list (ChatGPT) can afford next to a conversation. Reached by moving
- * rarely used packs to their facet and trimming the heaviest schemas, or by
- * adopting the compact view's listing (ADR-001 D3, step 2) — not by raising
- * the budget. Not enforced; the budget below is.
+ * Where `/mcp` was headed: about 25k tokens, which a host that loads the whole
+ * list (ChatGPT) can afford next to a conversation. Met on 2026-10-21, when
+ * `/mcp` adopted the compact listing (ADR-001 D3, step 3); kept as the line
+ * the default view must stay under. Not enforced; the budget below is.
  */
 export const DEFAULT_VIEW_TARGET_BYTES = 100_000;
 
 /** Bytes of `tools/list` result per view; see the module comment. */
 export const LISTING_BUDGETS: Readonly<Record<HttpViewKey, number>> = {
-  // 119,604 bytes, 95 tools on 2026-10-20, after six low-use groups moved to
-  // their facets (DEFAULT_FACET_DEMOTED_GROUPS) and the listing trims;
-  // 148,042 bytes before. payroll_record_payout then took it to 121,335 bytes,
-  // 96 tools, inside the headroom. Target: DEFAULT_VIEW_TARGET_BYTES.
-  [DEFAULT_FACET]: 126_000,
+  // 50,528 bytes, 37 tools on 2026-10-21: the compact listing, which `/mcp`
+  // serves by default (`MCP_DEFAULT_VIEW`); 121,576 bytes and 96 tools before.
+  [DEFAULT_FACET]: 53_500,
+  // Today's flat list, kept for gateways: 121,576 bytes, 96 tools on
+  // 2026-10-21, after six low-use groups moved to their facets
+  // (DEFAULT_FACET_DEMOTED_GROUPS) and the listing trims; 148,042 bytes on
+  // `/mcp` before those.
+  full: 126_000,
   readonly: 123_000, // 116,761 bytes, 84 tools on 2026-10-20
-  compact: 38_500, // 36,194 bytes, 26 tools on 2026-10-21; reaches 155
-  ops: 74_500, // 70,833 bytes, 53 tools
+  // The same listing as `/mcp`: 50,528 bytes, 37 tools on 2026-10-21, with ten
+  // more tools and `tools_call_destructive`; 36,194 and 26 before. Reaches 155.
+  compact: 53_500,
+  ops: 74_500, // 71,074 bytes, 53 tools
   catalog: 27_000, // 25,511 bytes, 34 tools
-  finance: 103_000, // 97,877 bytes, 57 tools; 99,702 and 58 with the payout
+  finance: 103_000, // 99,943 bytes, 58 tools
   marketing: 24_000, // 22,856 bytes, 17 tools
   analytics: 66_000, // 62,445 bytes, 33 tools
   onboarding: 13_500, // 12,387 bytes, 15 tools
