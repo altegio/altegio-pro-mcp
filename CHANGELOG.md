@@ -6,6 +6,22 @@ is declared stable.
 
 ## [Unreleased]
 
+### Fixed — search ranking, a quantity guard's wording, where secrets go
+
+- **`tools_search` ranks the tier a query asks for first** among matches
+  about as good: "membership type details" or "client visit history" ranks
+  the read first, "delete an appointment" the deletion. It matches singular
+  and plural forms alike: "unlink service from team member" finds
+  `services_unlink_team_member`.
+- **`visits_add_product` says what `expected_current_quantity` counts:**
+  the product's visit items on this appointment only. It said "on the visit",
+  so an agent that counted the product on every appointment of a visit could
+  be refused as stale.
+- **The live suites' secrets reach only the step that runs them**, not the
+  install steps before it.
+- **The eval runner hands the user token to hosts through their
+  environment**, never in their arguments or the files they are given.
+
 ### Changed — the dispatchers run only what a view does not list
 
 - **A dispatcher refuses a tool its view lists**, whatever the tier, and says
