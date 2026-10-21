@@ -38,16 +38,16 @@ ALTEGIO_E2E=1 CREDENTIALS_DIR=/tmp/altegio-mcp-live \
 Credentials and fixture ids come from the environment, never from a file in
 this public repository:
 
-| Variable | What it is |
-| --- | --- |
-| `ALTEGIO_API_TOKEN`, `ALTEGIO_USER_TOKEN` | Partner and user tokens with rights at the location |
-| `ALTEGIO_E2E_LOCATION_ID` | The disposable test location |
-| `ALTEGIO_E2E_CLIENT_ID` | A client with no reachable phone or email: arrived appointments can message the client |
-| `ALTEGIO_E2E_TEAM_MEMBER_ID`, `ALTEGIO_E2E_SERVICE_ID` | A team member who provides a priced service with no Bill of Materials |
-| `ALTEGIO_E2E_OPERATION_TEAM_MEMBER_ID` | A team member who may record inventory operations |
-| `ALTEGIO_E2E_PRODUCT_ID`, `ALTEGIO_E2E_INVENTORY_ID` | A cheap plain product and a sale inventory that holds it |
-| `ALTEGIO_E2E_CONSUMABLES_INVENTORY_ID` | The consumables inventory |
-| `ALTEGIO_E2E_ACCOUNT_ID` | A cash register used only by tests |
+| Variable                                               | What it is                                                                             |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `ALTEGIO_API_TOKEN`, `ALTEGIO_USER_TOKEN`              | Partner and user tokens with rights at the location                                    |
+| `ALTEGIO_E2E_LOCATION_ID`                              | The disposable test location                                                           |
+| `ALTEGIO_E2E_CLIENT_ID`                                | A client with no reachable phone or email: arrived appointments can message the client |
+| `ALTEGIO_E2E_TEAM_MEMBER_ID`, `ALTEGIO_E2E_SERVICE_ID` | A team member who provides a priced service with no Bill of Materials                  |
+| `ALTEGIO_E2E_OPERATION_TEAM_MEMBER_ID`                 | A team member who may record inventory operations                                      |
+| `ALTEGIO_E2E_PRODUCT_ID`, `ALTEGIO_E2E_INVENTORY_ID`   | A cheap plain product and a sale inventory that holds it                               |
+| `ALTEGIO_E2E_CONSUMABLES_INVENTORY_ID`                 | The consumables inventory                                                              |
+| `ALTEGIO_E2E_ACCOUNT_ID`                               | A cash register used only by tests                                                     |
 
 Rules the suites follow, and a new suite must follow too:
 

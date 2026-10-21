@@ -20,11 +20,11 @@ once per view, and scores what the host called.
 
 Tasks fall into three groups, derived from the views:
 
-| Group      | Expected tool                                                           |
-| ---------- | ----------------------------------------------------------------------- |
-| core       | listed on `/mcp` and on `/mcp/compact`                                  |
+| Group      | Expected tool                                                             |
+| ---------- | ------------------------------------------------------------------------- |
+| core       | listed on `/mcp` and on `/mcp/compact`                                    |
 | dispatched | listed on `/mcp`; on `/mcp/compact`, found and run through the dispatcher |
-| beyond     | not on `/mcp` at all; reachable only through the compact dispatcher     |
+| beyond     | not on `/mcp` at all; reachable only through the compact dispatcher       |
 
 ## Safety
 
@@ -44,15 +44,15 @@ ALTEGIO_EVAL_LOCATION_ID=… ALTEGIO_EVAL_TEAM_MEMBER_ID=… \
   npm run eval -- --host codex
 ```
 
-| Flag            | Default          | Meaning                                       |
-| --------------- | ---------------- | --------------------------------------------- |
-| `--host`        | `codex`          | `codex` (`codex exec`) or `gemini` (`gemini -p`) |
-| `--views`       | `default,compact`| views to compare                              |
-| `--tasks`       | all              | comma-separated task ids                      |
-| `--model`       | host default     | the host's model id                           |
-| `--effort`      | `medium`         | Codex reasoning effort                        |
-| `--repeat`      | `1`              | runs per task and view                        |
-| `--concurrency` | `3`              | parallel runs                                 |
+| Flag            | Default           | Meaning                                          |
+| --------------- | ----------------- | ------------------------------------------------ |
+| `--host`        | `codex`           | `codex` (`codex exec`) or `gemini` (`gemini -p`) |
+| `--views`       | `default,compact` | views to compare                                 |
+| `--tasks`       | all               | comma-separated task ids                         |
+| `--model`       | host default      | the host's model id                              |
+| `--effort`      | `medium`          | Codex reasoning effort                           |
+| `--repeat`      | `1`               | runs per task and view                           |
+| `--concurrency` | `3`               | parallel runs                                    |
 
 `CODEX_BIN` and `GEMINI_BIN` name the binaries when they are not on `PATH`.
 
