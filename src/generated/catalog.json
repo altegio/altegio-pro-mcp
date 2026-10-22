@@ -35,7 +35,7 @@
     "staff_id": "team_member_id"
   },
   "operationCount": 359,
-  "curatedCount": 122,
+  "curatedCount": 123,
   "domains": [
     {
       "domain": "altegio_plan",
@@ -31356,6 +31356,17 @@
           },
           "type": "object"
         }
+      },
+      "curation": {
+        "domain": "services",
+        "tier": "core",
+        "facets": [
+          "catalog",
+          "onboarding"
+        ],
+        "tool_name": "service_categories_create",
+        "write_allowed": false,
+        "notes": "Without weight Altegio assigns one itself (1173 on 4564, above every other category; live 2026-10-22). onboarding_add_categories creates through the same route in a batch.\n"
       }
     },
     {

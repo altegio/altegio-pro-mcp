@@ -456,6 +456,29 @@ describe('createProducts', () => {
     });
   });
 
+  it('does not read a product whose title only resembles the line', async () => {
+    const { client, calls } = setup([
+      unitsRoute,
+      categoriesRoute,
+      currencyRoute,
+      [
+        'GET',
+        /\/v2\/locations\/1\/products\/autocomplete$/,
+        200,
+        { data: [productResource()] },
+      ],
+      cardRoute(),
+      ['POST', /^\/locations\/1\/products$/, 201, created(42)],
+    ]);
+    await createProducts(client, {
+      location_id: 1,
+      skip_existing: false,
+      products: [{ title: 'Shampoo travel size', category_id: 2 }],
+    });
+    expect(calls.some((c) => /\/products\/5$/.test(c.path))).toBe(false);
+    expect(calls.filter((c) => c.method === 'POST')).toHaveLength(1);
+  });
+
   it('reports a line Altegio refuses and keeps the ones created', async () => {
     let n = 0;
     const { client } = setup([

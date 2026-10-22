@@ -197,6 +197,16 @@ operations:
     notes: >
       PUT is replacement-shaped. The curated client reads and merges the
       current service so unchanged fields and team-member links survive.
+  create_service_category:
+    domain: services
+    tier: core
+    facets: [catalog, onboarding]
+    tool_name: service_categories_create
+    write_allowed: false
+    notes: >
+      Without weight Altegio assigns one itself (1173 on 4564, above every
+      other category; live 2026-10-22). onboarding_add_categories creates
+      through the same route in a batch.
   update_service_category:
     domain: services
     tier: core

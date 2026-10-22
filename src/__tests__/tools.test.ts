@@ -91,6 +91,7 @@ describe('Tool Registration', () => {
     // Service delete + service ↔ team member links
     expect(toolNames).toContain('services_delete');
     expect(toolNames).toContain('service_categories_delete');
+    expect(toolNames).toContain('service_categories_create');
     expect(toolNames).toContain('service_categories_update');
     expect(toolNames).toContain('services_link_team_member');
     expect(toolNames).toContain('services_update_team_member_link');
@@ -132,7 +133,7 @@ describe('Tool Registration', () => {
     }
 
     // Total: 84 served factory-defined + 12 onboarding = 96 tools
-    expect(toolNames.length).toBe(166);
+    expect(toolNames.length).toBe(167);
     // stdio lists every tool, so it carries no dispatcher.
     expect(toolNames).not.toContain('tools_search');
   });

@@ -265,6 +265,7 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
       'services_unlink_team_member',
       'team_members_link_services',
       'service_categories_list',
+      'service_categories_create',
       'service_categories_update',
       'service_categories_delete',
       'team_members_list',
