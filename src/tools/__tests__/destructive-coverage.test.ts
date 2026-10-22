@@ -140,8 +140,9 @@ describe('destructive tools are gated', () => {
    * money or stock a person has to stand behind, so these ask first too. So
    * do product cards and categories: sales, receipts and consumables all read
    * the one product list, and an agent creating them in bulk from an invoice
-   * should not do so unseen. The list is explicit so the gate does not spread
-   * to ordinary creates.
+   * should not do so unseen. Service category writes ask first as a family, as
+   * do position changes: the service list and online booking show them. The
+   * list is explicit so the gate does not spread to ordinary creates.
    */
   const CONFIRMED_ADDITIVE = [
     'client_accounts_deposit',
@@ -154,6 +155,7 @@ describe('destructive tools are gated', () => {
     'product_categories_update',
     'products_create',
     'products_update',
+    'service_categories_create',
     'service_categories_update',
     'visits_add_payment',
     'visits_add_product',

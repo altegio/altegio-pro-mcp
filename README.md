@@ -6,7 +6,7 @@ A TypeScript [Model Context Protocol](https://modelcontextprotocol.io) server fo
 Altegio business owners, administrators, and team members. It provides
 administrative B2B operations, client workflows, onboarding, and analytics.
 
-**170 tools served (176 defined, 6 withheld from every view)** — see the generated
+**171 tools served (177 defined, 6 withheld from every view)** — see the generated
 [tool surface](docs/architecture/tool-surface.md) for exact membership and gates.
 The surface includes a 28-tool analytics pack, a 15-tool group events pack, a
 13-tool memberships pack, 15 visit, payment, finance and payroll tools, an 18-tool inventory

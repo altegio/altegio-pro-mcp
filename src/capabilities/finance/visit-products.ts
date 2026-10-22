@@ -212,7 +212,7 @@ export async function planSale(
   }
   if (product.sale_price === null || product.sale_unit_id === null) {
     refuse(
-      `product ${product.id} has no sale price or sale unit; set them in the product card first.`
+      `product ${product.id} has no sale price or sale unit; set them with products_update first.`
     );
   }
 

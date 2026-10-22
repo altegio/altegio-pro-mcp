@@ -505,6 +505,10 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
     what: 'the position title and description before and after',
     coveredBy: 'src/tools/__tests__/positions-categories.test.ts',
   },
+  service_categories_create: {
+    what: 'the new category title',
+    coveredBy: 'src/tools/__tests__/positions-categories.test.ts',
+  },
   service_categories_update: {
     what: 'the category title before and after',
     coveredBy: 'src/tools/__tests__/positions-categories.test.ts',

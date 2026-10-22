@@ -297,6 +297,7 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   services_unlink_team_member: 'services:write',
   service_categories_list: 'services:read',
   service_categories_delete: 'services:write',
+  service_categories_create: 'services:write',
   service_categories_update: 'services:write',
 
   // --- Appointments ---------------------------------------------------------
@@ -376,8 +377,7 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   // the Finances rights, so the scope is `finance:read`.
   suppliers_and_partners_list: 'finance:read',
   // The product catalog: the V3 preview declares `products:read` and
-  // `products:write` on its product operations. Matching incoming lines
-  // returns cost prices, like products_search, so it needs `inventory:read`.
+  // `products:write` on its product operations.
   product_categories_list: 'products:read',
   product_categories_create: 'products:write',
   product_categories_update: 'products:write',
