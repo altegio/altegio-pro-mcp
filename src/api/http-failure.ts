@@ -97,6 +97,26 @@ export interface FailureWording {
   alsoInvalid?: readonly number[];
 }
 
+/**
+ * What a caller does about HTTP 429, which the client already waited out and
+ * retried once (`AltegioClient.apiRequest`): pause, then send requests one at
+ * a time. Agents that repeated the call at once kept failing — 2,456 calls
+ * from three batch sessions in October 2026.
+ */
+export function rateLimitedMessage(
+  context: string,
+  retryAfterSeconds?: number
+): string {
+  const wait =
+    retryAfterSeconds !== undefined && retryAfterSeconds > 0
+      ? `${retryAfterSeconds} second${retryAfterSeconds === 1 ? '' : 's'}`
+      : 'a few seconds';
+  return (
+    `Altegio is limiting the request rate while trying to ${context} (HTTP 429). ` +
+    `Wait ${wait} before the next request, and send requests one at a time rather than in parallel.`
+  );
+}
+
 /** Next steps a single call names instead of the domain's own. */
 export interface FailureHints {
   /** Extra next step for a refused input. */
@@ -136,6 +156,13 @@ export function mapHttpFailure(
   ) {
     return new classes.input(
       `The API refused to ${context}. ${hints.invalid ?? 'Check the values and retry.'}${quoted}`
+    );
+  }
+  if (status === 429) {
+    return new AltegioApiError(
+      `${rateLimitedMessage(context)}${quoted}`,
+      status,
+      body
     );
   }
   if (status >= 500) {

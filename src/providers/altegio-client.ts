@@ -24,7 +24,11 @@ import { isLocationMetadataRead } from './location-read-policy.js';
 import { CredentialManager } from './credential-manager.js';
 import { prepareClientFile } from './client-file-upload.js';
 import { AuthenticationError, AltegioApiError } from '../utils/errors.js';
-import { notSignedIn, sessionExpired } from '../api/http-failure.js';
+import {
+  notSignedIn,
+  rateLimitedMessage,
+  sessionExpired,
+} from '../api/http-failure.js';
 import {
   isTimeout,
   noteUpstreamFailure,
@@ -69,8 +73,36 @@ import {
  */
 export const NETWORK_RETRY_DELAY_MS = 150;
 
+/**
+ * Wait before repeating a read the API refused with HTTP 429. V1 and V2 limit
+ * requests per second; without a `Retry-After` the next second is enough.
+ * A longer `Retry-After` is not waited out: the call fails and says how long.
+ */
+export const RATE_LIMIT_DEFAULT_WAIT_MS = 1_000;
+export const RATE_LIMIT_MAX_WAIT_MS = 5_000;
+
 /** Methods whose repeat cannot apply a change twice. */
 const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD']);
+
+/** Seconds a 429 asks to wait (`Retry-After`, seconds or a date), if it says. */
+export function retryAfterSeconds(
+  headers: Headers | undefined
+): number | undefined {
+  const raw = headers?.get?.('retry-after')?.trim();
+  if (!raw) return undefined;
+  if (/^\d+$/.test(raw)) return Number(raw);
+  const at = Date.parse(raw);
+  if (Number.isNaN(at)) return undefined;
+  return Math.max(0, Math.ceil((at - Date.now()) / 1000));
+}
+
+/** How long to wait before repeating a rate-limited read; none when too long. */
+function rateLimitWaitMs(headers: Headers | undefined): number | undefined {
+  const seconds = retryAfterSeconds(headers);
+  if (seconds === undefined) return RATE_LIMIT_DEFAULT_WAIT_MS;
+  const ms = seconds * 1000;
+  return ms <= RATE_LIMIT_MAX_WAIT_MS ? Math.max(ms, 100) : undefined;
+}
 
 const pause = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -332,22 +364,23 @@ export class AltegioClient {
       endpoint = `${path}?${params.toString()}`;
     }
 
-    // A read that got no response at all is sent once more: the dropped
-    // connection is gone, and a repeated GET changes nothing. A write is never
-    // repeated — it may have been applied before the connection dropped — and
-    // a timeout is not either, having waited long enough already.
+    // A read is sent once more when it got no response at all (the dropped
+    // connection is gone) or a 429 (the rate window moves on), and a repeated
+    // GET changes nothing. A write is never repeated — it may have been
+    // applied before the connection dropped — and a timeout is not either,
+    // having waited long enough already. One repeat at most, whatever the
+    // cause.
     const repeatable = IDEMPOTENT_METHODS.has(
       (options.method ?? 'GET').toUpperCase()
     );
     // The status (never the body) feeds the tool_call log's error class.
     for (let attempt = 1; ; attempt += 1) {
+      let response: Response;
       try {
-        const response = await fetch(`${this.apiUrl}${endpoint}`, {
+        response = await fetch(`${this.apiUrl}${endpoint}`, {
           ...options,
           headers,
         });
-        noteUpstreamResponse(response.status);
-        return response;
       } catch (error) {
         if (repeatable && attempt === 1 && !isTimeout(error)) {
           noteUpstreamRetry();
@@ -357,6 +390,17 @@ export class AltegioClient {
         noteUpstreamFailure(error);
         throw error;
       }
+      if (response.status === 429 && repeatable && attempt === 1) {
+        const wait = rateLimitWaitMs(response.headers);
+        if (wait !== undefined) {
+          await response.body?.cancel().catch(() => undefined);
+          noteUpstreamRetry();
+          await pause(wait);
+          continue;
+        }
+      }
+      noteUpstreamResponse(response.status);
+      return response;
     }
   }
 
@@ -490,6 +534,13 @@ export class AltegioClient {
         throw new AltegioApiError(
           `Not found while trying to ${context} (HTTP 404). Verify the ID is correct.${suffix}`,
           404,
+          body
+        );
+      case 429:
+        throw new AltegioApiError(
+          rateLimitedMessage(context, retryAfterSeconds(response.headers)) +
+            suffix,
+          429,
           body
         );
       default:
