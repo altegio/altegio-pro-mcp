@@ -36,8 +36,9 @@ export const pageArg = z
 
 /**
  * `page_size` with a tool-specific ceiling. The ceiling is also stated in
- * words: hosts that render a schema as a code signature drop `maximum`, and a
- * larger page size is refused rather than clamped.
+ * words: hosts that render a schema as a code signature drop `maximum`. A
+ * larger size is served at the ceiling on the first page and refused on a
+ * later one (`capPageSize` in `./input-normalization.ts`).
  */
 export function pageSizeArg(max = MAX_PAGE_SIZE, fallback = DEFAULT_PAGE_SIZE) {
   return z

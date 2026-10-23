@@ -78,8 +78,8 @@ export function formatZodIssues(
         issue.path[0] === 'page_size' &&
         typeof issue.maximum === 'number'
       ) {
-        // Never clamped: a caller that keeps its own size while following
-        // next_page would skip items. Say how to read the rest instead.
+        // Only a first page is served at the maximum (`capPageSize`): a later
+        // page at another size would skip items. Say how to read the rest.
         return (
           `page_size: at most ${issue.maximum}. Pass page_size ${issue.maximum} ` +
           'or less, then follow pagination.next_page with pagination.page_size ' +
