@@ -6,6 +6,21 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — an oversized first page is served, not refused
+
+- **A first page asked above a tool's `page_size` ceiling is served at the
+  ceiling** and says so: "page_size 300 is above this tool's maximum of 100,
+  so this page holds up to 100 items". `pagination.page_size` carries the size
+  served and `next_page` is counted in it. From 2026-10-12 to 2026-10-22 the
+  refusal failed 2,413 calls (30% of all failed calls), mostly
+  `appointments_list` and `locations_list`; a scripted client failed 97% of its
+  calls, and agents repeated the refused call unchanged in 200 sessions.
+- **A later page asked above the ceiling is still refused**, with how to read
+  on: its offset would not be the one the caller computed with its own size,
+  and reading the wrong items without an error is worse than a refusal.
+- The `tool_call` log marks a lowered first page with `page_size_capped: true`;
+  it never carries the size asked for.
+
 ### Fixed — a read is sent again after a dropped connection
 
 - **A `GET` to the Altegio API that gets no response is sent once more**,

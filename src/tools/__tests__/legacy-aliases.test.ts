@@ -129,12 +129,15 @@ describe('legacy tool aliases', () => {
     ).toEqual({ hidden_from_online_booking: false, dismissed: true });
   });
 
-  it('never clamps a former page size the replacement no longer allows', () => {
+  it('carries a former page size over as is: only a first page is lowered', () => {
     expect(
       translateLegacyArguments('get_appointments', { count: 300 })
     ).toEqual({ page_size: 300 });
     expect(
       issuesVia('get_appointments', { location_id: 1, count: 300 })
+    ).toBeUndefined();
+    expect(
+      issuesVia('get_appointments', { location_id: 1, page: 2, count: 300 })
     ).toEqual([
       expect.objectContaining({ code: 'too_big', path: ['page_size'] }),
     ]);

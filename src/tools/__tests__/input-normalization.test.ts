@@ -3,6 +3,7 @@ import { defineTool } from '../factory.js';
 import {
   acceptedKeysAt,
   canonicalInput,
+  capPageSize,
   coerceIdStrings,
   compactJsonSchema,
 } from '../input-normalization.js';
@@ -153,6 +154,47 @@ describe('helpers', () => {
         age: { type: 'integer', description: 'Age in years.' },
         changed_after: { type: 'string', format: 'date-time' },
       },
+    });
+  });
+});
+
+describe('first-page size cap', () => {
+  const paged = z
+    .object({
+      location_id: z.number().int().positive(),
+      page: z.number().int().positive().default(1),
+      page_size: z.number().int().positive().max(100).default(25),
+    })
+    .strict();
+
+  it('lowers an oversized first page to the ceiling and reports it', () => {
+    expect(capPageSize(paged, { location_id: 1, page_size: 300 })).toEqual({
+      value: { location_id: 1, page_size: 100 },
+      cap: { requested: 300, served: 100 },
+    });
+    expect(
+      capPageSize(paged, { location_id: 1, page: 1, page_size: 101 }).cap
+    ).toEqual({ requested: 101, served: 100 });
+  });
+
+  it('leaves a later page, a size within the ceiling and a non-integer alone', () => {
+    for (const args of [
+      { location_id: 1, page: 2, page_size: 300 },
+      { location_id: 1, page_size: 100 },
+      { location_id: 1, page_size: '300' },
+      { location_id: 1, page_size: 300.5 },
+    ]) {
+      expect(capPageSize(paged, args)).toEqual({ value: args });
+    }
+  });
+
+  it('leaves a tool without a page_size ceiling alone', () => {
+    const unbounded = z.object({ page_size: z.number().int() }).strict();
+    expect(capPageSize(unbounded, { page_size: 5000 })).toEqual({
+      value: { page_size: 5000 },
+    });
+    expect(capPageSize(schema, { location_id: 1, page_size: 300 })).toEqual({
+      value: { location_id: 1, page_size: 300 },
     });
   });
 });
