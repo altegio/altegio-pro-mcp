@@ -21,6 +21,17 @@ is declared stable.
 - The `tool_call` log marks a lowered first page with `page_size_capped: true`;
   it never carries the size asked for.
 
+### Fixed — a read is sent again after a dropped connection
+
+- **A `GET` to the Altegio API that gets no response is sent once more**,
+  150 ms later. These were dropped connections answered within 0.5–2 seconds:
+  about 35 failed calls a day in October 2026 (6% of failed calls), across
+  `clients_get_card`, `api_call_operation`, `clients_search`,
+  `clients_get_segment_report`, `analytics_get_overview` and others. A write
+  is never sent again, since it may have been applied before the connection
+  dropped, and neither is a request that timed out.
+- The `tool_call` log counts the repeats in `upstream_retries`.
+
 ### Fixed — `api_call_operation` sends V1 lists as lists
 
 - **A list parameter of a V1 operation goes out repeated as `name[]=…`**, as

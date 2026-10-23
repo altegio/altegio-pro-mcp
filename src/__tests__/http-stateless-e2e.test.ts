@@ -142,6 +142,57 @@ describe('sessionless tool calls, end to end', () => {
     }
   });
 
+  it('reads again after a dropped connection and logs the retry', async () => {
+    let upstreamCalls = 0;
+    jest.spyOn(global, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (!url.startsWith('https://api.alteg.io/')) {
+        return nativeFetch(input, init);
+      }
+      upstreamCalls += 1;
+      if (upstreamCalls === 1) {
+        throw Object.assign(new TypeError('fetch failed'), {
+          cause: { code: 'UND_ERR_SOCKET' },
+        });
+      }
+      return Response.json({ success: true, data: [] });
+    });
+    const toolLog = jest.spyOn(createLogger('tool-calls'), 'info');
+    const { app } = createApp();
+    const server = app.listen(0);
+    try {
+      const { port } = server.address() as AddressInfo;
+      const result = await rpcResult(
+        await nativeFetch(`http://127.0.0.1:${port}/mcp`, {
+          method: 'POST',
+          headers: {
+            accept: 'application/json, text/event-stream',
+            'content-type': 'application/json',
+            'x-altegio-user-token': 'direct-user-token',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'tools/call',
+            params: { name: 'locations_list', arguments: { page_size: 1 } },
+          }),
+        })
+      );
+      expect(result.isError).toBeFalsy();
+      expect(upstreamCalls).toBe(2);
+      const [fields] = toolLog.mock.calls.at(-1)!;
+      expect(fields).toMatchObject({
+        tool: 'locations_list',
+        outcome: 'success',
+        upstream_retries: 1,
+      });
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+
   it('logs the class and upstream status of a failed call, never its arguments', async () => {
     jest.spyOn(global, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input);
