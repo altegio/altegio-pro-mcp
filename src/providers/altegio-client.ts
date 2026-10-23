@@ -1753,21 +1753,6 @@ export class AltegioClient {
     );
   }
 
-  async getServiceCategory(
-    companyId: number,
-    categoryId: number
-  ): Promise<AltegioServiceCategory> {
-    this.requireAuth();
-
-    const response = await this.apiRequest(
-      `/service_category/${companyId}/${categoryId}`
-    );
-    return this.handleResponse<AltegioServiceCategory>(
-      response,
-      'fetch service category'
-    );
-  }
-
   /**
    * Change a service category. V2 has no service category write; V1 needs the
    * title on every call and keeps the weight and team members a call leaves

@@ -483,7 +483,7 @@ export const apiMapping: Record<string, ApiMapping> = {
     pathParams: ['location_id'],
     bodyParams: ['title', 'weight'],
   },
-  // Read first (get_service_category), then sent with the title: V1 needs it
+  // Read first from the location's list, then sent with the title: V1 needs it
   // on every call.
   service_categories_update: {
     path: '/service_category/{location_id}/{id}',

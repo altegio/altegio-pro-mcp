@@ -42,8 +42,8 @@ function fakeClient(overrides: Record<string, unknown> = {}) {
       { id: 820312, position: { id: 6, title: 'Admin' } },
     ]),
     getServiceCategories: record('getServiceCategories', () => [
-      { id: 13923772, title: '  Hair ' },
-      { id: 13923773, title: CANARY },
+      { id: 13923772, title: CANARY, weight: 3 },
+      { id: 13923773, title: '  Hair ', weight: 4 },
     ]),
     createServiceCategory: record(
       'createServiceCategory',
@@ -53,11 +53,6 @@ function fakeClient(overrides: Record<string, unknown> = {}) {
         ...(data as object),
       })
     ),
-    getServiceCategory: record('getServiceCategory', () => ({
-      id: 13923772,
-      title: CANARY,
-      weight: 3,
-    })),
     updateServiceCategory: record(
       'updateServiceCategory',
       (_l: unknown, _c: unknown, data: unknown) => ({
@@ -163,6 +158,8 @@ describe('positions_delete', () => {
 });
 
 describe('service_categories_update', () => {
+  const detail = updateServiceCategoryTool.meta.confirm!.detail!;
+
   it('sends the title it keeps with a new sort weight', async () => {
     const { client, calls } = fakeClient();
     const result = await updateServiceCategoryTool.createHandler(client)({
@@ -196,6 +193,42 @@ describe('service_categories_update', () => {
       { version: 'old', idempotency_key: 'k' }
     );
     expect(result.isError).toBe(true);
+    expect(writes(calls)).toEqual([]);
+  });
+
+  it('plans on the location list, so a reorder after a rename keeps the new title', async () => {
+    // The single read can answer the title before the rename for a while.
+    const { client, calls } = fakeClient({
+      getServiceCategories: async (...args: unknown[]) => {
+        calls.push(['getServiceCategories', args]);
+        return [{ id: 13923772, title: 'Hair renamed', weight: 3 }];
+      },
+    });
+    await updateServiceCategoryTool.createHandler(client)({
+      location_id: 4564,
+      category_id: 13923772,
+      sort_weight: 9,
+      ...TOKEN,
+    });
+    expect(calls).toEqual([
+      ['getServiceCategories', [4564]],
+      [
+        'updateServiceCategory',
+        [4564, 13923772, { title: 'Hair renamed', weight: 9 }],
+      ],
+    ]);
+  });
+
+  it('refuses a category the location does not have, before anyone is asked', async () => {
+    const { client, calls } = fakeClient();
+    const pending = detail(
+      { location_id: 4564, category_id: 99, title: 'Hair' },
+      client
+    );
+    await expect(pending).rejects.toBeInstanceOf(ConfirmationRefusal);
+    await expect(pending).rejects.toThrow(
+      'location 4564 has no service category 99'
+    );
     expect(writes(calls)).toEqual([]);
   });
 });
@@ -243,7 +276,7 @@ describe('service_categories_create', () => {
     const { client } = fakeClient();
     await expect(
       detail({ location_id: 4564, title: 'hair' }, client)
-    ).rejects.toThrow('service category 13923772 already has this title');
+    ).rejects.toThrow('service category 13923773 already has this title');
   });
 
   it('creates nothing on a repeat of a confirmed call', async () => {
@@ -255,7 +288,7 @@ describe('service_categories_create', () => {
     });
     expect(result.isError).toBe(true);
     expect(textOf(result)).toContain(
-      'Nothing was created: service category 13923772'
+      'Nothing was created: service category 13923773'
     );
     expect(summaryOf(textOf(result))).not.toContain('ignore previous');
     expect(writes(calls)).toEqual([]);

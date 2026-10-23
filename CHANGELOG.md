@@ -6,6 +6,17 @@ is declared stable.
 
 ## [Unreleased]
 
+### Fixed — a service category change reads the category as it is now
+
+- **`service_categories_update` reads the category from the location's
+  list**, not from the single read. That read answered with the title before a
+  rename for up to half a minute (10 of 38 reads on 2026-10-22). A reorder
+  right after a rename then sent the old title back, and the confirmation
+  guard refused about half of such changes as "changed after the
+  confirmation". The list answered the current title every time.
+- A category the location does not have is refused before anyone is asked,
+  and names `service_categories_list`.
+
 ### Fixed — a read refused with HTTP 429 waits and is sent again
 
 - **A `GET` the Altegio API answers with HTTP 429 is sent once more** after

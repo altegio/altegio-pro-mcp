@@ -145,8 +145,11 @@ describeLive(
         category_id: made.category,
         title: `references-live renamed ${stamp}`,
       });
+      // Read from the list: the single read can still answer the old title.
       expect(
-        await altegio.getServiceCategory(ids.LOCATION_ID, made.category)
+        (await altegio.getServiceCategories(ids.LOCATION_ID)).find(
+          (c) => c.id === made.category
+        )
       ).toMatchObject({ title: `references-live renamed ${stamp}`, weight: 3 });
 
       const reorder = await confirmedRun('service_categories_update', {

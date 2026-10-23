@@ -230,10 +230,18 @@ async function planCategoryUpdate(
       'Nothing was changed: pass a title, a sort_weight or both.'
     );
   }
-  const read = await client.getServiceCategory(
-    input.location_id,
-    input.category_id
+  // Read from the location's list: the single read (`/service_category/…`)
+  // answers with the title before a rename for up to half a minute (10 of 38
+  // reads, live 2026-10-22), and a reorder planned on it would send that title
+  // back. The list answered the current title every time.
+  const read = (await client.getServiceCategories(input.location_id)).find(
+    (c) => c.id === input.category_id
   );
+  if (!read) {
+    throw new CategoryChangeError(
+      `Nothing was changed: location ${input.location_id} has no service category ${input.category_id}. Find it with service_categories_list.`
+    );
+  }
   const before = {
     id: read.id,
     title: read.title,
