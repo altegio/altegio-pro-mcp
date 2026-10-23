@@ -30,9 +30,12 @@ import {
 import { requiredScopesFor, type ToolScope } from './scopes.js';
 import {
   acceptedKeysAt,
+  capPageSize,
   coerceIdStrings,
   compactJsonSchema,
+  type PageSizeCap,
 } from './input-normalization.js';
+import { notePageSizeCapped } from '../utils/tool-call-observation.js';
 
 export interface ToolAnnotations {
   title?: string;
@@ -155,6 +158,17 @@ function inputJsonSchema(
   };
 }
 
+/** Says that a first page was served smaller than asked, and how to read on. */
+function pageSizeCapNotice(cap: PageSizeCap): ToolContent {
+  return {
+    type: 'text',
+    text:
+      `page_size ${cap.requested} is above this tool's maximum of ${cap.served}, ` +
+      `so this page holds up to ${cap.served} items. Read on with ` +
+      'pagination.next_page and pagination.page_size from this result.',
+  };
+}
+
 export function defineTool<T extends ZodType>(
   def: ToolDefinition<T>
 ): DefinedTool<T> {
@@ -164,9 +178,10 @@ export function defineTool<T extends ZodType>(
     def.input instanceof z.ZodObject ? def.input.strict() : def.input;
   /**
    * The arguments as the schema should judge them: the confirmation token
-   * removed (the handler never sees it) and id digit strings turned into ids.
+   * removed (the handler never sees it), id digit strings turned into ids and
+   * an oversized first page lowered to the ceiling (`cap` says so).
    */
-  const normalized = (args: unknown): unknown => {
+  const prepared = (args: unknown): { value: unknown; cap?: PageSizeCap } => {
     let input: unknown = args ?? {};
     if (
       def.confirm &&
@@ -178,8 +193,9 @@ export function defineTool<T extends ZodType>(
       delete rest[CONFIRMATION_TOKEN_ARG];
       input = rest;
     }
-    return coerceIdStrings(schema, input);
+    return capPageSize(schema, coerceIdStrings(schema, input));
   };
+  const normalized = (args: unknown): unknown => prepared(args).value;
   // An unknown top-level key is answered with the keys the tool does take.
   const acceptedKeys = (path: readonly PropertyKey[]) => {
     const keys = acceptedKeysAt(schema, path);
@@ -216,7 +232,9 @@ export function defineTool<T extends ZodType>(
         withErrorHandling(
           def.name,
           async () => {
-            const input = schema.parse(normalized(args)) as z.infer<T>;
+            const { value, cap } = prepared(args);
+            const input = schema.parse(value) as z.infer<T>;
+            if (cap) notePageSizeCapped();
             const { text, structuredContent, extraContent, isError } =
               await def.handler({
                 input,
@@ -226,6 +244,7 @@ export function defineTool<T extends ZodType>(
             const result: ToolResult = {
               content: [
                 { type: 'text' as const, text },
+                ...(cap ? [pageSizeCapNotice(cap)] : []),
                 ...(extraContent ?? []),
               ],
             };

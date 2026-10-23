@@ -128,13 +128,45 @@ describe('appointments_list pages', () => {
     expect(new Set(ids).size).toBe(797);
   });
 
-  it('refuses a page size above 100', async () => {
-    const client = { getBookings: jest.fn() } as unknown as AltegioClient;
+  it('serves a first page asked above 100 at 100, and says so', async () => {
+    const all = Array.from({ length: 150 }, (_, i) => appointment(i));
+    const client = {
+      getBookings: jest.fn(
+        (_location: number, query: { page: number; count: number }) =>
+          Promise.resolve(
+            all.slice((query.page - 1) * query.count, query.page * query.count)
+          )
+      ),
+    } as unknown as AltegioClient;
     const result = await getAppointmentsTool.createHandler(client)({
       location_id: 4564,
       page_size: 300,
     });
+    expect(result.isError).toBeUndefined();
+    expect(client.getBookings).toHaveBeenCalledWith(
+      4564,
+      expect.objectContaining({ page: 1, count: 100 })
+    );
+    const content = result.structuredContent as {
+      items: unknown[];
+      pagination: { page_size: number; next_page: number | null };
+    };
+    expect(content.items).toHaveLength(100);
+    expect(content.pagination).toMatchObject({ page_size: 100, next_page: 2 });
+    expect(result.content.map((block) => block.text).join('\n')).toContain(
+      "page_size 300 is above this tool's maximum of 100"
+    );
+  });
+
+  it('refuses a later page asked above 100: its offset would be wrong', async () => {
+    const client = { getBookings: jest.fn() } as unknown as AltegioClient;
+    const result = await getAppointmentsTool.createHandler(client)({
+      location_id: 4564,
+      page: 2,
+      page_size: 300,
+    });
     expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('page_size: at most 100');
     expect(client.getBookings).not.toHaveBeenCalled();
   });
 });
