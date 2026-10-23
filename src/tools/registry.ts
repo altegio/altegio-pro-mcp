@@ -659,6 +659,9 @@ export function registerTools(
             ? { requested_tool: requested }
             : {}),
           ...(operationId ? { operation_id: operationId } : {}),
+          ...(observation.upstreamRetries
+            ? { upstream_retries: observation.upstreamRetries }
+            : {}),
         };
       };
       const inputIssues = () => inputIssuesOf.get(call.tool)?.(callArgs);

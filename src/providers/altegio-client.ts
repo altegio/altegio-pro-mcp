@@ -26,8 +26,10 @@ import { prepareClientFile } from './client-file-upload.js';
 import { AuthenticationError, AltegioApiError } from '../utils/errors.js';
 import { notSignedIn, sessionExpired } from '../api/http-failure.js';
 import {
+  isTimeout,
   noteUpstreamFailure,
   noteUpstreamResponse,
+  noteUpstreamRetry,
 } from '../utils/tool-call-observation.js';
 import { upstreamDetail } from '../tools/tool-result.js';
 import { v2Path } from '../api/altegio-http.js';
@@ -60,6 +62,19 @@ import {
  * segment is an entity id. The query string is dropped first so a numeric query
  * value (e.g. `page=2`) is never mistaken for the id.
  */
+/**
+ * Pause before repeating a read that got no response. The audited failures
+ * were dropped connections answered within 0.5–2 s (about 35 a day, 6% of
+ * failed calls in October 2026); a new connection a moment later succeeds.
+ */
+export const NETWORK_RETRY_DELAY_MS = 150;
+
+/** Methods whose repeat cannot apply a change twice. */
+const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD']);
+
+const pause = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 function companyIdFromPath(endpoint: string): number | undefined {
   const path = endpoint.split('?')[0] ?? endpoint;
   for (const segment of path.split('/')) {
@@ -317,17 +332,31 @@ export class AltegioClient {
       endpoint = `${path}?${params.toString()}`;
     }
 
+    // A read that got no response at all is sent once more: the dropped
+    // connection is gone, and a repeated GET changes nothing. A write is never
+    // repeated — it may have been applied before the connection dropped — and
+    // a timeout is not either, having waited long enough already.
+    const repeatable = IDEMPOTENT_METHODS.has(
+      (options.method ?? 'GET').toUpperCase()
+    );
     // The status (never the body) feeds the tool_call log's error class.
-    try {
-      const response = await fetch(`${this.apiUrl}${endpoint}`, {
-        ...options,
-        headers,
-      });
-      noteUpstreamResponse(response.status);
-      return response;
-    } catch (error) {
-      noteUpstreamFailure(error);
-      throw error;
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        const response = await fetch(`${this.apiUrl}${endpoint}`, {
+          ...options,
+          headers,
+        });
+        noteUpstreamResponse(response.status);
+        return response;
+      } catch (error) {
+        if (repeatable && attempt === 1 && !isTimeout(error)) {
+          noteUpstreamRetry();
+          await pause(NETWORK_RETRY_DELAY_MS);
+          continue;
+        }
+        noteUpstreamFailure(error);
+        throw error;
+      }
     }
   }
 
