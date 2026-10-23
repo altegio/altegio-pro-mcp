@@ -6,6 +6,19 @@ is declared stable.
 
 ## [Unreleased]
 
+### Fixed — a read refused with HTTP 429 waits and is sent again
+
+- **A `GET` the Altegio API answers with HTTP 429 is sent once more** after
+  the `Retry-After` it names, or one second without one (V1 and V2 limit
+  requests per second). A `Retry-After` above five seconds is not waited out,
+  and a write is never repeated. A read gets one repeat at most, whether after
+  a 429 or a dropped connection.
+- **A 429 that remains says what to do**: wait the time Altegio named (or a
+  few seconds), then send requests one at a time rather than in parallel —
+  instead of "Failed to … (HTTP 429)". From 2026-10-12 to 2026-10-22, 2,456
+  calls (31% of failed calls) failed on 429, all from three batch sessions
+  that repeated the call at once.
+
 ### Fixed — a read is sent again after a dropped connection
 
 - **A `GET` to the Altegio API that gets no response is sent once more**,
