@@ -385,8 +385,9 @@ export function buildRequest(
     const type = b.param.schema?.type;
     if (isArrayWireName(b.param.name)) {
       query[b.param.name] = listValues(b.value);
-    } else if (op.source === 'v2' && type === 'array') {
-      // V2 validates a list only in the repeated `name[]` form.
+    } else if ((op.source === 'v1' || op.source === 'v2') && type === 'array') {
+      // V1 and V2 validate a list only in the repeated `name[]` form: a
+      // comma-joined `types=8` is a string to them (HTTP 422, "must be array").
       query[`${b.param.name}[]`] = listValues(b.value);
     } else {
       query[b.param.name] = toQueryValue(b.value);
