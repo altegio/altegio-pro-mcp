@@ -30,6 +30,17 @@ is declared stable.
   dropped, and neither is a request that timed out.
 - The `tool_call` log counts the repeats in `upstream_retries`.
 
+### Fixed — `api_call_operation` sends V1 lists as lists
+
+- **A list parameter of a V1 operation goes out repeated as `name[]=…`**, as
+  V2 lists already did. It was joined into one value (`types=8`,
+  `include=state`), which V1 reads as a string and refuses with HTTP 422
+  "must be array". From 2026-10-12 to 2026-10-22 this failed 913 reads of
+  `get_sale_transaction` (about 40% of them) and every
+  `get_chain_loyalty_transaction_list` read filtered by type. The 14 V1 list
+  parameters of the catalog are affected, among them `include`,
+  `team_member_ids` and `abonements_ids`.
+
 ### Added — creating service categories
 
 - **`service_categories_create`** creates a service category, with an
