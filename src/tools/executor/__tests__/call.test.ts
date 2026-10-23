@@ -273,6 +273,38 @@ describe('api_call_operation', () => {
       ]);
     });
 
+    it('sends a V1 list parameter in the repeated `[]` form', async () => {
+      mockOk({ success: true, data: [] });
+      await callOperation(client, 'get_chain_loyalty_transaction_list', {
+        chain_id: 972132,
+        created_after: '2026-10-22',
+        created_before: '2026-10-22',
+        types: [8],
+        location_ids: '4564, 4565',
+      });
+      const params = new URL(fetchedUrl()).searchParams;
+      expect(params.getAll('types[]')).toEqual(['8']);
+      expect(params.has('types')).toBe(false);
+      // A comma-joined string is split into the same repeated form.
+      expect(params.getAll('location_ids[]')).toEqual(['4564', '4565']);
+    });
+
+    it('sends the V1 sale document include list in the repeated `[]` form', async () => {
+      mockOk({ success: true, data: { id: 9 } });
+      await callOperation(client, 'get_sale_transaction', {
+        location_id: 4564,
+        document_id: 9,
+        include: ['state', 'state.items'],
+      });
+      const url = new URL(fetchedUrl());
+      expect(url.pathname).toBe('/api/v1/locations/4564/sale/9');
+      expect(url.searchParams.getAll('include[]')).toEqual([
+        'state',
+        'state.items',
+      ]);
+      expect(url.searchParams.has('include')).toBe(false);
+    });
+
     it('passes a payload through untouched when the overlay has no projection', async () => {
       mockOk({ success: true, data: { id: 5, whatever: true } });
 
