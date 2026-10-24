@@ -197,4 +197,13 @@ describe('first-page size cap', () => {
       value: { location_id: 1, page_size: 300 },
     });
   });
+
+  it('serves no size the schema would refuse: an exclusive ceiling is no cap', () => {
+    const exclusive = z
+      .object({ page_size: z.number().int().lt(100) })
+      .strict();
+    expect(capPageSize(exclusive, { page_size: 300 })).toEqual({
+      value: { page_size: 300 },
+    });
+  });
 });

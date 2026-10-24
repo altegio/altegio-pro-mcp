@@ -146,9 +146,17 @@ export function capPageSize(
   const entry = shapeOf(unwrapSchema(schema))?.page_size;
   const core = entry ? unwrapSchema(entry) : undefined;
   if (!core || defOf(core).type !== 'number') return { value };
-  const served = (core as unknown as { _zod: { bag: { maximum?: unknown } } })
-    ._zod.bag.maximum;
-  if (typeof served !== 'number' || requested <= served) return { value };
+  // zod derives the ceiling from the checks (`_zod.bag` stays empty since
+  // 4.6). An exclusive ceiling is not a size the schema accepts: no cap.
+  const served = (core as unknown as { maxValue: number | null }).maxValue;
+  if (
+    typeof served !== 'number' ||
+    !Number.isSafeInteger(served) ||
+    requested <= served ||
+    !core.safeParse(served).success
+  ) {
+    return { value };
+  }
   return { value: { ...args, page_size: served }, cap: { requested, served } };
 }
 
