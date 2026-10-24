@@ -31,7 +31,10 @@ class LoggerFactory {
   private constructor() {
     this.defaultConfig = {
       level: process.env.LOG_LEVEL || 'info',
-      pretty: process.env.NODE_ENV !== 'production',
+      // pino-pretty runs in a worker thread per logger. Under Jest that is a
+      // thread per logger per test file, and each keeps its file's whole
+      // module graph alive, so tests log plain JSON to stderr instead.
+      pretty: !['production', 'test'].includes(process.env.NODE_ENV ?? ''),
       name: 'altegio-mcp',
     };
   }
