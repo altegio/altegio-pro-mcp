@@ -67,7 +67,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,json,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,json,md}\"",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
     "prepare": "husky",
     "api:inventory": "node scripts/api-inventory/openapi-inventory.mjs",
     "catalog:build": "node scripts/catalog/build.mjs",

@@ -228,7 +228,7 @@ analytics workflows. Discover the current inventory using `resources/list`,
 npm run typecheck
 npm run lint
 npm run format:check
-npm test -- --runInBand
+npm test
 npm run build
 npm run catalog:check
 npm run surface:check
