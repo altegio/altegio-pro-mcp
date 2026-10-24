@@ -6,6 +6,15 @@ is declared stable.
 
 ## [Unreleased]
 
+### Security
+
+- Updates for advisories published on 2026-10-23: `zod` 4.6.7 (memory
+  exhaustion on oversized constrained collections), `body-parser` 2.4.0
+  (through `express`) and `undici` 6.29.1 (through `cheerio`), both denial of
+  service. zod 4.6 no longer fills a schema's internal bounds when it is
+  defined, so the first-page size cap now reads the ceiling through
+  `maxValue`, and serves it only when the schema accepts it.
+
 ### Fixed — a service category change reads the category as it is now
 
 - **`service_categories_update` reads the category from the location's
