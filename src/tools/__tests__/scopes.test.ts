@@ -24,6 +24,7 @@ import {
   grantIsRecognised,
   missingScopes,
   requiredScopesFor,
+  requiredScopesForCall,
   scopeRefusalMessage,
   scopeSatisfied,
   type ToolScope,
@@ -52,11 +53,57 @@ describe('scope vocabulary', () => {
   it('declares which names are local placeholders, not v3 catalog names', () => {
     // If this list shrinks, the API team has published a real name for that
     // domain and the map above it should be revisited, not just renamed.
-    expect([...PLACEHOLDER_ONLY_SCOPES].sort()).toEqual([
-      'analytics:read',
-      'analytics:write',
-      'api:read',
+    expect([...PLACEHOLDER_ONLY_SCOPES].sort()).toEqual(['analytics:write']);
+  });
+});
+
+describe('the map follows the Altegio scope catalog', () => {
+  it('maps each tool to the catalog scope of the domain it reaches', () => {
+    expect(requiredScopesFor('events_list')).toEqual(['events:read']);
+    expect(requiredScopesFor('events_create')).toEqual(['events:write']);
+    expect(requiredScopesFor('events_book_clients')).toEqual([
+      'events:write',
+      'appointments:create',
     ]);
+    expect(requiredScopesFor('schedules_create')).toEqual([
+      'team_members:schedule',
+    ]);
+    expect(requiredScopesFor('onboarding_set_schedules')).toEqual([
+      'team_members:schedule',
+    ]);
+    expect(requiredScopesFor('payroll_record_payout')).toEqual(['payroll:pay']);
+    expect(requiredScopesFor('settings_get_online_booking')).toEqual([
+      'online_booking:read',
+    ]);
+    expect(requiredScopesFor('booking_forms_create')).toEqual([
+      'online_booking:configure',
+    ]);
+    expect(requiredScopesFor('appointments_find_free_slots')).toEqual([
+      'availability:read',
+    ]);
+    expect(requiredScopesFor('analytics_get_overview')).toEqual([
+      'analytics:read',
+    ]);
+  });
+
+  it('gates the executor per operation, not with an invented service scope', () => {
+    expect(requiredScopesFor('api_call_operation')).toEqual([]);
+    expect(KNOWN_SCOPES).not.toContain('api:read');
+  });
+
+  it('adds clients:read_contact when a call asks for contacts', () => {
+    expect(requiredScopesForCall('clients_search', {})).toEqual([
+      'clients:read',
+    ]);
+    expect(
+      requiredScopesForCall('clients_search', { include_contacts: true })
+    ).toEqual(['clients:read', 'clients:read_contact']);
+    expect(
+      requiredScopesForCall('api_call_operation', { include_contacts: true })
+    ).toEqual(['clients:read_contact']);
+    expect(
+      requiredScopesForCall('clients_search', { include_contacts: 'true' })
+    ).toEqual(['clients:read']);
   });
 });
 
