@@ -24,15 +24,27 @@ export interface AltegioHttp {
    * @param path  path below the API base, e.g. `/locations/1/analytics/overall`.
    * @param init  standard fetch options; `Accept`, `Accept-Language` and
    *              `Authorization` are supplied by the transport.
+   * @param scopedCompany  the location the call belongs to when the path does
+   *              not name it (`/loyalty/abonements?location_id=…`, a document
+   *              read by id): checked against the consent instead of the
+   *              first number in the path. `null` means "no location".
    */
-  request(path: string, init?: RequestInit): Promise<Response>;
+  request(
+    path: string,
+    init?: RequestInit,
+    scopedCompany?: number | null
+  ): Promise<Response>;
   /** Whether the current request has a usable user token. */
   isAuthenticated(): boolean;
 }
 
 /** Shape of the internal request plumbing the bridge borrows. */
 interface ClientInternals {
-  apiRequest?: (path: string, init?: RequestInit) => Promise<Response>;
+  apiRequest?: (
+    path: string,
+    init?: RequestInit,
+    scopedCompany?: number | null
+  ) => Promise<Response>;
 }
 
 /**
@@ -50,7 +62,10 @@ export function httpFromClient(client: AltegioClient): AltegioHttp {
     );
   }
   return {
-    request: (path, init) => request.call(client, path, init),
+    request: (path, init, scopedCompany) =>
+      scopedCompany === undefined
+        ? request.call(client, path, init)
+        : request.call(client, path, init, scopedCompany),
     isAuthenticated: () => client.isAuthenticated(),
   };
 }

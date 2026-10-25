@@ -59,6 +59,21 @@ describe('httpFromClient', () => {
     ]);
     expect(http.isAuthenticated()).toBe(true);
   });
+
+  it('forwards an explicit location for a path that does not name one', async () => {
+    const seen: unknown[][] = [];
+    const fake = {
+      [CLIENT_REQUEST_METHOD](...args: unknown[]) {
+        seen.push(args);
+        return Promise.resolve(new Response('{}'));
+      },
+      isAuthenticated: () => true,
+    } as unknown as AltegioClient;
+
+    const http = httpFromClient(fake);
+    await http.request('/loyalty/abonements', { method: 'GET' }, 4564);
+    expect(seen).toEqual([['/loyalty/abonements', { method: 'GET' }, 4564]]);
+  });
 });
 
 describe('requireUserToken', () => {

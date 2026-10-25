@@ -109,6 +109,8 @@ export interface V1CallOptions<H> {
   hints?: H;
   /** Statuses answered with `null` instead of an error. */
   tolerate?: readonly number[];
+  /** The location a path that does not name one belongs to (`AltegioHttp.request`). */
+  scopedCompany?: number | null;
 }
 
 export interface V1Envelope {
@@ -144,7 +146,8 @@ export async function v1Call<H>(
       method: options.method ?? 'GET',
       headers,
       ...(body !== undefined ? { body } : {}),
-    }
+    },
+    options.scopedCompany
   );
   const payload = await safeJson(response);
   if (options.tolerate?.includes(response.status)) return null;

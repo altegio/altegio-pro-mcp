@@ -567,7 +567,8 @@ export class InventoryAdapter implements InventoryApi {
   ): Promise<DocumentLine[]> {
     const { data } = await this.call(
       `/storage_operations/documents/goods_transactions/${documentId}`,
-      `read the lines of document ${documentId}`
+      `read the lines of document ${documentId}`,
+      { scopedCompany: locationId }
     );
     return rows(data)
       .filter((row) => !flag(row.deleted))
