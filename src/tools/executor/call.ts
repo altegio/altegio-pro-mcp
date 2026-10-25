@@ -54,7 +54,11 @@ import { DEFAULT_PAGE_SIZE, planPage, type Pagination } from './paging.js';
 import {
   assertCompanyAllowed,
   getRequestCompanyIds,
+  getRequestScopes,
+  runWithRequiredScopes,
 } from '../../request-context.js';
+import { CONTACT_SCOPE, checkToolScopes, type ToolScope } from '../scopes.js';
+import { executorScopeFor } from './scopes.js';
 
 /** Characters of payload kept in `structuredContent`. */
 export const PAYLOAD_BUDGET_CHARS = 9000;
@@ -579,6 +583,48 @@ function enforceCatalogCompanyScope(
   return null;
 }
 
+/**
+ * The scope gate the registry runs per tool, run here per operation: one
+ * tool name reaches every documented read, so the requirement is the read
+ * scope of the operation's catalog domain (`./scopes.ts`), plus
+ * `clients:read_contact` when contacts were asked for. A caller that
+ * declared no scopes (local stdio) passes, as everywhere; a declared grant
+ * that cannot be mapped to the operation's domain is refused rather than
+ * waved through.
+ */
+function requiredScopesForOperation(
+  op: CatalogOperation,
+  includeContacts: boolean
+): readonly ToolScope[] {
+  const granted = getRequestScopes();
+  const scope = executorScopeFor(op);
+  const required: ToolScope[] = scope === undefined ? [] : [scope];
+  if (includeContacts) required.push(CONTACT_SCOPE);
+  if (granted === undefined) return required;
+  if (scope === undefined) {
+    throw new ExecutorRefusalError(
+      `\`${op.operationId}\` belongs to the \`${op.domain}\` domain, which this build ` +
+        'cannot map to a permission of the connected token, so it is not run on a scoped connection. ' +
+        'Use a curated tool for this data.',
+      { operationId: op.operationId, reason: 'unmapped_operation_scope' }
+    );
+  }
+  const denial = checkToolScopes({
+    toolName: 'api_call_operation',
+    required,
+    granted,
+  });
+  if (denial) {
+    throw new ExecutorRefusalError(
+      denial.content
+        .map((part) => ('text' in part ? part.text : ''))
+        .join('\n'),
+      { operationId: op.operationId, reason: 'scope_denied', required }
+    );
+  }
+  return required;
+}
+
 // ---------------------------------------------------------------------------
 // Execution
 // ---------------------------------------------------------------------------
@@ -756,6 +802,8 @@ export async function callOperation(
     contactsParam === true ||
     contactsParam === 'true';
 
+  const required = requiredScopesForOperation(op, includeContacts);
+
   const route = chooseRoute(op, callParams);
 
   // Ask for a bounded page when the caller names no size: the result keeps
@@ -784,11 +832,11 @@ export async function callOperation(
   const endpoint =
     (route.source === 'v2' ? v2Path(built.path) : built.path) +
     (search ? `?${search}` : '');
-  const response = await client
-    .request('GET', endpoint, undefined, scopedCompany)
-    .catch((error: unknown) => {
-      throw explainedFailure(op, endpoint, error);
-    });
+  const response = await runWithRequiredScopes(required, () =>
+    client.request('GET', endpoint, undefined, scopedCompany)
+  ).catch((error: unknown) => {
+    throw explainedFailure(op, endpoint, error);
+  });
   const {
     data,
     meta,

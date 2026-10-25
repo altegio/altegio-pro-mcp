@@ -322,6 +322,68 @@ describe('token scopes gate execution, end to end', () => {
     expect(payload.result.isError).not.toBe(true);
   });
 
+  it('requires clients:read_contact only when a call asks for contacts', async () => {
+    const session = await openSession('clients:read');
+
+    const withoutContacts = await parseSse<JsonRpcToolResult>(
+      await session.call('clients_lookup', { location_id: 4564, query: 'ivan' })
+    );
+    expect(withoutContacts.result.isError).not.toBe(true);
+    expect(upstreamCalls).toHaveLength(1);
+
+    const denied = await parseSse<JsonRpcToolResult>(
+      await session.call('clients_lookup', {
+        location_id: 4564,
+        query: 'ivan',
+        include_contacts: true,
+      })
+    );
+    expect(denied.result.isError).toBe(true);
+    expect(denied.result.content[0]!.text).toContain('clients:read_contact');
+    expect(upstreamCalls).toHaveLength(1);
+
+    const contacts = await openSession('clients:read clients:read_contact');
+    const allowed = await parseSse<JsonRpcToolResult>(
+      await contacts.call('clients_lookup', {
+        location_id: 4564,
+        query: 'ivan',
+        include_contacts: true,
+      })
+    );
+    expect(allowed.result.isError).not.toBe(true);
+    expect(upstreamCalls).toHaveLength(2);
+  });
+
+  it('gates the executor by the scope of the operation it is about to run', async () => {
+    const session = await openSession('clients:read');
+
+    const allowed = await parseSse<JsonRpcToolResult>(
+      await session.call('api_call_operation', {
+        operation_id: 'get_comments',
+        params: { location_id: 4564 },
+      })
+    );
+    expect(allowed.result.isError).not.toBe(true);
+    expect(upstreamCalls.some((url) => url.includes('/comments/4564'))).toBe(
+      true
+    );
+
+    const before = upstreamCalls.length;
+    const denied = await parseSse<JsonRpcToolResult>(
+      await session.call('api_call_operation', {
+        operation_id: 'get_location_analytics_overall',
+        params: {
+          location_id: 4564,
+          date_from: '2026-10-01',
+          date_to: '2026-10-07',
+        },
+      })
+    );
+    expect(denied.result.isError).toBe(true);
+    expect(denied.result.content[0]!.text).toContain('analytics:read');
+    expect(upstreamCalls).toHaveLength(before);
+  });
+
   it('serves the same tools/list whatever the caller was granted', async () => {
     // ADR-001 D7: one path, one tool list. A tool the caller cannot execute is
     // still listed — and explains itself when called.

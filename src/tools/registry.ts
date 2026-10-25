@@ -44,11 +44,13 @@ import {
   getRequestScopes,
   requestContextFromHeaders,
   runWithContext,
+  runWithRequiredScopes,
 } from '../request-context.js';
 import { DEFAULT_PUBLIC_BASE_URL } from '../config/schema.js';
 import {
   checkToolScopes,
   requiredScopesFor,
+  requiredScopesForCall,
   type ToolScope,
 } from './scopes.js';
 import { runOnView, type ServingView } from './serving-view.js';
@@ -569,11 +571,15 @@ export function registerTools(
       // Scope check before anything else the call does. It precedes the
       // confirmation gate on purpose: a call the token cannot authorise must
       // not prompt a human, and must not make the API read that resolves the
-      // prompt's target. A caller with no declared scopes — every deployment
-      // today — passes straight through.
+      // prompt's target. A caller with no declared scopes (local stdio)
+      // passes straight through. The requirement is per call: a tool's own
+      // scopes plus `clients:read_contact` when the arguments ask for
+      // contacts; the same list is bound for the API client below, which
+      // checks it against the grant of the resource the call reaches.
+      const required = requiredScopesForCall(name, callArgs);
       const denial = checkToolScopes({
         toolName: name,
-        required: requiredScopes.get(name) ?? [],
+        required,
         granted: getRequestScopes(),
       });
       if (denial) {
@@ -604,7 +610,9 @@ export function registerTools(
         confirmed = gate.proceed;
       }
 
-      return handler(callArgs, confirmed);
+      return runWithRequiredScopes(required, () =>
+        handler(callArgs, confirmed)
+      );
     };
 
     // The SDK deliberately schedules protocol handlers on a later promise turn.
