@@ -55,6 +55,7 @@ import {
   getReportCsv,
   parseReportUri,
 } from '../capabilities/analytics/report-store.js';
+import { assertOauthTokenLive } from '../auth/oauth-door.js';
 
 export const GLOSSARY_URI = 'altegio://analytics/glossary';
 export const COVERAGE_URI = 'altegio://analytics/coverage';
@@ -477,6 +478,9 @@ export async function readAnalyticsResource(
 
   const report = parseReportUri(uri);
   if (report) {
+    // Served from memory: on an OAuth connection, ask Altegio first so a
+    // withdrawn consent cannot read a table it produced an hour ago.
+    await assertOauthTokenLive();
     const stored = getReportCsv(report.location_id, report.run_id);
     if (!stored) {
       return {
