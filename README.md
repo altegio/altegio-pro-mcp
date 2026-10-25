@@ -17,9 +17,12 @@ because their upstream report-data service is not usable.
 ## Connect
 
 The maintained HTTP endpoint is `https://mcp.alteg.io/pro`. Add it as a remote MCP
-server in your host and complete Altegio sign-in. Password-login tools are hidden
-on HTTP by default. The read-only endpoint is
-`https://mcp.alteg.io/pro/readonly`.
+server in your host: the host discovers Altegio's authorization server from the
+address, opens the Altegio sign-in and consent screen, and from then on sends one
+Altegio access token with every request. The consent names the chains and
+locations the connection may touch and the permissions it holds in each; the
+server enforces exactly that. Password-login tools are not served on HTTP. The
+read-only endpoint is `https://mcp.alteg.io/pro/readonly`.
 
 `/pro` lists 37 tools, about 50 KB: the most used tools (about 96 % of
 interactive calls) plus a dispatcher that reaches every other tool a generic
@@ -110,11 +113,28 @@ an unknown JSON-RPC method gets error -32601.
 
 ## Self-hosting and authentication
 
-The HTTP backend expects a trusted authentication proxy. It does not implement
-an OAuth authorization server. Keep the backend listener private; strip
-caller-supplied identity headers and forward only verified identity, credentials,
-location scope, and OAuth grants. Never expose a shared server token as an
+The HTTP backend expects a trusted proxy in front of it. It does not implement
+an OAuth authorization server; Altegio's own does the sign-in and consent. Keep
+the backend listener private; strip caller-supplied identity headers and
+forward only what the proxy verified. Never expose a shared server token as an
 unauthenticated public service.
+
+An Altegio OAuth access token (`ag_at_…`) arrives as `x-altegio-user-token` and
+is the whole credential: before the request reaches the MCP transport the
+server asks `GET /oauth/accessible-resources` which chains and locations the
+consent covers and which permissions the token holds in each, and
+`GET /api/v1/user/data` who holds it (the answer is kept per token for an hour
+and dropped the moment Altegio refuses the token). A refused token is answered
+`401` with `WWW-Authenticate: Bearer … resource_metadata="…"` naming the
+proxy's protected-resource document, so the host refreshes or signs in again.
+Every API call is confined to the consent at the transport: a location or chain
+outside it, or inside it without the permission the call needs, is refused
+before anything is sent; `x-mcp-auth-scope` from the proxy is ignored for such
+a token. Data the server holds locally (stored report CSVs, onboarding
+checkpoints) is served only after a fresh verdict on the token. API calls go
+out as `Authorization: Bearer <partner token>, User ag_at_…`, so the partner
+token must be the one Altegio issued to the MCP platform; the ERP web reports
+take the same header and never a `user_hash` query.
 
 `MCP_PUBLIC_BASE_URL` names the externally reachable full MCP endpoint in tool
 hints. For a local deployment this may be `http://localhost:3000/mcp`; it does not

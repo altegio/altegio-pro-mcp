@@ -6,6 +6,38 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — Altegio OAuth access tokens on the HTTP surface (RND-1975)
+
+- A connection made through Altegio's own authorization server sends an
+  `ag_at_…` access token; the server resolves it once per token with
+  `GET /oauth/accessible-resources` and `GET /api/v1/user/data`, keeps the
+  answer for an hour and forgets it the moment Altegio refuses the token.
+  A refused token is answered `401` with `WWW-Authenticate … resource_metadata`
+  naming the proxy's protected-resource document; an Altegio outage `503`.
+- Every API call is confined to the consent at the transport: a location or
+  chain outside it, or inside it without the permission the call needs, is
+  refused before anything is sent. `/chains/{id}/…` paths are checked against
+  the chain grants instead of being mistaken for a location; reads whose path
+  does not name the location (`/loyalty/abonements`, document reads by id)
+  pass it explicitly. `locations_list` and `memberships_list_chains` list only
+  what the consent covers. `x-mcp-auth-scope` from the proxy is ignored for an
+  access token.
+- The scope map follows the Altegio catalog: `events_*` require `events:*`,
+  schedules `team_members:schedule`, payouts `payroll:pay`, online-booking
+  settings `online_booking:*`, free slots `availability:read`. The executor's
+  invented `api:read` is gone; `api_call_operation` requires the read scope of
+  the operation's catalog domain. `clients:read_contact` is required whenever a
+  call passes `include_contacts: true`.
+- Stored report CSVs and onboarding checkpoints are served only after a fresh
+  verdict on the token and only for a covered location; `onboarding_status`
+  and `onboarding_resume` no longer read a checkpoint of a location outside the
+  consent.
+- The ERP web reports and `/personal_account` take the token in
+  `Authorization: Bearer <partner>, User ag_at_…` (RND-1974); `user_hash` is
+  never sent for an access token. A password login is refused on such a
+  connection. Local state is keyed by the Altegio user, so a rotated token
+  keeps its reports and checkpoints.
+
 ### Added — changing and deleting positions, changing service categories
 
 - **`positions_update`** renames a position or changes its description, and
