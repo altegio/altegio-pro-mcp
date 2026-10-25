@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { afterEach, beforeEach, describe, it, expect } from '@jest/globals';
 import {
   parseIdentityHeaders,
   parseUserToken,
@@ -15,8 +15,15 @@ import {
   requestContextFromHeaders,
   getRequestScopes,
   identityKey,
+  getRequestGrants,
+  isChainAllowed,
+  assertChainAllowed,
+  runWithRequiredScopes,
+  getRequiredScopes,
+  requestPrincipalKey,
   type RequestIdentity,
 } from '../request-context.js';
+import { oauthGrantsCache, type OauthGrants } from '../auth/oauth-access.js';
 
 describe('request-context', () => {
   describe('parseIdentityHeaders', () => {
@@ -429,5 +436,137 @@ describe('request-context', () => {
         )
       ).toThrow(/scoped to no valid companies/);
     });
+  });
+});
+
+describe('request-context: Altegio OAuth grants', () => {
+  const TOKEN = 'ag_at_request_context_test';
+  const grants: OauthGrants = {
+    userId: 42,
+    resources: [
+      {
+        type: 'location',
+        id: 4564,
+        mainChainId: 100,
+        scopes: new Set(['clients:read', 'finance:read']),
+      },
+      {
+        type: 'location',
+        id: 720441,
+        mainChainId: null,
+        scopes: new Set(['clients:read']),
+      },
+      {
+        type: 'chain',
+        id: 100,
+        mainChainId: null,
+        scopes: new Set(['chain_loyalty:read']),
+      },
+    ],
+    locationIds: new Set([4564, 720441]),
+    chainIds: new Set([100]),
+    scopes: new Set(['clients:read', 'finance:read', 'chain_loyalty:read']),
+    fetchedAt: 0,
+  };
+
+  beforeEach(() => {
+    oauthGrantsCache.clear();
+    oauthGrantsCache.set(TOKEN, grants);
+  });
+
+  afterEach(() => {
+    oauthGrantsCache.clear();
+  });
+
+  const oauthHeaders = (extra: Record<string, string> = {}) => ({
+    'x-altegio-user-token': TOKEN,
+    ...extra,
+  });
+
+  it('takes locations and scopes from the token, not from the proxy header', () => {
+    const context = requestContextFromHeaders(
+      oauthHeaders({ 'x-mcp-auth-scope': 'mcp:pro:read mcp:pro:write' })
+    );
+
+    expect(context.grants).toBe(grants);
+    expect([...(context.companyIds ?? [])].sort()).toEqual([4564, 720441]);
+    expect([...(context.scopes ?? [])].sort()).toEqual([
+      'chain_loyalty:read',
+      'clients:read',
+      'finance:read',
+    ]);
+    runWithContext(context, () => {
+      expect(getRequestGrants()).toBe(grants);
+      expect(getRequestScopes()?.has('mcp:pro:write')).toBe(false);
+    });
+  });
+
+  it('fails closed for an access token whose grants are not known', () => {
+    oauthGrantsCache.clear();
+    const context = requestContextFromHeaders(oauthHeaders());
+
+    expect(context.grants).toBeUndefined();
+    expect(context.companyIds?.size).toBe(0);
+    expect(context.scopes?.size).toBe(0);
+    runWithContext(context, () => {
+      expect(() => assertCompanyAllowed(4564)).toThrow(/no valid companies/);
+    });
+  });
+
+  it('leaves a legacy user token on the header-declared path', () => {
+    const context = requestContextFromHeaders({
+      'x-altegio-user-token': 'legacy-hash',
+      'x-mcp-auth-scope': 'mcp:pro:read',
+    });
+    expect(context.grants).toBeUndefined();
+    expect(context.companyIds).toBeUndefined();
+    expect(context.scopes).toEqual(new Set(['mcp:pro:read']));
+  });
+
+  it('allows a granted chain and refuses any other', () => {
+    runWithContext(requestContextFromHeaders(oauthHeaders()), () => {
+      expect(isChainAllowed(100)).toBe(true);
+      expect(isChainAllowed(101)).toBe(false);
+      expect(() => assertChainAllowed(100)).not.toThrow();
+      expect(() => assertChainAllowed(101)).toThrow(/chain 101/);
+    });
+  });
+
+  it('treats every chain as allowed without grants', () => {
+    runWithContext({ identity: null }, () => {
+      expect(isChainAllowed(5)).toBe(true);
+      expect(() => assertChainAllowed(5)).not.toThrow();
+    });
+  });
+
+  it("checks the call's required scopes against the location's own grant", () => {
+    runWithContext(requestContextFromHeaders(oauthHeaders()), () => {
+      runWithRequiredScopes(['finance:read'], () => {
+        expect(getRequiredScopes()).toEqual(['finance:read']);
+        expect(() => assertCompanyAllowed(4564)).not.toThrow();
+        expect(() => assertCompanyAllowed(720441)).toThrow(
+          /location 720441.*finance:read/
+        );
+      });
+      runWithRequiredScopes(['clients:read'], () => {
+        expect(() => assertCompanyAllowed(720441)).not.toThrow();
+      });
+      runWithRequiredScopes([], () => {
+        expect(() => assertCompanyAllowed(720441)).not.toThrow();
+        expect(() => assertCompanyAllowed(999)).toThrow(/999/);
+      });
+    });
+  });
+
+  it('keys local state by the Altegio user, not by the rotating token', () => {
+    runWithContext(requestContextFromHeaders(oauthHeaders()), () => {
+      expect(requestPrincipalKey()).toBe('altegio-user-42');
+    });
+    runWithContext(
+      requestContextFromHeaders({ 'x-altegio-user-token': 'legacy-hash' }),
+      () => {
+        expect(requestPrincipalKey()).toMatch(/^token-[0-9a-f]{16}$/);
+      }
+    );
   });
 });

@@ -16,6 +16,12 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import crypto from 'node:crypto';
 import { createLogger } from './utils/logger.js';
 import { AltegioApiError } from './utils/errors.js';
+import {
+  isOauthAccessToken,
+  oauthGrantsCache,
+  type OauthGrants,
+} from './auth/oauth-access.js';
+import { missingScopes, type ToolScope } from './tools/scopes.js';
 
 const logger = createLogger('request-context');
 
@@ -228,13 +234,40 @@ export interface RequestContext {
   companyIds?: ReadonlySet<number>;
   /** Trusted OAuth grants forwarded by the proxy, independent of identity. */
   scopes?: ReadonlySet<string>;
+  /**
+   * What an Altegio OAuth access token (`ag_at_…`) may do, resolved by the
+   * HTTP door and kept per token (`src/auth/oauth-access.ts`). When present,
+   * `companyIds` and `scopes` are derived from it and nothing the proxy or
+   * the client sent in headers can widen them.
+   */
+  grants?: OauthGrants;
 }
 
-/** Build the complete request context from HTTP headers in one place. */
+/**
+ * Build the complete request context from HTTP headers in one place.
+ *
+ * An Altegio OAuth access token is the whole credential: its grants decide
+ * the locations, chains and scopes. The proxy's `x-mcp-auth-scope` and the
+ * caller's `X-Altegio-Company-Id` are ignored for it, and a token whose grants
+ * are not known (the door did not run, or the entry expired) confines the
+ * request to nothing rather than to everything.
+ */
 export function requestContextFromHeaders(headers: HeaderBag): RequestContext {
+  const identity = parseIdentityHeaders(headers);
+  const userToken = parseUserToken(headers);
+  if (userToken !== undefined && isOauthAccessToken(userToken)) {
+    const grants = oauthGrantsCache.get(userToken);
+    return {
+      identity,
+      userToken,
+      grants,
+      companyIds: grants?.locationIds ?? new Set<number>(),
+      scopes: grants?.scopes ?? new Set<string>(),
+    };
+  }
   return {
-    identity: parseIdentityHeaders(headers),
-    userToken: parseUserToken(headers),
+    identity,
+    userToken,
     partnerToken: parsePartnerToken(headers),
     companyIds: parseCompanyIds(headers),
     scopes: parseScopes(headerValue(headers, 'x-mcp-auth-scope')),
@@ -242,6 +275,64 @@ export function requestContextFromHeaders(headers: HeaderBag): RequestContext {
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();
+
+/** The scopes the running tool call requires, bound by the registry. */
+const requiredScopesStorage = new AsyncLocalStorage<readonly ToolScope[]>();
+
+/**
+ * Run `fn` with the scopes the current tool call requires bound, so the API
+ * client can check them against the grant of the resource a call reaches —
+ * the registry gate only knows the union across resources.
+ */
+export function runWithRequiredScopes<T>(
+  scopes: readonly string[],
+  fn: () => T
+): T {
+  return requiredScopesStorage.run(scopes as readonly ToolScope[], fn);
+}
+
+/** The scopes the running tool call requires; `[]` outside a tool call. */
+export function getRequiredScopes(): readonly ToolScope[] {
+  return requiredScopesStorage.getStore() ?? [];
+}
+
+/** The grants of the current request's Altegio access token, if any. */
+export function getRequestGrants(): OauthGrants | undefined {
+  return storage.getStore()?.grants;
+}
+
+/**
+ * Whether `chainId` is covered by the current request's consent. `true`
+ * without grants: chains were never confined by the header-declared scope.
+ */
+export function isChainAllowed(chainId: number): boolean {
+  const grants = getRequestGrants();
+  return grants === undefined || grants.chainIds.has(chainId);
+}
+
+/** Refuse a chain the consent does not cover (`/chains/{id}/…` calls). */
+export function assertChainAllowed(chainId: number): void {
+  const grants = getRequestGrants();
+  if (grants === undefined) return;
+  const resource = grants.resources.find(
+    (r) => r.type === 'chain' && r.id === chainId
+  );
+  if (!resource) {
+    throw new AltegioApiError(
+      `This connection's Altegio consent does not include chain ${chainId}. ` +
+        `Reconnect with access to that chain to work with it.`,
+      403
+    );
+  }
+  const missing = missingScopes(resource.scopes, getRequiredScopes());
+  if (missing.length > 0) {
+    throw new AltegioApiError(
+      `This connection's Altegio consent covers chain ${chainId} without the ` +
+        `permission${missing.length === 1 ? '' : 's'} this call needs: ${missing.join(', ')}.`,
+      403
+    );
+  }
+}
 
 /**
  * Run `fn` with a full request context (identity + optional direct token)
@@ -324,6 +415,35 @@ export function isCompanyAllowed(companyId: number): boolean {
  * confined without having to remember to add a check.
  */
 export function assertCompanyAllowed(companyId: number): void {
+  const context = storage.getStore();
+  if (context?.grants) {
+    const resource = context.grants.resources.find(
+      (r) => r.type === 'location' && r.id === companyId
+    );
+    if (!resource) {
+      throw new AltegioApiError(
+        `This connection's Altegio consent does not include location ${companyId}. ` +
+          `Call locations_list for the locations it covers, or reconnect with access to this one.`,
+        403
+      );
+    }
+    const missing = missingScopes(resource.scopes, getRequiredScopes());
+    if (missing.length > 0) {
+      throw new AltegioApiError(
+        `This connection's Altegio consent covers location ${companyId} without the ` +
+          `permission${missing.length === 1 ? '' : 's'} this call needs: ${missing.join(', ')}. ` +
+          `The person who connected has to re-authorise with ${missing.length === 1 ? 'it' : 'them'} in that location.`,
+        403
+      );
+    }
+    return;
+  }
+  if (context?.userToken && isOauthAccessToken(context.userToken)) {
+    throw new AltegioApiError(
+      'This request is scoped to no valid companies: the Altegio access token has no known grants. Reconnect Altegio in your MCP client and retry.',
+      403
+    );
+  }
   const scope = getRequestCompanyIds();
   if (scope !== undefined && !scope.has(companyId)) {
     if (scope.size === 0) {
@@ -411,6 +531,8 @@ export function getRequestScopes(): ReadonlySet<string> | undefined {
 export function requestPrincipalKey(): string | undefined {
   const context = storage.getStore();
   if (context === undefined) return undefined;
+  // An access token rotates every hour; the person behind it does not.
+  if (context.grants) return `altegio-user-${context.grants.userId}`;
   if (context.userToken) {
     return `token-${crypto
       .createHash('sha256')
