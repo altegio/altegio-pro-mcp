@@ -46,6 +46,99 @@ is declared stable.
   connection. Local state is keyed by the Altegio user, so a rotated token
   keeps its reports and checkpoints.
 
+### Security
+
+- Updates for advisories published on 2026-10-23: `zod` 4.6.7 (memory
+  exhaustion on oversized constrained collections), `body-parser` 2.4.0
+  (through `express`) and `undici` 6.29.1 (through `cheerio`), both denial of
+  service. zod 4.6 no longer fills a schema's internal bounds when it is
+  defined, so the first-page size cap now reads the ceiling through
+  `maxValue`, and serves it only when the schema accepts it.
+
+### Fixed — a service category change reads the category as it is now
+
+- **`service_categories_update` reads the category from the location's
+  list**, not from the single read. That read answered with the title before a
+  rename for up to half a minute (10 of 38 reads on 2026-10-22). A reorder
+  right after a rename then sent the old title back, and the confirmation
+  guard refused about half of such changes as "changed after the
+  confirmation". The list answered the current title every time.
+- A category the location does not have is refused before anyone is asked,
+  and names `service_categories_list`.
+
+### Fixed — a read refused with HTTP 429 waits and is sent again
+
+- **A `GET` the Altegio API answers with HTTP 429 is sent once more** after
+  the `Retry-After` it names, or one second without one (V1 and V2 limit
+  requests per second). A `Retry-After` above five seconds is not waited out,
+  and a write is never repeated. A read gets one repeat at most, whether after
+  a 429 or a dropped connection.
+- **A 429 that remains says what to do**: wait the time Altegio named (or a
+  few seconds), then send requests one at a time rather than in parallel —
+  instead of "Failed to … (HTTP 429)". From 2026-10-12 to 2026-10-22, 2,456
+  calls (31% of failed calls) failed on 429, all from three batch sessions
+  that repeated the call at once.
+
+### Changed — an oversized first page is served, not refused
+
+- **A first page asked above a tool's `page_size` ceiling is served at the
+  ceiling** and says so: "page_size 300 is above this tool's maximum of 100,
+  so this page holds up to 100 items". `pagination.page_size` carries the size
+  served and `next_page` is counted in it. From 2026-10-12 to 2026-10-22 the
+  refusal failed 2,413 calls (30% of all failed calls), mostly
+  `appointments_list` and `locations_list`; a scripted client failed 97% of its
+  calls, and agents repeated the refused call unchanged in 200 sessions.
+- **A later page asked above the ceiling is still refused**, with how to read
+  on: its offset would not be the one the caller computed with its own size,
+  and reading the wrong items without an error is worse than a refusal.
+- The `tool_call` log marks a lowered first page with `page_size_capped: true`;
+  it never carries the size asked for.
+
+### Fixed — a read is sent again after a dropped connection
+
+- **A `GET` to the Altegio API that gets no response is sent once more**,
+  150 ms later. These were dropped connections answered within 0.5–2 seconds:
+  about 35 failed calls a day in October 2026 (6% of failed calls), across
+  `clients_get_card`, `api_call_operation`, `clients_search`,
+  `clients_get_segment_report`, `analytics_get_overview` and others. A write
+  is never sent again, since it may have been applied before the connection
+  dropped, and neither is a request that timed out.
+- The `tool_call` log counts the repeats in `upstream_retries`.
+
+### Fixed — `api_call_operation` sends V1 lists as lists
+
+- **A list parameter of a V1 operation goes out repeated as `name[]=…`**, as
+  V2 lists already did. It was joined into one value (`types=8`,
+  `include=state`), which V1 reads as a string and refuses with HTTP 422
+  "must be array". From 2026-10-12 to 2026-10-22 this failed 913 reads of
+  `get_sale_transaction` (about 40% of them) and every
+  `get_chain_loyalty_transaction_list` read filtered by type. The 14 V1 list
+  parameters of the catalog are affected, among them `include`,
+  `team_member_ids` and `abonements_ids`.
+
+### Added — creating service categories
+
+- **`service_categories_create`** creates a service category, with an
+  optional sort weight, on the documented V1 route; without one Altegio picks
+  the weight. A category with the same title at the location refuses the
+  call, so a repeated confirmed call creates nothing twice. It asks for
+  confirmation first, like changing and deleting a category, and is served on
+  `/pro/catalog`, `/pro/full` and through the dispatcher on `/pro`.
+  `onboarding_add_categories` still creates them in a batch during
+  onboarding.
+- The service category tools are grouped as "Service categories" instead of
+  "Categories", since product categories are grouped under "Inventory".
+
+### Changed — exact duplicates only, and "product" for a product
+
+- `products_create` looks only for exact duplicates — the same barcode,
+  article number or title — and no longer reads every product whose title
+  merely resembles a line, which it then ignored. The comments that described
+  a separate matching tool are gone.
+- Descriptions and confirmations of the `products_*` tools say "product", as
+  the glossary does, instead of "product card"; `visits_add_product` points a
+  product without a sale price or unit to `products_update`.
+
 ### Added — changing and deleting positions, changing service categories
 
 - **`positions_update`** renames a position or changes its description, and
@@ -85,16 +178,16 @@ is declared stable.
 - Both run on the documented V1 routes, ask for confirmation first, and are
   served on `/pro/finance` and through the dispatcher on `/pro`.
 
-### Added — the product catalog: product cards and categories, with a duplicate check
+### Added — the product catalog: products and categories, with a duplicate check
 
-- **`products_create`** creates up to 25 product cards in one confirmed call
+- **`products_create`** creates up to 25 products in one confirmed call
   — the new lines of a supplier invoice — with category, sale and cost price,
   sale and consumable units (by id or short title, such as `pcs` or `ml`),
   article number and barcode. Each line is checked against the existing
   products first: a same barcode, article number or title refuses the call,
   or with `skip_existing` only skips that line, so a repeated confirmed call
   creates nothing twice. Stock is not changed.
-- **`products_update`** changes a card — name, category, prices, units,
+- **`products_update`** changes a product — name, category, prices, units,
   article number, barcode, receipt name, comment, critical and desired stock —
   and sends the rest back unchanged; a unit change carries the conversion
   rules Altegio needs once stock has moved. **`products_archive`** archives a
@@ -106,7 +199,7 @@ is declared stable.
   an executor read (`api_call_operation` `list_product_units`), and similar
   product names stay with `products_search`.
 - Every write asks for confirmation first; changes show before → after and
-  are refused if the card or category moved after that. The writes run on the
+  are refused if the product or category moved after that. The writes run on the
   documented V1 routes (V2 reads products, categories and units but writes
   none) and send float fields with a decimal point, which V1 requires
   (`10.0`, not `10`). The new tools are served on `/pro/finance` and reached

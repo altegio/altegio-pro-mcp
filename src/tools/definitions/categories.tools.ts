@@ -12,7 +12,7 @@ import {
 
 export const getServiceCategoriesTool = defineTool({
   name: 'service_categories_list',
-  category: 'Categories',
+  category: 'Service categories',
   description:
     'Service categories of a location (how services are grouped). Paged by id with total.',
   annotations: {
@@ -65,7 +65,7 @@ export const getServiceCategoriesTool = defineTool({
 
 export const deleteServiceCategoryTool = defineTool({
   name: 'service_categories_delete',
-  category: 'Categories',
+  category: 'Service categories',
   description:
     'Delete a service category; delete or move its services first. A 403 on a chain-owned category is an ownership boundary — do not retry.',
   annotations: {
@@ -107,10 +107,105 @@ export const deleteServiceCategoryTool = defineTool({
   },
 });
 
-// ========== changing a service category ==========
-
 /** A change the call cannot make; nothing was sent. */
 class CategoryChangeError extends Error {}
+
+/** The same refusal, worded for the confirmation that shows it. */
+function refusalOf(error: CategoryChangeError): ConfirmationRefusal {
+  return new ConfirmationRefusal(
+    error.message.replace(/^Nothing was (changed|created): /, '')
+  );
+}
+
+// ========== creating a service category ==========
+
+interface CategoryCreateInput {
+  location_id: number;
+  title: string;
+  sort_weight?: number;
+}
+
+/**
+ * A category with the same title refuses the create, so a repeated confirmed
+ * call creates nothing twice.
+ */
+async function refuseTwin(
+  client: AltegioClient,
+  input: CategoryCreateInput
+): Promise<void> {
+  const title = input.title.trim().toLocaleLowerCase();
+  const twin = (await client.getServiceCategories(input.location_id)).find(
+    (c) => (c.title ?? '').trim().toLocaleLowerCase() === title
+  );
+  if (twin) {
+    throw new CategoryChangeError(
+      `Nothing was created: service category ${twin.id} already has this title. Use it, or give the new category another title.`
+    );
+  }
+}
+
+export const createServiceCategoryTool = defineTool({
+  name: 'service_categories_create',
+  category: 'Service categories',
+  description:
+    'Create a service category; file services under it with services_create or services_update. Refused when the location already has a category with this title. Asks for confirmation first.',
+  annotations: {
+    title: 'Create Service Category',
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: true,
+  },
+  input: z.object({
+    location_id: z.number().int().positive().describe('Location ID'),
+    title: z.string().trim().min(1).max(100).describe('Category title.'),
+    sort_weight: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe(
+        'Sort weight that orders the categories (the API’s weight). Default: Altegio picks one.'
+      ),
+  }),
+  confirm: {
+    action: 'Create service category',
+    target: (input) => `a service category at location ${input.location_id}`,
+    consequence:
+      'A new, empty service category is added to the location’s service list. Delete it with service_categories_delete while it holds no services.',
+    detail: async (input, client) => {
+      try {
+        await refuseTwin(client, input);
+      } catch (error) {
+        if (error instanceof CategoryChangeError) throw refusalOf(error);
+        throw error;
+      }
+      return input.sort_weight === undefined
+        ? 'Sort weight: Altegio picks one.'
+        : `Sort weight: ${input.sort_weight}.`;
+    },
+  },
+  handler: async ({ input, client }) => {
+    await refuseTwin(client, input);
+    const created = await client.createServiceCategory(input.location_id, {
+      title: input.title,
+      ...(input.sort_weight !== undefined ? { weight: input.sort_weight } : {}),
+    });
+    const weight = typeof created.weight === 'number' ? created.weight : null;
+    return {
+      text: withUntrustedBlock(
+        `Created service category ${created.id} at location ${input.location_id}, sort weight ${weight ?? 'not reported'}. File services under it with category_id ${created.id} (services_create, services_update).`,
+        [{ label: `category ${created.id} title`, value: created.title }],
+        { maxChars: 200 }
+      ),
+      structuredContent: {
+        location_id: input.location_id,
+        category: { id: created.id, title: created.title, sort_weight: weight },
+      },
+    };
+  },
+});
+
+// ========== changing a service category ==========
 
 interface CategoryUpdateInput {
   location_id: number;
@@ -135,10 +230,18 @@ async function planCategoryUpdate(
       'Nothing was changed: pass a title, a sort_weight or both.'
     );
   }
-  const read = await client.getServiceCategory(
-    input.location_id,
-    input.category_id
+  // Read from the location's list: the single read (`/service_category/…`)
+  // answers with the title before a rename for up to half a minute (10 of 38
+  // reads, live 2026-10-22), and a reorder planned on it would send that title
+  // back. The list answered the current title every time.
+  const read = (await client.getServiceCategories(input.location_id)).find(
+    (c) => c.id === input.category_id
   );
+  if (!read) {
+    throw new CategoryChangeError(
+      `Nothing was changed: location ${input.location_id} has no service category ${input.category_id}. Find it with service_categories_list.`
+    );
+  }
   const before = {
     id: read.id,
     title: read.title,
@@ -194,9 +297,9 @@ function refuseMoved(
 
 export const updateServiceCategoryTool = defineTool({
   name: 'service_categories_update',
-  category: 'Categories',
+  category: 'Service categories',
   description:
-    'Rename a service category or change its sort weight; its services and team members stay. Create categories with onboarding_add_categories. Asks for confirmation first, showing before → after; refused if the category changes after that. A 403 on a chain-owned category is an ownership boundary — do not retry.',
+    'Rename a service category or change its sort weight; its services and team members stay. Create one with service_categories_create. Asks for confirmation first, showing before → after; refused if the category changes after that. A 403 on a chain-owned category is an ownership boundary — do not retry.',
   annotations: {
     title: 'Update Service Category',
     destructiveHint: false,
@@ -232,11 +335,7 @@ export const updateServiceCategoryTool = defineTool({
           version: plan.version,
         };
       } catch (error) {
-        if (error instanceof CategoryChangeError) {
-          throw new ConfirmationRefusal(
-            error.message.replace(/^Nothing was changed: /, '')
-          );
-        }
+        if (error instanceof CategoryChangeError) throw refusalOf(error);
         throw error;
       }
     },

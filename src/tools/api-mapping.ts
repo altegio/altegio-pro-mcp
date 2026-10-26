@@ -475,7 +475,15 @@ export const apiMapping: Record<string, ApiMapping> = {
     pathParams: ['location_id', 'id'],
     queryParams: ['page', 'count'],
   },
-  // Read first (get_service_category), then sent with the title: V1 needs it
+  // The list is read first: a category with the same title refuses the create.
+  service_categories_create: {
+    path: '/service_categories/{location_id}',
+    method: 'post',
+    operationId: 'create_service_category',
+    pathParams: ['location_id'],
+    bodyParams: ['title', 'weight'],
+  },
+  // Read first from the location's list, then sent with the title: V1 needs it
   // on every call.
   service_categories_update: {
     path: '/service_category/{location_id}/{id}',

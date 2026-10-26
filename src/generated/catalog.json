@@ -35,7 +35,7 @@
     "staff_id": "team_member_id"
   },
   "operationCount": 359,
-  "curatedCount": 122,
+  "curatedCount": 123,
   "domains": [
     {
       "domain": "altegio_plan",
@@ -31356,6 +31356,17 @@
           },
           "type": "object"
         }
+      },
+      "curation": {
+        "domain": "services",
+        "tier": "core",
+        "facets": [
+          "catalog",
+          "onboarding"
+        ],
+        "tool_name": "service_categories_create",
+        "write_allowed": false,
+        "notes": "Without weight Altegio assigns one itself (1173 on 4564, above every other category; live 2026-10-22). onboarding_add_categories creates through the same route in a batch.\n"
       }
     },
     {
@@ -52295,20 +52306,21 @@
                   "type": "string"
                 },
                 "created_at": {
-                  "description": "UTC.",
+                  "description": "UTC; `null` when the creation date is not stored.",
                   "format": "date-time",
                   "readOnly": true,
-                  "type": "string"
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "currency": {
                   "description": "ISO 4217 currency of the Location. Server-controlled.",
                   "readOnly": true,
                   "type": "string"
                 },
-                "datetime_format": {
-                  "type": "string"
-                },
                 "description": {
+                  "description": "HTML fragment as entered in the Altegio editor; untrusted, sanitize it before rendering. `null` when empty.",
                   "type": [
                     "string",
                     "null"
@@ -52317,10 +52329,6 @@
                 "id": {
                   "readOnly": true,
                   "type": "integer"
-                },
-                "language": {
-                  "description": "BCP 47 language tag.",
-                  "type": "string"
                 },
                 "name": {
                   "type": "string"
@@ -52333,7 +52341,7 @@
                   "type": "string"
                 },
                 "phones": {
-                  "description": "Business contact phone numbers in international format.",
+                  "description": "Business contact phone numbers in E.164 (`+` and digits, no separators). Numbers that cannot be parsed as E.164 are omitted.",
                   "items": {
                     "type": "string"
                   },
@@ -52349,16 +52357,6 @@
                   "description": "Canonical IANA timezone of the Location (e.g. `Europe/Lisbon`).",
                   "readOnly": true,
                   "type": "string"
-                },
-                "unique_visit_time_interval": {
-                  "description": "Visit grouping interval in seconds: `-1` groups all appointments of the day, `0` keeps each appointment separate, positive values group by interval.",
-                  "type": "integer"
-                },
-                "updated_at": {
-                  "description": "UTC.",
-                  "format": "date-time",
-                  "readOnly": true,
-                  "type": "string"
                 }
               },
               "required": [
@@ -52369,9 +52367,13 @@
                 "country_code",
                 "currency",
                 "city_id",
-                "language",
-                "datetime_format",
-                "unique_visit_time_interval"
+                "description",
+                "business_type_id",
+                "address",
+                "coordinates",
+                "phones",
+                "site",
+                "created_at"
               ],
               "type": "object"
             },
@@ -52477,20 +52479,21 @@
               "type": "string"
             },
             "created_at": {
-              "description": "UTC.",
+              "description": "UTC; `null` when the creation date is not stored.",
               "format": "date-time",
               "readOnly": true,
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "currency": {
               "description": "ISO 4217 currency of the Location. Server-controlled.",
               "readOnly": true,
               "type": "string"
             },
-            "datetime_format": {
-              "type": "string"
-            },
             "description": {
+              "description": "HTML fragment as entered in the Altegio editor; untrusted, sanitize it before rendering. `null` when empty.",
               "type": [
                 "string",
                 "null"
@@ -52499,10 +52502,6 @@
             "id": {
               "readOnly": true,
               "type": "integer"
-            },
-            "language": {
-              "description": "BCP 47 language tag.",
-              "type": "string"
             },
             "name": {
               "type": "string"
@@ -52515,7 +52514,7 @@
               "type": "string"
             },
             "phones": {
-              "description": "Business contact phone numbers in international format.",
+              "description": "Business contact phone numbers in E.164 (`+` and digits, no separators). Numbers that cannot be parsed as E.164 are omitted.",
               "items": {
                 "type": "string"
               },
@@ -52531,16 +52530,6 @@
               "description": "Canonical IANA timezone of the Location (e.g. `Europe/Lisbon`).",
               "readOnly": true,
               "type": "string"
-            },
-            "unique_visit_time_interval": {
-              "description": "Visit grouping interval in seconds: `-1` groups all appointments of the day, `0` keeps each appointment separate, positive values group by interval.",
-              "type": "integer"
-            },
-            "updated_at": {
-              "description": "UTC.",
-              "format": "date-time",
-              "readOnly": true,
-              "type": "string"
             }
           },
           "required": [
@@ -52551,9 +52540,13 @@
             "country_code",
             "currency",
             "city_id",
-            "language",
-            "datetime_format",
-            "unique_visit_time_interval"
+            "description",
+            "business_type_id",
+            "address",
+            "coordinates",
+            "phones",
+            "site",
+            "created_at"
           ],
           "type": "object"
         }
@@ -52660,10 +52653,6 @@
                 "string",
                 "null"
               ]
-            },
-            "unique_visit_time_interval": {
-              "description": "Visit grouping interval in seconds: `-1` groups all appointments of the day, `0` keeps each appointment separate, positive values group by interval.",
-              "type": "integer"
             }
           },
           "type": "object"
@@ -52717,20 +52706,21 @@
               "type": "string"
             },
             "created_at": {
-              "description": "UTC.",
+              "description": "UTC; `null` when the creation date is not stored.",
               "format": "date-time",
               "readOnly": true,
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "currency": {
               "description": "ISO 4217 currency of the Location. Server-controlled.",
               "readOnly": true,
               "type": "string"
             },
-            "datetime_format": {
-              "type": "string"
-            },
             "description": {
+              "description": "HTML fragment as entered in the Altegio editor; untrusted, sanitize it before rendering. `null` when empty.",
               "type": [
                 "string",
                 "null"
@@ -52739,10 +52729,6 @@
             "id": {
               "readOnly": true,
               "type": "integer"
-            },
-            "language": {
-              "description": "BCP 47 language tag.",
-              "type": "string"
             },
             "name": {
               "type": "string"
@@ -52755,7 +52741,7 @@
               "type": "string"
             },
             "phones": {
-              "description": "Business contact phone numbers in international format.",
+              "description": "Business contact phone numbers in E.164 (`+` and digits, no separators). Numbers that cannot be parsed as E.164 are omitted.",
               "items": {
                 "type": "string"
               },
@@ -52771,16 +52757,6 @@
               "description": "Canonical IANA timezone of the Location (e.g. `Europe/Lisbon`).",
               "readOnly": true,
               "type": "string"
-            },
-            "unique_visit_time_interval": {
-              "description": "Visit grouping interval in seconds: `-1` groups all appointments of the day, `0` keeps each appointment separate, positive values group by interval.",
-              "type": "integer"
-            },
-            "updated_at": {
-              "description": "UTC.",
-              "format": "date-time",
-              "readOnly": true,
-              "type": "string"
             }
           },
           "required": [
@@ -52791,9 +52767,13 @@
             "country_code",
             "currency",
             "city_id",
-            "language",
-            "datetime_format",
-            "unique_visit_time_interval"
+            "description",
+            "business_type_id",
+            "address",
+            "coordinates",
+            "phones",
+            "site",
+            "created_at"
           ],
           "type": "object"
         }
@@ -59483,7 +59463,7 @@
       "path": "/locations/{location_id}/service_categories",
       "displayPath": "/locations/{location_id}/service_categories",
       "summary": "List service categories",
-      "description": "Returns the service categories of the Location. Use a category `id` as `category_id`\nwhen creating services.\n\n\nCursor-paginated list. Default ordering: weight desc, name, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
+      "description": "Returns the service categories of the Location. Use a category `id` as `category_id`\nwhen creating services.\n\n\nCursor-paginated list. Default ordering: `id` ascending. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
       "tags": [
         "Services"
       ],
@@ -59580,7 +59560,7 @@
                         "x-truncated": true
                       },
                       "weight": {
-                        "description": "Ordering weight (higher sorts first).",
+                        "description": "Display order the business set in Altegio (higher first). Lists are ordered by `id`; sort by `weight` on the client.",
                         "type": "integer",
                         "x-truncated": true
                       }
@@ -59588,7 +59568,8 @@
                     "required": [
                       "id",
                       "object",
-                      "name"
+                      "name",
+                      "weight"
                     ],
                     "type": "object"
                   },
@@ -59676,14 +59657,15 @@
               "type": "string"
             },
             "weight": {
-              "description": "Ordering weight (higher sorts first).",
+              "description": "Display order the business set in Altegio (higher first). Lists are ordered by `id`; sort by `weight` on the client.",
               "type": "integer"
             }
           },
           "required": [
             "id",
             "object",
-            "name"
+            "name",
+            "weight"
           ],
           "type": "object"
         }
@@ -59767,14 +59749,15 @@
               "type": "string"
             },
             "weight": {
-              "description": "Ordering weight (higher sorts first).",
+              "description": "Display order the business set in Altegio (higher first). Lists are ordered by `id`; sort by `weight` on the client.",
               "type": "integer"
             }
           },
           "required": [
             "id",
             "object",
-            "name"
+            "name",
+            "weight"
           ],
           "type": "object"
         }
@@ -59832,7 +59815,7 @@
       "path": "/locations/{location_id}/services",
       "displayPath": "/locations/{location_id}/services",
       "summary": "List services",
-      "description": "Returns the services of the Location as a cursor-paginated list. Prices are integer\nminor units; `duration_seconds` is the default duration, and `team_members[]` carries\nper-member price/duration overrides.\n\n\nCursor-paginated list. Default ordering: category_id, name, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
+      "description": "Returns the services of the Location as a cursor-paginated list. Prices are integer\nminor units; `duration_seconds` is the default duration, and `team_members[]` lists the\nTeam Members providing the service by id.\n\n\nCursor-paginated list. Default ordering: `id` ascending. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
       "tags": [
         "Services"
       ],
@@ -59918,13 +59901,19 @@
                     "description": "A bookable service of the Location.",
                     "properties": {
                       "category_id": {
-                        "description": "Service category (`listServiceCategories`).",
-                        "type": "integer",
+                        "description": "Service category (`listServiceCategories`); `null` when the category is not listed in this Location.",
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
                         "x-truncated": true
                       },
                       "created_at": {
-                        "description": "UTC.",
-                        "type": "string",
+                        "description": "UTC; `null` when the creation date is not stored.",
+                        "type": [
+                          "string",
+                          "null"
+                        ],
                         "x-truncated": true
                       },
                       "currency": {
@@ -59933,7 +59922,7 @@
                         "x-truncated": true
                       },
                       "duration_seconds": {
-                        "description": "Default duration in seconds.",
+                        "description": "Default duration of the service in seconds (the Location-wide default, `3600` when none is set).",
                         "type": "integer",
                         "x-truncated": true
                       },
@@ -59941,12 +59930,8 @@
                         "type": "integer",
                         "x-truncated": true
                       },
-                      "is_bookable": {
-                        "description": "Derived — `true` when the service has at least one bookable Team Member link.",
-                        "type": "boolean",
-                        "x-truncated": true
-                      },
                       "name": {
+                        "description": "Internal name shown to the business in Altegio, as the business entered it; not translated.",
                         "type": "string",
                         "x-truncated": true
                       },
@@ -59954,18 +59939,35 @@
                         "type": "string",
                         "x-truncated": true
                       },
-                      "package": {
-                        "description": "Package settings and components. Present only when `type` is `package`.",
-                        "type": "object",
+                      "online_booking_enabled": {
+                        "description": "The business's online booking setting for this service in the Location. It does not mean that free time is available; free slots come from the availability operations.",
+                        "type": "boolean",
                         "x-truncated": true
                       },
-                      "price_minor": {
-                        "description": "Default price in integer minor units of the Location currency.",
+                      "online_booking_name": {
+                        "description": "Client-facing name shown in online booking, as the business entered it; equals `name` when no separate online booking name is set. Not translated.",
+                        "type": "string",
+                        "x-truncated": true
+                      },
+                      "package": {
+                        "description": "Package settings and components; `null` when `type` is `simple`.",
+                        "x-truncated": true
+                      },
+                      "price_max_minor": {
+                        "description": "Upper bound of the base price range, integer minor units of the Location currency; equals `price_min_minor` for a single price; `null` for a legacy \"from\" price without an upper bound.",
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "x-truncated": true
+                      },
+                      "price_min_minor": {
+                        "description": "Base price of the service in this Location, integer minor units of the Location currency, as set by the business: a single price or the lower bound of a range. For a package, the package price stored…",
                         "type": "integer",
                         "x-truncated": true
                       },
                       "team_members": {
-                        "description": "Team Members providing this service, with per-member overrides. Read-only here; links are written through `updateTeamMemberServices`.",
+                        "description": "Team Members providing this service, by id. Read-only here; links are written through `updateTeamMemberServices`.",
                         "type": "array",
                         "x-truncated": true
                       },
@@ -59974,9 +59976,9 @@
                         "type": "string",
                         "x-truncated": true
                       },
-                      "updated_at": {
-                        "description": "UTC.",
-                        "type": "string",
+                      "weight": {
+                        "description": "Display order the business set in Altegio (higher first). Lists are ordered by `id`; sort by `weight` on the client.",
+                        "type": "integer",
                         "x-truncated": true
                       }
                     },
@@ -59985,10 +59987,17 @@
                       "object",
                       "type",
                       "name",
+                      "online_booking_name",
                       "category_id",
                       "duration_seconds",
-                      "price_minor",
-                      "currency"
+                      "weight",
+                      "price_min_minor",
+                      "price_max_minor",
+                      "currency",
+                      "online_booking_enabled",
+                      "team_members",
+                      "package",
+                      "created_at"
                     ],
                     "type": "object"
                   },
@@ -60063,7 +60072,7 @@
                 "name": {
                   "type": "string"
                 },
-                "price_minor": {
+                "price_min_minor": {
                   "description": "Integer minor units of the Location currency.",
                   "type": "integer"
                 },
@@ -60100,13 +60109,12 @@
                   "description": "Required for package services; lists the simple-service components.",
                   "properties": {
                     "components": {
-                      "description": "Component services in execution order. On PATCH the array is replaced as a whole (merge-patch array semantics).",
+                      "description": "Component services in execution order; empty while the package is `not_configured`. On PATCH the array is replaced as a whole (merge-patch array semantics).",
                       "items": {
                         "type": "object",
                         "x-truncated": true
                       },
                       "maxItems": 10,
-                      "minItems": 1,
                       "type": "array"
                     },
                     "exec_order": {
@@ -60133,15 +60141,6 @@
                         "discount"
                       ],
                       "type": "string"
-                    },
-                    "status": {
-                      "description": "Read-only package configuration status.",
-                      "enum": [
-                        "not_configured",
-                        "ready"
-                      ],
-                      "readOnly": true,
-                      "type": "string"
                     }
                   },
                   "required": [
@@ -60149,7 +60148,7 @@
                   ],
                   "type": "object"
                 },
-                "price_minor": {
+                "price_min_minor": {
                   "description": "Integer minor units of the Location currency.",
                   "type": "integer"
                 },
@@ -60180,14 +60179,20 @@
           "description": "A bookable service of the Location.",
           "properties": {
             "category_id": {
-              "description": "Service category (`listServiceCategories`).",
-              "type": "integer"
+              "description": "Service category (`listServiceCategories`); `null` when the category is not listed in this Location.",
+              "type": [
+                "integer",
+                "null"
+              ]
             },
             "created_at": {
-              "description": "UTC.",
+              "description": "UTC; `null` when the creation date is not stored.",
               "format": "date-time",
               "readOnly": true,
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "currency": {
               "description": "ISO 4217, server-controlled by the Location.",
@@ -60195,19 +60200,15 @@
               "type": "string"
             },
             "duration_seconds": {
-              "description": "Default duration in seconds.",
+              "description": "Default duration of the service in seconds (the Location-wide default, `3600` when none is set).",
               "type": "integer"
             },
             "id": {
               "readOnly": true,
               "type": "integer"
             },
-            "is_bookable": {
-              "description": "Derived — `true` when the service has at least one bookable Team Member link.",
-              "readOnly": true,
-              "type": "boolean"
-            },
             "name": {
+              "description": "Internal name shown to the business in Altegio, as the business entered it; not translated.",
               "type": "string"
             },
             "object": {
@@ -60217,111 +60218,97 @@
               "readOnly": true,
               "type": "string"
             },
-            "package": {
-              "additionalProperties": false,
-              "description": "Package settings and components. Present only when `type` is `package`.",
-              "properties": {
-                "components": {
-                  "description": "Component services in execution order. On PATCH the array is replaced as a whole (merge-patch array semantics).",
-                  "items": {
-                    "type": "object",
-                    "x-truncated": true
-                  },
-                  "maxItems": 10,
-                  "minItems": 1,
-                  "type": "array"
-                },
-                "exec_order": {
-                  "default": "sequential",
-                  "description": "Order in which component services are performed.",
-                  "enum": [
-                    "sequential",
-                    "sequential_multi",
-                    "parallel"
-                  ],
-                  "type": "string"
-                },
-                "price_discount_percent": {
-                  "default": 0,
-                  "description": "Discount applied to the component sum; used only when `pricing_type` is `discount`, ignored otherwise.",
-                  "type": "number"
-                },
-                "pricing_type": {
-                  "default": "sum",
-                  "description": "How the package price derives from its components.",
-                  "enum": [
-                    "sum",
-                    "manual",
-                    "discount"
-                  ],
-                  "type": "string"
-                },
-                "status": {
-                  "description": "Read-only package configuration status.",
-                  "enum": [
-                    "not_configured",
-                    "ready"
-                  ],
-                  "readOnly": true,
-                  "type": "string"
-                }
-              },
-              "required": [
-                "components"
-              ],
-              "type": "object"
+            "online_booking_enabled": {
+              "description": "The business's online booking setting for this service in the Location. It does not mean that free time is available; free slots come from the availability operations.",
+              "readOnly": true,
+              "type": "boolean"
             },
-            "price_minor": {
-              "description": "Default price in integer minor units of the Location currency.",
+            "online_booking_name": {
+              "description": "Client-facing name shown in online booking, as the business entered it; equals `name` when no separate online booking name is set. Not translated.",
+              "readOnly": true,
+              "type": "string"
+            },
+            "package": {
+              "description": "Package settings and components; `null` when `type` is `simple`.",
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "description": "Package settings and components of a service with `type: package`.",
+                  "properties": {
+                    "components": {
+                      "description": "Component services in execution order; empty while the package is `not_configured`.",
+                      "items": {
+                        "type": "object",
+                        "x-truncated": true
+                      },
+                      "maxItems": 10,
+                      "type": "array"
+                    },
+                    "exec_order": {
+                      "description": "Order in which component services are performed.",
+                      "enum": [
+                        "sequential",
+                        "sequential_multi",
+                        "parallel"
+                      ],
+                      "type": "string"
+                    },
+                    "price_discount_percent": {
+                      "description": "Discount applied to the component sum; used only when `pricing_type` is `discount`, ignored otherwise.",
+                      "type": "number"
+                    },
+                    "pricing_type": {
+                      "description": "How the package price derives from its components.",
+                      "enum": [
+                        "sum",
+                        "manual",
+                        "discount"
+                      ],
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "Read-only package configuration status.",
+                      "enum": [
+                        "not_configured",
+                        "ready"
+                      ],
+                      "readOnly": true,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "exec_order",
+                    "pricing_type",
+                    "price_discount_percent",
+                    "status",
+                    "components"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "price_max_minor": {
+              "description": "Upper bound of the base price range, integer minor units of the Location currency; equals `price_min_minor` for a single price; `null` for a legacy \"from\" price without an upper bound.",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "price_min_minor": {
+              "description": "Base price of the service in this Location, integer minor units of the Location currency, as set by the business: a single price or the lower bound of a range. For a package, the package price stored…",
               "type": "integer"
             },
             "team_members": {
-              "description": "Team Members providing this service, with per-member overrides. Read-only here; links are written through `updateTeamMemberServices`.",
+              "description": "Team Members providing this service, by id. Read-only here; links are written through `updateTeamMemberServices`.",
               "items": {
                 "additionalProperties": false,
+                "description": "A Team Member linked to the service.",
                 "properties": {
-                  "duration_seconds": {
-                    "description": "Per-member duration override in seconds. `null` uses the service default.",
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "is_bookable": {
-                    "description": "Per-link online scheduling flag override; `null` uses the service default.",
-                    "type": [
-                      "boolean",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "online_booking_enabled": {
-                    "description": "Per-link public scheduling availability override; `null` uses the service default.",
-                    "type": [
-                      "boolean",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "price_minor": {
-                    "description": "Per-member price override, integer minor units. `null` uses the service default.",
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
                   "team_member_id": {
                     "type": "integer",
-                    "x-truncated": true
-                  },
-                  "technological_card_id": {
-                    "description": "Per-link technological card override; `null` uses the service default.",
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
                     "x-truncated": true
                   }
                 },
@@ -60342,11 +60329,10 @@
               ],
               "type": "string"
             },
-            "updated_at": {
-              "description": "UTC.",
-              "format": "date-time",
+            "weight": {
+              "description": "Display order the business set in Altegio (higher first). Lists are ordered by `id`; sort by `weight` on the client.",
               "readOnly": true,
-              "type": "string"
+              "type": "integer"
             }
           },
           "required": [
@@ -60354,10 +60340,17 @@
             "object",
             "type",
             "name",
+            "online_booking_name",
             "category_id",
             "duration_seconds",
-            "price_minor",
-            "currency"
+            "weight",
+            "price_min_minor",
+            "price_max_minor",
+            "currency",
+            "online_booking_enabled",
+            "team_members",
+            "package",
+            "created_at"
           ],
           "type": "object"
         }
@@ -60411,14 +60404,20 @@
           "description": "A bookable service of the Location.",
           "properties": {
             "category_id": {
-              "description": "Service category (`listServiceCategories`).",
-              "type": "integer"
+              "description": "Service category (`listServiceCategories`); `null` when the category is not listed in this Location.",
+              "type": [
+                "integer",
+                "null"
+              ]
             },
             "created_at": {
-              "description": "UTC.",
+              "description": "UTC; `null` when the creation date is not stored.",
               "format": "date-time",
               "readOnly": true,
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "currency": {
               "description": "ISO 4217, server-controlled by the Location.",
@@ -60426,19 +60425,15 @@
               "type": "string"
             },
             "duration_seconds": {
-              "description": "Default duration in seconds.",
+              "description": "Default duration of the service in seconds (the Location-wide default, `3600` when none is set).",
               "type": "integer"
             },
             "id": {
               "readOnly": true,
               "type": "integer"
             },
-            "is_bookable": {
-              "description": "Derived — `true` when the service has at least one bookable Team Member link.",
-              "readOnly": true,
-              "type": "boolean"
-            },
             "name": {
+              "description": "Internal name shown to the business in Altegio, as the business entered it; not translated.",
               "type": "string"
             },
             "object": {
@@ -60448,111 +60443,97 @@
               "readOnly": true,
               "type": "string"
             },
-            "package": {
-              "additionalProperties": false,
-              "description": "Package settings and components. Present only when `type` is `package`.",
-              "properties": {
-                "components": {
-                  "description": "Component services in execution order. On PATCH the array is replaced as a whole (merge-patch array semantics).",
-                  "items": {
-                    "type": "object",
-                    "x-truncated": true
-                  },
-                  "maxItems": 10,
-                  "minItems": 1,
-                  "type": "array"
-                },
-                "exec_order": {
-                  "default": "sequential",
-                  "description": "Order in which component services are performed.",
-                  "enum": [
-                    "sequential",
-                    "sequential_multi",
-                    "parallel"
-                  ],
-                  "type": "string"
-                },
-                "price_discount_percent": {
-                  "default": 0,
-                  "description": "Discount applied to the component sum; used only when `pricing_type` is `discount`, ignored otherwise.",
-                  "type": "number"
-                },
-                "pricing_type": {
-                  "default": "sum",
-                  "description": "How the package price derives from its components.",
-                  "enum": [
-                    "sum",
-                    "manual",
-                    "discount"
-                  ],
-                  "type": "string"
-                },
-                "status": {
-                  "description": "Read-only package configuration status.",
-                  "enum": [
-                    "not_configured",
-                    "ready"
-                  ],
-                  "readOnly": true,
-                  "type": "string"
-                }
-              },
-              "required": [
-                "components"
-              ],
-              "type": "object"
+            "online_booking_enabled": {
+              "description": "The business's online booking setting for this service in the Location. It does not mean that free time is available; free slots come from the availability operations.",
+              "readOnly": true,
+              "type": "boolean"
             },
-            "price_minor": {
-              "description": "Default price in integer minor units of the Location currency.",
+            "online_booking_name": {
+              "description": "Client-facing name shown in online booking, as the business entered it; equals `name` when no separate online booking name is set. Not translated.",
+              "readOnly": true,
+              "type": "string"
+            },
+            "package": {
+              "description": "Package settings and components; `null` when `type` is `simple`.",
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "description": "Package settings and components of a service with `type: package`.",
+                  "properties": {
+                    "components": {
+                      "description": "Component services in execution order; empty while the package is `not_configured`.",
+                      "items": {
+                        "type": "object",
+                        "x-truncated": true
+                      },
+                      "maxItems": 10,
+                      "type": "array"
+                    },
+                    "exec_order": {
+                      "description": "Order in which component services are performed.",
+                      "enum": [
+                        "sequential",
+                        "sequential_multi",
+                        "parallel"
+                      ],
+                      "type": "string"
+                    },
+                    "price_discount_percent": {
+                      "description": "Discount applied to the component sum; used only when `pricing_type` is `discount`, ignored otherwise.",
+                      "type": "number"
+                    },
+                    "pricing_type": {
+                      "description": "How the package price derives from its components.",
+                      "enum": [
+                        "sum",
+                        "manual",
+                        "discount"
+                      ],
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "Read-only package configuration status.",
+                      "enum": [
+                        "not_configured",
+                        "ready"
+                      ],
+                      "readOnly": true,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "exec_order",
+                    "pricing_type",
+                    "price_discount_percent",
+                    "status",
+                    "components"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "price_max_minor": {
+              "description": "Upper bound of the base price range, integer minor units of the Location currency; equals `price_min_minor` for a single price; `null` for a legacy \"from\" price without an upper bound.",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "price_min_minor": {
+              "description": "Base price of the service in this Location, integer minor units of the Location currency, as set by the business: a single price or the lower bound of a range. For a package, the package price stored…",
               "type": "integer"
             },
             "team_members": {
-              "description": "Team Members providing this service, with per-member overrides. Read-only here; links are written through `updateTeamMemberServices`.",
+              "description": "Team Members providing this service, by id. Read-only here; links are written through `updateTeamMemberServices`.",
               "items": {
                 "additionalProperties": false,
+                "description": "A Team Member linked to the service.",
                 "properties": {
-                  "duration_seconds": {
-                    "description": "Per-member duration override in seconds. `null` uses the service default.",
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "is_bookable": {
-                    "description": "Per-link online scheduling flag override; `null` uses the service default.",
-                    "type": [
-                      "boolean",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "online_booking_enabled": {
-                    "description": "Per-link public scheduling availability override; `null` uses the service default.",
-                    "type": [
-                      "boolean",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "price_minor": {
-                    "description": "Per-member price override, integer minor units. `null` uses the service default.",
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
                   "team_member_id": {
                     "type": "integer",
-                    "x-truncated": true
-                  },
-                  "technological_card_id": {
-                    "description": "Per-link technological card override; `null` uses the service default.",
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
                     "x-truncated": true
                   }
                 },
@@ -60573,11 +60554,10 @@
               ],
               "type": "string"
             },
-            "updated_at": {
-              "description": "UTC.",
-              "format": "date-time",
+            "weight": {
+              "description": "Display order the business set in Altegio (higher first). Lists are ordered by `id`; sort by `weight` on the client.",
               "readOnly": true,
-              "type": "string"
+              "type": "integer"
             }
           },
           "required": [
@@ -60585,10 +60565,17 @@
             "object",
             "type",
             "name",
+            "online_booking_name",
             "category_id",
             "duration_seconds",
-            "price_minor",
-            "currency"
+            "weight",
+            "price_min_minor",
+            "price_max_minor",
+            "currency",
+            "online_booking_enabled",
+            "team_members",
+            "package",
+            "created_at"
           ],
           "type": "object"
         }
@@ -60656,13 +60643,12 @@
               "description": "Only for package services; `components` replaces the whole list.",
               "properties": {
                 "components": {
-                  "description": "Component services in execution order. On PATCH the array is replaced as a whole (merge-patch array semantics).",
+                  "description": "Component services in execution order; empty while the package is `not_configured`. On PATCH the array is replaced as a whole (merge-patch array semantics).",
                   "items": {
                     "type": "object",
                     "x-truncated": true
                   },
                   "maxItems": 10,
-                  "minItems": 1,
                   "type": "array"
                 },
                 "exec_order": {
@@ -60689,15 +60675,6 @@
                     "discount"
                   ],
                   "type": "string"
-                },
-                "status": {
-                  "description": "Read-only package configuration status.",
-                  "enum": [
-                    "not_configured",
-                    "ready"
-                  ],
-                  "readOnly": true,
-                  "type": "string"
                 }
               },
               "required": [
@@ -60705,7 +60682,7 @@
               ],
               "type": "object"
             },
-            "price_minor": {
+            "price_min_minor": {
               "description": "Integer minor units of the Location currency.",
               "type": "integer"
             }
@@ -60720,14 +60697,20 @@
           "description": "A bookable service of the Location.",
           "properties": {
             "category_id": {
-              "description": "Service category (`listServiceCategories`).",
-              "type": "integer"
+              "description": "Service category (`listServiceCategories`); `null` when the category is not listed in this Location.",
+              "type": [
+                "integer",
+                "null"
+              ]
             },
             "created_at": {
-              "description": "UTC.",
+              "description": "UTC; `null` when the creation date is not stored.",
               "format": "date-time",
               "readOnly": true,
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "currency": {
               "description": "ISO 4217, server-controlled by the Location.",
@@ -60735,19 +60718,15 @@
               "type": "string"
             },
             "duration_seconds": {
-              "description": "Default duration in seconds.",
+              "description": "Default duration of the service in seconds (the Location-wide default, `3600` when none is set).",
               "type": "integer"
             },
             "id": {
               "readOnly": true,
               "type": "integer"
             },
-            "is_bookable": {
-              "description": "Derived — `true` when the service has at least one bookable Team Member link.",
-              "readOnly": true,
-              "type": "boolean"
-            },
             "name": {
+              "description": "Internal name shown to the business in Altegio, as the business entered it; not translated.",
               "type": "string"
             },
             "object": {
@@ -60757,111 +60736,97 @@
               "readOnly": true,
               "type": "string"
             },
-            "package": {
-              "additionalProperties": false,
-              "description": "Package settings and components. Present only when `type` is `package`.",
-              "properties": {
-                "components": {
-                  "description": "Component services in execution order. On PATCH the array is replaced as a whole (merge-patch array semantics).",
-                  "items": {
-                    "type": "object",
-                    "x-truncated": true
-                  },
-                  "maxItems": 10,
-                  "minItems": 1,
-                  "type": "array"
-                },
-                "exec_order": {
-                  "default": "sequential",
-                  "description": "Order in which component services are performed.",
-                  "enum": [
-                    "sequential",
-                    "sequential_multi",
-                    "parallel"
-                  ],
-                  "type": "string"
-                },
-                "price_discount_percent": {
-                  "default": 0,
-                  "description": "Discount applied to the component sum; used only when `pricing_type` is `discount`, ignored otherwise.",
-                  "type": "number"
-                },
-                "pricing_type": {
-                  "default": "sum",
-                  "description": "How the package price derives from its components.",
-                  "enum": [
-                    "sum",
-                    "manual",
-                    "discount"
-                  ],
-                  "type": "string"
-                },
-                "status": {
-                  "description": "Read-only package configuration status.",
-                  "enum": [
-                    "not_configured",
-                    "ready"
-                  ],
-                  "readOnly": true,
-                  "type": "string"
-                }
-              },
-              "required": [
-                "components"
-              ],
-              "type": "object"
+            "online_booking_enabled": {
+              "description": "The business's online booking setting for this service in the Location. It does not mean that free time is available; free slots come from the availability operations.",
+              "readOnly": true,
+              "type": "boolean"
             },
-            "price_minor": {
-              "description": "Default price in integer minor units of the Location currency.",
+            "online_booking_name": {
+              "description": "Client-facing name shown in online booking, as the business entered it; equals `name` when no separate online booking name is set. Not translated.",
+              "readOnly": true,
+              "type": "string"
+            },
+            "package": {
+              "description": "Package settings and components; `null` when `type` is `simple`.",
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "description": "Package settings and components of a service with `type: package`.",
+                  "properties": {
+                    "components": {
+                      "description": "Component services in execution order; empty while the package is `not_configured`.",
+                      "items": {
+                        "type": "object",
+                        "x-truncated": true
+                      },
+                      "maxItems": 10,
+                      "type": "array"
+                    },
+                    "exec_order": {
+                      "description": "Order in which component services are performed.",
+                      "enum": [
+                        "sequential",
+                        "sequential_multi",
+                        "parallel"
+                      ],
+                      "type": "string"
+                    },
+                    "price_discount_percent": {
+                      "description": "Discount applied to the component sum; used only when `pricing_type` is `discount`, ignored otherwise.",
+                      "type": "number"
+                    },
+                    "pricing_type": {
+                      "description": "How the package price derives from its components.",
+                      "enum": [
+                        "sum",
+                        "manual",
+                        "discount"
+                      ],
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "Read-only package configuration status.",
+                      "enum": [
+                        "not_configured",
+                        "ready"
+                      ],
+                      "readOnly": true,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "exec_order",
+                    "pricing_type",
+                    "price_discount_percent",
+                    "status",
+                    "components"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "price_max_minor": {
+              "description": "Upper bound of the base price range, integer minor units of the Location currency; equals `price_min_minor` for a single price; `null` for a legacy \"from\" price without an upper bound.",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "price_min_minor": {
+              "description": "Base price of the service in this Location, integer minor units of the Location currency, as set by the business: a single price or the lower bound of a range. For a package, the package price stored…",
               "type": "integer"
             },
             "team_members": {
-              "description": "Team Members providing this service, with per-member overrides. Read-only here; links are written through `updateTeamMemberServices`.",
+              "description": "Team Members providing this service, by id. Read-only here; links are written through `updateTeamMemberServices`.",
               "items": {
                 "additionalProperties": false,
+                "description": "A Team Member linked to the service.",
                 "properties": {
-                  "duration_seconds": {
-                    "description": "Per-member duration override in seconds. `null` uses the service default.",
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "is_bookable": {
-                    "description": "Per-link online scheduling flag override; `null` uses the service default.",
-                    "type": [
-                      "boolean",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "online_booking_enabled": {
-                    "description": "Per-link public scheduling availability override; `null` uses the service default.",
-                    "type": [
-                      "boolean",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
-                  "price_minor": {
-                    "description": "Per-member price override, integer minor units. `null` uses the service default.",
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
-                    "x-truncated": true
-                  },
                   "team_member_id": {
                     "type": "integer",
-                    "x-truncated": true
-                  },
-                  "technological_card_id": {
-                    "description": "Per-link technological card override; `null` uses the service default.",
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
                     "x-truncated": true
                   }
                 },
@@ -60882,11 +60847,10 @@
               ],
               "type": "string"
             },
-            "updated_at": {
-              "description": "UTC.",
-              "format": "date-time",
+            "weight": {
+              "description": "Display order the business set in Altegio (higher first). Lists are ordered by `id`; sort by `weight` on the client.",
               "readOnly": true,
-              "type": "string"
+              "type": "integer"
             }
           },
           "required": [
@@ -60894,10 +60858,17 @@
             "object",
             "type",
             "name",
+            "online_booking_name",
             "category_id",
             "duration_seconds",
-            "price_minor",
-            "currency"
+            "weight",
+            "price_min_minor",
+            "price_max_minor",
+            "currency",
+            "online_booking_enabled",
+            "team_members",
+            "package",
+            "created_at"
           ],
           "type": "object"
         }
@@ -62580,6 +62551,12 @@
                 "additionalProperties": false,
                 "description": "Per-link overrides for one service. Every field is optional; `null` falls back to the service default.",
                 "properties": {
+                  "bill_of_materials_id": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
                   "duration_seconds": {
                     "description": "Per-member duration override in seconds.",
                     "type": [
@@ -62601,12 +62578,6 @@
                   },
                   "price_minor": {
                     "description": "Per-member price override, integer minor units of the Location currency.",
-                    "type": [
-                      "integer",
-                      "null"
-                    ]
-                  },
-                  "technological_card_id": {
                     "type": [
                       "integer",
                       "null"
@@ -62665,8 +62636,16 @@
                 "data": {
                   "items": {
                     "additionalProperties": false,
-                    "description": "Service link seen from the Team Member side; carries the same per-link overrides as `ServiceTeamMemberLink`.",
+                    "description": "Service link seen from the Team Member side, with its per-link overrides.",
                     "properties": {
+                      "bill_of_materials_id": {
+                        "description": "Per-link technological card override; `null` uses the service default.",
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "x-truncated": true
+                      },
                       "duration_seconds": {
                         "description": "Per-member duration override in seconds. `null` uses the service default.",
                         "type": [
@@ -62701,14 +62680,6 @@
                       },
                       "service_id": {
                         "type": "integer",
-                        "x-truncated": true
-                      },
-                      "technological_card_id": {
-                        "description": "Per-link technological card override; `null` uses the service default.",
-                        "type": [
-                          "integer",
-                          "null"
-                        ],
                         "x-truncated": true
                       }
                     },

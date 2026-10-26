@@ -7,7 +7,7 @@ npm ci
 npm run lint
 npm run format:check
 npm run typecheck
-npm test -- --runInBand
+npm test
 npm run build
 npm run catalog:check
 npm run surface:check
@@ -16,6 +16,13 @@ npm run surface:check
 `npm run test:coverage` adds coverage reporting. `npm run test:watch` runs Jest
 in watch mode. Default tests use mocked upstream responses and local HTTP
 servers; no real credentials or business data are needed.
+
+Jest transpiles without type checking; `npm run typecheck` checks the sources
+and, through `tsconfig.test.json`, the tests. A full run uses two workers and
+replaces a worker once its heap passes 384 MB, about 1.5 GB in all. Every test
+file loads its own copy of the server, and V8 frees old copies only near its
+heap limit, so one long-lived process grows to gigabytes: avoid `--runInBand`
+and a raised `--maxWorkers` for the whole suite.
 
 The catalog check requires an OpenAPI checkout. Set `ALTEGIO_API_DOCS` to its
 root; without it, the check reports a skip. Tests still validate the committed

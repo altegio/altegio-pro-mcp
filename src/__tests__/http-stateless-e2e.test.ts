@@ -142,6 +142,57 @@ describe('sessionless tool calls, end to end', () => {
     }
   });
 
+  it('reads again after a dropped connection and logs the retry', async () => {
+    let upstreamCalls = 0;
+    jest.spyOn(global, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (!url.startsWith('https://api.alteg.io/')) {
+        return nativeFetch(input, init);
+      }
+      upstreamCalls += 1;
+      if (upstreamCalls === 1) {
+        throw Object.assign(new TypeError('fetch failed'), {
+          cause: { code: 'UND_ERR_SOCKET' },
+        });
+      }
+      return Response.json({ success: true, data: [] });
+    });
+    const toolLog = jest.spyOn(createLogger('tool-calls'), 'info');
+    const { app } = createApp();
+    const server = app.listen(0);
+    try {
+      const { port } = server.address() as AddressInfo;
+      const result = await rpcResult(
+        await nativeFetch(`http://127.0.0.1:${port}/mcp`, {
+          method: 'POST',
+          headers: {
+            accept: 'application/json, text/event-stream',
+            'content-type': 'application/json',
+            'x-altegio-user-token': 'direct-user-token',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'tools/call',
+            params: { name: 'locations_list', arguments: { page_size: 1 } },
+          }),
+        })
+      );
+      expect(result.isError).toBeFalsy();
+      expect(upstreamCalls).toBe(2);
+      const [fields] = toolLog.mock.calls.at(-1)!;
+      expect(fields).toMatchObject({
+        tool: 'locations_list',
+        outcome: 'success',
+        upstream_retries: 1,
+      });
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+
   it('logs the class and upstream status of a failed call, never its arguments', async () => {
     jest.spyOn(global, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input);
@@ -268,6 +319,7 @@ describe('sessionless tool calls, end to end', () => {
     const fetchSpy = jest.spyOn(global, 'fetch');
     const { result, fields } = await callOnce('/mcp', 'get_appointments', {
       location_id: LOCATION,
+      page: 2,
       count: 300,
       surprise_key: 'secret value',
     });
@@ -297,12 +349,47 @@ describe('sessionless tool calls, end to end', () => {
     ).toHaveLength(0);
   });
 
-  it('refuses an oversized page on the read-only view with what to do, never clamping it', async () => {
+  it('serves an oversized first page at the maximum, says so and logs it without the size', async () => {
+    jest.spyOn(global, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (!url.startsWith('https://api.alteg.io/')) {
+        return nativeFetch(input, init);
+      }
+      return Response.json({ success: true, data: [] });
+    });
     const { result, fields } = await callOnce(
       '/mcp/readonly',
       'services_list',
       {
         location_id: LOCATION,
+        page_size: 300,
+      }
+    );
+    expect(result.isError).toBeFalsy();
+    expect(result.content.map((block) => block.text).join('\n')).toContain(
+      "page_size 300 is above this tool's maximum of 100"
+    );
+    expect(fields).toMatchObject({
+      tool: 'services_list',
+      outcome: 'success',
+      page_size_capped: true,
+    });
+    expect(
+      JSON.stringify({
+        ...fields,
+        request_id: undefined,
+        latency_ms: undefined,
+      })
+    ).not.toContain('300');
+  });
+
+  it('refuses an oversized later page on the read-only view with what to do', async () => {
+    const { result, fields } = await callOnce(
+      '/mcp/readonly',
+      'services_list',
+      {
+        location_id: LOCATION,
+        page: 2,
         page_size: 300,
       }
     );

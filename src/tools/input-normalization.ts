@@ -9,6 +9,8 @@
  *   An integer-typed argument whose key names an id (`id`, `*_id`, `*_ids`)
  *   accepts a canonical digit string. Nothing else is loosened: `"12abc"`,
  *   `"1.5"`, a page number as a string and every non-id field stay strict.
+ * - **First-page size.** A first page asked above the tool's `page_size`
+ *   ceiling is served at the ceiling and says so (`capPageSize`).
  * - **Accepted keys.** The strict top-level object refuses an unknown key; the
  *   error then names the keys that object does accept (`./tool-result.ts`).
  * - **Canonical input.** The confirmation gate binds its token to the parsed
@@ -106,6 +108,56 @@ export function coerceIdStrings(
     return out;
   }
   return value;
+}
+
+/** A first page asked larger than the tool serves: what was asked and served. */
+export interface PageSizeCap {
+  requested: number;
+  served: number;
+}
+
+/**
+ * Serve the first page of an oversized `page_size` at the tool's ceiling.
+ *
+ * Scripts and models ask for 200 or 500 rows, and a refusal cost 2,400
+ * failed calls from 2026-10-12 to 2026-10-22, most repeated unchanged. Only
+ * page 1 is lowered: its items are the first ones whatever the size, and the
+ * served size comes back in `pagination.page_size` with `next_page` counted
+ * in it. A later page keeps the refusal — its offset would not be the one the
+ * caller computed with its own size, and reading the wrong items without an
+ * error is worse than a refusal (`renderPage`).
+ */
+export function capPageSize(
+  schema: ZodType,
+  value: unknown
+): { value: unknown; cap?: PageSizeCap } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { value };
+  }
+  const args = value as Record<string, unknown>;
+  const requested = args.page_size;
+  if (
+    typeof requested !== 'number' ||
+    !Number.isSafeInteger(requested) ||
+    (args.page !== undefined && args.page !== 1)
+  ) {
+    return { value };
+  }
+  const entry = shapeOf(unwrapSchema(schema))?.page_size;
+  const core = entry ? unwrapSchema(entry) : undefined;
+  if (!core || defOf(core).type !== 'number') return { value };
+  // zod derives the ceiling from the checks (`_zod.bag` stays empty since
+  // 4.6). An exclusive ceiling is not a size the schema accepts: no cap.
+  const served = (core as unknown as { maxValue: number | null }).maxValue;
+  if (
+    typeof served !== 'number' ||
+    !Number.isSafeInteger(served) ||
+    requested <= served ||
+    !core.safeParse(served).success
+  ) {
+    return { value };
+  }
+  return { value: { ...args, page_size: served }, cap: { requested, served } };
 }
 
 /**

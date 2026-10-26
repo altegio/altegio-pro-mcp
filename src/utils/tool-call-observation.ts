@@ -52,6 +52,10 @@ export interface ToolCallObservation {
   unexpectedError?: boolean;
   /** The call was refused by a rate limit, before doing its work. */
   rateLimited?: boolean;
+  /** The first page was served at the tool's page size ceiling, below the size asked. */
+  pageSizeCapped?: boolean;
+  /** Upstream requests sent again after a failed attempt. */
+  upstreamRetries?: number;
 }
 
 /** Bounds on what one call may add to its log line. */
@@ -102,6 +106,20 @@ export function noteUpstreamResponse(status: number): void {
   if (!observation) return;
   observation.upstreamResponses += 1;
   if (status >= 400) observation.upstreamErrorStatus = status;
+}
+
+/** Note that a first page was served below the page size asked for. */
+export function notePageSizeCapped(): void {
+  const observation = storage.getStore();
+  if (observation) observation.pageSizeCapped = true;
+}
+
+/** Note that an upstream request is sent again after a failed attempt. */
+export function noteUpstreamRetry(): void {
+  const observation = storage.getStore();
+  if (observation) {
+    observation.upstreamRetries = (observation.upstreamRetries ?? 0) + 1;
+  }
 }
 
 /** Note an upstream request that failed before any response arrived. */

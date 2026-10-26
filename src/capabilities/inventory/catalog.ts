@@ -17,7 +17,6 @@
 import type { AltegioClient } from '../../providers/altegio-client.js';
 import { ProductCatalogAdapter } from '../../api/v1/product-catalog-adapter.js';
 import type {
-  Product,
   ProductCard,
   ProductCardWrite,
   ProductCatalogApi,
@@ -401,17 +400,12 @@ function resolveUnit(
 
 // ========== matching products ==========
 
-export type MatchKind = 'barcode' | 'article' | 'title' | 'similar_title';
+export type MatchKind = 'barcode' | 'article' | 'title';
 
+/** An existing product a new line would duplicate. */
 export interface ProductMatch {
   product_id: number;
-  title: string | null;
   match: MatchKind;
-  category_id: number | null;
-  article: string | null;
-  barcode: string | null;
-  sale_price: number | null;
-  cost_price: number | null;
 }
 
 export interface MatchQuery {
@@ -420,7 +414,7 @@ export interface MatchQuery {
   barcode?: string;
 }
 
-/** Candidates a search reads per line; the closest are kept. */
+/** Candidates a search reads per term. */
 const CANDIDATES_PER_TERM = 5;
 const CARD_READ_CONCURRENCY = 6;
 
@@ -428,7 +422,6 @@ const MATCH_ORDER: Record<MatchKind, number> = {
   barcode: 0,
   article: 1,
   title: 2,
-  similar_title: 3,
 };
 
 function matchKind(card: ProductCard, query: MatchQuery): MatchKind | null {
@@ -438,14 +431,15 @@ function matchKind(card: ProductCard, query: MatchQuery): MatchKind | null {
     return 'article';
   if (query.title && normalized(card.title) === normalized(query.title))
     return 'title';
-  return query.title ? 'similar_title' : null;
+  return null;
 }
 
 /**
- * The live products a line may already be: searched by its barcode, article
- * number and title (each of at least two characters), then read whole for
- * the article number and barcode the search does not return. Archived
- * products are not found: Altegio's search leaves them out.
+ * The live products a line duplicates: the same barcode, article number or
+ * title. Each is searched for (at least two characters); the search returns
+ * no article number or barcode, so those hits are read whole, while a title
+ * hit is read only when its title is the line's. Archived products are not
+ * found: Altegio's search leaves them out.
  */
 async function matchesFor(
   client: AltegioClient,
@@ -453,42 +447,36 @@ async function matchesFor(
   query: MatchQuery
 ): Promise<ProductMatch[]> {
   const products = productsApi(client);
-  const terms = [query.barcode, query.article, query.title]
-    .map((t) => t?.trim())
-    .filter((t): t is string => !!t && t.length >= 2);
-  const found = new Map<number, Product>();
-  for (const term of new Set(terms)) {
+  const usable = (t: string | undefined): t is string =>
+    !!t && t.trim().length >= 2;
+  const candidates = new Set<number>();
+  for (const term of new Set(
+    [query.barcode, query.article].filter(usable).map((t) => t.trim())
+  )) {
     const hits = await products.searchProducts(locationId, term, {
       page: 1,
       page_size: CANDIDATES_PER_TERM,
     });
-    for (const p of hits) found.set(p.id, p);
+    for (const p of hits) candidates.add(p.id);
+  }
+  if (usable(query.title)) {
+    const hits = await products.searchProducts(locationId, query.title.trim(), {
+      page: 1,
+      page_size: CANDIDATES_PER_TERM,
+    });
+    for (const p of hits)
+      if (normalized(p.title) === normalized(query.title)) candidates.add(p.id);
   }
   const api = productCatalogApi(client);
   const cards = await mapWithConcurrency(
-    [...found.keys()],
+    [...candidates],
     CARD_READ_CONCURRENCY,
     (productId) => api.getProductCard(locationId, productId)
   );
   return cards
-    .map((card) => ({ card, kind: matchKind(card, query) }))
-    .filter((m): m is { card: ProductCard; kind: MatchKind } => m.kind !== null)
-    .sort((a, b) => MATCH_ORDER[a.kind] - MATCH_ORDER[b.kind])
-    .map(({ card, kind }) => ({
-      product_id: card.id,
-      title: card.title,
-      match: kind,
-      category_id: card.category_id,
-      article: card.article,
-      barcode: card.barcode,
-      sale_price: card.sale_price,
-      cost_price: card.cost_price,
-    }));
-}
-
-/** An exact match by barcode, article number or title blocks a create. */
-function isDuplicate(match: ProductMatch): boolean {
-  return match.match !== 'similar_title';
+    .map((card) => ({ product_id: card.id, match: matchKind(card, query) }))
+    .filter((m): m is ProductMatch => m.match !== null)
+    .sort((a, b) => MATCH_ORDER[a.match] - MATCH_ORDER[b.match]);
 }
 
 // ========== product cards: create ==========
@@ -602,9 +590,7 @@ async function planCreate(
       line: index + 1,
       sale_unit: saleUnit,
       consumable_unit: consumableUnit,
-      existing: (await matchesFor(client, input.location_id, p)).filter(
-        isDuplicate
-      ),
+      existing: await matchesFor(client, input.location_id, p),
       write: {
         title: p.title.trim(),
         category_id: p.category_id,

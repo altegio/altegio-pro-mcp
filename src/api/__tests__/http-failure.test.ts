@@ -118,6 +118,15 @@ describe('mapHttpFailure', () => {
     ).toBeInstanceOf(FinanceInputError);
   });
 
+  it('reads a 429 as a rate limit: pause, then one request at a time', () => {
+    const limited = mapHttpFailure(429, undefined, 'save it', classes, wording);
+    expect(limited).toBeInstanceOf(AltegioApiError);
+    expect(limited.statusCode).toBe(429);
+    expect(limited.message).toBe(
+      'Altegio is limiting the request rate while trying to save it (HTTP 429). Wait a few seconds before the next request, and send requests one at a time rather than in parallel.'
+    );
+  });
+
   it('reads a 5xx as the service being down, and anything else as itself', () => {
     const down = mapHttpFailure(503, undefined, 'save it', classes, wording);
     expect(down.message).toBe(

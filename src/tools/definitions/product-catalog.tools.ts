@@ -1,7 +1,6 @@
 /**
- * `[Inventory]` product catalog — product cards (create, change, archive),
- * product categories, the units a product is counted in, and the matching of
- * incoming lines (a supplier invoice) to existing products.
+ * `[Inventory]` product catalog — products (create, change, archive), product
+ * categories and the units a product is counted in.
  *
  * Names, parameters and results use the product glossary; the wire vocabulary
  * (`good`, `goods_categories`, `cost`/`actual_cost`, `unit_equals`,
@@ -79,7 +78,7 @@ const productFields = {
     .max(255)
     .optional()
     .describe('Name printed on the receipt; Altegio never shows it back.'),
-  comment: z.string().max(1000).optional().describe('Comment on the card.'),
+  comment: z.string().max(1000).optional().describe('Comment on the product.'),
   critical_quantity: z
     .number()
     .min(0)
@@ -228,7 +227,7 @@ export const productsCreateTool = defineTool({
   name: 'products_create',
   category: 'Inventory',
   description:
-    'Create one or more product cards (up to 25, such as the new lines of a supplier invoice): name, product category, sale and cost price in the location currency, sale and consumable units, article number, barcode. Each line is first checked against the existing products: a same barcode, article number or title refuses the call and names the product, or with skip_existing only skips that line, so a repeated call creates nothing twice; products_search finds similar names. Stock is not changed: record a product receipt with inventory_create_operation. Asks for confirmation first.',
+    'Create one or more products (up to 25, such as the new lines of a supplier invoice): name, product category, sale and cost price in the location currency, sale and consumable units, article number, barcode. Each line is first checked against the existing products: a same barcode, article number or title refuses the call and names the product, or with skip_existing only skips that line, so a repeated call creates nothing twice; products_search finds similar names. Stock is not changed: record a product receipt with inventory_create_operation. Asks for confirmation first.',
   annotations: {
     title: 'Inventory: create products',
     destructiveHint: false,
@@ -252,9 +251,9 @@ export const productsCreateTool = defineTool({
   confirm: {
     action: 'Create products',
     target: (input) =>
-      `${input.products?.length ?? 0} product card(s) at location ${input.location_id}`,
+      `${input.products?.length ?? 0} new product(s) at location ${input.location_id}`,
     consequence:
-      'New product cards are added to the location’s product list with the prices and units below; no stock moves. Archive one created by mistake with products_archive.',
+      'The new products are added to the location’s product list with the prices and units below; no stock moves. Archive one created by mistake with products_archive.',
     detail: (input, client) => catalog.describeProductsCreate(client, input),
   },
   handler: async ({ input, client, confirmation }) =>
@@ -265,7 +264,7 @@ export const productsUpdateTool = defineTool({
   name: 'products_update',
   category: 'Inventory',
   description:
-    'Change a product card: name, product category, sale or cost price, units, article number, barcode, receipt name, comment, critical and desired stock. Fields left out stay. A unit change on a product whose stock has moved converts its past operations by Altegio’s rules. Membership and gift card products are refused. Asks for confirmation first, showing before → after; refused if the card changes after that.',
+    'Change a product: name, product category, sale or cost price, units, article number, barcode, receipt name, comment, critical and desired stock. Fields left out stay. A unit change on a product whose stock has moved converts its past operations by Altegio’s rules. Membership and gift card products are refused. Asks for confirmation first, showing before → after; refused if the card changes after that.',
   annotations: {
     title: 'Inventory: change a product',
     destructiveHint: false,
@@ -285,7 +284,7 @@ export const productsUpdateTool = defineTool({
       `product ${input.product_id} at location ${input.location_id}`,
     resolve: (input, client) => catalog.describeProduct(client, input),
     consequence:
-      'The product card is stored with the changes below; every later sale, receipt and consumption uses them. Past documents keep their prices.',
+      'The product is stored with the changes below; every later sale, receipt and consumption uses them. Past documents keep their prices.',
     detail: (input, client) => catalog.describeProductUpdate(client, input),
   },
   handler: async ({ input, client, confirmation }) =>

@@ -2,8 +2,9 @@
  * Opt-in live suite for changing positions and service categories, through
  * the real `tools/call` path of a host without elicitation: a position of its
  * own is renamed (its description stays), its description cleared, then
- * deleted twice; a service category of its own is renamed and reordered (its
- * weight stays through a rename), then deleted.
+ * deleted twice; a service category of its own is created (a repeat of the
+ * confirmed call creates nothing), renamed and reordered (its weight stays
+ * through a rename), then deleted.
  *
  * Skipped unless `ALTEGIO_E2E=1`. Credentials and the location come from the
  * environment, never a file in this public repo:
@@ -15,7 +16,6 @@
  *     npx jest references-live
  */
 import type { AltegioClient } from '../providers/altegio-client.js';
-import { httpFromClient } from '../api/altegio-http.js';
 import {
   describeLive,
   liveClient,
@@ -119,29 +119,37 @@ describeLive(
       made.position = 0;
     }, 120_000);
 
-    it('renames and reorders a service category, then deletes it', async () => {
-      const created = await httpFromClient(altegio).request(
-        `/service_categories/${ids.LOCATION_ID}`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            title: `references-live ${stamp}`,
-            weight: 3,
-          }),
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
+    it('creates, renames and reorders a service category, then deletes it', async () => {
+      const create = await host.confirmed('service_categories_create', {
+        ...at(),
+        title: `references-live ${stamp}`,
+        sort_weight: 3,
+      });
+      const created = await create.run();
+      expect(created.isError).toBeFalsy();
       made.category = (
-        (await created.json()) as { data: { id: number } }
-      ).data.id;
+        created.structuredContent as { category: { id: number } }
+      ).category.id;
+      expect(created.structuredContent).toMatchObject({
+        category: { title: `references-live ${stamp}`, sort_weight: 3 },
+      });
+
+      const repeat = await create.run();
+      expect(repeat.isError).toBe(true);
+      expect(textOf(repeat)).toContain(
+        `service category ${made.category} already has this title`
+      );
 
       await confirmedRun('service_categories_update', {
         ...at(),
         category_id: made.category,
         title: `references-live renamed ${stamp}`,
       });
+      // Read from the list: the single read can still answer the old title.
       expect(
-        await altegio.getServiceCategory(ids.LOCATION_ID, made.category)
+        (await altegio.getServiceCategories(ids.LOCATION_ID)).find(
+          (c) => c.id === made.category
+        )
       ).toMatchObject({ title: `references-live renamed ${stamp}`, weight: 3 });
 
       const reorder = await confirmedRun('service_categories_update', {
