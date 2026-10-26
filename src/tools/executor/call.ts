@@ -56,6 +56,7 @@ import {
   assertCompanyAllowed,
   getRequestCompanyIds,
   getRequestScopes,
+  hasDeclaredLocations,
   runWithRequiredScopes,
 } from '../../request-context.js';
 import { CONTACT_SCOPE, checkToolScopes, type ToolScope } from '../scopes.js';
@@ -546,6 +547,22 @@ const LOCATION_PARAMETER_NAMES = new Set([
   'salon_id',
 ]);
 
+function usedChainId(
+  op: CatalogOperation,
+  params: Record<string, unknown>
+): number | undefined {
+  const chainParameter = op.parameters.find(
+    (parameter) =>
+      parameter.in === 'path' && parameter.name.toLowerCase() === 'chain_id'
+  );
+  const usedName =
+    chainParameter &&
+    acceptedParamNames(op, chainParameter.name, chainParameter.in).find(
+      (name) => has(params, name)
+    );
+  return usedName === undefined ? undefined : Number(params[usedName]);
+}
+
 /**
  * Resolve and enforce the location dimension from catalog metadata.
  *
@@ -570,6 +587,10 @@ function enforceCatalogCompanyScope(
     if (usedName === undefined) continue;
     const value = Number(params[usedName]);
     assertCompanyAllowed(value);
+    const chainId = usedChainId(op, params);
+    if (chainId !== undefined && hasDeclaredLocations()) {
+      assertChainAllowed(chainId);
+    }
     return value;
   }
 
@@ -577,17 +598,9 @@ function enforceCatalogCompanyScope(
   // its scope was resolved at the chain level (`./scopes.ts`), and the
   // transport must not read the chain id as a location.
   if (isChainLevelOperation(op)) {
-    const chainParameter = op.parameters.find(
-      (parameter) =>
-        parameter.in === 'path' && parameter.name.toLowerCase() === 'chain_id'
-    );
-    const usedName =
-      chainParameter &&
-      acceptedParamNames(op, chainParameter.name, chainParameter.in).find(
-        (name) => has(params, name)
-      );
-    if (usedName !== undefined) {
-      assertChainAllowed(Number(params[usedName]));
+    const chainId = usedChainId(op, params);
+    if (chainId !== undefined) {
+      assertChainAllowed(chainId);
       return null;
     }
   }

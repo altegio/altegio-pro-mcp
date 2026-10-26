@@ -514,6 +514,35 @@ describe('request-context: Altegio OAuth grants', () => {
     });
   });
 
+  it('confines a users.hash request to its declared locations, chains included', () => {
+    // The analytics agent's embedded chat stays on its system user's
+    // users.hash and names the open location; a chain-level read would reach
+    // the chain of a salon the chat was not opened in.
+    const context = requestContextFromHeaders({
+      'x-altegio-user-token': 'legacy-hash',
+      'x-altegio-company-id': '4564',
+    });
+    runWithContext(context, () => {
+      expect(() => assertCompanyAllowed(4564)).not.toThrow();
+      expect(() => assertCompanyAllowed(720441)).toThrow();
+      expect(isChainAllowed(100)).toBe(false);
+      expect(() => assertChainAllowed(100)).toThrow(/chain-level/);
+      expect(() => assertCompaniesAllowed([4564, 720441])).toThrow(/720441/);
+      expect(() => assertCompaniesAllowed([4564])).not.toThrow();
+    });
+  });
+
+  it('leaves a users.hash request without the header unconfined', () => {
+    runWithContext(
+      requestContextFromHeaders({ 'x-altegio-user-token': 'legacy-hash' }),
+      () => {
+        expect(isChainAllowed(100)).toBe(true);
+        expect(() => assertChainAllowed(100)).not.toThrow();
+        expect(() => assertCompaniesAllowed([4564, 720441])).not.toThrow();
+      }
+    );
+  });
+
   it('leaves a legacy user token on the header-declared path', () => {
     const context = requestContextFromHeaders({
       'x-altegio-user-token': 'legacy-hash',

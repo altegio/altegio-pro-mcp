@@ -30,6 +30,8 @@ interface JsonRpcToolResult {
 
 const TOKEN_A = 'ag_at_e2e_token_a';
 const TOKEN_B = 'ag_at_e2e_token_b';
+/** The analytics agent's system user: a users.hash /pro still admits. */
+const LEGACY_TOKEN = 'e2e-system-user-hash';
 
 /** What Altegio says about each token: the same person, two tokens. */
 const RESOURCES: Record<string, unknown[]> = {
@@ -57,6 +59,7 @@ const RESOURCES: Record<string, unknown[]> = {
       ],
     },
   ],
+  [LEGACY_TOKEN]: [],
   [TOKEN_B]: [
     {
       type: 'location',
@@ -357,6 +360,63 @@ describe('Altegio OAuth lane, end to end', () => {
     );
     expect(chain.result.isError).toBe(true);
     expect(chain.result.content[0]!.text).toMatch(/chain-level/);
+    expect(upstream).toHaveLength(before);
+  });
+
+  it('confines a users.hash session to the declared location, chains included', async () => {
+    const session = await openSession(LEGACY_TOKEN, {
+      'x-altegio-company-id': '4564',
+    });
+    const listing = await parseSse<JsonRpcToolResult>(
+      await session.call('locations_list', {
+        managed_only: true,
+        page_size: 10,
+      })
+    );
+    expect(listing.result.isError).not.toBe(true);
+    expect(listing.result.content[0]!.text).toContain('4564');
+    expect(listing.result.content[0]!.text).not.toContain('720441');
+
+    const before = upstream.length;
+    const hidden = await parseSse<JsonRpcToolResult>(
+      await session.call('resources_list', { location_id: 720441 })
+    );
+    expect(hidden.result.isError).toBe(true);
+
+    const chain = await parseSse<JsonRpcToolResult>(
+      await session.call('api_call_operation', {
+        operation_id: 'get_chain_client_by_phone_number',
+        params: { chain_id: 100, phone: '+10000000000' },
+      })
+    );
+    expect(chain.result.isError).toBe(true);
+    expect(chain.result.content[0]!.text).toMatch(/chain-level/);
+
+    const types = await parseSse<JsonRpcToolResult>(
+      await session.call('memberships_list_types', {
+        chain_id: 100,
+        page: 1,
+        page_size: 10,
+      })
+    );
+    expect(types.result.isError).toBe(true);
+
+    const deposits = await parseSse<JsonRpcToolResult>(
+      await session.call('api_call_operation', {
+        operation_id: 'get_client_account_list_by_chain',
+        params: { chain_id: 100 },
+      })
+    );
+    expect(deposits.result.isError).toBe(true);
+
+    const cards = await parseSse<JsonRpcToolResult>(
+      await session.call('api_call_operation', {
+        operation_id: 'get_loyalty_card_list_by_phone',
+        params: { phone: '10000000000', chain_id: 200, location_id: 4564 },
+      })
+    );
+    expect(cards.result.isError).toBe(true);
+    expect(cards.result.content[0]!.text).toMatch(/chain-level/);
     expect(upstream).toHaveLength(before);
   });
 

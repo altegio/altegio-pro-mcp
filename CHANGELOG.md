@@ -50,6 +50,12 @@ is declared stable.
   location is refused before any call and listed nowhere, and no chain-level
   read is allowed. It never widens the consent. The analytics agent's
   embedded chat shares one token across locations and relies on it.
+- The same header now confines a `users.hash` request the same way: every
+  chain-level call is refused (`/chains/{id}/…`, `/deposits/chain/{id}`, the
+  membership tools that read a chain), a membership type's `location_ids`
+  must stay inside the named locations, and an executor operation that names
+  a chain next to a location is refused. Before, such a request was confined
+  by location only, so a chain read could reach other locations of the chain.
 - A refused token on a section of Pro (`/mcp/analytics`) is challenged with
   the protected-resource document of that section (`/pro/analytics`), the
   address the host connected to.

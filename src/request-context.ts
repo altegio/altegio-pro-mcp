@@ -317,33 +317,45 @@ export function getRequestGrants(): OauthGrants | undefined {
 }
 
 /**
- * The locations an access-token request confined itself to with
- * `X-Altegio-Company-Id`, or `undefined` when it did not.
+ * The locations a request confined itself to with `X-Altegio-Company-Id`, or
+ * `undefined` when it did not. For an access token the set is already cut down
+ * to the consent.
  */
 function declaredLocations(): ReadonlySet<number> | undefined {
   const context = storage.getStore();
-  return context?.grants && context.declaresLocations
-    ? (context.companyIds ?? new Set<number>())
-    : undefined;
+  if (context?.grants) {
+    return context.declaresLocations
+      ? (context.companyIds ?? new Set<number>())
+      : undefined;
+  }
+  return context?.companyIds;
+}
+
+/** Whether the request named its locations with `X-Altegio-Company-Id`. */
+export function hasDeclaredLocations(): boolean {
+  return declaredLocations() !== undefined;
 }
 
 function confinement(allowed: ReadonlySet<number>): string {
   if (allowed.size === 0) {
-    return "This request is confined by X-Altegio-Company-Id to no location this connection's Altegio consent covers";
+    return getRequestGrants()
+      ? "This request is confined by X-Altegio-Company-Id to no location this connection's Altegio consent covers"
+      : 'This request is confined by X-Altegio-Company-Id to no valid location';
   }
   const list = [...allowed].sort((a, b) => a - b).join(', ');
   return `This request is confined to location${allowed.size === 1 ? '' : 's'} ${list} by X-Altegio-Company-Id`;
 }
 
 /**
- * Whether `chainId` is covered by the current request's consent. `true`
- * without grants: chains were never confined by the header-declared scope.
- * `false` for every chain once an access-token request names its locations.
+ * Whether `chainId` is covered by the current request. `false` for every chain
+ * once a request names its locations with `X-Altegio-Company-Id`: a chain-level
+ * call reaches every location of the chain. Otherwise `true` without grants,
+ * and the consent decides with them.
  */
 export function isChainAllowed(chainId: number): boolean {
+  if (declaredLocations() !== undefined) return false;
   const grants = getRequestGrants();
-  if (grants === undefined) return true;
-  return declaredLocations() === undefined && grants.chainIds.has(chainId);
+  return grants === undefined || grants.chainIds.has(chainId);
 }
 
 /**
@@ -353,8 +365,6 @@ export function isChainAllowed(chainId: number): boolean {
  * call belong to the chain, not to each location.
  */
 export function assertCompaniesAllowed(companyIds: readonly number[]): void {
-  const grants = getRequestGrants();
-  if (grants === undefined) return;
   const declared = declaredLocations();
   if (declared !== undefined) {
     const undeclared = companyIds.filter((id) => !declared.has(id));
@@ -366,6 +376,8 @@ export function assertCompaniesAllowed(companyIds: readonly number[]): void {
       );
     }
   }
+  const grants = getRequestGrants();
+  if (grants === undefined) return;
   const outside = companyIds.filter((id) => !grants.locationIds.has(id));
   if (outside.length === 0) return;
   throw new AltegioApiError(
@@ -377,8 +389,6 @@ export function assertCompaniesAllowed(companyIds: readonly number[]): void {
 
 /** Refuse a chain the consent does not cover (`/chains/{id}/…` calls). */
 export function assertChainAllowed(chainId: number): void {
-  const grants = getRequestGrants();
-  if (grants === undefined) return;
   const declared = declaredLocations();
   if (declared !== undefined) {
     throw new AltegioApiError(
@@ -386,6 +396,8 @@ export function assertChainAllowed(chainId: number): void {
       403
     );
   }
+  const grants = getRequestGrants();
+  if (grants === undefined) return;
   const resource = grants.resources.find(
     (r) => r.type === 'chain' && r.id === chainId
   );
