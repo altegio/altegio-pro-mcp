@@ -63,6 +63,10 @@ is declared stable.
 - A refused token on a section of Pro (`/mcp/analytics`) is challenged with
   the protected-resource document of that section (`/pro/analytics`), the
   address the host connected to.
+- A request admitted on an access token answers with `X-Altegio-User-Id`
+  and, when Altegio names one, `X-Altegio-User-Email`. The proxy cannot read
+  the token: it logs the id as the request's subject, keeps the e-mail for
+  the usage reports and strips both before the response reaches the host.
 
 ### Security
 

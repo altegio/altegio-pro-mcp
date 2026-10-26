@@ -207,9 +207,43 @@ describe('the OAuth door on the HTTP surface', () => {
     });
   });
 
+  it('names the person behind a good token to the proxy, for its request log', async () => {
+    altegio.mockImplementation((url) => {
+      if (url.includes('/oauth/accessible-resources')) return json(listing);
+      return json({
+        success: true,
+        data: { id: 42, email: ' owner@example.com ' },
+      });
+    });
+    const res = await initialize('/mcp', GOOD);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('x-altegio-user-id')).toBe('42');
+    expect(res.headers.get('x-altegio-user-email')).toBe('owner@example.com');
+    await nativeFetch(`${base}/mcp`, {
+      method: 'DELETE',
+      headers: { 'mcp-session-id': res.headers.get('mcp-session-id')! },
+    });
+  });
+
+  it('leaves out an e-mail a header cannot carry', async () => {
+    altegio.mockImplementation((url) => {
+      if (url.includes('/oauth/accessible-resources')) return json(listing);
+      return json({ success: true, data: { id: 42, email: 'вла@пример.рф' } });
+    });
+    const res = await initialize('/mcp', GOOD);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('x-altegio-user-id')).toBe('42');
+    expect(res.headers.get('x-altegio-user-email')).toBeNull();
+    await nativeFetch(`${base}/mcp`, {
+      method: 'DELETE',
+      headers: { 'mcp-session-id': res.headers.get('mcp-session-id')! },
+    });
+  });
+
   it('leaves a legacy token to the existing lanes', async () => {
     const res = await initialize('/mcp', 'legacy-users-hash');
     expect(res.status).toBe(200);
+    expect(res.headers.get('x-altegio-user-id')).toBeNull();
     expect(
       altegio.mock.calls.filter(([url]) =>
         url.includes('/oauth/accessible-resources')

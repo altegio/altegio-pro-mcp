@@ -38,6 +38,8 @@ export interface ResourceGrant {
 /** Everything the server knows about one access token. */
 export interface OauthGrants {
   userId: number;
+  /** The person's e-mail, when Altegio names one: handed to the proxy, never logged here. */
+  email?: string;
   resources: readonly ResourceGrant[];
   locationIds: ReadonlySet<number>;
   chainIds: ReadonlySet<number>;
@@ -189,6 +191,9 @@ export async function fetchOauthGrants(
     );
   }
 
+  const rawEmail = (profile as { data?: { email?: unknown } })?.data?.email;
+  const email = typeof rawEmail === 'string' ? rawEmail.trim() : '';
+
   const locationIds = new Set<number>();
   const chainIds = new Set<number>();
   const scopes = new Set<string>();
@@ -199,6 +204,7 @@ export async function fetchOauthGrants(
 
   return {
     userId,
+    ...(email ? { email } : {}),
     resources,
     locationIds,
     chainIds,

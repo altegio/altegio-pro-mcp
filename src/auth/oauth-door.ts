@@ -25,6 +25,9 @@ import {
 
 const logger = createLogger('oauth-door');
 
+/** An e-mail a response header carries as it is: printable ASCII, one `@`. */
+const HEADER_SAFE_EMAIL = /^[!-?A-~]{1,64}@[!-?A-~]{1,189}$/;
+
 /** `/mcp/<view>` → `<view>`: the section of Pro the proxy serves at `/pro/<view>`. */
 const VIEW_SEGMENT = /^\/mcp\/([a-z][a-z0-9_-]{0,63})(?:\/|$)/;
 
@@ -61,12 +64,19 @@ export function oauthDoor(options: OauthDoorOptions): RequestHandler {
     const token = Array.isArray(header) ? header[0] : header;
     if (!isOauthAccessToken(token)) return next();
     try {
-      await resolveOauthGrants({
+      const grants = await resolveOauthGrants({
         token: token!,
         apiBase: options.apiBase,
         partnerToken: options.partnerToken,
         ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
       });
+      // The proxy cannot read the token, so it learns from here who made the
+      // request: it logs the user id as the request's subject, keeps the
+      // e-mail for usage reports, and strips both before the response leaves.
+      res.set('X-Altegio-User-Id', String(grants.userId));
+      if (grants.email && HEADER_SAFE_EMAIL.test(grants.email)) {
+        res.set('X-Altegio-User-Email', grants.email);
+      }
       next();
     } catch (error) {
       if (error instanceof OauthTokenRejectedError) {
