@@ -30,7 +30,6 @@ import {
   requestContextFromHeaders,
   runWithContext,
 } from '../request-context.js';
-import { DEFAULT_FACET, READONLY_VIEW } from '../tools/facets.js';
 import { AuthenticationError } from '../utils/errors.js';
 
 const GOOD = 'ag_at_door_good_token';
@@ -55,14 +54,18 @@ const listing = {
 };
 
 describe('protectedResourceMetadataUrl', () => {
-  it('names the proxy document of the address the view is served on', () => {
-    expect(
-      protectedResourceMetadataUrl('https://mcp.alteg.io/pro', DEFAULT_FACET)
-    ).toBe('https://mcp.alteg.io/.well-known/oauth-protected-resource/pro');
-    expect(
-      protectedResourceMetadataUrl('https://mcp.alteg.io/pro', READONLY_VIEW)
-    ).toBe(
-      'https://mcp.alteg.io/.well-known/oauth-protected-resource/pro/readonly'
+  it('names the proxy document of the address the request came in on', () => {
+    const base = 'https://mcp.alteg.io/pro';
+    const doc = 'https://mcp.alteg.io/.well-known/oauth-protected-resource/pro';
+    expect(protectedResourceMetadataUrl(base, '/mcp')).toBe(doc);
+    expect(protectedResourceMetadataUrl(base, '/mcp/readonly')).toBe(
+      `${doc}/readonly`
+    );
+    expect(protectedResourceMetadataUrl(base, '/mcp/analytics')).toBe(
+      `${doc}/analytics`
+    );
+    expect(protectedResourceMetadataUrl(base, '/mcp/readonly/extra')).toBe(
+      `${doc}/readonly`
     );
   });
 });
@@ -158,6 +161,14 @@ describe('the OAuth door on the HTTP surface', () => {
     expect(res.status).toBe(401);
     expect(res.headers.get('www-authenticate')).toContain(
       'resource_metadata="https://mcp.alteg.io/.well-known/oauth-protected-resource/pro/readonly"'
+    );
+  });
+
+  it('points a section of Pro at the document of its own address', async () => {
+    const res = await initialize('/mcp/analytics', BAD);
+    expect(res.status).toBe(401);
+    expect(res.headers.get('www-authenticate')).toContain(
+      'resource_metadata="https://mcp.alteg.io/.well-known/oauth-protected-resource/pro/analytics"'
     );
   });
 

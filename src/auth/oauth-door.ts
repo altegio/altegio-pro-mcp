@@ -11,7 +11,6 @@
  */
 import type { RequestHandler } from 'express';
 import { loadConfig } from '../config/schema.js';
-import { READONLY_VIEW, type FacetKey } from '../tools/facets.js';
 import { getRequestUserToken } from '../request-context.js';
 import { createLogger } from '../utils/logger.js';
 import { AuthenticationError } from '../utils/errors.js';
@@ -26,26 +25,24 @@ import {
 
 const logger = createLogger('oauth-door');
 
+/** `/mcp/<view>` → `<view>`: the section of Pro the proxy serves at `/pro/<view>`. */
+const VIEW_SEGMENT = /^\/mcp\/([a-z][a-z0-9_-]{0,63})(?:\/|$)/;
+
 /**
- * The protected-resource metadata document for the address a view is served
- * on: the proxy publishes one per route, and the read-only view is its own
+ * The protected-resource metadata document for the address the request came
+ * in on: `/mcp` is `/pro`, `/mcp/<view>` is `/pro/<view>`. RFC 9728 §3.3 has
+ * the document name exactly that address, so a host that checks `resource`
+ * against the URL it connected to accepts it; the read-only view is its own
  * route (`/pro/readonly`).
  */
 export function protectedResourceMetadataUrl(
   publicBaseUrl: string,
-  facet: FacetKey
+  requestPath: string
 ): string {
   const base = new URL(publicBaseUrl);
   const path = base.pathname.replace(/\/+$/, '');
-  const suffix = facet === READONLY_VIEW ? `/${READONLY_VIEW}` : '';
-  return `${base.origin}/.well-known/oauth-protected-resource${path}${suffix}`;
-}
-
-function facetOfPath(path: string): FacetKey {
-  return path === `/mcp/${READONLY_VIEW}` ||
-    path.startsWith(`/mcp/${READONLY_VIEW}/`)
-    ? READONLY_VIEW
-    : 'default';
+  const view = VIEW_SEGMENT.exec(requestPath)?.[1];
+  return `${base.origin}/.well-known/oauth-protected-resource${path}${view ? `/${view}` : ''}`;
 }
 
 export interface OauthDoorOptions {
@@ -75,7 +72,7 @@ export function oauthDoor(options: OauthDoorOptions): RequestHandler {
       if (error instanceof OauthTokenRejectedError) {
         const metadata = protectedResourceMetadataUrl(
           options.publicBaseUrl,
-          facetOfPath(req.path)
+          req.path
         );
         logger.info(
           {

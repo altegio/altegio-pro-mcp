@@ -45,6 +45,9 @@ is declared stable.
   never sent for an access token. A password login is refused on such a
   connection. Local state is keyed by the Altegio user, so a rotated token
   keeps its reports and checkpoints.
+- A refused token on a section of Pro (`/mcp/analytics`) is challenged with
+  the protected-resource document of that section (`/pro/analytics`), the
+  address the host connected to.
 
 ### Security
 
