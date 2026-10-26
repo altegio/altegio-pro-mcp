@@ -326,6 +326,40 @@ describe('Altegio OAuth lane, end to end', () => {
     expect(upstream).toHaveLength(before);
   });
 
+  it('confines a shared token to the location the embedding declares', async () => {
+    // One token for two locations, the header naming one: the other is
+    // neither listed nor readable, and no chain-level read gets through.
+    const session = await openSession(TOKEN_A, {
+      'x-altegio-company-id': '4564',
+    });
+    const listing = await parseSse<JsonRpcToolResult>(
+      await session.call('locations_list', {
+        managed_only: true,
+        page_size: 10,
+      })
+    );
+    expect(listing.result.isError).not.toBe(true);
+    expect(listing.result.content[0]!.text).toContain('4564');
+    expect(listing.result.content[0]!.text).not.toContain('720441');
+
+    const before = upstream.length;
+    const hidden = await parseSse<JsonRpcToolResult>(
+      await session.call('resources_list', { location_id: 720441 })
+    );
+    expect(hidden.result.isError).toBe(true);
+    expect(hidden.result.content[0]!.text).toMatch(/confined to location 4564/);
+
+    const chain = await parseSse<JsonRpcToolResult>(
+      await session.call('api_call_operation', {
+        operation_id: 'get_chain_client_by_phone_number',
+        params: { chain_id: 100, phone: '+10000000000' },
+      })
+    );
+    expect(chain.result.isError).toBe(true);
+    expect(chain.result.content[0]!.text).toMatch(/chain-level/);
+    expect(upstream).toHaveLength(before);
+  });
+
   it('refuses a membership type sold at a location outside the consent', async () => {
     const session = await openSession(TOKEN_A);
     const before = upstream.length;

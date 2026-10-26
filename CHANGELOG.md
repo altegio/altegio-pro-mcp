@@ -45,6 +45,11 @@ is declared stable.
   never sent for an access token. A password login is refused on such a
   connection. Local state is keyed by the Altegio user, so a rotated token
   keeps its reports and checkpoints.
+- `X-Altegio-Company-Id` narrows an access token's grants instead of being
+  ignored: a request sees only the granted locations it names, every other
+  location is refused before any call and listed nowhere, and no chain-level
+  read is allowed. It never widens the consent. The analytics agent's
+  embedded chat shares one token across locations and relies on it.
 - A refused token on a section of Pro (`/mcp/analytics`) is challenged with
   the protected-resource document of that section (`/pro/analytics`), the
   address the host connected to.

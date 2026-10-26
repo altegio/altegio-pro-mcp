@@ -130,7 +130,10 @@ proxy's protected-resource document, so the host refreshes or signs in again.
 Every API call is confined to the consent at the transport: a location or chain
 outside it, or inside it without the permission the call needs, is refused
 before anything is sent; `x-mcp-auth-scope` from the proxy is ignored for such
-a token. Data the server holds locally (stored report CSVs, onboarding
+a token. `X-Altegio-Company-Id` can only narrow it: the request then reaches
+the granted locations the header names and no chain, so one token shared
+across locations (an embedded chat) is confined to the location open there.
+Data the server holds locally (stored report CSVs, onboarding
 checkpoints) is served only after a fresh verdict on the token. API calls go
 out as `Authorization: Bearer <partner token>, User ag_at_…`, so the partner
 token must be the one Altegio issued to the MCP platform; the ERP web reports

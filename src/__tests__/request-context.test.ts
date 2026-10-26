@@ -524,6 +524,57 @@ describe('request-context: Altegio OAuth grants', () => {
     expect(context.scopes).toEqual(new Set(['mcp:pro:read']));
   });
 
+  it('narrows the grants to the locations the caller declares, never widens them', () => {
+    // An embedding that shares one token across locations (the analytics
+    // agent's chat in an iframe) confines each request to the location open
+    // there; a location outside the consent stays outside.
+    const context = requestContextFromHeaders(
+      oauthHeaders({ 'x-altegio-company-id': '4564, 999' })
+    );
+
+    expect(context.grants).toBe(grants);
+    expect([...(context.companyIds ?? [])]).toEqual([4564]);
+    runWithContext(context, () => {
+      expect(() => assertCompanyAllowed(4564)).not.toThrow();
+      expect(isCompanyAllowed(4564)).toBe(true);
+      expect(isCompanyAllowed(720441)).toBe(false);
+      expect(() => assertCompanyAllowed(720441)).toThrow(
+        /confined to location 4564/
+      );
+      expect(() => assertCompanyAllowed(999)).toThrow(
+        /confined to location 4564/
+      );
+      expect(() => assertCompaniesAllowed([4564, 720441])).toThrow(/720441/);
+    });
+  });
+
+  it('refuses every chain once the caller confines a request to locations', () => {
+    // A chain-level read spans every location of the chain, the ones the
+    // embedding did not open included.
+    runWithContext(
+      requestContextFromHeaders(
+        oauthHeaders({ 'x-altegio-company-id': '4564' })
+      ),
+      () => {
+        expect(isChainAllowed(100)).toBe(false);
+        expect(() => assertChainAllowed(100)).toThrow(/chain-level/);
+      }
+    );
+  });
+
+  it('confines to nothing when the declared locations are invalid or outside the grants', () => {
+    for (const value of ['abc', '999']) {
+      const context = requestContextFromHeaders(
+        oauthHeaders({ 'x-altegio-company-id': value })
+      );
+      expect(context.companyIds?.size).toBe(0);
+      runWithContext(context, () => {
+        expect(() => assertCompanyAllowed(4564)).toThrow();
+        expect(isChainAllowed(100)).toBe(false);
+      });
+    }
+  });
+
   it('allows a granted chain and refuses any other', () => {
     runWithContext(requestContextFromHeaders(oauthHeaders()), () => {
       expect(isChainAllowed(100)).toBe(true);

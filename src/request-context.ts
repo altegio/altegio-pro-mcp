@@ -241,28 +241,43 @@ export interface RequestContext {
    * the client sent in headers can widen them.
    */
   grants?: OauthGrants;
+  /**
+   * The request names its locations in `X-Altegio-Company-Id` on top of an
+   * access token: `companyIds` is then the part of the grants it named, and
+   * no chain is reachable. An embedding that shares one token across
+   * locations (the analytics agent's chat) confines each request this way.
+   */
+  declaresLocations?: boolean;
 }
 
 /**
  * Build the complete request context from HTTP headers in one place.
  *
  * An Altegio OAuth access token is the whole credential: its grants decide
- * the locations, chains and scopes. The proxy's `x-mcp-auth-scope` and the
- * caller's `X-Altegio-Company-Id` are ignored for it, and a token whose grants
- * are not known (the door did not run, or the entry expired) confines the
- * request to nothing rather than to everything.
+ * the locations, chains and scopes, and a token whose grants are not known
+ * (the door did not run, or the entry expired) confines the request to
+ * nothing rather than to everything. The proxy's `x-mcp-auth-scope` is
+ * ignored for it; the caller's `X-Altegio-Company-Id` can only narrow it — to
+ * the granted locations it names, with every chain out of reach — never
+ * widen it.
  */
 export function requestContextFromHeaders(headers: HeaderBag): RequestContext {
   const identity = parseIdentityHeaders(headers);
   const userToken = parseUserToken(headers);
   if (userToken !== undefined && isOauthAccessToken(userToken)) {
     const grants = oauthGrantsCache.get(userToken);
+    const granted = grants?.locationIds ?? new Set<number>();
+    const declared = parseCompanyIds(headers);
     return {
       identity,
       userToken,
       grants,
-      companyIds: grants?.locationIds ?? new Set<number>(),
+      companyIds:
+        declared === undefined
+          ? granted
+          : new Set([...granted].filter((id) => declared.has(id))),
       scopes: grants?.scopes ?? new Set<string>(),
+      ...(declared === undefined ? {} : { declaresLocations: true }),
     };
   }
   return {
@@ -302,12 +317,33 @@ export function getRequestGrants(): OauthGrants | undefined {
 }
 
 /**
+ * The locations an access-token request confined itself to with
+ * `X-Altegio-Company-Id`, or `undefined` when it did not.
+ */
+function declaredLocations(): ReadonlySet<number> | undefined {
+  const context = storage.getStore();
+  return context?.grants && context.declaresLocations
+    ? (context.companyIds ?? new Set<number>())
+    : undefined;
+}
+
+function confinement(allowed: ReadonlySet<number>): string {
+  if (allowed.size === 0) {
+    return "This request is confined by X-Altegio-Company-Id to no location this connection's Altegio consent covers";
+  }
+  const list = [...allowed].sort((a, b) => a - b).join(', ');
+  return `This request is confined to location${allowed.size === 1 ? '' : 's'} ${list} by X-Altegio-Company-Id`;
+}
+
+/**
  * Whether `chainId` is covered by the current request's consent. `true`
  * without grants: chains were never confined by the header-declared scope.
+ * `false` for every chain once an access-token request names its locations.
  */
 export function isChainAllowed(chainId: number): boolean {
   const grants = getRequestGrants();
-  return grants === undefined || grants.chainIds.has(chainId);
+  if (grants === undefined) return true;
+  return declaredLocations() === undefined && grants.chainIds.has(chainId);
 }
 
 /**
@@ -319,6 +355,17 @@ export function isChainAllowed(chainId: number): boolean {
 export function assertCompaniesAllowed(companyIds: readonly number[]): void {
   const grants = getRequestGrants();
   if (grants === undefined) return;
+  const declared = declaredLocations();
+  if (declared !== undefined) {
+    const undeclared = companyIds.filter((id) => !declared.has(id));
+    if (undeclared.length > 0) {
+      throw new AltegioApiError(
+        `${confinement(declared)}; location${undeclared.length === 1 ? '' : 's'} ` +
+          `${undeclared.join(', ')} ${undeclared.length === 1 ? 'is' : 'are'} outside it.`,
+        403
+      );
+    }
+  }
   const outside = companyIds.filter((id) => !grants.locationIds.has(id));
   if (outside.length === 0) return;
   throw new AltegioApiError(
@@ -332,6 +379,13 @@ export function assertCompaniesAllowed(companyIds: readonly number[]): void {
 export function assertChainAllowed(chainId: number): void {
   const grants = getRequestGrants();
   if (grants === undefined) return;
+  const declared = declaredLocations();
+  if (declared !== undefined) {
+    throw new AltegioApiError(
+      `${confinement(declared)}, so chain ${chainId} cannot be read: a chain-level call reaches every location of the chain.`,
+      403
+    );
+  }
   const resource = grants.resources.find(
     (r) => r.type === 'chain' && r.id === chainId
   );
@@ -435,6 +489,13 @@ export function isCompanyAllowed(companyId: number): boolean {
 export function assertCompanyAllowed(companyId: number): void {
   const context = storage.getStore();
   if (context?.grants) {
+    const declared = declaredLocations();
+    if (declared !== undefined && !declared.has(companyId)) {
+      throw new AltegioApiError(
+        `${confinement(declared)}; location ${companyId} is outside it.`,
+        403
+      );
+    }
     const resource = context.grants.resources.find(
       (r) => r.type === 'location' && r.id === companyId
     );
