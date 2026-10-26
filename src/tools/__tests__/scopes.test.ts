@@ -178,6 +178,19 @@ describe('scopeSatisfied', () => {
     expect(scopeSatisfied(grants('clients:write'), 'clients:read')).toBe(true);
   });
 
+  it('lets the platform read grant cover read_contact, which Altegio files under reads', () => {
+    // biz.erp `Scope::operationType()` is "starts with read", and the
+    // read-only consent carries clients:read_contact; the staff stack's
+    // mcp:pro:read must keep showing contacts on include_contacts.
+    expect(scopeSatisfied(grants('mcp:pro:read'), 'clients:read_contact')).toBe(
+      true
+    );
+    // The v3 vocabulary keeps the separate axis: clients:read alone does not.
+    expect(scopeSatisfied(grants('clients:read'), 'clients:read_contact')).toBe(
+      false
+    );
+  });
+
   it('does not let read cover write', () => {
     expect(scopeSatisfied(grants('clients:read'), 'clients:write')).toBe(false);
   });

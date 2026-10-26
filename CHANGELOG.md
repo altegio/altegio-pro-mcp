@@ -26,8 +26,16 @@ is declared stable.
   schedules `team_members:schedule`, payouts `payroll:pay`, online-booking
   settings `online_booking:*`, free slots `availability:read`. The executor's
   invented `api:read` is gone; `api_call_operation` requires the read scope of
-  the operation's catalog domain. `clients:read_contact` is required whenever a
-  call passes `include_contacts: true`.
+  the operation's catalog domain, at its level: a read addressed by `chain_id`
+  needs the chain scope of its domain (`chain_clients:read`,
+  `chain_loyalty:read`, `chain_services:read`, `chain_client_accounts:read`)
+  and is confined by the chain grant. `clients:read_contact` is required
+  whenever a call passes `include_contacts: true`; the staff stack's
+  `mcp:pro:read` covers it, as Altegio files `read_contact` under reads.
+- `memberships_create_type` and `memberships_update_type` refuse
+  `location_ids` outside the consent. The `tool_call` log line carries
+  `principal` — `altegio-user-<id>` on an OAuth connection, a token or
+  identity hash otherwise — so usage can be counted per person.
 - Stored report CSVs and onboarding checkpoints are served only after a fresh
   verdict on the token and only for a covered location; `onboarding_status`
   and `onboarding_resume` no longer read a checkpoint of a location outside the

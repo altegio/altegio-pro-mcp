@@ -22,6 +22,7 @@ import type { AddressInfo } from 'node:net';
 import type { Server as HttpServer } from 'node:http';
 import { createApp } from '../http-server.js';
 import { oauthGrantsCache } from '../auth/oauth-access.js';
+import { createLogger } from '../utils/logger.js';
 
 interface JsonRpcToolResult {
   result: { isError?: boolean; content: Array<{ text: string }> };
@@ -49,7 +50,11 @@ const RESOURCES: Record<string, unknown[]> = {
       type: 'chain',
       id: 100,
       main_chain_id: null,
-      scopes: ['chain_loyalty:read'],
+      scopes: [
+        'chain_loyalty:read',
+        'chain_loyalty:configure',
+        'chain_clients:read',
+      ],
     },
   ],
   [TOKEN_B]: [
@@ -122,6 +127,18 @@ describe('Altegio OAuth lane, end to end', () => {
             { id: 720441, title: 'B' },
             { id: 999, title: 'Not granted' },
           ],
+        });
+      }
+      if (target.includes('/chains/100/loyalty/abonement_types')) {
+        return json({
+          success: true,
+          data: {
+            id: 55,
+            title: 'Ten visits',
+            price: 100,
+            location_ids: [4564],
+            services: [],
+          },
         });
       }
       if (target.includes('/chains')) {
@@ -282,6 +299,76 @@ describe('Altegio OAuth lane, end to end', () => {
     expect(denied.result.isError).toBe(true);
     expect(denied.result.content[0]!.text).toContain('chain 200');
     expect(upstream).toHaveLength(before);
+  });
+
+  it('lets the executor read a granted chain and refuses another', async () => {
+    const session = await openSession(TOKEN_A);
+    const allowed = await parseSse<JsonRpcToolResult>(
+      await session.call('api_call_operation', {
+        operation_id: 'get_chain_client_by_phone_number',
+        params: { chain_id: 100, phone: '+10000000000' },
+      })
+    );
+    expect(allowed.result.isError).not.toBe(true);
+    expect(upstream.some((u) => u.url.includes('/chains/100/clients'))).toBe(
+      true
+    );
+
+    const before = upstream.length;
+    const denied = await parseSse<JsonRpcToolResult>(
+      await session.call('api_call_operation', {
+        operation_id: 'get_chain_client_by_phone_number',
+        params: { chain_id: 200, phone: '+10000000000' },
+      })
+    );
+    expect(denied.result.isError).toBe(true);
+    expect(denied.result.content[0]!.text).toContain('chain 200');
+    expect(upstream).toHaveLength(before);
+  });
+
+  it('refuses a membership type sold at a location outside the consent', async () => {
+    const session = await openSession(TOKEN_A);
+    const before = upstream.length;
+    const denied = await parseSse<JsonRpcToolResult>(
+      await session.call('memberships_create_type', {
+        chain_id: 100,
+        title: 'Ten visits',
+        price: 100,
+        location_ids: [4564, 999],
+        services: [{ service_id: 7, visits: 10 }],
+      })
+    );
+    expect(denied.result.isError).toBe(true);
+    expect(denied.result.content[0]!.text).toContain('999');
+    expect(upstream).toHaveLength(before);
+
+    await parseSse<JsonRpcToolResult>(
+      await session.call('memberships_create_type', {
+        chain_id: 100,
+        title: 'Ten visits',
+        price: 100,
+        location_ids: [4564],
+        services: [{ service_id: 7, visits: 10 }],
+      })
+    );
+    expect(
+      upstream.some((u) =>
+        u.url.includes('/chains/100/loyalty/abonement_types')
+      )
+    ).toBe(true);
+  });
+
+  it('logs the call under the Altegio user, never under the token', async () => {
+    const toolLog = jest.spyOn(createLogger('tool-calls'), 'info');
+    const session = await openSession(TOKEN_A);
+    await parseSse(
+      await session.call('locations_list', { managed_only: true, page_size: 1 })
+    );
+    const line = toolLog.mock.calls
+      .map(([fields]) => fields as Record<string, unknown>)
+      .find((fields) => fields.tool === 'locations_list');
+    expect(line?.principal).toBe('altegio-user-42');
+    expect(JSON.stringify(line)).not.toContain(TOKEN_A);
   });
 
   it('resolves a rotated token again and keeps the same person', async () => {

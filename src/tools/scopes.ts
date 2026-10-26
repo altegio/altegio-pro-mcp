@@ -85,6 +85,9 @@ const V3_CATALOG_SCOPES = [
   'chain_loyalty:read',
   'chain_loyalty:configure',
   'chain_loyalty:transact',
+  'chain_clients:read',
+  'chain_services:read',
+  'chain_client_accounts:read',
   'checkout:read',
   'checkout:capture',
   'checkout:cancel',
@@ -603,9 +606,14 @@ export function scopeSatisfied(
   // v3 vocabulary: the single ratified implication.
   if (action === 'read' && granted.has(`${domain}:write`)) return true;
 
-  // Platform vocabulary: one grade for the whole service.
+  // Platform vocabulary: one grade for the whole service. `read_contact` is
+  // a read in Altegio's own classification (`Scope::operationType()` is
+  // "starts with read", and the read-only consent carries it), so the staff
+  // stack's read grade keeps showing contacts on `include_contacts`.
   if (granted.has(PLATFORM_SCOPE_WRITE)) return true;
-  if (action === 'read' && granted.has(PLATFORM_SCOPE_READ)) return true;
+  if (action.startsWith('read') && granted.has(PLATFORM_SCOPE_READ)) {
+    return true;
+  }
 
   return false;
 }

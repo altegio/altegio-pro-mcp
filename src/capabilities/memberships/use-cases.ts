@@ -26,6 +26,7 @@ import type {
   MembershipsApi,
 } from '../../api/memberships-api.js';
 import { MembershipsInputError } from './errors.js';
+import { assertCompaniesAllowed } from '../../request-context.js';
 import { resolveLocationCurrency } from '../../api/v1/location-currency.js';
 import {
   decimalsOf,
@@ -621,6 +622,9 @@ export async function createType(
     services: input.services,
   } as TypeDraft;
   checkFields(fields);
+  // The path names the chain; the locations the type is sold at travel in
+  // the body and must stay inside the consent too.
+  assertCompaniesAllowed(fields.location_ids);
   const saved = await api(client).createType(
     input.chain_id,
     await typeWrite(client, fields, passedFields(input))
@@ -650,6 +654,9 @@ export async function updateType(
     throw new MembershipsInputError(
       'Nothing to update: pass at least one field of the membership type to change.'
     );
+  }
+  if (changes.location_ids !== undefined) {
+    assertCompaniesAllowed(changes.location_ids);
   }
   const port = api(client);
   const current = await port.getType(input.chain_id, input.type_id);

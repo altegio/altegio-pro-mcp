@@ -18,6 +18,7 @@ import {
   getRequestGrants,
   isChainAllowed,
   assertChainAllowed,
+  assertCompaniesAllowed,
   runWithRequiredScopes,
   getRequiredScopes,
   requestPrincipalKey,
@@ -555,6 +556,17 @@ describe('request-context: Altegio OAuth grants', () => {
         expect(() => assertCompanyAllowed(720441)).not.toThrow();
         expect(() => assertCompanyAllowed(999)).toThrow(/999/);
       });
+    });
+  });
+
+  it('refuses a location list that reaches outside the consent', () => {
+    runWithContext(requestContextFromHeaders(oauthHeaders()), () => {
+      expect(() => assertCompaniesAllowed([4564, 720441])).not.toThrow();
+      expect(() => assertCompaniesAllowed([4564, 999])).toThrow(/999/);
+      expect(() => assertCompaniesAllowed([])).not.toThrow();
+    });
+    runWithContext({ identity: null }, () => {
+      expect(() => assertCompaniesAllowed([1, 2, 3])).not.toThrow();
     });
   });
 

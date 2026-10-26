@@ -52,13 +52,14 @@ import {
 import { indexIncluded, projectToGlossary } from './glossary.js';
 import { DEFAULT_PAGE_SIZE, planPage, type Pagination } from './paging.js';
 import {
+  assertChainAllowed,
   assertCompanyAllowed,
   getRequestCompanyIds,
   getRequestScopes,
   runWithRequiredScopes,
 } from '../../request-context.js';
 import { CONTACT_SCOPE, checkToolScopes, type ToolScope } from '../scopes.js';
-import { executorScopeFor } from './scopes.js';
+import { executorScopeFor, isChainLevelOperation } from './scopes.js';
 
 /** Characters of payload kept in `structuredContent`. */
 export const PAYLOAD_BUDGET_CHARS = 9000;
@@ -571,11 +572,30 @@ function enforceCatalogCompanyScope(
     return value;
   }
 
+  // A chain-level read is confined by the chain grant (RFC decision 13):
+  // its scope was resolved at the chain level (`./scopes.ts`), and the
+  // transport must not read the chain id as a location.
+  if (isChainLevelOperation(op)) {
+    const chainParameter = op.parameters.find(
+      (parameter) =>
+        parameter.in === 'path' && parameter.name.toLowerCase() === 'chain_id'
+    );
+    const usedName =
+      chainParameter &&
+      acceptedParamNames(op, chainParameter.name, chainParameter.in).find(
+        (name) => has(params, name)
+      );
+    if (usedName !== undefined) {
+      assertChainAllowed(Number(params[usedName]));
+      return null;
+    }
+  }
+
   if (declaredScope !== undefined) {
     throw new ExecutorRefusalError(
-      `\`${op.operationId}\` cannot be confined to the declared location scope ` +
-        'because this API operation has no explicit location parameter. Use a ' +
-        'curated location-scoped tool, or reconnect without a declared location scope.',
+      `\`${op.operationId}\` cannot be confined to the declared location scope of ` +
+        'this connection: the operation names neither a location nor a chain. ' +
+        'Use a curated tool that takes a location_id or chain_id for this data.',
       { operationId: op.operationId, reason: 'unscoped_catalog_operation' }
     );
   }

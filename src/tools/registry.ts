@@ -43,6 +43,7 @@ import {
 import {
   getRequestScopes,
   requestContextFromHeaders,
+  requestPrincipalKey,
   runWithContext,
   runWithRequiredScopes,
 } from '../request-context.js';
@@ -654,11 +655,16 @@ export function registerTools(
           getOperation(callArgs.operation_id)
             ? callArgs.operation_id
             : undefined;
+        // Who: the pseudonymous principal local state is keyed by
+        // (`altegio-user-<id>` on an Altegio OAuth connection, a token hash
+        // or identity hash otherwise) — never the token, never an e-mail.
+        const principal = requestPrincipalKey();
         return {
           event: 'tool_call',
           ...observation.correlation,
           rpc_method: 'tools/call',
           tool: call.tool,
+          ...(principal ? { principal } : {}),
           ...(call.alias ? { alias: call.alias } : {}),
           ...(call.via ? { via: call.via } : {}),
           ...(call.tool === 'unknown' &&

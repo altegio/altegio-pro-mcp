@@ -310,6 +310,24 @@ export function isChainAllowed(chainId: number): boolean {
   return grants === undefined || grants.chainIds.has(chainId);
 }
 
+/**
+ * Refuse a list of locations that reaches outside the consent — for a write
+ * that attaches locations in its body (a membership type's `location_ids`)
+ * where the path names only the chain. Membership only: the scopes of the
+ * call belong to the chain, not to each location.
+ */
+export function assertCompaniesAllowed(companyIds: readonly number[]): void {
+  const grants = getRequestGrants();
+  if (grants === undefined) return;
+  const outside = companyIds.filter((id) => !grants.locationIds.has(id));
+  if (outside.length === 0) return;
+  throw new AltegioApiError(
+    `This connection's Altegio consent does not include location${outside.length === 1 ? '' : 's'} ` +
+      `${outside.join(', ')}. Call locations_list for the locations it covers.`,
+    403
+  );
+}
+
 /** Refuse a chain the consent does not cover (`/chains/{id}/…` calls). */
 export function assertChainAllowed(chainId: number): void {
   const grants = getRequestGrants();
