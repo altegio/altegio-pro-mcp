@@ -8,6 +8,13 @@ export const DEFAULT_SESSION_IDLE_MS = 30 * 60 * 1000;
  */
 export const DEFAULT_UNUSED_SESSION_IDLE_MS = 5 * 60 * 1000;
 
+/**
+ * How long a session is spared from capacity eviction after its last request.
+ * A host that opens a session per call (ChatGPT) initializes and calls a tool
+ * within a second or two; the next host's initialize must not take that slot.
+ */
+export const DEFAULT_EVICTION_GRACE_MS = 60 * 1000;
+
 /** Counts reported when a session is evicted to make room; never an ID. */
 export interface HttpSessionEviction {
   /** Whether the evicted session had made a tool call. */
@@ -23,6 +30,8 @@ export interface HttpSessionBudgetOptions {
   readonly idleTimeoutMs?: number;
   /** Idle expiry before it has; never longer than `idleTimeoutMs`. */
   readonly unusedIdleTimeoutMs?: number;
+  /** Time after its last request during which a session is evicted last. */
+  readonly evictionGraceMs?: number;
   readonly onEvict?: (eviction: HttpSessionEviction) => void;
   /** Clock, for tests. */
   readonly now?: () => number;
@@ -32,9 +41,10 @@ export interface HttpSessionBudgetOptions {
  * Bound retained HTTP servers across all views, including abandoned sessions.
  *
  * Memory stays bounded by `maxSessions` leases. When the budget is full, a new
- * session takes the slot of the least recently used idle one — a session that
- * never made a tool call before one that did — and only a budget whose every
- * lease is serving a request refuses. A per-request (sessionless) server holds a
+ * session takes the slot of the least recently used idle one — among those
+ * idle past the eviction grace, a session that never made a tool call before
+ * one that did — and only a budget whose every lease is serving a request
+ * refuses. A per-request (sessionless) server holds a
  * lease too, for exactly as long as its request runs.
  */
 export class HttpSessionBudget {
@@ -42,6 +52,7 @@ export class HttpSessionBudget {
   private readonly leases = new Set<HttpSessionLease>();
   private readonly idleTimeoutMs: number;
   private readonly unusedIdleTimeoutMs: number;
+  private readonly evictionGraceMs: number;
   private readonly now: () => number;
   private readonly onEvict?: (eviction: HttpSessionEviction) => void;
 
@@ -56,6 +67,8 @@ export class HttpSessionBudget {
       resolved.unusedIdleTimeoutMs ?? DEFAULT_UNUSED_SESSION_IDLE_MS,
       this.idleTimeoutMs
     );
+    this.evictionGraceMs =
+      resolved.evictionGraceMs ?? DEFAULT_EVICTION_GRACE_MS;
     this.now = resolved.now ?? Date.now;
     this.onEvict = resolved.onEvict;
   }
@@ -88,21 +101,38 @@ export class HttpSessionBudget {
     return lease;
   }
 
-  /** Close one idle session to make room; false when every lease is busy. */
+  /**
+   * Close one idle session to make room; false when every lease is busy.
+   *
+   * Among sessions idle past the grace, one that never made a tool call goes
+   * before one that did, least recently used first. A session inside the
+   * grace goes only when no older one is idle, and then the oldest. Until
+   * 2026-10-24 the first unused session went whatever its age: on 2026-10-23
+   * ChatGPT (a session per call) kept the customer budget full, 613 sessions
+   * were evicted in three hours, most of them idle 0 s, and its tool calls
+   * came back 404 a second or two after their initialize.
+   */
   private evictIdle(): boolean {
-    let candidate: HttpSessionLease | undefined;
+    const now = this.now();
+    let oldestIdle: HttpSessionLease | undefined;
+    let usedPastGrace: HttpSessionLease | undefined;
+    let unusedPastGrace: HttpSessionLease | undefined;
+    // Recency order: once one lease is inside the grace, so is every later one.
     for (const lease of this.leases) {
       if (!lease.idle) continue;
+      oldestIdle ??= lease;
+      if (now - lease.lastActive < this.evictionGraceMs) break;
       if (!lease.used) {
-        candidate = lease;
+        unusedPastGrace = lease;
         break;
       }
-      candidate ??= lease;
+      usedPastGrace ??= lease;
     }
+    const candidate = unusedPastGrace ?? usedPastGrace ?? oldestIdle;
     if (!candidate) return false;
     const idleSeconds = Math.max(
       0,
-      Math.round((this.now() - candidate.lastActive) / 1000)
+      Math.round((now - candidate.lastActive) / 1000)
     );
     candidate.evict();
     this.onEvict?.({
