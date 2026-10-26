@@ -14,7 +14,7 @@ export const getCurrentUserTool = defineTool({
   name: 'users_get_current',
   category: 'Users',
   description:
-    'The signed-in user: id, name, approval state and Altegio interface language (ISO 639-1) — answer in that language. Needs no location_id.',
+    'The signed-in user: id, name, email, approval state and Altegio interface language (ISO 639-1) — answer in that language. Needs no location_id.',
   annotations: {
     title: 'Get Current User',
     readOnlyHint: true,
@@ -34,15 +34,18 @@ export const getCurrentUserTool = defineTool({
         ? `Altegio interface language: ${language}.`
         : 'Altegio did not report an interface language.',
     ];
-    // The display name is typed by the person themselves.
-    const untrusted: UntrustedField[] = user.name
-      ? [{ label: 'user name', value: user.name }]
-      : [];
+    const email = user.email?.trim() || null;
+    // The display name and the email are typed by the person themselves.
+    const untrusted: UntrustedField[] = [
+      ...(user.name ? [{ label: 'user name', value: user.name }] : []),
+      ...(email ? [{ label: 'user email', value: email }] : []),
+    ];
     return {
       text: withUntrustedBlock(lines.join('\n'), untrusted, { maxChars: 120 }),
       structuredContent: {
         id: user.id,
         name: user.name ?? null,
+        email,
         language,
         is_approved: user.is_approved ?? null,
       },

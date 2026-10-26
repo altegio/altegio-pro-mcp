@@ -56,17 +56,17 @@ Served tools per category, in `tools/list` order:
 
 | View | Address | Lists (of 177 defined) | Reaches | `tools/list` bytes | Budget (used) | Reasons |
 | --- | --- | --- | --- | --- | --- | --- |
-| `all` | stdio (no HTTP route) | 167 | 167 | 220,544 | — | all ×167, -off ×6, -cmp ×4 |
-| `default` | `/mcp` | 37 | 168 | 50,915 | 53,500 (95 %) | disp ×131, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
-| `full` | `/mcp/full` | 101 | 101 | 126,111 | 132,500 (95 %) | dflt ×97, -low ×34, -pack ×29, -off ×6, -cmp ×4, base ×3, -pwd ×2, -name ×1, xtra ×1 |
-| `readonly` | `/mcp/readonly` | 85 | 85 | 117,813 | 123,000 (96 %) | ro ×85, -write ×80, -off ×6, -cmp ×4, -pwd ×2 |
-| `compact` | `/mcp/compact` | 37 | 168 | 50,915 | 53,500 (95 %) | disp ×131, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
-| `ops` | `/mcp/ops` | 53 | 53 | 71,186 | 74,500 (96 %) | - ×112, pfx ×27, rule ×23, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
-| `catalog` | `/mcp/catalog` | 38 | 38 | 28,721 | 30,000 (96 %) | - ×127, rule ×35, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
-| `finance` | `/mcp/finance` | 67 | 67 | 114,184 | 118,000 (97 %) | - ×98, pfx ×60, -off ×6, -cmp ×4, rule ×4, base ×3, -pwd ×2 |
-| `marketing` | `/mcp/marketing` | 17 | 17 | 22,856 | 24,000 (95 %) | - ×148, pfx ×13, -off ×6, -cmp ×4, base ×3, -pwd ×2, rule ×1 |
-| `analytics` | `/mcp/analytics` | 33 | 33 | 62,445 | 66,000 (95 %) | - ×132, pfx ×30, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
-| `onboarding` | `/mcp/onboarding` | 15 | 15 | 12,387 | 13,500 (92 %) | - ×150, pfx ×12, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
+| `all` | stdio (no HTTP route) | 167 | 167 | 220,551 | — | all ×167, -off ×6, -cmp ×4 |
+| `default` | `/mcp` | 37 | 168 | 50,922 | 53,500 (95 %) | disp ×131, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
+| `full` | `/mcp/full` | 101 | 101 | 126,118 | 132,500 (95 %) | dflt ×97, -low ×34, -pack ×29, -off ×6, -cmp ×4, base ×3, -pwd ×2, -name ×1, xtra ×1 |
+| `readonly` | `/mcp/readonly` | 85 | 85 | 117,820 | 123,000 (96 %) | ro ×85, -write ×80, -off ×6, -cmp ×4, -pwd ×2 |
+| `compact` | `/mcp/compact` | 37 | 168 | 50,922 | 53,500 (95 %) | disp ×131, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
+| `ops` | `/mcp/ops` | 53 | 53 | 71,193 | 74,500 (96 %) | - ×112, pfx ×27, rule ×23, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
+| `catalog` | `/mcp/catalog` | 38 | 38 | 28,728 | 30,000 (96 %) | - ×127, rule ×35, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
+| `finance` | `/mcp/finance` | 67 | 67 | 114,191 | 118,000 (97 %) | - ×98, pfx ×60, -off ×6, -cmp ×4, rule ×4, base ×3, -pwd ×2 |
+| `marketing` | `/mcp/marketing` | 17 | 17 | 22,863 | 24,000 (95 %) | - ×148, pfx ×13, -off ×6, -cmp ×4, base ×3, -pwd ×2, rule ×1 |
+| `analytics` | `/mcp/analytics` | 33 | 33 | 62,452 | 66,000 (95 %) | - ×132, pfx ×30, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
+| `onboarding` | `/mcp/onboarding` | 15 | 15 | 12,394 | 13,500 (92 %) | - ×150, pfx ×12, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
 
 `tools/list` bytes is the serialized result the view sends in the default
 deployment — what a host that loads the whole list pays on every connection,

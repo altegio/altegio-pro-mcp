@@ -56,6 +56,10 @@ is declared stable.
   must stay inside the named locations, and an executor operation that names
   a chain next to a location is refused. Before, such a request was confined
   by location only, so a chain read could reach other locations of the chain.
+- `users_get_current` returns the signed-in person's email next to the name.
+  An access token carries no identity claims, so the analytics agent reads
+  the owner's profile from this tool after Altegio sign-in. The email is the
+  person's own writing and comes back inside the untrusted block.
 - A refused token on a section of Pro (`/mcp/analytics`) is challenged with
   the protected-resource document of that section (`/pro/analytics`), the
   address the host connected to.
