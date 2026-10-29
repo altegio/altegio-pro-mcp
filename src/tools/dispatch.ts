@@ -170,10 +170,26 @@ function singular(token: string): string {
   return token;
 }
 
-/** A field's tokens, each also in its singular form. */
+/**
+ * Forms of one word that the plural rule does not join: a client pays, the
+ * visit is paid, a payment is recorded. "pay" is also under the prefix
+ * minimum, so without this "pay for appointment" never reached a payment.
+ */
+const WORD_ROOTS: ReadonlyMap<string, string> = new Map([
+  ['paid', 'pay'],
+  ['payment', 'pay'],
+]);
+
+/** One form per word: its singular, then its root. */
+function wordForm(token: string): string {
+  const one = singular(token);
+  return WORD_ROOTS.get(one) ?? one;
+}
+
+/** A field's tokens, each also in its one form. */
 function tokenSet(text: string): ReadonlySet<string> {
   const tokens = tokenize(text);
-  return new Set([...tokens, ...tokens.map(singular)]);
+  return new Set([...tokens, ...tokens.map(wordForm)]);
 }
 
 /** The first sentence of a description: what the tool does. */
@@ -244,7 +260,7 @@ export function searchTools(
     (entry) =>
       view.serves(entry.spec.name) && !DISPATCH_TOOLS.includes(entry.spec.name)
   );
-  const terms = [...new Set(queryTerms(query).map(singular))];
+  const terms = [...new Set(queryTerms(query).map(wordForm))];
   const named = new Set(
     (query.toLowerCase().match(/[a-z0-9_]+/g) ?? []).flatMap((word) => [
       word,
