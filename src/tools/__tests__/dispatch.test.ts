@@ -167,6 +167,13 @@ describe('tools_search', () => {
     ['freeze a membership', 'memberships_freeze'],
     ['sell a product on a visit', 'visits_add_product'],
     ['add payment to visit', 'visits_add_payment'],
+    // "pay", "paid" and "payment" are one word; "checkout" names the payment.
+    ['pay for appointment', 'visits_add_payment'],
+    ['set appointment paid status', 'visits_add_payment'],
+    ['checkout', 'visits_add_payment'],
+    // …and a salary is payroll, not a visit's payment.
+    ['pay salary', 'payroll_record_payout'],
+    ['pay supplier invoice', 'inventory_pay_document'],
     ['create a group event', 'events_create'],
     ['deposit to client account', 'client_accounts_deposit'],
     ['client files', 'clients_list_files'],
