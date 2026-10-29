@@ -53693,8 +53693,11 @@
                   "description": "Present only when requested with `expand[]=team_member`.",
                   "properties": {
                     "created_at": {
-                      "description": "UTC.",
-                      "type": "string",
+                      "description": "UTC; `null` for legacy records without a creation date.",
+                      "type": [
+                        "string",
+                        "null"
+                      ],
                       "x-truncated": true
                     },
                     "dismissal_date": {
@@ -53718,16 +53721,12 @@
                       "x-truncated": true
                     },
                     "is_billable": {
-                      "description": "Whether this Team Member occupies a paid seat in the Location's licence, which is what the Location is charged for. A non-billable member cannot hold schedule access, so `is_bookable` is always `fals…",
-                      "type": "boolean",
-                      "x-truncated": true
-                    },
-                    "is_bookable": {
-                      "description": "Derived — whether the member can currently receive appointments.",
+                      "description": "Whether the member counts as a paid seat by their own Billable setting on the current licensing model, or by access to the Digital schedule on the older one. Free seats such as the Location owner or…",
                       "type": "boolean",
                       "x-truncated": true
                     },
                     "name": {
+                      "description": "Display name, HTML entities decoded.",
                       "type": "string",
                       "x-truncated": true
                     },
@@ -53735,26 +53734,21 @@
                       "type": "string",
                       "x-truncated": true
                     },
+                    "online_booking_enabled": {
+                      "description": "The business's online booking setting for this team member in the Location. It does not mean that free time is available; free slots come from the availability operations.",
+                      "type": "boolean",
+                      "x-truncated": true
+                    },
                     "position_id": {
-                      "description": "Position from `listPositions`.",
+                      "description": "Position from `listPositions`; `null` when the member has no position or the position is not listed by `listPositions`.",
                       "type": [
                         "integer",
                         "null"
                       ],
                       "x-truncated": true
                     },
-                    "service_ids": {
-                      "description": "Services this Team Member can be scheduled for. Written through `updateTeamMemberServices`.",
-                      "type": "array",
-                      "x-truncated": true
-                    },
                     "specialization": {
-                      "description": "Public profession label shown to clients (for example in online booking).",
-                      "type": "string",
-                      "x-truncated": true
-                    },
-                    "updated_at": {
-                      "description": "UTC.",
+                      "description": "Public profession label shown to clients (for example in online booking), HTML entities decoded.",
                       "type": "string",
                       "x-truncated": true
                     }
@@ -53764,7 +53758,13 @@
                     "id",
                     "object",
                     "name",
-                    "specialization"
+                    "specialization",
+                    "position_id",
+                    "online_booking_enabled",
+                    "is_billable",
+                    "dismissal_date",
+                    "dismissal_reason",
+                    "created_at"
                   ],
                   "type": "object"
                 },
@@ -54134,10 +54134,13 @@
               "description": "Present only when requested with `expand[]=team_member`.",
               "properties": {
                 "created_at": {
-                  "description": "UTC.",
+                  "description": "UTC; `null` for legacy records without a creation date.",
                   "format": "date-time",
                   "readOnly": true,
-                  "type": "string"
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "dismissal_date": {
                   "description": "Last working day set by `dismissTeamMember`, `YYYY-MM-DD` in the Location timezone; `null` while employed.",
@@ -54161,15 +54164,11 @@
                   "type": "integer"
                 },
                 "is_billable": {
-                  "description": "Whether this Team Member occupies a paid seat in the Location's licence, which is what the Location is charged for. A non-billable member cannot hold schedule access, so `is_bookable` is always `fals…",
-                  "type": "boolean"
-                },
-                "is_bookable": {
-                  "description": "Derived — whether the member can currently receive appointments.",
-                  "readOnly": true,
+                  "description": "Whether the member counts as a paid seat by their own Billable setting on the current licensing model, or by access to the Digital schedule on the older one. Free seats such as the Location owner or…",
                   "type": "boolean"
                 },
                 "name": {
+                  "description": "Display name, HTML entities decoded.",
                   "type": "string"
                 },
                 "object": {
@@ -54179,30 +54178,19 @@
                   "readOnly": true,
                   "type": "string"
                 },
+                "online_booking_enabled": {
+                  "description": "The business's online booking setting for this team member in the Location. It does not mean that free time is available; free slots come from the availability operations.",
+                  "type": "boolean"
+                },
                 "position_id": {
-                  "description": "Position from `listPositions`.",
+                  "description": "Position from `listPositions`; `null` when the member has no position or the position is not listed by `listPositions`.",
                   "type": [
                     "integer",
                     "null"
                   ]
                 },
-                "service_ids": {
-                  "description": "Services this Team Member can be scheduled for. Written through `updateTeamMemberServices`.",
-                  "items": {
-                    "type": "integer",
-                    "x-truncated": true
-                  },
-                  "readOnly": true,
-                  "type": "array"
-                },
                 "specialization": {
-                  "description": "Public profession label shown to clients (for example in online booking).",
-                  "type": "string"
-                },
-                "updated_at": {
-                  "description": "UTC.",
-                  "format": "date-time",
-                  "readOnly": true,
+                  "description": "Public profession label shown to clients (for example in online booking), HTML entities decoded.",
                   "type": "string"
                 }
               },
@@ -54211,7 +54199,13 @@
                 "id",
                 "object",
                 "name",
-                "specialization"
+                "specialization",
+                "position_id",
+                "online_booking_enabled",
+                "is_billable",
+                "dismissal_date",
+                "dismissal_reason",
+                "created_at"
               ],
               "type": "object"
             },
@@ -54579,10 +54573,13 @@
               "description": "Present only when requested with `expand[]=team_member`.",
               "properties": {
                 "created_at": {
-                  "description": "UTC.",
+                  "description": "UTC; `null` for legacy records without a creation date.",
                   "format": "date-time",
                   "readOnly": true,
-                  "type": "string"
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "dismissal_date": {
                   "description": "Last working day set by `dismissTeamMember`, `YYYY-MM-DD` in the Location timezone; `null` while employed.",
@@ -54606,15 +54603,11 @@
                   "type": "integer"
                 },
                 "is_billable": {
-                  "description": "Whether this Team Member occupies a paid seat in the Location's licence, which is what the Location is charged for. A non-billable member cannot hold schedule access, so `is_bookable` is always `fals…",
-                  "type": "boolean"
-                },
-                "is_bookable": {
-                  "description": "Derived — whether the member can currently receive appointments.",
-                  "readOnly": true,
+                  "description": "Whether the member counts as a paid seat by their own Billable setting on the current licensing model, or by access to the Digital schedule on the older one. Free seats such as the Location owner or…",
                   "type": "boolean"
                 },
                 "name": {
+                  "description": "Display name, HTML entities decoded.",
                   "type": "string"
                 },
                 "object": {
@@ -54624,30 +54617,19 @@
                   "readOnly": true,
                   "type": "string"
                 },
+                "online_booking_enabled": {
+                  "description": "The business's online booking setting for this team member in the Location. It does not mean that free time is available; free slots come from the availability operations.",
+                  "type": "boolean"
+                },
                 "position_id": {
-                  "description": "Position from `listPositions`.",
+                  "description": "Position from `listPositions`; `null` when the member has no position or the position is not listed by `listPositions`.",
                   "type": [
                     "integer",
                     "null"
                   ]
                 },
-                "service_ids": {
-                  "description": "Services this Team Member can be scheduled for. Written through `updateTeamMemberServices`.",
-                  "items": {
-                    "type": "integer",
-                    "x-truncated": true
-                  },
-                  "readOnly": true,
-                  "type": "array"
-                },
                 "specialization": {
-                  "description": "Public profession label shown to clients (for example in online booking).",
-                  "type": "string"
-                },
-                "updated_at": {
-                  "description": "UTC.",
-                  "format": "date-time",
-                  "readOnly": true,
+                  "description": "Public profession label shown to clients (for example in online booking), HTML entities decoded.",
                   "type": "string"
                 }
               },
@@ -54656,7 +54638,13 @@
                 "id",
                 "object",
                 "name",
-                "specialization"
+                "specialization",
+                "position_id",
+                "online_booking_enabled",
+                "is_billable",
+                "dismissal_date",
+                "dismissal_reason",
+                "created_at"
               ],
               "type": "object"
             },
@@ -55002,10 +54990,13 @@
               "description": "Present only when requested with `expand[]=team_member`.",
               "properties": {
                 "created_at": {
-                  "description": "UTC.",
+                  "description": "UTC; `null` for legacy records without a creation date.",
                   "format": "date-time",
                   "readOnly": true,
-                  "type": "string"
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "dismissal_date": {
                   "description": "Last working day set by `dismissTeamMember`, `YYYY-MM-DD` in the Location timezone; `null` while employed.",
@@ -55029,15 +55020,11 @@
                   "type": "integer"
                 },
                 "is_billable": {
-                  "description": "Whether this Team Member occupies a paid seat in the Location's licence, which is what the Location is charged for. A non-billable member cannot hold schedule access, so `is_bookable` is always `fals…",
-                  "type": "boolean"
-                },
-                "is_bookable": {
-                  "description": "Derived — whether the member can currently receive appointments.",
-                  "readOnly": true,
+                  "description": "Whether the member counts as a paid seat by their own Billable setting on the current licensing model, or by access to the Digital schedule on the older one. Free seats such as the Location owner or…",
                   "type": "boolean"
                 },
                 "name": {
+                  "description": "Display name, HTML entities decoded.",
                   "type": "string"
                 },
                 "object": {
@@ -55047,30 +55034,19 @@
                   "readOnly": true,
                   "type": "string"
                 },
+                "online_booking_enabled": {
+                  "description": "The business's online booking setting for this team member in the Location. It does not mean that free time is available; free slots come from the availability operations.",
+                  "type": "boolean"
+                },
                 "position_id": {
-                  "description": "Position from `listPositions`.",
+                  "description": "Position from `listPositions`; `null` when the member has no position or the position is not listed by `listPositions`.",
                   "type": [
                     "integer",
                     "null"
                   ]
                 },
-                "service_ids": {
-                  "description": "Services this Team Member can be scheduled for. Written through `updateTeamMemberServices`.",
-                  "items": {
-                    "type": "integer",
-                    "x-truncated": true
-                  },
-                  "readOnly": true,
-                  "type": "array"
-                },
                 "specialization": {
-                  "description": "Public profession label shown to clients (for example in online booking).",
-                  "type": "string"
-                },
-                "updated_at": {
-                  "description": "UTC.",
-                  "format": "date-time",
-                  "readOnly": true,
+                  "description": "Public profession label shown to clients (for example in online booking), HTML entities decoded.",
                   "type": "string"
                 }
               },
@@ -55079,7 +55055,13 @@
                 "id",
                 "object",
                 "name",
-                "specialization"
+                "specialization",
+                "position_id",
+                "online_booking_enabled",
+                "is_billable",
+                "dismissal_date",
+                "dismissal_reason",
+                "created_at"
               ],
               "type": "object"
             },
@@ -56346,10 +56328,13 @@
               "description": "Present only when requested with `expand[]=team_member`.",
               "properties": {
                 "created_at": {
-                  "description": "UTC.",
+                  "description": "UTC; `null` for legacy records without a creation date.",
                   "format": "date-time",
                   "readOnly": true,
-                  "type": "string"
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "dismissal_date": {
                   "description": "Last working day set by `dismissTeamMember`, `YYYY-MM-DD` in the Location timezone; `null` while employed.",
@@ -56373,15 +56358,11 @@
                   "type": "integer"
                 },
                 "is_billable": {
-                  "description": "Whether this Team Member occupies a paid seat in the Location's licence, which is what the Location is charged for. A non-billable member cannot hold schedule access, so `is_bookable` is always `fals…",
-                  "type": "boolean"
-                },
-                "is_bookable": {
-                  "description": "Derived — whether the member can currently receive appointments.",
-                  "readOnly": true,
+                  "description": "Whether the member counts as a paid seat by their own Billable setting on the current licensing model, or by access to the Digital schedule on the older one. Free seats such as the Location owner or…",
                   "type": "boolean"
                 },
                 "name": {
+                  "description": "Display name, HTML entities decoded.",
                   "type": "string"
                 },
                 "object": {
@@ -56391,30 +56372,19 @@
                   "readOnly": true,
                   "type": "string"
                 },
+                "online_booking_enabled": {
+                  "description": "The business's online booking setting for this team member in the Location. It does not mean that free time is available; free slots come from the availability operations.",
+                  "type": "boolean"
+                },
                 "position_id": {
-                  "description": "Position from `listPositions`.",
+                  "description": "Position from `listPositions`; `null` when the member has no position or the position is not listed by `listPositions`.",
                   "type": [
                     "integer",
                     "null"
                   ]
                 },
-                "service_ids": {
-                  "description": "Services this Team Member can be scheduled for. Written through `updateTeamMemberServices`.",
-                  "items": {
-                    "type": "integer",
-                    "x-truncated": true
-                  },
-                  "readOnly": true,
-                  "type": "array"
-                },
                 "specialization": {
-                  "description": "Public profession label shown to clients (for example in online booking).",
-                  "type": "string"
-                },
-                "updated_at": {
-                  "description": "UTC.",
-                  "format": "date-time",
-                  "readOnly": true,
+                  "description": "Public profession label shown to clients (for example in online booking), HTML entities decoded.",
                   "type": "string"
                 }
               },
@@ -56423,7 +56393,13 @@
                 "id",
                 "object",
                 "name",
-                "specialization"
+                "specialization",
+                "position_id",
+                "online_booking_enabled",
+                "is_billable",
+                "dismissal_date",
+                "dismissal_reason",
+                "created_at"
               ],
               "type": "object"
             },
@@ -58791,7 +58767,7 @@
       "path": "/locations/{location_id}/positions",
       "displayPath": "/locations/{location_id}/positions",
       "summary": "List positions",
-      "description": "Returns the position directory of the Location. Reference a position from a Team\nMember via `position_id`.\n\n\nCursor-paginated list. Default ordering: weight desc, title, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
+      "description": "Returns the position directory of the Location. Reference a position from a Team\nMember via `position_id`.\n\n\nCursor-paginated list. Default ordering: `id` ascending. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
       "tags": [
         "Positions"
       ],
@@ -60926,7 +60902,7 @@
       "path": "/locations/{location_id}/team_members",
       "displayPath": "/locations/{location_id}/team_members",
       "summary": "List team members",
-      "description": "Returns the Team Members of the Location as a cursor-paginated list. The base\nrepresentation contains name, position, and bookable services; Team Member personal\ncontact data is not exposed in the preview scope.\n\n\nCursor-paginated list. Default ordering: name, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
+      "description": "Returns the working Team Members of the Location as a cursor-paginated list; dismissed\nmembers are readable by id via `getTeamMember`. The list representation is the same Team\nMember object as `getTeamMember`. Team Member personal contact data is not exposed in the\npreview scope.\n\n\nCursor-paginated list. Default ordering: `id` ascending. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
       "tags": [
         "Team Members"
       ],
@@ -61012,8 +60988,11 @@
                     "description": "A Team Member of the Location. Personal contact data of Team Members is not exposed in the preview scope.",
                     "properties": {
                       "created_at": {
-                        "description": "UTC.",
-                        "type": "string",
+                        "description": "UTC; `null` for legacy records without a creation date.",
+                        "type": [
+                          "string",
+                          "null"
+                        ],
                         "x-truncated": true
                       },
                       "dismissal_date": {
@@ -61037,16 +61016,12 @@
                         "x-truncated": true
                       },
                       "is_billable": {
-                        "description": "Whether this Team Member occupies a paid seat in the Location's licence, which is what the Location is charged for. A non-billable member cannot hold schedule access, so `is_bookable` is always `fals…",
-                        "type": "boolean",
-                        "x-truncated": true
-                      },
-                      "is_bookable": {
-                        "description": "Derived — whether the member can currently receive appointments.",
+                        "description": "Whether the member counts as a paid seat by their own Billable setting on the current licensing model, or by access to the Digital schedule on the older one. Free seats such as the Location owner or…",
                         "type": "boolean",
                         "x-truncated": true
                       },
                       "name": {
+                        "description": "Display name, HTML entities decoded.",
                         "type": "string",
                         "x-truncated": true
                       },
@@ -61054,26 +61029,21 @@
                         "type": "string",
                         "x-truncated": true
                       },
+                      "online_booking_enabled": {
+                        "description": "The business's online booking setting for this team member in the Location. It does not mean that free time is available; free slots come from the availability operations.",
+                        "type": "boolean",
+                        "x-truncated": true
+                      },
                       "position_id": {
-                        "description": "Position from `listPositions`.",
+                        "description": "Position from `listPositions`; `null` when the member has no position or the position is not listed by `listPositions`.",
                         "type": [
                           "integer",
                           "null"
                         ],
                         "x-truncated": true
                       },
-                      "service_ids": {
-                        "description": "Services this Team Member can be scheduled for. Written through `updateTeamMemberServices`.",
-                        "type": "array",
-                        "x-truncated": true
-                      },
                       "specialization": {
-                        "description": "Public profession label shown to clients (for example in online booking).",
-                        "type": "string",
-                        "x-truncated": true
-                      },
-                      "updated_at": {
-                        "description": "UTC.",
+                        "description": "Public profession label shown to clients (for example in online booking), HTML entities decoded.",
                         "type": "string",
                         "x-truncated": true
                       }
@@ -61082,7 +61052,13 @@
                       "id",
                       "object",
                       "name",
-                      "specialization"
+                      "specialization",
+                      "position_id",
+                      "online_booking_enabled",
+                      "is_billable",
+                      "dismissal_date",
+                      "dismissal_reason",
+                      "created_at"
                     ],
                     "type": "object"
                   },
@@ -61168,10 +61144,13 @@
           "description": "A Team Member of the Location. Personal contact data of Team Members is not exposed in the preview scope.",
           "properties": {
             "created_at": {
-              "description": "UTC.",
+              "description": "UTC; `null` for legacy records without a creation date.",
               "format": "date-time",
               "readOnly": true,
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "dismissal_date": {
               "description": "Last working day set by `dismissTeamMember`, `YYYY-MM-DD` in the Location timezone; `null` while employed.",
@@ -61195,15 +61174,11 @@
               "type": "integer"
             },
             "is_billable": {
-              "description": "Whether this Team Member occupies a paid seat in the Location's licence, which is what the Location is charged for. A non-billable member cannot hold schedule access, so `is_bookable` is always `fals…",
-              "type": "boolean"
-            },
-            "is_bookable": {
-              "description": "Derived — whether the member can currently receive appointments.",
-              "readOnly": true,
+              "description": "Whether the member counts as a paid seat by their own Billable setting on the current licensing model, or by access to the Digital schedule on the older one. Free seats such as the Location owner or…",
               "type": "boolean"
             },
             "name": {
+              "description": "Display name, HTML entities decoded.",
               "type": "string"
             },
             "object": {
@@ -61213,29 +61188,19 @@
               "readOnly": true,
               "type": "string"
             },
+            "online_booking_enabled": {
+              "description": "The business's online booking setting for this team member in the Location. It does not mean that free time is available; free slots come from the availability operations.",
+              "type": "boolean"
+            },
             "position_id": {
-              "description": "Position from `listPositions`.",
+              "description": "Position from `listPositions`; `null` when the member has no position or the position is not listed by `listPositions`.",
               "type": [
                 "integer",
                 "null"
               ]
             },
-            "service_ids": {
-              "description": "Services this Team Member can be scheduled for. Written through `updateTeamMemberServices`.",
-              "items": {
-                "type": "integer"
-              },
-              "readOnly": true,
-              "type": "array"
-            },
             "specialization": {
-              "description": "Public profession label shown to clients (for example in online booking).",
-              "type": "string"
-            },
-            "updated_at": {
-              "description": "UTC.",
-              "format": "date-time",
-              "readOnly": true,
+              "description": "Public profession label shown to clients (for example in online booking), HTML entities decoded.",
               "type": "string"
             }
           },
@@ -61243,7 +61208,13 @@
             "id",
             "object",
             "name",
-            "specialization"
+            "specialization",
+            "position_id",
+            "online_booking_enabled",
+            "is_billable",
+            "dismissal_date",
+            "dismissal_reason",
+            "created_at"
           ],
           "type": "object"
         }
@@ -61256,7 +61227,7 @@
       "path": "/locations/{location_id}/team_members/{team_member_id}",
       "displayPath": "/locations/{location_id}/team_members/{team_member_id}",
       "summary": "Get a team member",
-      "description": "Returns a single Team Member.",
+      "description": "Returns a single Team Member. Dismissed members are readable; deleted ones answer\n`404 resource_not_found`.",
       "tags": [
         "Team Members"
       ],
@@ -61297,10 +61268,13 @@
           "description": "A Team Member of the Location. Personal contact data of Team Members is not exposed in the preview scope.",
           "properties": {
             "created_at": {
-              "description": "UTC.",
+              "description": "UTC; `null` for legacy records without a creation date.",
               "format": "date-time",
               "readOnly": true,
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "dismissal_date": {
               "description": "Last working day set by `dismissTeamMember`, `YYYY-MM-DD` in the Location timezone; `null` while employed.",
@@ -61324,15 +61298,11 @@
               "type": "integer"
             },
             "is_billable": {
-              "description": "Whether this Team Member occupies a paid seat in the Location's licence, which is what the Location is charged for. A non-billable member cannot hold schedule access, so `is_bookable` is always `fals…",
-              "type": "boolean"
-            },
-            "is_bookable": {
-              "description": "Derived — whether the member can currently receive appointments.",
-              "readOnly": true,
+              "description": "Whether the member counts as a paid seat by their own Billable setting on the current licensing model, or by access to the Digital schedule on the older one. Free seats such as the Location owner or…",
               "type": "boolean"
             },
             "name": {
+              "description": "Display name, HTML entities decoded.",
               "type": "string"
             },
             "object": {
@@ -61342,29 +61312,19 @@
               "readOnly": true,
               "type": "string"
             },
+            "online_booking_enabled": {
+              "description": "The business's online booking setting for this team member in the Location. It does not mean that free time is available; free slots come from the availability operations.",
+              "type": "boolean"
+            },
             "position_id": {
-              "description": "Position from `listPositions`.",
+              "description": "Position from `listPositions`; `null` when the member has no position or the position is not listed by `listPositions`.",
               "type": [
                 "integer",
                 "null"
               ]
             },
-            "service_ids": {
-              "description": "Services this Team Member can be scheduled for. Written through `updateTeamMemberServices`.",
-              "items": {
-                "type": "integer"
-              },
-              "readOnly": true,
-              "type": "array"
-            },
             "specialization": {
-              "description": "Public profession label shown to clients (for example in online booking).",
-              "type": "string"
-            },
-            "updated_at": {
-              "description": "UTC.",
-              "format": "date-time",
-              "readOnly": true,
+              "description": "Public profession label shown to clients (for example in online booking), HTML entities decoded.",
               "type": "string"
             }
           },
@@ -61372,7 +61332,13 @@
             "id",
             "object",
             "name",
-            "specialization"
+            "specialization",
+            "position_id",
+            "online_booking_enabled",
+            "is_billable",
+            "dismissal_date",
+            "dismissal_reason",
+            "created_at"
           ],
           "type": "object"
         }
@@ -61455,10 +61421,13 @@
           "description": "A Team Member of the Location. Personal contact data of Team Members is not exposed in the preview scope.",
           "properties": {
             "created_at": {
-              "description": "UTC.",
+              "description": "UTC; `null` for legacy records without a creation date.",
               "format": "date-time",
               "readOnly": true,
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "dismissal_date": {
               "description": "Last working day set by `dismissTeamMember`, `YYYY-MM-DD` in the Location timezone; `null` while employed.",
@@ -61482,15 +61451,11 @@
               "type": "integer"
             },
             "is_billable": {
-              "description": "Whether this Team Member occupies a paid seat in the Location's licence, which is what the Location is charged for. A non-billable member cannot hold schedule access, so `is_bookable` is always `fals…",
-              "type": "boolean"
-            },
-            "is_bookable": {
-              "description": "Derived — whether the member can currently receive appointments.",
-              "readOnly": true,
+              "description": "Whether the member counts as a paid seat by their own Billable setting on the current licensing model, or by access to the Digital schedule on the older one. Free seats such as the Location owner or…",
               "type": "boolean"
             },
             "name": {
+              "description": "Display name, HTML entities decoded.",
               "type": "string"
             },
             "object": {
@@ -61500,29 +61465,19 @@
               "readOnly": true,
               "type": "string"
             },
+            "online_booking_enabled": {
+              "description": "The business's online booking setting for this team member in the Location. It does not mean that free time is available; free slots come from the availability operations.",
+              "type": "boolean"
+            },
             "position_id": {
-              "description": "Position from `listPositions`.",
+              "description": "Position from `listPositions`; `null` when the member has no position or the position is not listed by `listPositions`.",
               "type": [
                 "integer",
                 "null"
               ]
             },
-            "service_ids": {
-              "description": "Services this Team Member can be scheduled for. Written through `updateTeamMemberServices`.",
-              "items": {
-                "type": "integer"
-              },
-              "readOnly": true,
-              "type": "array"
-            },
             "specialization": {
-              "description": "Public profession label shown to clients (for example in online booking).",
-              "type": "string"
-            },
-            "updated_at": {
-              "description": "UTC.",
-              "format": "date-time",
-              "readOnly": true,
+              "description": "Public profession label shown to clients (for example in online booking), HTML entities decoded.",
               "type": "string"
             }
           },
@@ -61530,7 +61485,13 @@
             "id",
             "object",
             "name",
-            "specialization"
+            "specialization",
+            "position_id",
+            "online_booking_enabled",
+            "is_billable",
+            "dismissal_date",
+            "dismissal_reason",
+            "created_at"
           ],
           "type": "object"
         }
@@ -61945,7 +61906,7 @@
       "path": "/locations/{location_id}/team_members/{team_member_id}/dismiss",
       "displayPath": "/locations/{location_id}/team_members/{team_member_id}/dismiss",
       "summary": "Dismiss a team member",
-      "description": "Dismisses a Team Member as a command: the response is the Team Member with\n`dismissal_date` set and `is_bookable: false`. Dismissal is not a field of the Team\nMember card — `updateTeamMember` cannot set it. The acting user needs the dismissal\npermission of the Location; dismissing a member who has a system login also needs the\npermission to delete users, otherwise `403 permission_denied`. Dismissing an already\ndismissed member returns the current state unchanged.",
+      "description": "Dismisses a Team Member as a command: the response is the Team Member with\n`dismissal_date` set and `online_booking_enabled: false`. Dismissal is not a field of the Team\nMember card — `updateTeamMember` cannot set it. The acting user needs the dismissal\npermission of the Location; dismissing a member who has a system login also needs the\npermission to delete users, otherwise `403 permission_denied`. Dismissing an already\ndismissed member returns the current state unchanged.",
       "tags": [
         "Team Members"
       ],
@@ -62006,10 +61967,13 @@
           "description": "A Team Member of the Location. Personal contact data of Team Members is not exposed in the preview scope.",
           "properties": {
             "created_at": {
-              "description": "UTC.",
+              "description": "UTC; `null` for legacy records without a creation date.",
               "format": "date-time",
               "readOnly": true,
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "dismissal_date": {
               "description": "Last working day set by `dismissTeamMember`, `YYYY-MM-DD` in the Location timezone; `null` while employed.",
@@ -62033,15 +61997,11 @@
               "type": "integer"
             },
             "is_billable": {
-              "description": "Whether this Team Member occupies a paid seat in the Location's licence, which is what the Location is charged for. A non-billable member cannot hold schedule access, so `is_bookable` is always `fals…",
-              "type": "boolean"
-            },
-            "is_bookable": {
-              "description": "Derived — whether the member can currently receive appointments.",
-              "readOnly": true,
+              "description": "Whether the member counts as a paid seat by their own Billable setting on the current licensing model, or by access to the Digital schedule on the older one. Free seats such as the Location owner or…",
               "type": "boolean"
             },
             "name": {
+              "description": "Display name, HTML entities decoded.",
               "type": "string"
             },
             "object": {
@@ -62051,29 +62011,19 @@
               "readOnly": true,
               "type": "string"
             },
+            "online_booking_enabled": {
+              "description": "The business's online booking setting for this team member in the Location. It does not mean that free time is available; free slots come from the availability operations.",
+              "type": "boolean"
+            },
             "position_id": {
-              "description": "Position from `listPositions`.",
+              "description": "Position from `listPositions`; `null` when the member has no position or the position is not listed by `listPositions`.",
               "type": [
                 "integer",
                 "null"
               ]
             },
-            "service_ids": {
-              "description": "Services this Team Member can be scheduled for. Written through `updateTeamMemberServices`.",
-              "items": {
-                "type": "integer"
-              },
-              "readOnly": true,
-              "type": "array"
-            },
             "specialization": {
-              "description": "Public profession label shown to clients (for example in online booking).",
-              "type": "string"
-            },
-            "updated_at": {
-              "description": "UTC.",
-              "format": "date-time",
-              "readOnly": true,
+              "description": "Public profession label shown to clients (for example in online booking), HTML entities decoded.",
               "type": "string"
             }
           },
@@ -62081,7 +62031,13 @@
             "id",
             "object",
             "name",
-            "specialization"
+            "specialization",
+            "position_id",
+            "online_booking_enabled",
+            "is_billable",
+            "dismissal_date",
+            "dismissal_reason",
+            "created_at"
           ],
           "type": "object"
         }
@@ -62221,7 +62177,7 @@
       "path": "/locations/{location_id}/team_members/{team_member_id}/schedule",
       "displayPath": "/locations/{location_id}/team_members/{team_member_id}/schedule",
       "summary": "Get a team member's schedule",
-      "description": "Returns the **configured working schedule** of a Team Member for a date range — the\ndays and working slots set by the business. This is not availability: free bookable\nslots come from `GET /locations/{location_id}/availability`.",
+      "description": "Returns the **configured working schedule** of a Team Member for a date range — the\ndays and working intervals set by the business. This is not availability: free bookable\nslots come from `GET /locations/{location_id}/availability`.\n\nVisibility follows the acting user's rights in the Digital schedule: a member outside\nthe user's allowed team members (own appointments or own position) answers\n`404 resource_not_found`, and days before the user's history access limit (N days back\nfrom today) are omitted from `days`; `date_from` and `date_to` stay as requested.",
       "tags": [
         "Team Members"
       ],
@@ -62265,7 +62221,7 @@
           }
         },
         {
-          "description": "Last date of the range (inclusive), `YYYY-MM-DD`.",
+          "description": "Last date of the range (inclusive), `YYYY-MM-DD`. Must not be earlier than `date_from`; the range covers at most 92 calendar days inclusive, i.e. `date_to` is at most 91 days after `date_from` (any three calendar months); otherwise `422 validation_failed` with `errors[0].pointer = date_to`, `source = query` and `code = invalid_value`.",
           "name": "date_to",
           "in": "query",
           "required": true,
@@ -62279,66 +62235,55 @@
         "contentType": "application/json",
         "statusCode": "200",
         "schema": {
-          "allOf": [
-            {
-              "description": "Common list envelope. `data` holds the page items; pass `next_cursor` as the `cursor` query parameter to fetch the next page while `has_more` is `true`.",
-              "properties": {
-                "has_more": {
-                  "description": "Whether more items exist beyond this page.",
-                  "type": "boolean"
-                },
-                "next_cursor": {
-                  "description": "Opaque cursor for the next page; `null` on the last page.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "object": {
-                  "enum": [
-                    "list"
-                  ],
-                  "type": "string"
-                }
-              },
-              "required": [
-                "object",
-                "has_more",
-                "next_cursor"
-              ],
-              "type": "object"
+          "description": "Configured working schedule of a Team Member — every day of the requested range in order.",
+          "properties": {
+            "date_from": {
+              "format": "date",
+              "type": "string"
             },
-            {
-              "properties": {
-                "data": {
-                  "items": {
-                    "properties": {
-                      "date": {
-                        "type": "string",
-                        "x-truncated": true
-                      },
-                      "slots": {
-                        "description": "Working intervals of the day; empty means a day off.",
-                        "type": "array",
-                        "x-truncated": true
-                      }
-                    },
-                    "required": [
-                      "date",
-                      "slots"
-                    ],
-                    "type": "object"
+            "date_to": {
+              "format": "date",
+              "type": "string"
+            },
+            "days": {
+              "items": {
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "x-truncated": true
                   },
-                  "type": "array"
-                }
+                  "intervals": {
+                    "description": "Working intervals of the day; empty means a day off.",
+                    "type": "array",
+                    "x-truncated": true
+                  }
+                },
+                "required": [
+                  "date",
+                  "intervals"
+                ],
+                "type": "object"
               },
-              "required": [
-                "data"
+              "type": "array"
+            },
+            "object": {
+              "enum": [
+                "team_member_schedule"
               ],
-              "type": "object"
+              "type": "string"
+            },
+            "team_member_id": {
+              "type": "integer"
             }
+          },
+          "required": [
+            "object",
+            "team_member_id",
+            "date_from",
+            "date_to",
+            "days"
           ],
-          "description": "Working days of a Team Member within the requested range."
+          "type": "object"
         }
       }
     },
@@ -62349,7 +62294,7 @@
       "path": "/locations/{location_id}/team_members/{team_member_id}/schedule",
       "displayPath": "/locations/{location_id}/team_members/{team_member_id}/schedule",
       "summary": "Update a team member's schedule",
-      "description": "Updates the working schedule as a **merge-patch map keyed by date**: each key is a\n`YYYY-MM-DD` date, the value sets the working slots of that day, and `null` clears the\nday. Dates absent from the body are left unchanged. Times are wall-clock `HH:MM` in\nthe Location's timezone.",
+      "description": "Updates the working schedule as a **merge-patch map keyed by date**: each key is a\n`YYYY-MM-DD` date, the value sets the working intervals of that day, and `null` clears the\nday. Dates absent from the body are left unchanged. Times are wall-clock `HH:MM` in\nthe Location's timezone. The response covers every day from the earliest to the latest\ndate of the body, as `date_from` and `date_to`.",
       "tags": [
         "Team Members"
       ],
@@ -62388,14 +62333,14 @@
         "contentType": "application/merge-patch+json",
         "schema": {
           "additionalProperties": false,
-          "description": "Merge-patch map keyed by `YYYY-MM-DD` date. A present date replaces that day's working slots; `null` clears the day. Dates absent from the body are unchanged.",
+          "description": "Merge-patch map keyed by `YYYY-MM-DD` date. A present date replaces that day's working intervals; `null` clears the day. Dates absent from the body are unchanged.",
           "patternProperties": {
             "^[0-9]{4}-[0-9]{2}-[0-9]{2}$": {
               "oneOf": [
                 {
                   "additionalProperties": false,
                   "properties": {
-                    "slots": {
+                    "intervals": {
                       "items": {
                         "additionalProperties": false,
                         "properties": {
@@ -62420,7 +62365,7 @@
                     }
                   },
                   "required": [
-                    "slots"
+                    "intervals"
                   ],
                   "type": "object"
                 },
@@ -62437,66 +62382,55 @@
         "contentType": "application/json",
         "statusCode": "200",
         "schema": {
-          "allOf": [
-            {
-              "description": "Common list envelope. `data` holds the page items; pass `next_cursor` as the `cursor` query parameter to fetch the next page while `has_more` is `true`.",
-              "properties": {
-                "has_more": {
-                  "description": "Whether more items exist beyond this page.",
-                  "type": "boolean"
-                },
-                "next_cursor": {
-                  "description": "Opaque cursor for the next page; `null` on the last page.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "object": {
-                  "enum": [
-                    "list"
-                  ],
-                  "type": "string"
-                }
-              },
-              "required": [
-                "object",
-                "has_more",
-                "next_cursor"
-              ],
-              "type": "object"
+          "description": "Configured working schedule of a Team Member — every day of the requested range in order.",
+          "properties": {
+            "date_from": {
+              "format": "date",
+              "type": "string"
             },
-            {
-              "properties": {
-                "data": {
-                  "items": {
-                    "properties": {
-                      "date": {
-                        "type": "string",
-                        "x-truncated": true
-                      },
-                      "slots": {
-                        "description": "Working intervals of the day; empty means a day off.",
-                        "type": "array",
-                        "x-truncated": true
-                      }
-                    },
-                    "required": [
-                      "date",
-                      "slots"
-                    ],
-                    "type": "object"
+            "date_to": {
+              "format": "date",
+              "type": "string"
+            },
+            "days": {
+              "items": {
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "x-truncated": true
                   },
-                  "type": "array"
-                }
+                  "intervals": {
+                    "description": "Working intervals of the day; empty means a day off.",
+                    "type": "array",
+                    "x-truncated": true
+                  }
+                },
+                "required": [
+                  "date",
+                  "intervals"
+                ],
+                "type": "object"
               },
-              "required": [
-                "data"
+              "type": "array"
+            },
+            "object": {
+              "enum": [
+                "team_member_schedule"
               ],
-              "type": "object"
+              "type": "string"
+            },
+            "team_member_id": {
+              "type": "integer"
             }
+          },
+          "required": [
+            "object",
+            "team_member_id",
+            "date_from",
+            "date_to",
+            "days"
           ],
-          "description": "Working days of a Team Member within the requested range."
+          "type": "object"
         }
       }
     },
@@ -62794,7 +62728,7 @@
       "path": "/oauth/register",
       "displayPath": "/oauth/register",
       "summary": "Register an OAuth client (DCR)",
-      "description": "Minimal Dynamic Client Registration (RFC 7591) for MCP hosts and other clients that\nare not pre-registered. Registration only issues a `client_id` — access to any data\nstill requires the user login/consent flow and granted scopes.\n\nPublic clients (native apps, local MCP packages, agent hosts without a secure\nbackend) receive **no `client_secret`** and must use Authorization Code + PKCE.\nA `client_id` supplied as an HTTPS URL pointing to a Client ID Metadata Document\n(CIMD) is also accepted at the authorization endpoint without prior registration.\n\nRegistration is rate-limited and monitored for abuse; redirect URIs are validated.",
+      "description": "Minimal Dynamic Client Registration (RFC 7591) for MCP hosts and other clients that\nare not pre-registered. Registration only issues a `client_id` — access to any data\nstill requires the user login/consent flow and granted scopes.\n\nThe body must be `application/json` (RFC 7591 §3.1): a body of any other type is read as\nempty and answered with `invalid_client_metadata`.\n\nEvery registered client is **public**: it receives **no `client_secret`**, the response\nalways says `token_endpoint_auth_method: none` whatever was requested, and the client\nmust use Authorization Code + PKCE. Only `client_name` and `redirect_uris` are kept;\nother RFC 7591 metadata is accepted and ignored. Redirect URIs that are neither absolute\nHTTPS nor loopback (for example a custom scheme) are dropped from the registration, and\nthe request fails only when none is left. Every registration creates a new client with a\nnew `client_id`; a client that receives no consent within a day of registration is\ndeleted.\n\nA `client_id` supplied as an HTTPS URL pointing to a Client ID Metadata Document\n(CIMD) is accepted at the authorization, token and revocation endpoints without prior\nregistration.\n\nRegistration is rate-limited.",
       "tags": [
         "Authorization"
       ],
@@ -62810,11 +62744,12 @@
         "required": true,
         "contentType": "application/json",
         "schema": {
-          "additionalProperties": false,
           "description": "Dynamic Client Registration request (RFC 7591).",
           "properties": {
             "client_name": {
               "description": "Human-readable OAuth client name shown on the consent screen.",
+              "maxLength": 255,
+              "minLength": 1,
               "type": "string"
             },
             "client_uri": {
@@ -62855,7 +62790,7 @@
               "type": "string"
             },
             "token_endpoint_auth_method": {
-              "description": "`none` declares a public client (PKCE only, no secret).",
+              "description": "`none` declares a public client (PKCE only, no secret). A request naming a secret-based method is not refused: the server answers with `none`, and a registered client never gets a secret (RFC 7591 §3…",
               "enum": [
                 "none"
               ],
