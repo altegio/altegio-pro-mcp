@@ -53045,7 +53045,7 @@
       "path": "/locations/{location_id}/appointments",
       "displayPath": "/locations/{location_id}/appointments",
       "summary": "List appointments",
-      "description": "Returns the appointments of the Location as a cursor-paginated list, newest window\nfirst by start time with a stable tie-breaker. Client contact data inside\n`expand[]=client` uses redacted contact fields without `clients:read_contact`.\n\nCancelled appointments are included; filter them out on the `status` field. There is no\nstatus query parameter in the first iteration.\n\n\nCursor-paginated list. Default ordering: starts_at desc, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
+      "description": "Returns the appointments of the Location as a cursor-paginated list, newest window\nfirst by start time with a stable tie-breaker. Client contact data inside\n`include[]=client` uses redacted contact fields without `clients:read_contact`.\n\nCancelled appointments are included; filter them out on the `status` field. There is no\nstatus query parameter in the first iteration.\n\n\nCursor-paginated list. Default ordering: starts_at desc, id tie-breaker. Cursors use the `cursor` query parameter, expire after one hour, and are bound to the credential, tenant, list, and filters. Expired, malformed, foreign, or re-filtered cursors fail with `422 validation_failed` using field codes `expired_cursor`, `invalid_cursor`, `foreign_cursor`, or `filter_changed`.",
       "tags": [
         "Appointments"
       ],
@@ -53088,8 +53088,8 @@
           }
         },
         {
-          "description": "Relations to embed, one level deep. Expanding `client` never bypasses PII rules — contact fields are `null` and listed in `redacted_fields` without `clients:read_contact`. Unknown values fail with `422`.",
-          "name": "expand[]",
+          "description": "Relations to include, one level deep; each adds a new field next to its id. Including `client` never bypasses PII rules — contact fields are `null` and listed in `redacted_fields` without `clients:read_contact`. Unknown values fail with `422`.",
+          "name": "include[]",
           "in": "query",
           "required": false,
           "schema": {
@@ -53200,8 +53200,7 @@
                         "x-truncated": true
                       },
                       "client": {
-                        "description": "Present only when requested with `expand[]=client`; PII rules apply.",
-                        "type": "object",
+                        "description": "Present only when requested with `include[]=client`; `null` when `client_id` is `null`. PII rules apply.",
                         "x-truncated": true
                       },
                       "client_id": {
@@ -53270,7 +53269,7 @@
                         "x-truncated": true
                       },
                       "team_member": {
-                        "description": "Present only when requested with `expand[]=team_member`.",
+                        "description": "Present only when requested with `include[]=team_member`.",
                         "type": "object",
                         "x-truncated": true
                       },
@@ -53476,139 +53475,147 @@
                   ]
                 },
                 "client": {
-                  "description": "Present only when requested with `expand[]=client`; PII rules apply.",
-                  "properties": {
-                    "additional_phone": {
-                      "description": "Additional phone number. `null` when absent or withheld — see `redacted_fields`.",
-                      "type": [
-                        "string",
-                        "null"
+                  "description": "Present only when requested with `include[]=client`; `null` when `client_id` is `null`. PII rules apply.",
+                  "oneOf": [
+                    {
+                      "description": "A client of the Location. Contact fields (`phone`, `email`, `additional_phone`) are PII: without `clients:read_contact` plus the subject contact permission they are returned as `null` and their names…",
+                      "properties": {
+                        "additional_phone": {
+                          "description": "Additional phone number. `null` when absent or withheld — see `redacted_fields`.",
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "x-truncated": true
+                        },
+                        "birth_date": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "x-truncated": true
+                        },
+                        "comment": {
+                          "description": "Private note about the client; requires comment access.",
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "x-truncated": true
+                        },
+                        "created_at": {
+                          "description": "UTC.",
+                          "type": "string",
+                          "x-truncated": true
+                        },
+                        "currency": {
+                          "description": "ISO 4217, server-controlled by the Location.",
+                          "type": "string",
+                          "x-truncated": true
+                        },
+                        "discount": {
+                          "description": "Personal discount, percent.",
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "x-truncated": true
+                        },
+                        "display_name": {
+                          "type": "string",
+                          "x-truncated": true
+                        },
+                        "email": {
+                          "description": "Email address. `null` when absent or withheld — see `redacted_fields`.",
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "x-truncated": true
+                        },
+                        "first_visit_at": {
+                          "description": "Location-local offset.",
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "x-truncated": true
+                        },
+                        "id": {
+                          "type": "integer",
+                          "x-truncated": true
+                        },
+                        "last_visit_at": {
+                          "description": "Location-local offset.",
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "x-truncated": true
+                        },
+                        "name": {
+                          "type": "string",
+                          "x-truncated": true
+                        },
+                        "object": {
+                          "type": "string",
+                          "x-truncated": true
+                        },
+                        "patronymic": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "x-truncated": true
+                        },
+                        "phone": {
+                          "description": "International phone number. `null` when absent or withheld — see `redacted_fields`.",
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "x-truncated": true
+                        },
+                        "redacted_fields": {
+                          "description": "Names of fields withheld by the PII policy for this object, for example `[\"phone\", \"email\"]`. A withheld contact is always returned as `null` — never as a masked or empty string, so an integration ca…",
+                          "type": "array",
+                          "x-truncated": true
+                        },
+                        "sold_amount_minor": {
+                          "description": "Lifetime paid total, integer minor units of the Location currency.",
+                          "type": "integer",
+                          "x-truncated": true
+                        },
+                        "surname": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "x-truncated": true
+                        },
+                        "updated_at": {
+                          "description": "UTC.",
+                          "type": "string",
+                          "x-truncated": true
+                        },
+                        "visits_count": {
+                          "type": "integer",
+                          "x-truncated": true
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "object",
+                        "name",
+                        "phone"
                       ],
-                      "x-truncated": true
+                      "type": "object"
                     },
-                    "birth_date": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "x-truncated": true
-                    },
-                    "comment": {
-                      "description": "Private note about the client; requires comment access.",
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "x-truncated": true
-                    },
-                    "created_at": {
-                      "description": "UTC.",
-                      "type": "string",
-                      "x-truncated": true
-                    },
-                    "currency": {
-                      "description": "ISO 4217, server-controlled by the Location.",
-                      "type": "string",
-                      "x-truncated": true
-                    },
-                    "discount": {
-                      "description": "Personal discount, percent.",
-                      "type": [
-                        "number",
-                        "null"
-                      ],
-                      "x-truncated": true
-                    },
-                    "display_name": {
-                      "type": "string",
-                      "x-truncated": true
-                    },
-                    "email": {
-                      "description": "Email address. `null` when absent or withheld — see `redacted_fields`.",
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "x-truncated": true
-                    },
-                    "first_visit_at": {
-                      "description": "Location-local offset.",
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "x-truncated": true
-                    },
-                    "id": {
-                      "type": "integer",
-                      "x-truncated": true
-                    },
-                    "last_visit_at": {
-                      "description": "Location-local offset.",
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "x-truncated": true
-                    },
-                    "name": {
-                      "type": "string",
-                      "x-truncated": true
-                    },
-                    "object": {
-                      "type": "string",
-                      "x-truncated": true
-                    },
-                    "patronymic": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "x-truncated": true
-                    },
-                    "phone": {
-                      "description": "International phone number. `null` when absent or withheld — see `redacted_fields`.",
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "x-truncated": true
-                    },
-                    "redacted_fields": {
-                      "description": "Names of fields withheld by the PII policy for this object, for example `[\"phone\", \"email\"]`. A withheld contact is always returned as `null` — never as a masked or empty string, so an integration ca…",
-                      "type": "array",
-                      "x-truncated": true
-                    },
-                    "sold_amount_minor": {
-                      "description": "Lifetime paid total, integer minor units of the Location currency.",
-                      "type": "integer",
-                      "x-truncated": true
-                    },
-                    "surname": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "x-truncated": true
-                    },
-                    "updated_at": {
-                      "description": "UTC.",
-                      "type": "string",
-                      "x-truncated": true
-                    },
-                    "visits_count": {
-                      "type": "integer",
-                      "x-truncated": true
+                    {
+                      "type": "null"
                     }
-                  },
-                  "readOnly": true,
-                  "required": [
-                    "id",
-                    "object",
-                    "name",
-                    "phone"
                   ],
-                  "type": "object"
+                  "readOnly": true
                 },
                 "client_id": {
                   "description": "`null` only on appointments without a client.",
@@ -53690,8 +53697,16 @@
                   "type": "string"
                 },
                 "team_member": {
-                  "description": "Present only when requested with `expand[]=team_member`.",
+                  "description": "Present only when requested with `include[]=team_member`.",
                   "properties": {
+                    "avatar_url": {
+                      "description": "Photo of the team member, up to 220×220 px (smaller when the uploaded photo is smaller); `null` when no photo is set.",
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "x-truncated": true
+                    },
                     "created_at": {
                       "description": "UTC; `null` for legacy records without a creation date.",
                       "type": [
@@ -53708,21 +53723,8 @@
                       ],
                       "x-truncated": true
                     },
-                    "dismissal_reason": {
-                      "description": "Reason given on dismissal; `null` while employed.",
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "x-truncated": true
-                    },
                     "id": {
                       "type": "integer",
-                      "x-truncated": true
-                    },
-                    "is_billable": {
-                      "description": "Whether the member counts as a paid seat by their own Billable setting on the current licensing model, or by access to the Digital schedule on the older one. Free seats such as the Location owner or…",
-                      "type": "boolean",
                       "x-truncated": true
                     },
                     "name": {
@@ -53759,11 +53761,10 @@
                     "object",
                     "name",
                     "specialization",
+                    "avatar_url",
                     "position_id",
                     "online_booking_enabled",
-                    "is_billable",
                     "dismissal_date",
-                    "dismissal_reason",
                     "created_at"
                   ],
                   "type": "object"
@@ -53877,8 +53878,8 @@
           }
         },
         {
-          "description": "Relations to embed, one level deep. Expanding `client` never bypasses PII rules — contact fields are `null` and listed in `redacted_fields` without `clients:read_contact`. Unknown values fail with `422`.",
-          "name": "expand[]",
+          "description": "Relations to include, one level deep; each adds a new field next to its id. Including `client` never bypasses PII rules — contact fields are `null` and listed in `redacted_fields` without `clients:read_contact`. Unknown values fail with `422`.",
+          "name": "include[]",
           "in": "query",
           "required": false,
           "schema": {
@@ -53916,142 +53917,150 @@
               ]
             },
             "client": {
-              "description": "Present only when requested with `expand[]=client`; PII rules apply.",
-              "properties": {
-                "additional_phone": {
-                  "description": "Additional phone number. `null` when absent or withheld — see `redacted_fields`.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "birth_date": {
-                  "format": "date",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "comment": {
-                  "description": "Private note about the client; requires comment access.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "created_at": {
-                  "description": "UTC.",
-                  "format": "date-time",
-                  "readOnly": true,
-                  "type": "string"
-                },
-                "currency": {
-                  "description": "ISO 4217, server-controlled by the Location.",
-                  "readOnly": true,
-                  "type": "string"
-                },
-                "discount": {
-                  "description": "Personal discount, percent.",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "display_name": {
-                  "readOnly": true,
-                  "type": "string"
-                },
-                "email": {
-                  "description": "Email address. `null` when absent or withheld — see `redacted_fields`.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "first_visit_at": {
-                  "description": "Location-local offset.",
-                  "format": "date-time",
-                  "readOnly": true,
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "id": {
-                  "readOnly": true,
-                  "type": "integer"
-                },
-                "last_visit_at": {
-                  "description": "Location-local offset.",
-                  "format": "date-time",
-                  "readOnly": true,
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "name": {
-                  "type": "string"
-                },
-                "object": {
-                  "enum": [
-                    "client"
-                  ],
-                  "readOnly": true,
-                  "type": "string"
-                },
-                "patronymic": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "phone": {
-                  "description": "International phone number. `null` when absent or withheld — see `redacted_fields`.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "redacted_fields": {
-                  "description": "Names of fields withheld by the PII policy for this object, for example `[\"phone\", \"email\"]`. A withheld contact is always returned as `null` — never as a masked or empty string, so an integration ca…",
-                  "items": {
-                    "type": "string",
-                    "x-truncated": true
+              "description": "Present only when requested with `include[]=client`; `null` when `client_id` is `null`. PII rules apply.",
+              "oneOf": [
+                {
+                  "description": "A client of the Location. Contact fields (`phone`, `email`, `additional_phone`) are PII: without `clients:read_contact` plus the subject contact permission they are returned as `null` and their names…",
+                  "properties": {
+                    "additional_phone": {
+                      "description": "Additional phone number. `null` when absent or withheld — see `redacted_fields`.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "birth_date": {
+                      "format": "date",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "comment": {
+                      "description": "Private note about the client; requires comment access.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "created_at": {
+                      "description": "UTC.",
+                      "format": "date-time",
+                      "readOnly": true,
+                      "type": "string"
+                    },
+                    "currency": {
+                      "description": "ISO 4217, server-controlled by the Location.",
+                      "readOnly": true,
+                      "type": "string"
+                    },
+                    "discount": {
+                      "description": "Personal discount, percent.",
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "display_name": {
+                      "readOnly": true,
+                      "type": "string"
+                    },
+                    "email": {
+                      "description": "Email address. `null` when absent or withheld — see `redacted_fields`.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "first_visit_at": {
+                      "description": "Location-local offset.",
+                      "format": "date-time",
+                      "readOnly": true,
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "id": {
+                      "readOnly": true,
+                      "type": "integer"
+                    },
+                    "last_visit_at": {
+                      "description": "Location-local offset.",
+                      "format": "date-time",
+                      "readOnly": true,
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "object": {
+                      "enum": [
+                        "client"
+                      ],
+                      "readOnly": true,
+                      "type": "string"
+                    },
+                    "patronymic": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "phone": {
+                      "description": "International phone number. `null` when absent or withheld — see `redacted_fields`.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "redacted_fields": {
+                      "description": "Names of fields withheld by the PII policy for this object, for example `[\"phone\", \"email\"]`. A withheld contact is always returned as `null` — never as a masked or empty string, so an integration ca…",
+                      "items": {
+                        "type": "string",
+                        "x-truncated": true
+                      },
+                      "readOnly": true,
+                      "type": "array"
+                    },
+                    "sold_amount_minor": {
+                      "description": "Lifetime paid total, integer minor units of the Location currency.",
+                      "readOnly": true,
+                      "type": "integer"
+                    },
+                    "surname": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "updated_at": {
+                      "description": "UTC.",
+                      "format": "date-time",
+                      "readOnly": true,
+                      "type": "string"
+                    },
+                    "visits_count": {
+                      "readOnly": true,
+                      "type": "integer"
+                    }
                   },
-                  "readOnly": true,
-                  "type": "array"
+                  "required": [
+                    "id",
+                    "object",
+                    "name",
+                    "phone"
+                  ],
+                  "type": "object"
                 },
-                "sold_amount_minor": {
-                  "description": "Lifetime paid total, integer minor units of the Location currency.",
-                  "readOnly": true,
-                  "type": "integer"
-                },
-                "surname": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "updated_at": {
-                  "description": "UTC.",
-                  "format": "date-time",
-                  "readOnly": true,
-                  "type": "string"
-                },
-                "visits_count": {
-                  "readOnly": true,
-                  "type": "integer"
+                {
+                  "type": "null"
                 }
-              },
-              "readOnly": true,
-              "required": [
-                "id",
-                "object",
-                "name",
-                "phone"
               ],
-              "type": "object"
+              "readOnly": true
             },
             "client_id": {
               "description": "`null` only on appointments without a client.",
@@ -54131,8 +54140,17 @@
               "type": "string"
             },
             "team_member": {
-              "description": "Present only when requested with `expand[]=team_member`.",
+              "description": "Present only when requested with `include[]=team_member`.",
               "properties": {
+                "avatar_url": {
+                  "description": "Photo of the team member, up to 220×220 px (smaller when the uploaded photo is smaller); `null` when no photo is set.",
+                  "format": "uri",
+                  "readOnly": true,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "created_at": {
                   "description": "UTC; `null` for legacy records without a creation date.",
                   "format": "date-time",
@@ -54151,21 +54169,9 @@
                     "null"
                   ]
                 },
-                "dismissal_reason": {
-                  "description": "Reason given on dismissal; `null` while employed.",
-                  "readOnly": true,
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
                 "id": {
                   "readOnly": true,
                   "type": "integer"
-                },
-                "is_billable": {
-                  "description": "Whether the member counts as a paid seat by their own Billable setting on the current licensing model, or by access to the Digital schedule on the older one. Free seats such as the Location owner or…",
-                  "type": "boolean"
                 },
                 "name": {
                   "description": "Display name, HTML entities decoded.",
@@ -54200,11 +54206,10 @@
                 "object",
                 "name",
                 "specialization",
+                "avatar_url",
                 "position_id",
                 "online_booking_enabled",
-                "is_billable",
                 "dismissal_date",
-                "dismissal_reason",
                 "created_at"
               ],
               "type": "object"
@@ -54355,142 +54360,150 @@
               ]
             },
             "client": {
-              "description": "Present only when requested with `expand[]=client`; PII rules apply.",
-              "properties": {
-                "additional_phone": {
-                  "description": "Additional phone number. `null` when absent or withheld — see `redacted_fields`.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "birth_date": {
-                  "format": "date",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "comment": {
-                  "description": "Private note about the client; requires comment access.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "created_at": {
-                  "description": "UTC.",
-                  "format": "date-time",
-                  "readOnly": true,
-                  "type": "string"
-                },
-                "currency": {
-                  "description": "ISO 4217, server-controlled by the Location.",
-                  "readOnly": true,
-                  "type": "string"
-                },
-                "discount": {
-                  "description": "Personal discount, percent.",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "display_name": {
-                  "readOnly": true,
-                  "type": "string"
-                },
-                "email": {
-                  "description": "Email address. `null` when absent or withheld — see `redacted_fields`.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "first_visit_at": {
-                  "description": "Location-local offset.",
-                  "format": "date-time",
-                  "readOnly": true,
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "id": {
-                  "readOnly": true,
-                  "type": "integer"
-                },
-                "last_visit_at": {
-                  "description": "Location-local offset.",
-                  "format": "date-time",
-                  "readOnly": true,
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "name": {
-                  "type": "string"
-                },
-                "object": {
-                  "enum": [
-                    "client"
-                  ],
-                  "readOnly": true,
-                  "type": "string"
-                },
-                "patronymic": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "phone": {
-                  "description": "International phone number. `null` when absent or withheld — see `redacted_fields`.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "redacted_fields": {
-                  "description": "Names of fields withheld by the PII policy for this object, for example `[\"phone\", \"email\"]`. A withheld contact is always returned as `null` — never as a masked or empty string, so an integration ca…",
-                  "items": {
-                    "type": "string",
-                    "x-truncated": true
+              "description": "Present only when requested with `include[]=client`; `null` when `client_id` is `null`. PII rules apply.",
+              "oneOf": [
+                {
+                  "description": "A client of the Location. Contact fields (`phone`, `email`, `additional_phone`) are PII: without `clients:read_contact` plus the subject contact permission they are returned as `null` and their names…",
+                  "properties": {
+                    "additional_phone": {
+                      "description": "Additional phone number. `null` when absent or withheld — see `redacted_fields`.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "birth_date": {
+                      "format": "date",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "comment": {
+                      "description": "Private note about the client; requires comment access.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "created_at": {
+                      "description": "UTC.",
+                      "format": "date-time",
+                      "readOnly": true,
+                      "type": "string"
+                    },
+                    "currency": {
+                      "description": "ISO 4217, server-controlled by the Location.",
+                      "readOnly": true,
+                      "type": "string"
+                    },
+                    "discount": {
+                      "description": "Personal discount, percent.",
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "display_name": {
+                      "readOnly": true,
+                      "type": "string"
+                    },
+                    "email": {
+                      "description": "Email address. `null` when absent or withheld — see `redacted_fields`.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "first_visit_at": {
+                      "description": "Location-local offset.",
+                      "format": "date-time",
+                      "readOnly": true,
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "id": {
+                      "readOnly": true,
+                      "type": "integer"
+                    },
+                    "last_visit_at": {
+                      "description": "Location-local offset.",
+                      "format": "date-time",
+                      "readOnly": true,
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "object": {
+                      "enum": [
+                        "client"
+                      ],
+                      "readOnly": true,
+                      "type": "string"
+                    },
+                    "patronymic": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "phone": {
+                      "description": "International phone number. `null` when absent or withheld — see `redacted_fields`.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "redacted_fields": {
+                      "description": "Names of fields withheld by the PII policy for this object, for example `[\"phone\", \"email\"]`. A withheld contact is always returned as `null` — never as a masked or empty string, so an integration ca…",
+                      "items": {
+                        "type": "string",
+                        "x-truncated": true
+                      },
+                      "readOnly": true,
+                      "type": "array"
+                    },
+                    "sold_amount_minor": {
+                      "description": "Lifetime paid total, integer minor units of the Location currency.",
+                      "readOnly": true,
+                      "type": "integer"
+                    },
+                    "surname": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "updated_at": {
+                      "description": "UTC.",
+                      "format": "date-time",
+                      "readOnly": true,
+                      "type": "string"
+                    },
+                    "visits_count": {
+                      "readOnly": true,
+                      "type": "integer"
+                    }
                   },
-                  "readOnly": true,
-                  "type": "array"
+                  "required": [
+                    "id",
+                    "object",
+                    "name",
+                    "phone"
+                  ],
+                  "type": "object"
                 },
-                "sold_amount_minor": {
-                  "description": "Lifetime paid total, integer minor units of the Location currency.",
-                  "readOnly": true,
-                  "type": "integer"
-                },
-                "surname": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "updated_at": {
-                  "description": "UTC.",
-                  "format": "date-time",
-                  "readOnly": true,
-                  "type": "string"
-                },
-                "visits_count": {
-                  "readOnly": true,
-                  "type": "integer"
+                {
+                  "type": "null"
                 }
-              },
-              "readOnly": true,
-              "required": [
-                "id",
-                "object",
-                "name",
-                "phone"
               ],
-              "type": "object"
+              "readOnly": true
             },
             "client_id": {
               "description": "`null` only on appointments without a client.",
@@ -54570,8 +54583,17 @@
               "type": "string"
             },
             "team_member": {
-              "description": "Present only when requested with `expand[]=team_member`.",
+              "description": "Present only when requested with `include[]=team_member`.",
               "properties": {
+                "avatar_url": {
+                  "description": "Photo of the team member, up to 220×220 px (smaller when the uploaded photo is smaller); `null` when no photo is set.",
+                  "format": "uri",
+                  "readOnly": true,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "created_at": {
                   "description": "UTC; `null` for legacy records without a creation date.",
                   "format": "date-time",
@@ -54590,21 +54612,9 @@
                     "null"
                   ]
                 },
-                "dismissal_reason": {
-                  "description": "Reason given on dismissal; `null` while employed.",
-                  "readOnly": true,
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
                 "id": {
                   "readOnly": true,
                   "type": "integer"
-                },
-                "is_billable": {
-                  "description": "Whether the member counts as a paid seat by their own Billable setting on the current licensing model, or by access to the Digital schedule on the older one. Free seats such as the Location owner or…",
-                  "type": "boolean"
                 },
                 "name": {
                   "description": "Display name, HTML entities decoded.",
@@ -54639,11 +54649,10 @@
                 "object",
                 "name",
                 "specialization",
+                "avatar_url",
                 "position_id",
                 "online_booking_enabled",
-                "is_billable",
                 "dismissal_date",
-                "dismissal_reason",
                 "created_at"
               ],
               "type": "object"
@@ -54772,142 +54781,150 @@
               ]
             },
             "client": {
-              "description": "Present only when requested with `expand[]=client`; PII rules apply.",
-              "properties": {
-                "additional_phone": {
-                  "description": "Additional phone number. `null` when absent or withheld — see `redacted_fields`.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "birth_date": {
-                  "format": "date",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "comment": {
-                  "description": "Private note about the client; requires comment access.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "created_at": {
-                  "description": "UTC.",
-                  "format": "date-time",
-                  "readOnly": true,
-                  "type": "string"
-                },
-                "currency": {
-                  "description": "ISO 4217, server-controlled by the Location.",
-                  "readOnly": true,
-                  "type": "string"
-                },
-                "discount": {
-                  "description": "Personal discount, percent.",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "display_name": {
-                  "readOnly": true,
-                  "type": "string"
-                },
-                "email": {
-                  "description": "Email address. `null` when absent or withheld — see `redacted_fields`.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "first_visit_at": {
-                  "description": "Location-local offset.",
-                  "format": "date-time",
-                  "readOnly": true,
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "id": {
-                  "readOnly": true,
-                  "type": "integer"
-                },
-                "last_visit_at": {
-                  "description": "Location-local offset.",
-                  "format": "date-time",
-                  "readOnly": true,
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "name": {
-                  "type": "string"
-                },
-                "object": {
-                  "enum": [
-                    "client"
-                  ],
-                  "readOnly": true,
-                  "type": "string"
-                },
-                "patronymic": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "phone": {
-                  "description": "International phone number. `null` when absent or withheld — see `redacted_fields`.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "redacted_fields": {
-                  "description": "Names of fields withheld by the PII policy for this object, for example `[\"phone\", \"email\"]`. A withheld contact is always returned as `null` — never as a masked or empty string, so an integration ca…",
-                  "items": {
-                    "type": "string",
-                    "x-truncated": true
+              "description": "Present only when requested with `include[]=client`; `null` when `client_id` is `null`. PII rules apply.",
+              "oneOf": [
+                {
+                  "description": "A client of the Location. Contact fields (`phone`, `email`, `additional_phone`) are PII: without `clients:read_contact` plus the subject contact permission they are returned as `null` and their names…",
+                  "properties": {
+                    "additional_phone": {
+                      "description": "Additional phone number. `null` when absent or withheld — see `redacted_fields`.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "birth_date": {
+                      "format": "date",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "comment": {
+                      "description": "Private note about the client; requires comment access.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "created_at": {
+                      "description": "UTC.",
+                      "format": "date-time",
+                      "readOnly": true,
+                      "type": "string"
+                    },
+                    "currency": {
+                      "description": "ISO 4217, server-controlled by the Location.",
+                      "readOnly": true,
+                      "type": "string"
+                    },
+                    "discount": {
+                      "description": "Personal discount, percent.",
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "display_name": {
+                      "readOnly": true,
+                      "type": "string"
+                    },
+                    "email": {
+                      "description": "Email address. `null` when absent or withheld — see `redacted_fields`.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "first_visit_at": {
+                      "description": "Location-local offset.",
+                      "format": "date-time",
+                      "readOnly": true,
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "id": {
+                      "readOnly": true,
+                      "type": "integer"
+                    },
+                    "last_visit_at": {
+                      "description": "Location-local offset.",
+                      "format": "date-time",
+                      "readOnly": true,
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "object": {
+                      "enum": [
+                        "client"
+                      ],
+                      "readOnly": true,
+                      "type": "string"
+                    },
+                    "patronymic": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "phone": {
+                      "description": "International phone number. `null` when absent or withheld — see `redacted_fields`.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "redacted_fields": {
+                      "description": "Names of fields withheld by the PII policy for this object, for example `[\"phone\", \"email\"]`. A withheld contact is always returned as `null` — never as a masked or empty string, so an integration ca…",
+                      "items": {
+                        "type": "string",
+                        "x-truncated": true
+                      },
+                      "readOnly": true,
+                      "type": "array"
+                    },
+                    "sold_amount_minor": {
+                      "description": "Lifetime paid total, integer minor units of the Location currency.",
+                      "readOnly": true,
+                      "type": "integer"
+                    },
+                    "surname": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "updated_at": {
+                      "description": "UTC.",
+                      "format": "date-time",
+                      "readOnly": true,
+                      "type": "string"
+                    },
+                    "visits_count": {
+                      "readOnly": true,
+                      "type": "integer"
+                    }
                   },
-                  "readOnly": true,
-                  "type": "array"
+                  "required": [
+                    "id",
+                    "object",
+                    "name",
+                    "phone"
+                  ],
+                  "type": "object"
                 },
-                "sold_amount_minor": {
-                  "description": "Lifetime paid total, integer minor units of the Location currency.",
-                  "readOnly": true,
-                  "type": "integer"
-                },
-                "surname": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "updated_at": {
-                  "description": "UTC.",
-                  "format": "date-time",
-                  "readOnly": true,
-                  "type": "string"
-                },
-                "visits_count": {
-                  "readOnly": true,
-                  "type": "integer"
+                {
+                  "type": "null"
                 }
-              },
-              "readOnly": true,
-              "required": [
-                "id",
-                "object",
-                "name",
-                "phone"
               ],
-              "type": "object"
+              "readOnly": true
             },
             "client_id": {
               "description": "`null` only on appointments without a client.",
@@ -54987,8 +55004,17 @@
               "type": "string"
             },
             "team_member": {
-              "description": "Present only when requested with `expand[]=team_member`.",
+              "description": "Present only when requested with `include[]=team_member`.",
               "properties": {
+                "avatar_url": {
+                  "description": "Photo of the team member, up to 220×220 px (smaller when the uploaded photo is smaller); `null` when no photo is set.",
+                  "format": "uri",
+                  "readOnly": true,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "created_at": {
                   "description": "UTC; `null` for legacy records without a creation date.",
                   "format": "date-time",
@@ -55007,21 +55033,9 @@
                     "null"
                   ]
                 },
-                "dismissal_reason": {
-                  "description": "Reason given on dismissal; `null` while employed.",
-                  "readOnly": true,
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
                 "id": {
                   "readOnly": true,
                   "type": "integer"
-                },
-                "is_billable": {
-                  "description": "Whether the member counts as a paid seat by their own Billable setting on the current licensing model, or by access to the Digital schedule on the older one. Free seats such as the Location owner or…",
-                  "type": "boolean"
                 },
                 "name": {
                   "description": "Display name, HTML entities decoded.",
@@ -55056,11 +55070,10 @@
                 "object",
                 "name",
                 "specialization",
+                "avatar_url",
                 "position_id",
                 "online_booking_enabled",
-                "is_billable",
                 "dismissal_date",
-                "dismissal_reason",
                 "created_at"
               ],
               "type": "object"
@@ -56110,142 +56123,150 @@
               ]
             },
             "client": {
-              "description": "Present only when requested with `expand[]=client`; PII rules apply.",
-              "properties": {
-                "additional_phone": {
-                  "description": "Additional phone number. `null` when absent or withheld — see `redacted_fields`.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "birth_date": {
-                  "format": "date",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "comment": {
-                  "description": "Private note about the client; requires comment access.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "created_at": {
-                  "description": "UTC.",
-                  "format": "date-time",
-                  "readOnly": true,
-                  "type": "string"
-                },
-                "currency": {
-                  "description": "ISO 4217, server-controlled by the Location.",
-                  "readOnly": true,
-                  "type": "string"
-                },
-                "discount": {
-                  "description": "Personal discount, percent.",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "display_name": {
-                  "readOnly": true,
-                  "type": "string"
-                },
-                "email": {
-                  "description": "Email address. `null` when absent or withheld — see `redacted_fields`.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "first_visit_at": {
-                  "description": "Location-local offset.",
-                  "format": "date-time",
-                  "readOnly": true,
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "id": {
-                  "readOnly": true,
-                  "type": "integer"
-                },
-                "last_visit_at": {
-                  "description": "Location-local offset.",
-                  "format": "date-time",
-                  "readOnly": true,
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "name": {
-                  "type": "string"
-                },
-                "object": {
-                  "enum": [
-                    "client"
-                  ],
-                  "readOnly": true,
-                  "type": "string"
-                },
-                "patronymic": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "phone": {
-                  "description": "International phone number. `null` when absent or withheld — see `redacted_fields`.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "redacted_fields": {
-                  "description": "Names of fields withheld by the PII policy for this object, for example `[\"phone\", \"email\"]`. A withheld contact is always returned as `null` — never as a masked or empty string, so an integration ca…",
-                  "items": {
-                    "type": "string",
-                    "x-truncated": true
+              "description": "Present only when requested with `include[]=client`; `null` when `client_id` is `null`. PII rules apply.",
+              "oneOf": [
+                {
+                  "description": "A client of the Location. Contact fields (`phone`, `email`, `additional_phone`) are PII: without `clients:read_contact` plus the subject contact permission they are returned as `null` and their names…",
+                  "properties": {
+                    "additional_phone": {
+                      "description": "Additional phone number. `null` when absent or withheld — see `redacted_fields`.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "birth_date": {
+                      "format": "date",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "comment": {
+                      "description": "Private note about the client; requires comment access.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "created_at": {
+                      "description": "UTC.",
+                      "format": "date-time",
+                      "readOnly": true,
+                      "type": "string"
+                    },
+                    "currency": {
+                      "description": "ISO 4217, server-controlled by the Location.",
+                      "readOnly": true,
+                      "type": "string"
+                    },
+                    "discount": {
+                      "description": "Personal discount, percent.",
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "display_name": {
+                      "readOnly": true,
+                      "type": "string"
+                    },
+                    "email": {
+                      "description": "Email address. `null` when absent or withheld — see `redacted_fields`.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "first_visit_at": {
+                      "description": "Location-local offset.",
+                      "format": "date-time",
+                      "readOnly": true,
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "id": {
+                      "readOnly": true,
+                      "type": "integer"
+                    },
+                    "last_visit_at": {
+                      "description": "Location-local offset.",
+                      "format": "date-time",
+                      "readOnly": true,
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "object": {
+                      "enum": [
+                        "client"
+                      ],
+                      "readOnly": true,
+                      "type": "string"
+                    },
+                    "patronymic": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "phone": {
+                      "description": "International phone number. `null` when absent or withheld — see `redacted_fields`.",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "redacted_fields": {
+                      "description": "Names of fields withheld by the PII policy for this object, for example `[\"phone\", \"email\"]`. A withheld contact is always returned as `null` — never as a masked or empty string, so an integration ca…",
+                      "items": {
+                        "type": "string",
+                        "x-truncated": true
+                      },
+                      "readOnly": true,
+                      "type": "array"
+                    },
+                    "sold_amount_minor": {
+                      "description": "Lifetime paid total, integer minor units of the Location currency.",
+                      "readOnly": true,
+                      "type": "integer"
+                    },
+                    "surname": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "updated_at": {
+                      "description": "UTC.",
+                      "format": "date-time",
+                      "readOnly": true,
+                      "type": "string"
+                    },
+                    "visits_count": {
+                      "readOnly": true,
+                      "type": "integer"
+                    }
                   },
-                  "readOnly": true,
-                  "type": "array"
+                  "required": [
+                    "id",
+                    "object",
+                    "name",
+                    "phone"
+                  ],
+                  "type": "object"
                 },
-                "sold_amount_minor": {
-                  "description": "Lifetime paid total, integer minor units of the Location currency.",
-                  "readOnly": true,
-                  "type": "integer"
-                },
-                "surname": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "updated_at": {
-                  "description": "UTC.",
-                  "format": "date-time",
-                  "readOnly": true,
-                  "type": "string"
-                },
-                "visits_count": {
-                  "readOnly": true,
-                  "type": "integer"
+                {
+                  "type": "null"
                 }
-              },
-              "readOnly": true,
-              "required": [
-                "id",
-                "object",
-                "name",
-                "phone"
               ],
-              "type": "object"
+              "readOnly": true
             },
             "client_id": {
               "description": "`null` only on appointments without a client.",
@@ -56325,8 +56346,17 @@
               "type": "string"
             },
             "team_member": {
-              "description": "Present only when requested with `expand[]=team_member`.",
+              "description": "Present only when requested with `include[]=team_member`.",
               "properties": {
+                "avatar_url": {
+                  "description": "Photo of the team member, up to 220×220 px (smaller when the uploaded photo is smaller); `null` when no photo is set.",
+                  "format": "uri",
+                  "readOnly": true,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "created_at": {
                   "description": "UTC; `null` for legacy records without a creation date.",
                   "format": "date-time",
@@ -56345,21 +56375,9 @@
                     "null"
                   ]
                 },
-                "dismissal_reason": {
-                  "description": "Reason given on dismissal; `null` while employed.",
-                  "readOnly": true,
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
                 "id": {
                   "readOnly": true,
                   "type": "integer"
-                },
-                "is_billable": {
-                  "description": "Whether the member counts as a paid seat by their own Billable setting on the current licensing model, or by access to the Digital schedule on the older one. Free seats such as the Location owner or…",
-                  "type": "boolean"
                 },
                 "name": {
                   "description": "Display name, HTML entities decoded.",
@@ -56394,11 +56412,10 @@
                 "object",
                 "name",
                 "specialization",
+                "avatar_url",
                 "position_id",
                 "online_booking_enabled",
-                "is_billable",
                 "dismissal_date",
-                "dismissal_reason",
                 "created_at"
               ],
               "type": "object"
@@ -56476,8 +56493,8 @@
           }
         },
         {
-          "description": "Relations to embed, one level deep. Expanding `client` never bypasses PII rules — contact fields are `null` and listed in `redacted_fields` without `clients:read_contact`. Unknown values fail with `422`.",
-          "name": "expand[]",
+          "description": "Relations to include, one level deep; each adds a new field next to its id. Including `client` never bypasses PII rules — contact fields are `null` and listed in `redacted_fields` without `clients:read_contact`. Unknown values fail with `422`.",
+          "name": "include[]",
           "in": "query",
           "required": false,
           "schema": {
@@ -56511,7 +56528,7 @@
               "type": "array"
             },
             "client": {
-              "description": "Present only when requested with `expand[]=client`; PII rules apply.",
+              "description": "Present only when requested with `include[]=client`; PII rules apply.",
               "properties": {
                 "additional_phone": {
                   "description": "Additional phone number. `null` when absent or withheld — see `redacted_fields`.",
@@ -57047,7 +57064,7 @@
               "type": "array"
             },
             "client": {
-              "description": "Present only when requested with `expand[]=client`; PII rules apply.",
+              "description": "Present only when requested with `include[]=client`; PII rules apply.",
               "properties": {
                 "additional_phone": {
                   "description": "Additional phone number. `null` when absent or withheld — see `redacted_fields`.",
@@ -59942,8 +59959,13 @@
                         "type": "integer",
                         "x-truncated": true
                       },
+                      "team_member_ids": {
+                        "description": "Team Members providing this service. Read-only here; links are written through `updateTeamMemberServices`.",
+                        "type": "array",
+                        "x-truncated": true
+                      },
                       "team_members": {
-                        "description": "Team Members providing this service, by id. Read-only here; links are written through `updateTeamMemberServices`.",
+                        "description": "Settings of each Team Member from `team_member_ids` for this service. Present only when requested with `include[]=team_members`.",
                         "type": "array",
                         "x-truncated": true
                       },
@@ -59971,7 +59993,7 @@
                       "price_max_minor",
                       "currency",
                       "online_booking_enabled",
-                      "team_members",
+                      "team_member_ids",
                       "package",
                       "created_at"
                     ],
@@ -60277,19 +60299,60 @@
               "description": "Base price of the service in this Location, integer minor units of the Location currency, as set by the business: a single price or the lower bound of a range. For a package, the package price stored…",
               "type": "integer"
             },
+            "team_member_ids": {
+              "description": "Team Members providing this service. Read-only here; links are written through `updateTeamMemberServices`.",
+              "items": {
+                "type": "integer"
+              },
+              "readOnly": true,
+              "type": "array"
+            },
             "team_members": {
-              "description": "Team Members providing this service, by id. Read-only here; links are written through `updateTeamMemberServices`.",
+              "description": "Settings of each Team Member from `team_member_ids` for this service. Present only when requested with `include[]=team_members`.",
               "items": {
                 "additionalProperties": false,
-                "description": "A Team Member linked to the service.",
+                "description": "Settings of a Team Member for the service, returned with `include[]=team_members`.",
                 "properties": {
+                  "duration_seconds": {
+                    "description": "Own duration of the service for this Team Member in seconds, as set in Altegio; `null` when no own duration is set and the service `duration_seconds` applies. Always `null` for a package: the package…",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "online_booking_enabled": {
+                    "description": "Whether online booking of this service is enabled for this Team Member in Altegio. It does not mean that free time is available.",
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "price_max_minor": {
+                    "description": "Upper bound of the Team Member's own price, integer minor units; equals `price_min_minor` for a single price; `null` for a \"from\" price or when the service price applies.",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "price_min_minor": {
+                    "description": "Own price of this Team Member for the service, integer minor units of the Location currency: a single price or the lower bound of a range. For a simple service it comes from the Team Member's price g…",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
                   "team_member_id": {
                     "type": "integer",
                     "x-truncated": true
                   }
                 },
                 "required": [
-                  "team_member_id"
+                  "team_member_id",
+                  "duration_seconds",
+                  "price_min_minor",
+                  "price_max_minor",
+                  "online_booking_enabled"
                 ],
                 "type": "object"
               },
@@ -60324,7 +60387,7 @@
             "price_max_minor",
             "currency",
             "online_booking_enabled",
-            "team_members",
+            "team_member_ids",
             "package",
             "created_at"
           ],
@@ -60339,7 +60402,7 @@
       "path": "/locations/{location_id}/services/{service_id}",
       "displayPath": "/locations/{location_id}/services/{service_id}",
       "summary": "Get a service",
-      "description": "Returns a single service with its category, pricing, duration, Team Member links, and\npackage components when `type` is `package`.",
+      "description": "Returns a single service with its category, pricing, duration, Team Member ids, and\npackage components when `type` is `package`. With `include[]=team_members` the response\nalso carries `team_members`: the duration, price and online booking setting of each\nTeam Member for the service.",
       "tags": [
         "Services"
       ],
@@ -60370,6 +60433,21 @@
           "required": true,
           "schema": {
             "type": "integer"
+          }
+        },
+        {
+          "description": "Relations to include, one level deep. `team_members` adds the `team_members` field: the duration, price and online booking setting of each Team Member from `team_member_ids`. Unknown values fail with `422`.",
+          "name": "include[]",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "items": {
+              "enum": [
+                "team_members"
+              ],
+              "type": "string"
+            },
+            "type": "array"
           }
         }
       ],
@@ -60502,19 +60580,60 @@
               "description": "Base price of the service in this Location, integer minor units of the Location currency, as set by the business: a single price or the lower bound of a range. For a package, the package price stored…",
               "type": "integer"
             },
+            "team_member_ids": {
+              "description": "Team Members providing this service. Read-only here; links are written through `updateTeamMemberServices`.",
+              "items": {
+                "type": "integer"
+              },
+              "readOnly": true,
+              "type": "array"
+            },
             "team_members": {
-              "description": "Team Members providing this service, by id. Read-only here; links are written through `updateTeamMemberServices`.",
+              "description": "Settings of each Team Member from `team_member_ids` for this service. Present only when requested with `include[]=team_members`.",
               "items": {
                 "additionalProperties": false,
-                "description": "A Team Member linked to the service.",
+                "description": "Settings of a Team Member for the service, returned with `include[]=team_members`.",
                 "properties": {
+                  "duration_seconds": {
+                    "description": "Own duration of the service for this Team Member in seconds, as set in Altegio; `null` when no own duration is set and the service `duration_seconds` applies. Always `null` for a package: the package…",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "online_booking_enabled": {
+                    "description": "Whether online booking of this service is enabled for this Team Member in Altegio. It does not mean that free time is available.",
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "price_max_minor": {
+                    "description": "Upper bound of the Team Member's own price, integer minor units; equals `price_min_minor` for a single price; `null` for a \"from\" price or when the service price applies.",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "price_min_minor": {
+                    "description": "Own price of this Team Member for the service, integer minor units of the Location currency: a single price or the lower bound of a range. For a simple service it comes from the Team Member's price g…",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
                   "team_member_id": {
                     "type": "integer",
                     "x-truncated": true
                   }
                 },
                 "required": [
-                  "team_member_id"
+                  "team_member_id",
+                  "duration_seconds",
+                  "price_min_minor",
+                  "price_max_minor",
+                  "online_booking_enabled"
                 ],
                 "type": "object"
               },
@@ -60549,7 +60668,7 @@
             "price_max_minor",
             "currency",
             "online_booking_enabled",
-            "team_members",
+            "team_member_ids",
             "package",
             "created_at"
           ],
@@ -60795,19 +60914,60 @@
               "description": "Base price of the service in this Location, integer minor units of the Location currency, as set by the business: a single price or the lower bound of a range. For a package, the package price stored…",
               "type": "integer"
             },
+            "team_member_ids": {
+              "description": "Team Members providing this service. Read-only here; links are written through `updateTeamMemberServices`.",
+              "items": {
+                "type": "integer"
+              },
+              "readOnly": true,
+              "type": "array"
+            },
             "team_members": {
-              "description": "Team Members providing this service, by id. Read-only here; links are written through `updateTeamMemberServices`.",
+              "description": "Settings of each Team Member from `team_member_ids` for this service. Present only when requested with `include[]=team_members`.",
               "items": {
                 "additionalProperties": false,
-                "description": "A Team Member linked to the service.",
+                "description": "Settings of a Team Member for the service, returned with `include[]=team_members`.",
                 "properties": {
+                  "duration_seconds": {
+                    "description": "Own duration of the service for this Team Member in seconds, as set in Altegio; `null` when no own duration is set and the service `duration_seconds` applies. Always `null` for a package: the package…",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "online_booking_enabled": {
+                    "description": "Whether online booking of this service is enabled for this Team Member in Altegio. It does not mean that free time is available.",
+                    "type": "boolean",
+                    "x-truncated": true
+                  },
+                  "price_max_minor": {
+                    "description": "Upper bound of the Team Member's own price, integer minor units; equals `price_min_minor` for a single price; `null` for a \"from\" price or when the service price applies.",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
+                  "price_min_minor": {
+                    "description": "Own price of this Team Member for the service, integer minor units of the Location currency: a single price or the lower bound of a range. For a simple service it comes from the Team Member's price g…",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "x-truncated": true
+                  },
                   "team_member_id": {
                     "type": "integer",
                     "x-truncated": true
                   }
                 },
                 "required": [
-                  "team_member_id"
+                  "team_member_id",
+                  "duration_seconds",
+                  "price_min_minor",
+                  "price_max_minor",
+                  "online_booking_enabled"
                 ],
                 "type": "object"
               },
@@ -60842,7 +61002,7 @@
             "price_max_minor",
             "currency",
             "online_booking_enabled",
-            "team_members",
+            "team_member_ids",
             "package",
             "created_at"
           ],
@@ -60987,6 +61147,14 @@
                   "items": {
                     "description": "A Team Member of the Location. Personal contact data of Team Members is not exposed in the preview scope.",
                     "properties": {
+                      "avatar_url": {
+                        "description": "Photo of the team member, up to 220×220 px (smaller when the uploaded photo is smaller); `null` when no photo is set.",
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "x-truncated": true
+                      },
                       "created_at": {
                         "description": "UTC; `null` for legacy records without a creation date.",
                         "type": [
@@ -61003,21 +61171,8 @@
                         ],
                         "x-truncated": true
                       },
-                      "dismissal_reason": {
-                        "description": "Reason given on dismissal; `null` while employed.",
-                        "type": [
-                          "string",
-                          "null"
-                        ],
-                        "x-truncated": true
-                      },
                       "id": {
                         "type": "integer",
-                        "x-truncated": true
-                      },
-                      "is_billable": {
-                        "description": "Whether the member counts as a paid seat by their own Billable setting on the current licensing model, or by access to the Digital schedule on the older one. Free seats such as the Location owner or…",
-                        "type": "boolean",
                         "x-truncated": true
                       },
                       "name": {
@@ -61053,11 +61208,10 @@
                       "object",
                       "name",
                       "specialization",
+                      "avatar_url",
                       "position_id",
                       "online_booking_enabled",
-                      "is_billable",
                       "dismissal_date",
-                      "dismissal_reason",
                       "created_at"
                     ],
                     "type": "object"
@@ -61143,6 +61297,15 @@
         "schema": {
           "description": "A Team Member of the Location. Personal contact data of Team Members is not exposed in the preview scope.",
           "properties": {
+            "avatar_url": {
+              "description": "Photo of the team member, up to 220×220 px (smaller when the uploaded photo is smaller); `null` when no photo is set.",
+              "format": "uri",
+              "readOnly": true,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "created_at": {
               "description": "UTC; `null` for legacy records without a creation date.",
               "format": "date-time",
@@ -61161,21 +61324,9 @@
                 "null"
               ]
             },
-            "dismissal_reason": {
-              "description": "Reason given on dismissal; `null` while employed.",
-              "readOnly": true,
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "id": {
               "readOnly": true,
               "type": "integer"
-            },
-            "is_billable": {
-              "description": "Whether the member counts as a paid seat by their own Billable setting on the current licensing model, or by access to the Digital schedule on the older one. Free seats such as the Location owner or…",
-              "type": "boolean"
             },
             "name": {
               "description": "Display name, HTML entities decoded.",
@@ -61209,11 +61360,10 @@
             "object",
             "name",
             "specialization",
+            "avatar_url",
             "position_id",
             "online_booking_enabled",
-            "is_billable",
             "dismissal_date",
-            "dismissal_reason",
             "created_at"
           ],
           "type": "object"
@@ -61267,6 +61417,15 @@
         "schema": {
           "description": "A Team Member of the Location. Personal contact data of Team Members is not exposed in the preview scope.",
           "properties": {
+            "avatar_url": {
+              "description": "Photo of the team member, up to 220×220 px (smaller when the uploaded photo is smaller); `null` when no photo is set.",
+              "format": "uri",
+              "readOnly": true,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "created_at": {
               "description": "UTC; `null` for legacy records without a creation date.",
               "format": "date-time",
@@ -61285,21 +61444,9 @@
                 "null"
               ]
             },
-            "dismissal_reason": {
-              "description": "Reason given on dismissal; `null` while employed.",
-              "readOnly": true,
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "id": {
               "readOnly": true,
               "type": "integer"
-            },
-            "is_billable": {
-              "description": "Whether the member counts as a paid seat by their own Billable setting on the current licensing model, or by access to the Digital schedule on the older one. Free seats such as the Location owner or…",
-              "type": "boolean"
             },
             "name": {
               "description": "Display name, HTML entities decoded.",
@@ -61333,11 +61480,10 @@
             "object",
             "name",
             "specialization",
+            "avatar_url",
             "position_id",
             "online_booking_enabled",
-            "is_billable",
             "dismissal_date",
-            "dismissal_reason",
             "created_at"
           ],
           "type": "object"
@@ -61420,6 +61566,15 @@
         "schema": {
           "description": "A Team Member of the Location. Personal contact data of Team Members is not exposed in the preview scope.",
           "properties": {
+            "avatar_url": {
+              "description": "Photo of the team member, up to 220×220 px (smaller when the uploaded photo is smaller); `null` when no photo is set.",
+              "format": "uri",
+              "readOnly": true,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "created_at": {
               "description": "UTC; `null` for legacy records without a creation date.",
               "format": "date-time",
@@ -61438,21 +61593,9 @@
                 "null"
               ]
             },
-            "dismissal_reason": {
-              "description": "Reason given on dismissal; `null` while employed.",
-              "readOnly": true,
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "id": {
               "readOnly": true,
               "type": "integer"
-            },
-            "is_billable": {
-              "description": "Whether the member counts as a paid seat by their own Billable setting on the current licensing model, or by access to the Digital schedule on the older one. Free seats such as the Location owner or…",
-              "type": "boolean"
             },
             "name": {
               "description": "Display name, HTML entities decoded.",
@@ -61486,11 +61629,10 @@
             "object",
             "name",
             "specialization",
+            "avatar_url",
             "position_id",
             "online_booking_enabled",
-            "is_billable",
             "dismissal_date",
-            "dismissal_reason",
             "created_at"
           ],
           "type": "object"
@@ -61966,6 +62108,15 @@
         "schema": {
           "description": "A Team Member of the Location. Personal contact data of Team Members is not exposed in the preview scope.",
           "properties": {
+            "avatar_url": {
+              "description": "Photo of the team member, up to 220×220 px (smaller when the uploaded photo is smaller); `null` when no photo is set.",
+              "format": "uri",
+              "readOnly": true,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "created_at": {
               "description": "UTC; `null` for legacy records without a creation date.",
               "format": "date-time",
@@ -61984,21 +62135,9 @@
                 "null"
               ]
             },
-            "dismissal_reason": {
-              "description": "Reason given on dismissal; `null` while employed.",
-              "readOnly": true,
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "id": {
               "readOnly": true,
               "type": "integer"
-            },
-            "is_billable": {
-              "description": "Whether the member counts as a paid seat by their own Billable setting on the current licensing model, or by access to the Digital schedule on the older one. Free seats such as the Location owner or…",
-              "type": "boolean"
             },
             "name": {
               "description": "Display name, HTML entities decoded.",
@@ -62032,11 +62171,10 @@
             "object",
             "name",
             "specialization",
+            "avatar_url",
             "position_id",
             "online_booking_enabled",
-            "is_billable",
             "dismissal_date",
-            "dismissal_reason",
             "created_at"
           ],
           "type": "object"
@@ -62680,6 +62818,11 @@
                     ],
                     "x-truncated": true
                   },
+                  "name": {
+                    "description": "Name of the location or chain as the business entered it, so a client can tell the resources apart without reading each one.",
+                    "type": "string",
+                    "x-truncated": true
+                  },
                   "object": {
                     "type": "string",
                     "x-truncated": true
@@ -62699,6 +62842,8 @@
                   "object",
                   "type",
                   "id",
+                  "name",
+                  "main_chain_id",
                   "scopes"
                 ],
                 "type": "object"
