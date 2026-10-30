@@ -80,7 +80,9 @@ const SYNONYM_GROUPS: string[][] = [
   ['visit', 'visits'],
   ['service', 'services'],
   ['position', 'positions', 'role', 'roles'],
-  ['payment', 'payments', 'payroll', 'salary'],
+  // Salary is the legacy word for payroll, not for a payment: joined to
+  // "payment", "pay salary" ranked a visit's payment over a payroll payout.
+  ['payroll', 'salary'],
   ['availability', 'available', 'free', 'slot', 'slots', 'seance', 'seances'],
   ['fiscal', 'fiscalization', 'kkm', 'cash', 'register', 'till', 'receipt'],
   ['inventory', 'stock', 'storage', 'storages', 'warehouse'],

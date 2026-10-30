@@ -197,7 +197,7 @@ export const visitsAddPaymentTool = defineTool({
   name: 'visits_add_payment',
   category: 'Visits',
   description:
-    'Record a payment or an advance payment on an appointment’s visit: money received into an account or cash register (method account + account_id), or paid from a client account, loyalty card, loyalty program, gift card, membership or advance payment hold — method and its id from payment_options in visits_get. Pass amount_due from visits_get as expected_amount_due; the call is refused if the visit changed. Refused on a waiting or no-show appointment, where Altegio does not keep a payment; paying a confirmed appointment whose time has passed marks it arrived. Records money received; charges no card. Asks for confirmation first.',
+    'Record a payment or an advance payment on an appointment’s visit at checkout, which sets its payment status to paid or partly paid: money received into an account or cash register (method account + account_id), or paid from a client account, loyalty card, loyalty program, gift card, membership or advance payment hold — method and its id from payment_options in visits_get. Pass amount_due from visits_get as expected_amount_due; the call is refused if the visit changed. Refused on a waiting or no-show appointment, where Altegio does not keep a payment; paying a confirmed appointment whose time has passed marks it arrived. Records money received; charges no card. Asks for confirmation first.',
   annotations: {
     title: 'Visits: record a payment',
     destructiveHint: false,

@@ -7,6 +7,7 @@ import {
   jest,
 } from '@jest/globals';
 import {
+  DEFAULT_EVICTION_GRACE_MS,
   HttpSessionBudget,
   type HttpSessionEviction,
 } from '../utils/http-sessions.js';
@@ -148,10 +149,48 @@ describe('HTTP session budget at capacity', () => {
     used.markUsed();
     clock = 1000;
     budget.acquire(probeClose);
+    clock = 1000 + DEFAULT_EVICTION_GRACE_MS; // both past the grace
 
     expect(budget.acquire(closer())).toBeDefined();
     expect(probeClose).toHaveBeenCalledTimes(1);
     expect(usedClose).not.toHaveBeenCalled();
+  });
+
+  it('spares a session that just initialized for its first tool call', () => {
+    // 2026-10-23: a host that opens a session per call lost each new session
+    // to the next initialize and got 404 on the call a second later.
+    const evictions: HttpSessionEviction[] = [];
+    const budget = new HttpSessionBudget(2, {
+      now,
+      onEvict: (eviction) => evictions.push(eviction),
+    });
+    const staleClose = closer();
+    const freshClose = closer();
+    budget.acquire(staleClose)!.markUsed();
+    clock = 10 * 60 * 1000;
+    budget.acquire(freshClose); // initialized, tool call still to come
+    clock += 1000;
+
+    expect(budget.acquire(closer())).toBeDefined();
+    expect(freshClose).not.toHaveBeenCalled();
+    expect(staleClose).toHaveBeenCalledTimes(1);
+    expect(evictions).toEqual([{ used: true, idleSeconds: 601, sessions: 1 }]);
+  });
+
+  it('takes the oldest idle session when every idle one is inside the grace', () => {
+    const budget = new HttpSessionBudget(3, { now, evictionGraceMs: 60_000 });
+    const closes = [closer(), closer(), closer()];
+    budget.acquire(closes[0]!)!.markUsed();
+    clock = 1000;
+    budget.acquire(closes[1]!);
+    clock = 2000;
+    budget.acquire(closes[2]!);
+    clock = 3000;
+
+    expect(budget.acquire(closer())).toBeDefined();
+    expect(closes[0]).toHaveBeenCalledTimes(1);
+    expect(closes[1]).not.toHaveBeenCalled();
+    expect(closes[2]).not.toHaveBeenCalled();
   });
 
   it('refuses only when every session is serving a request', () => {
