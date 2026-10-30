@@ -18,6 +18,10 @@
  */
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
+  requestContextFromHeaders,
+  runWithContext,
+} from '../request-context.js';
+import {
   ErrorCode,
   ListResourceTemplatesRequestSchema,
   ListResourcesRequestSchema,
@@ -150,18 +154,29 @@ export function registerResources(
     })),
   }));
 
-  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-    const content = await readResource(modules, request.params.uri);
-    return {
-      contents: [
-        {
-          uri: content.uri ?? request.params.uri,
-          ...(content.mimeType ? { mimeType: content.mimeType } : {}),
-          text: content.text,
-        },
-      ],
-    };
-  });
+  server.setRequestHandler(
+    ReadResourceRequestSchema,
+    async (request, extra) => {
+      // Same re-binding as `tools/call` (`../tools/registry.ts`): the SDK runs
+      // protocol handlers outside the AsyncLocalStorage scope of the HTTP
+      // request, so the stored report a read serves is confined to the caller
+      // by rebuilding its context from the SDK's copy of the headers.
+      const headers = extra.requestInfo?.headers;
+      const read = () => readResource(modules, request.params.uri);
+      const content = headers
+        ? await runWithContext(requestContextFromHeaders(headers), read)
+        : await read();
+      return {
+        contents: [
+          {
+            uri: content.uri ?? request.params.uri,
+            ...(content.mimeType ? { mimeType: content.mimeType } : {}),
+            text: content.text,
+          },
+        ],
+      };
+    }
+  );
 
   return resources.map((entry) => entry.uri);
 }

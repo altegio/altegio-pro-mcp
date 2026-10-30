@@ -59,14 +59,23 @@ const V3_CATALOG_SCOPES = [
   'locations:write',
   'team_members:read',
   'team_members:write',
+  'team_members:schedule',
   'team_members:manage_access',
   'services:read',
   'services:write',
   'clients:read',
+  'clients:read_contact',
   'clients:write',
   'appointments:read',
   'appointments:create',
   'appointments:write',
+  'availability:read',
+  'events:read',
+  'events:write',
+  'online_booking:read',
+  'online_booking:configure',
+  'analytics:read',
+  'payroll:pay',
   'loyalty:read',
   'products:read',
   'products:write',
@@ -76,6 +85,9 @@ const V3_CATALOG_SCOPES = [
   'chain_loyalty:read',
   'chain_loyalty:configure',
   'chain_loyalty:transact',
+  'chain_clients:read',
+  'chain_services:read',
+  'chain_client_accounts:read',
   'checkout:read',
   'checkout:capture',
   'checkout:cancel',
@@ -87,25 +99,17 @@ const V3_CATALOG_SCOPES = [
 ] as const;
 
 /**
- * Names this server had to invent because the v3 P0 catalog has no domain for
- * them yet. They follow the same `domain:action` convention, and they are the
- * first thing to revisit when the API team publishes the final vocabulary.
+ * Names this server had to invent because the Altegio catalog has no scope
+ * for them. They follow the same `domain:action` convention.
  *
- * - `analytics:*` — the analytics pack reads `/locations/{id}/analytics/**`,
- *   which is out of the P0 slice entirely. Some of it is money-shaped (the
- *   day-end report, loyalty results) and may well end up behind `finance:read`
- *   or a split of it; mapping it onto `finance:read` today would be worse than
- *   an honest placeholder, because that name means "cash registers and
- *   financial accounts" (PM2), not "reports".
- * - `api:read` — the universal executor reaches every documented GET across
- *   every domain under ONE tool name, so no per-domain scope can describe it.
- *   See `TOOL_SCOPES` for why it is mapped coarsely and what closes the gap.
+ * - `analytics:write` — the catalog has `analytics:read` only; the one tool
+ *   that would write a report (`analytics_delete_assistant_report`) is
+ *   disabled, so no issued token ever needs to carry this name.
+ *
+ * The executor's former `api:read` is gone: the universal executor resolves
+ * its scope per operation from the catalog domain (`./executor/scopes.ts`).
  */
-const LOCAL_PLACEHOLDER_SCOPES = [
-  'analytics:read',
-  'analytics:write',
-  'api:read',
-] as const;
+const LOCAL_PLACEHOLDER_SCOPES = ['analytics:write'] as const;
 
 export const KNOWN_SCOPES = [
   ...V3_CATALOG_SCOPES,
@@ -210,19 +214,17 @@ type ScopeRequirement = ToolScope | readonly ToolScope[] | null;
  *   status and preview touch the checkpoint file and the caller's own pasted
  *   text, never the Altegio API.
  *
- * Two gaps this map cannot close, recorded rather than hidden:
+ * Two requirements are decided per call rather than per tool:
  *
- * - **`clients:read_contact` is not expressed.** In v3 it gates *fields*
- *   (phone, email) inside a response, not the endpoint, and V1 has no such
- *   redaction — so a caller with `clients:read` still sees whatever V1
- *   returns. Enforcing it as an endpoint scope would over-restrict; pretending
- *   it is enforced would be worse. It belongs to the V3 adapter work.
- * - **`api_call_operation` is coarse.** One tool name reaches every
- *   documented GET, so it is mapped to the `api:read` placeholder: a caller
- *   scoped to `clients:read` alone is refused the executor outright rather
- *   than being handed a route around its own scope. The real fix is resolving
- *   the scope per catalog operation at call time, which needs the final
- *   vocabulary first.
+ * - **`clients:read_contact`** gates *fields* (phone, email), not endpoints.
+ *   Every tool withholds contacts unless the call passes
+ *   `include_contacts: true` (`../contacts.ts`), so that argument is the
+ *   moment the scope is required: `requiredScopesForCall` adds it then, and a
+ *   token without it is refused before V1 — which cannot redact — is reached.
+ * - **`api_call_operation`** reaches every documented GET under one name, so
+ *   the map leaves it ungated and the executor resolves the scope of the
+ *   operation it is about to run from the catalog domain
+ *   (`./executor/scopes.ts`), then checks it the same way.
  */
 export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   // --- Auth: establishes the credential, so it cannot require one ----------
@@ -234,7 +236,8 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   // business data, and refusing them would break discovery for every caller.
   api_search_operations: null,
   api_describe_operation: null,
-  api_call_operation: 'api:read',
+  // Resolved per operation at call time (`./executor/scopes.ts`).
+  api_call_operation: null,
 
   // --- Curated-tool dispatcher (the compact listing) -------------------------
   // The search reads tool metadata only. The three dispatchers require nothing
@@ -262,11 +265,11 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   locations_update: 'locations:write',
   settings_get_appointment_calendar: 'locations:read',
   settings_update_appointment_calendar: 'locations:write',
-  settings_get_online_booking: 'locations:read',
-  settings_update_online_booking: 'locations:write',
-  booking_forms_list: 'locations:read',
-  booking_forms_create: 'locations:write',
-  booking_forms_delete: 'locations:write',
+  settings_get_online_booking: 'online_booking:read',
+  settings_update_online_booking: 'online_booking:configure',
+  booking_forms_list: 'online_booking:read',
+  booking_forms_create: 'online_booking:configure',
+  booking_forms_delete: 'online_booking:configure',
   resources_list: 'locations:read',
 
   // --- Team members, positions, schedules ----------------------------------
@@ -279,9 +282,9 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   positions_update: 'team_members:write',
   positions_delete: 'team_members:write',
   schedules_get: 'team_members:read',
-  schedules_create: 'team_members:write',
-  schedules_update: 'team_members:write',
-  schedules_delete: 'team_members:write',
+  schedules_create: 'team_members:schedule',
+  schedules_update: 'team_members:schedule',
+  schedules_delete: 'team_members:schedule',
 
   // --- Access management (dangerous, never implied by team_members:write) ---
   locations_remove_user: 'team_members:manage_access',
@@ -302,7 +305,7 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
 
   // --- Appointments ---------------------------------------------------------
   appointments_list: 'appointments:read',
-  appointments_find_free_slots: 'appointments:read',
+  appointments_find_free_slots: 'availability:read',
   appointments_preview_attendance: 'appointments:read',
   appointments_apply_attendance: 'appointments:write',
   appointments_create: 'appointments:create',
@@ -317,21 +320,22 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   // reading and managing events is `appointments:read` / `:write`, and booking
   // clients creates appointments, which needs the explicit `:create` grant.
   // Duplicating an event can copy its bookings, so it needs both.
-  events_list: 'appointments:read',
-  events_get: 'appointments:read',
-  events_list_dates: 'appointments:read',
-  events_list_services: 'appointments:read',
-  events_list_duplication_strategies: 'appointments:read',
-  events_create: 'appointments:write',
-  events_update: 'appointments:write',
-  events_delete: 'appointments:write',
-  events_duplicate: ['appointments:write', 'appointments:create'],
-  events_create_duplication_strategy: 'appointments:write',
-  events_update_duplication_strategy: 'appointments:write',
-  events_delete_duplication_strategy: 'appointments:write',
-  events_book_clients: 'appointments:create',
-  events_update_appointment: 'appointments:write',
-  events_reschedule_appointment: 'appointments:write',
+  events_list: 'events:read',
+  events_get: 'events:read',
+  events_list_dates: 'events:read',
+  events_list_services: 'events:read',
+  events_list_duplication_strategies: 'events:read',
+  events_create: 'events:write',
+  events_update: 'events:write',
+  events_delete: 'events:write',
+  events_duplicate: 'events:write',
+  events_create_duplication_strategy: 'events:write',
+  events_update_duplication_strategy: 'events:write',
+  events_delete_duplication_strategy: 'events:write',
+  // Booking a client into an event creates an appointment (AP1 action-scope).
+  events_book_clients: ['events:write', 'appointments:create'],
+  events_update_appointment: ['events:write', 'appointments:write'],
+  events_reschedule_appointment: ['events:write', 'appointments:write'],
 
   // --- Memberships -----------------------------------------------------------
   // Membership types and sold memberships belong to a chain, and the v3
@@ -416,7 +420,7 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   payroll_get_calculation: 'payroll:read',
   // A payout is a financial transaction; the V3 preview spec has no payroll
   // write scope.
-  payroll_record_payout: 'finance:write',
+  payroll_record_payout: 'payroll:pay',
 
   // --- Client base ----------------------------------------------------------
   clients_search: 'clients:read',
@@ -481,7 +485,7 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   onboarding_preview_data: null,
   onboarding_add_positions: 'team_members:write',
   onboarding_add_team_members_batch: 'team_members:write',
-  onboarding_set_schedules: 'team_members:write',
+  onboarding_set_schedules: 'team_members:schedule',
   onboarding_add_categories: 'services:write',
   onboarding_add_services_batch: 'services:write',
   onboarding_import_clients: 'clients:write',
@@ -512,6 +516,27 @@ export function requiredScopesFor(toolName: string): readonly ToolScope[] {
   const requirement = TOOL_SCOPES[toolName];
   if (requirement == null) return NO_SCOPES;
   return typeof requirement === 'string' ? [requirement] : requirement;
+}
+
+/** The field-level scope behind `include_contacts: true` (`../contacts.ts`). */
+export const CONTACT_SCOPE: ToolScope = 'clients:read_contact';
+
+/**
+ * What one *call* requires: the tool's own scopes, plus `clients:read_contact`
+ * when the arguments ask for phone and email. Only the boolean `true` opts in,
+ * as the argument schema says; a string is not a request for contacts.
+ */
+export function requiredScopesForCall(
+  toolName: string,
+  args: unknown
+): readonly ToolScope[] {
+  const required = requiredScopesFor(toolName);
+  const wantsContacts =
+    !!args &&
+    typeof args === 'object' &&
+    (args as { include_contacts?: unknown }).include_contacts === true;
+  if (!wantsContacts || required.includes(CONTACT_SCOPE)) return required;
+  return [...required, CONTACT_SCOPE];
 }
 
 // ==========================================================================
@@ -581,9 +606,14 @@ export function scopeSatisfied(
   // v3 vocabulary: the single ratified implication.
   if (action === 'read' && granted.has(`${domain}:write`)) return true;
 
-  // Platform vocabulary: one grade for the whole service.
+  // Platform vocabulary: one grade for the whole service. `read_contact` is
+  // a read in Altegio's own classification (`Scope::operationType()` is
+  // "starts with read", and the read-only consent carries it), so the staff
+  // stack's read grade keeps showing contacts on `include_contacts`.
   if (granted.has(PLATFORM_SCOPE_WRITE)) return true;
-  if (action === 'read' && granted.has(PLATFORM_SCOPE_READ)) return true;
+  if (action.startsWith('read') && granted.has(PLATFORM_SCOPE_READ)) {
+    return true;
+  }
 
   return false;
 }

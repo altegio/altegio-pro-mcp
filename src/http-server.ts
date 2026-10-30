@@ -34,6 +34,8 @@ import {
   HttpSessionBudget,
   type HttpSessionLease,
 } from './utils/http-sessions.js';
+import { oauthDoor } from './auth/oauth-door.js';
+import { oauthOriginFromApiBase } from './auth/oauth-access.js';
 
 const logger = createLogger('http-server');
 
@@ -200,7 +202,8 @@ export function createApp(
   transportsByFacet: Record<FacetKey, TransportRegistry>;
 } {
   const app = express();
-  const env = loadConfig().env;
+  const config = loadConfig();
+  const env = config.env;
   const budget = new HttpSessionBudget(
     options.maxSessions ?? env.MCP_HTTP_MAX_SESSIONS,
     {
@@ -406,6 +409,15 @@ export function createApp(
     res.once('close', record);
     next();
   });
+  // An Altegio OAuth access token is resolved — or challenged — before the
+  // transport sees the request (`./auth/oauth-door.ts`).
+  app.use(
+    oauthDoor({
+      apiBase: config.altegio.apiBase,
+      partnerToken: config.altegio.partnerToken,
+      publicBaseUrl: env.MCP_PUBLIC_BASE_URL,
+    })
+  );
   app.use(express.json({ limit: '17mb' }));
 
   // Health check endpoint
@@ -685,6 +697,9 @@ async function startHTTPServer(): Promise<void> {
     );
     logger.info(
       `Read-only view on /mcp/${READONLY_VIEW}: serves only tools annotated readOnlyHint, and refuses every other tool by name. Addresses named to callers are based on ${config.env.MCP_PUBLIC_BASE_URL}`
+    );
+    logger.info(
+      `Altegio OAuth access tokens (ag_at_) are accepted on the HTTP views and verified against ${oauthOriginFromApiBase(config.altegio.apiBase)}/oauth/accessible-resources; a refused token is answered 401 with resource_metadata`
     );
   });
 }

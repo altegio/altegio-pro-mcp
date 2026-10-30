@@ -39,8 +39,10 @@ import { upstreamDetail } from '../tools/tool-result.js';
 import { v2Path } from '../api/altegio-http.js';
 import { hexColor } from '../utils/color.js';
 import {
+  assertChainAllowed,
   assertCompanyAllowed,
   getRequestCompanyIds,
+  getRequestGrants,
   getRequestIdentity,
   getRequestPartnerToken,
   getRequestUserToken,
@@ -48,6 +50,7 @@ import {
   isCompanyAllowed,
   type RequestIdentity,
 } from '../request-context.js';
+import { isOauthAccessToken, oauthGrantsCache } from '../auth/oauth-access.js';
 
 /**
  * The company (location) ID an Altegio request path targets, if any.
@@ -116,6 +119,18 @@ function companyIdFromPath(endpoint: string): number | undefined {
     }
   }
   return undefined;
+}
+
+/**
+ * The chain a `/chains/{id}/…` path targets. Chains and locations are
+ * separate grants (RFC decision 13), so a chain id must never be compared
+ * against the location set the first-number heuristic above feeds.
+ */
+function chainIdFromPath(endpoint: string): number | undefined {
+  const match = /^\/chains\/(\d+)(?:[/?]|$)/.exec(endpoint);
+  if (!match) return undefined;
+  const id = Number(match[1]);
+  return Number.isInteger(id) && id > 0 ? id : undefined;
 }
 
 /**
@@ -333,10 +348,19 @@ export class AltegioClient {
     // tools, the analytics/clients ports, and the executor — so an out-of-scope
     // company is rejected here regardless of which tool asked (a no-op when no
     // scope was declared).
+    const targetChain =
+      scopedCompanyOverride === undefined
+        ? chainIdFromPath(endpoint)
+        : undefined;
     const targetCompany =
       scopedCompanyOverride === undefined
-        ? companyIdFromPath(endpoint)
+        ? targetChain === undefined
+          ? companyIdFromPath(endpoint)
+          : undefined
         : (scopedCompanyOverride ?? undefined);
+    if (targetChain !== undefined) {
+      assertChainAllowed(targetChain);
+    }
     if (targetCompany !== undefined) {
       assertCompanyAllowed(targetCompany);
     }
@@ -400,8 +424,38 @@ export class AltegioClient {
         }
       }
       noteUpstreamResponse(response.status);
+      if (response.status === 401) this.forgetRefusedToken();
       return response;
     }
+  }
+
+  /**
+   * Altegio refused the request's OAuth access token: drop what this server
+   * remembers about it, so the next HTTP request is challenged at the door
+   * (401 + `WWW-Authenticate`) and the host refreshes or signs in again,
+   * instead of a stale grant serving local state for up to an hour.
+   */
+  private forgetRefusedToken(): void {
+    const token = getRequestUserToken();
+    if (token !== undefined && isOauthAccessToken(token)) {
+      oauthGrantsCache.evict(token);
+    }
+  }
+
+  /**
+   * How the ERP web part is told who is asking. An OAuth access token goes in
+   * the `Authorization` header the RND-1974 bridge reads, together with the
+   * server's own partner token; it is never put in the query, where it would
+   * land in the edge and web-server logs. A legacy `users.hash` keeps the
+   * `user_hash` query parameter the web part has always accepted.
+   */
+  private legacyWebCredential(userToken: string): {
+    header?: string;
+    query?: string;
+  } {
+    return isOauthAccessToken(userToken)
+      ? { header: `Bearer ${this.partnerToken}, User ${userToken}` }
+      : { query: userToken };
   }
 
   /**
@@ -435,7 +489,10 @@ export class AltegioClient {
       const values = Array.isArray(raw) ? raw : [raw];
       for (const value of values) url.searchParams.append(name, String(value));
     }
-    url.searchParams.set('user_hash', userToken);
+    const credential = this.legacyWebCredential(userToken);
+    if (credential.query !== undefined) {
+      url.searchParams.set('user_hash', credential.query);
+    }
 
     let response: Response;
     try {
@@ -444,6 +501,9 @@ export class AltegioClient {
         headers: {
           Accept: 'application/json, text/html, application/vnd.ms-excel',
           'X-Requested-With': 'XMLHttpRequest',
+          ...(credential.header !== undefined
+            ? { Authorization: credential.header }
+            : {}),
         },
         redirect: 'manual',
         credentials: 'omit',
@@ -458,12 +518,14 @@ export class AltegioClient {
     }
 
     if (response.status >= 300 && response.status < 400) {
+      this.forgetRefusedToken();
       throw new AltegioApiError(
         'The legacy analytics report redirected instead of returning data. Refresh the delegated Altegio authentication and retry.',
         401
       );
     }
     if (response.status === 401) {
+      this.forgetRefusedToken();
       throw new AltegioApiError(
         'The delegated Altegio authentication was not accepted by the legacy analytics report. Refresh it and retry.',
         401
@@ -628,6 +690,17 @@ export class AltegioClient {
   ): Promise<{ success: boolean; user_token?: string; error?: string }> {
     const identity = getRequestIdentity();
 
+    // A connection signed in through Altegio OAuth already has its credential;
+    // a password would only add a second, consent-free way in.
+    const requestToken = getRequestUserToken();
+    if (requestToken !== undefined && isOauthAccessToken(requestToken)) {
+      return {
+        success: false,
+        error:
+          'This connection is signed in with Altegio OAuth; a password login is not available here. Reconnect Altegio in your MCP client to sign in as someone else.',
+      };
+    }
+
     // In the HTTP deployment an anonymous request has no identity to key a
     // token by; refuse rather than silently writing a shared token.
     if (identity === null && this.requireDelegatedIdentity) {
@@ -722,7 +795,11 @@ export class AltegioClient {
     // caller explicitly supplies my=0.
     params = { ...params, my: 1 };
     const declaredCompanyIds = getRequestCompanyIds();
-    if (declaredCompanyIds) {
+    // An OAuth consent covers locations the person can already see, so the
+    // documented `my=1` listing filtered below is the right answer; the
+    // per-id fan-out exists for a header-declared scope whose technical user
+    // may not appear in that listing at all.
+    if (declaredCompanyIds && getRequestGrants() === undefined) {
       // A UC2 application's technical user can successfully access a declared
       // location directly while `/locations?my=1` still returns an empty list.
       // The trusted proxy has already bound this request to the declared
@@ -925,12 +1002,21 @@ export class AltegioClient {
     if (!userToken) return null;
 
     const url = new URL(`${this.legacyWebUrl}/personal_account`);
-    url.searchParams.set('user_hash', userToken);
+    const credential = this.legacyWebCredential(userToken);
+    if (credential.query !== undefined) {
+      url.searchParams.set('user_hash', credential.query);
+    }
     let response: Response;
     try {
       response = await fetch(url, {
         method: 'GET',
-        headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' },
+        headers: {
+          Accept: 'text/html',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(credential.header !== undefined
+            ? { Authorization: credential.header }
+            : {}),
+        },
         redirect: 'manual',
         credentials: 'omit',
       });

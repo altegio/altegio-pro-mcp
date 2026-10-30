@@ -5,6 +5,11 @@ import type { ToolResult } from '../tool-result';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { oauthGrantsCache } from '../../auth/oauth-access';
+import {
+  requestContextFromHeaders,
+  runWithContext,
+} from '../../request-context';
 
 /**
  * One value carrying everything the fence is supposed to survive: a forged
@@ -1121,5 +1126,98 @@ describe('Onboarding Handlers', () => {
       const state = await stateManager.load(123);
       expect(state?.phase).toBe('schedules');
     });
+  });
+});
+
+describe('Onboarding status on an Altegio OAuth connection', () => {
+  const TOKEN = 'ag_at_onboarding_status';
+  const nativeFetch = global.fetch;
+  let handlers: OnboardingHandlers;
+  let testDir: string;
+
+  beforeEach(() => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'onboarding-oauth-'));
+    const client = {
+      isAuthenticated: jest.fn().mockReturnValue(true),
+      getLocation: jest.fn().mockResolvedValue({ id: 4564 }),
+    } as unknown as jest.Mocked<AltegioClient>;
+    handlers = new OnboardingHandlers(
+      client,
+      new OnboardingStateManager(testDir)
+    );
+    oauthGrantsCache.clear();
+    oauthGrantsCache.set(TOKEN, {
+      userId: 42,
+      resources: [
+        {
+          type: 'location',
+          id: 4564,
+          mainChainId: null,
+          scopes: new Set(['team_members:write']),
+        },
+      ],
+      locationIds: new Set([4564]),
+      chainIds: new Set(),
+      scopes: new Set(['team_members:write']),
+      fetchedAt: 0,
+    });
+    jest.spyOn(global, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/oauth/accessible-resources')) {
+        return new Response(
+          JSON.stringify({
+            object: 'list',
+            data: [
+              {
+                type: 'location',
+                id: 4564,
+                main_chain_id: null,
+                scopes: ['team_members:write'],
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      if (url.endsWith('/user/data')) {
+        return new Response(
+          JSON.stringify({ success: true, data: { id: 42 } }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }
+        );
+      }
+      return nativeFetch(input, init);
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    oauthGrantsCache.clear();
+    fs.rmSync(testDir, { recursive: true, force: true });
+  });
+
+  const asOauth = <T>(fn: () => Promise<T>) =>
+    runWithContext(
+      requestContextFromHeaders({ 'x-altegio-user-token': TOKEN }),
+      fn
+    );
+
+  it('refuses a checkpoint of a location the consent does not cover', async () => {
+    const result = await asOauth(() => handlers.status({ location_id: 999 }));
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('does not include location 999');
+  });
+
+  it('reads a checkpoint of a covered location after a fresh verdict', async () => {
+    await asOauth(() => handlers.start({ location_id: 4564 }));
+    const result = await asOauth(() => handlers.status({ location_id: 4564 }));
+    expect(result.isError).not.toBe(true);
+    expect(
+      (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+        String(url).includes('/oauth/accessible-resources')
+      ).length
+    ).toBeGreaterThan(0);
   });
 });

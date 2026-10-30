@@ -364,13 +364,15 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
   },
 
   users_get_current: {
-    what: 'the display name the signed-in person typed for themselves',
+    what: 'the display name and email the signed-in person typed for themselves',
     canary: {
       args: {},
       routes: [
         {
           match: /\/user\/data/,
-          body: ok(envelope({ id: 1, name: CANARY, lang: 'pl' })),
+          body: ok(
+            envelope({ id: 1, name: CANARY, email: CANARY, lang: 'pl' })
+          ),
         },
       ],
     },

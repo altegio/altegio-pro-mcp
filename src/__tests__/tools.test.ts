@@ -232,6 +232,7 @@ describe('users_get_current', () => {
       getCurrentUser: jest.fn().mockResolvedValue({
         id: 1884217,
         name: 'Owner',
+        email: ' owner@example.test ',
         lang: 'pt-BR',
         is_approved: true,
         user_token: 'never-shown',
@@ -244,9 +245,15 @@ describe('users_get_current', () => {
     expect(result.structuredContent).toEqual({
       id: 1884217,
       name: 'Owner',
+      email: 'owner@example.test',
       language: 'pt',
       is_approved: true,
     });
+    const [summary, block] = (result.content[0]?.text ?? '').split(
+      '<<<UNTRUSTED'
+    );
+    expect(summary).not.toContain('owner@example.test');
+    expect(block).toContain('owner@example.test');
     expect(result.content[0]?.text).toContain(
       'Altegio interface language: pt.'
     );
@@ -266,6 +273,7 @@ describe('users_get_current', () => {
     expect(result.structuredContent).toEqual({
       id: 5,
       name: null,
+      email: null,
       language: 'pl',
       is_approved: null,
     });
@@ -283,6 +291,7 @@ describe('users_get_current', () => {
     expect(result.structuredContent).toEqual({
       id: 5,
       name: null,
+      email: null,
       language: null,
       is_approved: null,
     });

@@ -35,6 +35,7 @@ import { majorOf } from '../money.js';
 import { httpFromClient, type AltegioHttp } from '../altegio-http.js';
 import type { AltegioClient } from '../../providers/altegio-client.js';
 import { v1Read, type V1CallOptions, type V1Envelope } from './envelope.js';
+import { isChainAllowed } from '../../request-context.js';
 import {
   MembershipsNotFoundError,
   mapMembershipsHttpError,
@@ -444,7 +445,11 @@ export class MembershipsAdapter implements MembershipsApi {
 
   async listChains(): Promise<ChainAccess[]> {
     const { data } = await this.call('/chains', 'list the chains');
-    return rows(data).map(chainFromWire);
+    // The API lists every chain the person can see; the consent may cover
+    // fewer, and a chain outside it must not even be named.
+    return rows(data)
+      .map(chainFromWire)
+      .filter((chain) => isChainAllowed(chain.id));
   }
 
   async listTypes(
@@ -646,6 +651,7 @@ export class MembershipsAdapter implements MembershipsApi {
       `list the memberships of client ${clientId} in location ${locationId}`,
       {
         query: { location_id: locationId, phone, chain_id: chainId },
+        scopedCompany: locationId,
         hints: {
           forbidden:
             'Ask a location owner for access to loyalty in this location, or call locations_list to pick another location.',

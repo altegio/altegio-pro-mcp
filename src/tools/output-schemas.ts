@@ -49,6 +49,7 @@ export const currentUserOutput = entitySchema(
   {
     id: idProp,
     name: nullableStrProp,
+    email: nullableStrProp,
     language: nullableStrProp,
     is_approved: nullableBoolProp,
   },

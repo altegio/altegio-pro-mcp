@@ -12,6 +12,8 @@ import {
   type UntrustedField,
 } from './tool-result.js';
 import { notSignedIn } from '../api/http-failure.js';
+import { assertOauthTokenLive } from '../auth/oauth-door.js';
+import { assertCompanyAllowed } from '../request-context.js';
 import {
   seatChoiceRefusal,
   type MissingSeatChoice,
@@ -300,11 +302,22 @@ export class OnboardingHandlers {
     });
   }
 
+  /**
+   * A checkpoint is local state: nothing upstream refuses it. Confine it to
+   * the consent (the location must be covered) and, on an OAuth connection,
+   * to a token Altegio still accepts.
+   */
+  private async requireLocalStateAccess(locationId: number): Promise<void> {
+    await assertOauthTokenLive();
+    assertCompanyAllowed(locationId);
+  }
+
   async resume(args: unknown) {
     return withErrorHandling('onboarding_resume', async () => {
       this.requireAuth();
 
       const { location_id } = LocationIdSchema.parse(args);
+      await this.requireLocalStateAccess(location_id);
       const state = await this.stateManager.load(location_id);
 
       if (!state) {
@@ -345,6 +358,7 @@ export class OnboardingHandlers {
       this.requireAuth();
 
       const { location_id } = LocationIdSchema.parse(args);
+      await this.requireLocalStateAccess(location_id);
       const state = await this.stateManager.load(location_id);
 
       if (!state) {

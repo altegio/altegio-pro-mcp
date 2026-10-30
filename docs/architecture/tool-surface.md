@@ -56,17 +56,17 @@ Served tools per category, in `tools/list` order:
 
 | View | Address | Lists (of 177 defined) | Reaches | `tools/list` bytes | Budget (used) | Reasons |
 | --- | --- | --- | --- | --- | --- | --- |
-| `all` | stdio (no HTTP route) | 167 | 167 | 220,610 | — | all ×167, -off ×6, -cmp ×4 |
-| `default` | `/mcp` | 37 | 168 | 50,915 | 53,500 (95 %) | disp ×131, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
-| `full` | `/mcp/full` | 101 | 101 | 126,177 | 132,500 (95 %) | dflt ×97, -low ×34, -pack ×29, -off ×6, -cmp ×4, base ×3, -pwd ×2, -name ×1, xtra ×1 |
-| `readonly` | `/mcp/readonly` | 85 | 85 | 117,813 | 123,000 (96 %) | ro ×85, -write ×80, -off ×6, -cmp ×4, -pwd ×2 |
-| `compact` | `/mcp/compact` | 37 | 168 | 50,915 | 53,500 (95 %) | disp ×131, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
-| `ops` | `/mcp/ops` | 53 | 53 | 71,252 | 74,500 (96 %) | - ×112, pfx ×27, rule ×23, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
-| `catalog` | `/mcp/catalog` | 38 | 38 | 28,721 | 30,000 (96 %) | - ×127, rule ×35, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
-| `finance` | `/mcp/finance` | 67 | 67 | 114,250 | 118,000 (97 %) | - ×98, pfx ×60, -off ×6, -cmp ×4, rule ×4, base ×3, -pwd ×2 |
-| `marketing` | `/mcp/marketing` | 17 | 17 | 22,856 | 24,000 (95 %) | - ×148, pfx ×13, -off ×6, -cmp ×4, base ×3, -pwd ×2, rule ×1 |
-| `analytics` | `/mcp/analytics` | 33 | 33 | 62,445 | 66,000 (95 %) | - ×132, pfx ×30, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
-| `onboarding` | `/mcp/onboarding` | 15 | 15 | 12,387 | 13,500 (92 %) | - ×150, pfx ×12, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
+| `all` | stdio (no HTTP route) | 167 | 167 | 220,617 | — | all ×167, -off ×6, -cmp ×4 |
+| `default` | `/mcp` | 37 | 168 | 50,922 | 53,500 (95 %) | disp ×131, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
+| `full` | `/mcp/full` | 101 | 101 | 126,184 | 132,500 (95 %) | dflt ×97, -low ×34, -pack ×29, -off ×6, -cmp ×4, base ×3, -pwd ×2, -name ×1, xtra ×1 |
+| `readonly` | `/mcp/readonly` | 85 | 85 | 117,820 | 123,000 (96 %) | ro ×85, -write ×80, -off ×6, -cmp ×4, -pwd ×2 |
+| `compact` | `/mcp/compact` | 37 | 168 | 50,922 | 53,500 (95 %) | disp ×131, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
+| `ops` | `/mcp/ops` | 53 | 53 | 71,259 | 74,500 (96 %) | - ×112, pfx ×27, rule ×23, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
+| `catalog` | `/mcp/catalog` | 38 | 38 | 28,728 | 30,000 (96 %) | - ×127, rule ×35, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
+| `finance` | `/mcp/finance` | 67 | 67 | 114,257 | 118,000 (97 %) | - ×98, pfx ×60, -off ×6, -cmp ×4, rule ×4, base ×3, -pwd ×2 |
+| `marketing` | `/mcp/marketing` | 17 | 17 | 22,863 | 24,000 (95 %) | - ×148, pfx ×13, -off ×6, -cmp ×4, base ×3, -pwd ×2, rule ×1 |
+| `analytics` | `/mcp/analytics` | 33 | 33 | 62,452 | 66,000 (95 %) | - ×132, pfx ×30, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
+| `onboarding` | `/mcp/onboarding` | 15 | 15 | 12,394 | 13,500 (92 %) | - ×150, pfx ×12, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
 
 `tools/list` bytes is the serialized result the view sends in the default
 deployment — what a host that loads the whole list pays on every connection,
@@ -150,7 +150,7 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 
 | Tool | stdio | /mcp | /full | /readonly | /compact | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `api_call_operation` | `all` | `list` | `dflt` | `ro` | `list` | `-` | `-` | `-` | `-` | `-` | `-` | api:read, reads-only |
+| `api_call_operation` | `all` | `list` | `dflt` | `ro` | `list` | `-` | `-` | `-` | `-` | `-` | `-` | reads-only |
 | `api_describe_operation` | `all` | `list` | `dflt` | `ro` | `list` | `-` | `-` | `-` | `-` | `-` | `-` | — |
 | `api_search_operations` | `all` | `list` | `dflt` | `ro` | `list` | `-` | `-` | `-` | `-` | `-` | `-` | — |
 
@@ -203,7 +203,7 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | `appointments_create` | `all` | `list` | `dflt` | `-write` | `list` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:create |
 | `appointments_create_tag` | `all` | `disp` | `dflt` | `-write` | `disp` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:write |
 | `appointments_delete` | `all` | `list` | `dflt` | `-write` | `list` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:write, confirm |
-| `appointments_find_free_slots` | `all` | `list` | `dflt` | `ro` | `list` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:read |
+| `appointments_find_free_slots` | `all` | `list` | `dflt` | `ro` | `list` | `rule` | `-` | `-` | `-` | `-` | `-` | availability:read |
 | `appointments_get_consumables` | `all` | `disp` | `dflt` | `ro` | `disp` | `rule` | `-` | `rule` | `-` | `-` | `-` | appointments:read + inventory:read |
 | `appointments_list` | `all` | `list` | `dflt` | `ro` | `list` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:read |
 | `appointments_list_tags` | `all` | `disp` | `dflt` | `ro` | `disp` | `rule` | `-` | `-` | `-` | `-` | `-` | appointments:read |
@@ -239,21 +239,21 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 
 | Tool | stdio | /mcp | /full | /readonly | /compact | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `events_book_clients` | `all` | `list` | `dflt` | `-write` | `list` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:create |
-| `events_create` | `all` | `disp` | `dflt` | `-write` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write |
-| `events_create_duplication_strategy` | `all` | `disp` | `-low` | `-write` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write |
-| `events_delete` | `all` | `disp` | `dflt` | `-write` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write, confirm |
-| `events_delete_duplication_strategy` | `all` | `disp` | `-low` | `-write` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write, confirm |
-| `events_duplicate` | `all` | `disp` | `dflt` | `-write` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write + appointments:create |
-| `events_get` | `all` | `list` | `dflt` | `ro` | `list` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:read |
-| `events_list` | `all` | `disp` | `dflt` | `ro` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:read |
-| `events_list_dates` | `all` | `disp` | `dflt` | `ro` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:read |
-| `events_list_duplication_strategies` | `all` | `disp` | `-low` | `ro` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:read |
-| `events_list_services` | `all` | `disp` | `dflt` | `ro` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:read |
-| `events_reschedule_appointment` | `all` | `disp` | `dflt` | `-write` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write |
-| `events_update` | `all` | `disp` | `dflt` | `-write` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write |
-| `events_update_appointment` | `all` | `disp` | `dflt` | `-write` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write |
-| `events_update_duplication_strategy` | `all` | `disp` | `-low` | `-write` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | appointments:write |
+| `events_book_clients` | `all` | `list` | `dflt` | `-write` | `list` | `pfx` | `-` | `-` | `-` | `-` | `-` | events:write + appointments:create |
+| `events_create` | `all` | `disp` | `dflt` | `-write` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | events:write |
+| `events_create_duplication_strategy` | `all` | `disp` | `-low` | `-write` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | events:write |
+| `events_delete` | `all` | `disp` | `dflt` | `-write` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | events:write, confirm |
+| `events_delete_duplication_strategy` | `all` | `disp` | `-low` | `-write` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | events:write, confirm |
+| `events_duplicate` | `all` | `disp` | `dflt` | `-write` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | events:write |
+| `events_get` | `all` | `list` | `dflt` | `ro` | `list` | `pfx` | `-` | `-` | `-` | `-` | `-` | events:read |
+| `events_list` | `all` | `disp` | `dflt` | `ro` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | events:read |
+| `events_list_dates` | `all` | `disp` | `dflt` | `ro` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | events:read |
+| `events_list_duplication_strategies` | `all` | `disp` | `-low` | `ro` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | events:read |
+| `events_list_services` | `all` | `disp` | `dflt` | `ro` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | events:read |
+| `events_reschedule_appointment` | `all` | `disp` | `dflt` | `-write` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | events:write + appointments:write |
+| `events_update` | `all` | `disp` | `dflt` | `-write` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | events:write |
+| `events_update_appointment` | `all` | `disp` | `dflt` | `-write` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | events:write + appointments:write |
+| `events_update_duplication_strategy` | `all` | `disp` | `-low` | `-write` | `disp` | `pfx` | `-` | `-` | `-` | `-` | `-` | events:write |
 
 ### Feedback
 
@@ -334,7 +334,7 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | `onboarding_preview_data` | `all` | `disp` | `-low` | `ro` | `disp` | `-` | `-` | `-` | `-` | `-` | `pfx` | — |
 | `onboarding_resume` | `all` | `disp` | `-low` | `ro` | `disp` | `-` | `-` | `-` | `-` | `-` | `pfx` | — |
 | `onboarding_rollback_phase` | `all` | `disp` | `-low` | `-write` | `disp` | `-` | `-` | `-` | `-` | `-` | `pfx` | team_members:write + services:write + clients:write + appointments:write, confirm |
-| `onboarding_set_schedules` | `all` | `disp` | `-low` | `-write` | `disp` | `-` | `-` | `-` | `-` | `-` | `pfx` | team_members:write |
+| `onboarding_set_schedules` | `all` | `disp` | `-low` | `-write` | `disp` | `-` | `-` | `-` | `-` | `-` | `pfx` | team_members:schedule |
 | `onboarding_start` | `all` | `disp` | `-low` | `-write` | `disp` | `-` | `-` | `-` | `-` | `-` | `pfx` | — |
 | `onboarding_status` | `all` | `disp` | `-low` | `ro` | `disp` | `-` | `-` | `-` | `-` | `-` | `pfx` | — |
 
@@ -343,7 +343,7 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | Tool | stdio | /mcp | /full | /readonly | /compact | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `payroll_get_calculation` | `all` | `list` | `dflt` | `ro` | `list` | `-` | `-` | `pfx` | `-` | `-` | `-` | payroll:read |
-| `payroll_record_payout` | `all` | `disp` | `dflt` | `-write` | `disp` | `-` | `-` | `pfx` | `-` | `-` | `-` | finance:write, confirm |
+| `payroll_record_payout` | `all` | `disp` | `dflt` | `-write` | `disp` | `-` | `-` | `pfx` | `-` | `-` | `-` | payroll:pay, confirm |
 
 ### Positions
 
@@ -364,10 +364,10 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 
 | Tool | stdio | /mcp | /full | /readonly | /compact | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `schedules_create` | `all` | `list` | `dflt` | `-write` | `list` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write |
-| `schedules_delete` | `all` | `disp` | `dflt` | `-write` | `disp` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write, confirm |
+| `schedules_create` | `all` | `list` | `dflt` | `-write` | `list` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:schedule |
+| `schedules_delete` | `all` | `disp` | `dflt` | `-write` | `disp` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:schedule, confirm |
 | `schedules_get` | `all` | `list` | `dflt` | `ro` | `list` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:read |
-| `schedules_update` | `all` | `disp` | `dflt` | `-write` | `disp` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:write |
+| `schedules_update` | `all` | `disp` | `dflt` | `-write` | `disp` | `-` | `rule` | `-` | `-` | `-` | `-` | team_members:schedule |
 
 ### Service categories
 
@@ -395,13 +395,13 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 
 | Tool | stdio | /mcp | /full | /readonly | /compact | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `booking_forms_create` | `all` | `disp` | `-low` | `-write` | `disp` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write |
-| `booking_forms_delete` | `all` | `disp` | `-low` | `-write` | `disp` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write, confirm |
-| `booking_forms_list` | `all` | `disp` | `dflt` | `ro` | `disp` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
+| `booking_forms_create` | `all` | `disp` | `-low` | `-write` | `disp` | `-` | `rule` | `-` | `-` | `-` | `-` | online_booking:configure |
+| `booking_forms_delete` | `all` | `disp` | `-low` | `-write` | `disp` | `-` | `rule` | `-` | `-` | `-` | `-` | online_booking:configure, confirm |
+| `booking_forms_list` | `all` | `disp` | `dflt` | `ro` | `disp` | `-` | `rule` | `-` | `-` | `-` | `-` | online_booking:read |
 | `settings_get_appointment_calendar` | `all` | `disp` | `dflt` | `ro` | `disp` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
-| `settings_get_online_booking` | `all` | `disp` | `dflt` | `ro` | `disp` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:read |
+| `settings_get_online_booking` | `all` | `disp` | `dflt` | `ro` | `disp` | `-` | `rule` | `-` | `-` | `-` | `-` | online_booking:read |
 | `settings_update_appointment_calendar` | `all` | `disp` | `dflt` | `-write` | `disp` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write |
-| `settings_update_online_booking` | `all` | `disp` | `dflt` | `-write` | `disp` | `-` | `rule` | `-` | `-` | `-` | `-` | locations:write |
+| `settings_update_online_booking` | `all` | `disp` | `dflt` | `-write` | `disp` | `-` | `rule` | `-` | `-` | `-` | `-` | online_booking:configure |
 
 ### Team members
 

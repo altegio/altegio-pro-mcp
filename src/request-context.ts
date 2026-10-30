@@ -16,6 +16,12 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import crypto from 'node:crypto';
 import { createLogger } from './utils/logger.js';
 import { AltegioApiError } from './utils/errors.js';
+import {
+  isOauthAccessToken,
+  oauthGrantsCache,
+  type OauthGrants,
+} from './auth/oauth-access.js';
+import { missingScopes, type ToolScope } from './tools/scopes.js';
 
 const logger = createLogger('request-context');
 
@@ -228,13 +234,55 @@ export interface RequestContext {
   companyIds?: ReadonlySet<number>;
   /** Trusted OAuth grants forwarded by the proxy, independent of identity. */
   scopes?: ReadonlySet<string>;
+  /**
+   * What an Altegio OAuth access token (`ag_at_…`) may do, resolved by the
+   * HTTP door and kept per token (`src/auth/oauth-access.ts`). When present,
+   * `companyIds` and `scopes` are derived from it and nothing the proxy or
+   * the client sent in headers can widen them.
+   */
+  grants?: OauthGrants;
+  /**
+   * The request names its locations in `X-Altegio-Company-Id` on top of an
+   * access token: `companyIds` is then the part of the grants it named, and
+   * no chain is reachable. An embedding that shares one token across
+   * locations (the analytics agent's chat) confines each request this way.
+   */
+  declaresLocations?: boolean;
 }
 
-/** Build the complete request context from HTTP headers in one place. */
+/**
+ * Build the complete request context from HTTP headers in one place.
+ *
+ * An Altegio OAuth access token is the whole credential: its grants decide
+ * the locations, chains and scopes, and a token whose grants are not known
+ * (the door did not run, or the entry expired) confines the request to
+ * nothing rather than to everything. The proxy's `x-mcp-auth-scope` is
+ * ignored for it; the caller's `X-Altegio-Company-Id` can only narrow it — to
+ * the granted locations it names, with every chain out of reach — never
+ * widen it.
+ */
 export function requestContextFromHeaders(headers: HeaderBag): RequestContext {
+  const identity = parseIdentityHeaders(headers);
+  const userToken = parseUserToken(headers);
+  if (userToken !== undefined && isOauthAccessToken(userToken)) {
+    const grants = oauthGrantsCache.get(userToken);
+    const granted = grants?.locationIds ?? new Set<number>();
+    const declared = parseCompanyIds(headers);
+    return {
+      identity,
+      userToken,
+      grants,
+      companyIds:
+        declared === undefined
+          ? granted
+          : new Set([...granted].filter((id) => declared.has(id))),
+      scopes: grants?.scopes ?? new Set<string>(),
+      ...(declared === undefined ? {} : { declaresLocations: true }),
+    };
+  }
   return {
-    identity: parseIdentityHeaders(headers),
-    userToken: parseUserToken(headers),
+    identity,
+    userToken,
     partnerToken: parsePartnerToken(headers),
     companyIds: parseCompanyIds(headers),
     scopes: parseScopes(headerValue(headers, 'x-mcp-auth-scope')),
@@ -242,6 +290,133 @@ export function requestContextFromHeaders(headers: HeaderBag): RequestContext {
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();
+
+/** The scopes the running tool call requires, bound by the registry. */
+const requiredScopesStorage = new AsyncLocalStorage<readonly ToolScope[]>();
+
+/**
+ * Run `fn` with the scopes the current tool call requires bound, so the API
+ * client can check them against the grant of the resource a call reaches —
+ * the registry gate only knows the union across resources.
+ */
+export function runWithRequiredScopes<T>(
+  scopes: readonly string[],
+  fn: () => T
+): T {
+  return requiredScopesStorage.run(scopes as readonly ToolScope[], fn);
+}
+
+/** The scopes the running tool call requires; `[]` outside a tool call. */
+export function getRequiredScopes(): readonly ToolScope[] {
+  return requiredScopesStorage.getStore() ?? [];
+}
+
+/** The grants of the current request's Altegio access token, if any. */
+export function getRequestGrants(): OauthGrants | undefined {
+  return storage.getStore()?.grants;
+}
+
+/**
+ * The locations a request confined itself to with `X-Altegio-Company-Id`, or
+ * `undefined` when it did not. For an access token the set is already cut down
+ * to the consent.
+ */
+function declaredLocations(): ReadonlySet<number> | undefined {
+  const context = storage.getStore();
+  if (context?.grants) {
+    return context.declaresLocations
+      ? (context.companyIds ?? new Set<number>())
+      : undefined;
+  }
+  return context?.companyIds;
+}
+
+/** Whether the request named its locations with `X-Altegio-Company-Id`. */
+export function hasDeclaredLocations(): boolean {
+  return declaredLocations() !== undefined;
+}
+
+function confinement(allowed: ReadonlySet<number>): string {
+  if (allowed.size === 0) {
+    return getRequestGrants()
+      ? "This request is confined by X-Altegio-Company-Id to no location this connection's Altegio consent covers"
+      : 'This request is confined by X-Altegio-Company-Id to no valid location';
+  }
+  const list = [...allowed].sort((a, b) => a - b).join(', ');
+  return `This request is confined to location${allowed.size === 1 ? '' : 's'} ${list} by X-Altegio-Company-Id`;
+}
+
+/**
+ * Whether `chainId` is covered by the current request. `false` for every chain
+ * once a request names its locations with `X-Altegio-Company-Id`: a chain-level
+ * call reaches every location of the chain. Otherwise `true` without grants,
+ * and the consent decides with them.
+ */
+export function isChainAllowed(chainId: number): boolean {
+  if (declaredLocations() !== undefined) return false;
+  const grants = getRequestGrants();
+  return grants === undefined || grants.chainIds.has(chainId);
+}
+
+/**
+ * Refuse a list of locations that reaches outside the consent — for a write
+ * that attaches locations in its body (a membership type's `location_ids`)
+ * where the path names only the chain. Membership only: the scopes of the
+ * call belong to the chain, not to each location.
+ */
+export function assertCompaniesAllowed(companyIds: readonly number[]): void {
+  const declared = declaredLocations();
+  if (declared !== undefined) {
+    const undeclared = companyIds.filter((id) => !declared.has(id));
+    if (undeclared.length > 0) {
+      throw new AltegioApiError(
+        `${confinement(declared)}; location${undeclared.length === 1 ? '' : 's'} ` +
+          `${undeclared.join(', ')} ${undeclared.length === 1 ? 'is' : 'are'} outside it.`,
+        403
+      );
+    }
+  }
+  const grants = getRequestGrants();
+  if (grants === undefined) return;
+  const outside = companyIds.filter((id) => !grants.locationIds.has(id));
+  if (outside.length === 0) return;
+  throw new AltegioApiError(
+    `This connection's Altegio consent does not include location${outside.length === 1 ? '' : 's'} ` +
+      `${outside.join(', ')}. Call locations_list for the locations it covers.`,
+    403
+  );
+}
+
+/** Refuse a chain the consent does not cover (`/chains/{id}/…` calls). */
+export function assertChainAllowed(chainId: number): void {
+  const declared = declaredLocations();
+  if (declared !== undefined) {
+    throw new AltegioApiError(
+      `${confinement(declared)}, so chain ${chainId} cannot be read: a chain-level call reaches every location of the chain.`,
+      403
+    );
+  }
+  const grants = getRequestGrants();
+  if (grants === undefined) return;
+  const resource = grants.resources.find(
+    (r) => r.type === 'chain' && r.id === chainId
+  );
+  if (!resource) {
+    throw new AltegioApiError(
+      `This connection's Altegio consent does not include chain ${chainId}. ` +
+        `Reconnect with access to that chain to work with it.`,
+      403
+    );
+  }
+  const missing = missingScopes(resource.scopes, getRequiredScopes());
+  if (missing.length > 0) {
+    throw new AltegioApiError(
+      `This connection's Altegio consent covers chain ${chainId} without the ` +
+        `permission${missing.length === 1 ? '' : 's'} this call needs: ${missing.join(', ')}.`,
+      403
+    );
+  }
+}
 
 /**
  * Run `fn` with a full request context (identity + optional direct token)
@@ -324,6 +499,42 @@ export function isCompanyAllowed(companyId: number): boolean {
  * confined without having to remember to add a check.
  */
 export function assertCompanyAllowed(companyId: number): void {
+  const context = storage.getStore();
+  if (context?.grants) {
+    const declared = declaredLocations();
+    if (declared !== undefined && !declared.has(companyId)) {
+      throw new AltegioApiError(
+        `${confinement(declared)}; location ${companyId} is outside it.`,
+        403
+      );
+    }
+    const resource = context.grants.resources.find(
+      (r) => r.type === 'location' && r.id === companyId
+    );
+    if (!resource) {
+      throw new AltegioApiError(
+        `This connection's Altegio consent does not include location ${companyId}. ` +
+          `Call locations_list for the locations it covers, or reconnect with access to this one.`,
+        403
+      );
+    }
+    const missing = missingScopes(resource.scopes, getRequiredScopes());
+    if (missing.length > 0) {
+      throw new AltegioApiError(
+        `This connection's Altegio consent covers location ${companyId} without the ` +
+          `permission${missing.length === 1 ? '' : 's'} this call needs: ${missing.join(', ')}. ` +
+          `The person who connected has to re-authorise with ${missing.length === 1 ? 'it' : 'them'} in that location.`,
+        403
+      );
+    }
+    return;
+  }
+  if (context?.userToken && isOauthAccessToken(context.userToken)) {
+    throw new AltegioApiError(
+      'This request is scoped to no valid companies: the Altegio access token has no known grants. Reconnect Altegio in your MCP client and retry.',
+      403
+    );
+  }
   const scope = getRequestCompanyIds();
   if (scope !== undefined && !scope.has(companyId)) {
     if (scope.size === 0) {
@@ -411,6 +622,8 @@ export function getRequestScopes(): ReadonlySet<string> | undefined {
 export function requestPrincipalKey(): string | undefined {
   const context = storage.getStore();
   if (context === undefined) return undefined;
+  // An access token rotates every hour; the person behind it does not.
+  if (context.grants) return `altegio-user-${context.grants.userId}`;
   if (context.userToken) {
     return `token-${crypto
       .createHash('sha256')

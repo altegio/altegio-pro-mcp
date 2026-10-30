@@ -456,6 +456,7 @@ export class FinanceAdapter implements FinanceApi {
             forbidden:
               'Reading the payments of a document needs the Finances access rights at the location; ask the location owner for them.',
           },
+          scopedCompany: locationId,
         }
       ),
       this.zoneOf(locationId),

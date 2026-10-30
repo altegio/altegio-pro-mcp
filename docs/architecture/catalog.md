@@ -171,7 +171,9 @@ tool already owns.
   JSON:API document. Under a declared location scope it also requires and
   validates an explicit `location_id`, `company_id` or `salon_id`; chain-level,
   entity-only and company-less reads are refused because a numeric URL segment
-  is not proof of location ownership.
+  is not proof of location ownership. When the scope comes from
+  `X-Altegio-Company-Id`, an operation that names a `chain_id` next to the
+  location is refused too.
 - `budget.ts` — the overlay `projection` allowlist and the result size budget.
 
 `src/tools/definitions/executor.tools.ts` wraps those in three `defineTool`

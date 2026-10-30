@@ -6,6 +6,68 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — Altegio OAuth access tokens on the HTTP surface (RND-1975)
+
+- A connection made through Altegio's own authorization server sends an
+  `ag_at_…` access token; the server resolves it once per token with
+  `GET /oauth/accessible-resources` and `GET /api/v1/user/data`, keeps the
+  answer for an hour and forgets it the moment Altegio refuses the token.
+  A refused token is answered `401` with `WWW-Authenticate … resource_metadata`
+  naming the proxy's protected-resource document; an Altegio outage `503`.
+- Every API call is confined to the consent at the transport: a location or
+  chain outside it, or inside it without the permission the call needs, is
+  refused before anything is sent. `/chains/{id}/…` paths are checked against
+  the chain grants instead of being mistaken for a location; reads whose path
+  does not name the location (`/loyalty/abonements`, document reads by id)
+  pass it explicitly. `locations_list` and `memberships_list_chains` list only
+  what the consent covers. `x-mcp-auth-scope` from the proxy is ignored for an
+  access token.
+- The scope map follows the Altegio catalog: `events_*` require `events:*`,
+  schedules `team_members:schedule`, payouts `payroll:pay`, online-booking
+  settings `online_booking:*`, free slots `availability:read`. The executor's
+  invented `api:read` is gone; `api_call_operation` requires the read scope of
+  the operation's catalog domain, at its level: a read addressed by `chain_id`
+  needs the chain scope of its domain (`chain_clients:read`,
+  `chain_loyalty:read`, `chain_services:read`, `chain_client_accounts:read`)
+  and is confined by the chain grant. `clients:read_contact` is required
+  whenever a call passes `include_contacts: true`; the staff stack's
+  `mcp:pro:read` covers it, as Altegio files `read_contact` under reads.
+- `memberships_create_type` and `memberships_update_type` refuse
+  `location_ids` outside the consent. The `tool_call` log line carries
+  `principal` — `altegio-user-<id>` on an OAuth connection, a token or
+  identity hash otherwise — so usage can be counted per person.
+- Stored report CSVs and onboarding checkpoints are served only after a fresh
+  verdict on the token and only for a covered location; `onboarding_status`
+  and `onboarding_resume` no longer read a checkpoint of a location outside the
+  consent.
+- The ERP web reports and `/personal_account` take the token in
+  `Authorization: Bearer <partner>, User ag_at_…` (RND-1974); `user_hash` is
+  never sent for an access token. A password login is refused on such a
+  connection. Local state is keyed by the Altegio user, so a rotated token
+  keeps its reports and checkpoints.
+- `X-Altegio-Company-Id` narrows an access token's grants instead of being
+  ignored: a request sees only the granted locations it names, every other
+  location is refused before any call and listed nowhere, and no chain-level
+  read is allowed. It never widens the consent. The analytics agent's
+  embedded chat shares one token across locations and relies on it.
+- The same header now confines a `users.hash` request the same way: every
+  chain-level call is refused (`/chains/{id}/…`, `/deposits/chain/{id}`, the
+  membership tools that read a chain), a membership type's `location_ids`
+  must stay inside the named locations, and an executor operation that names
+  a chain next to a location is refused. Before, such a request was confined
+  by location only, so a chain read could reach other locations of the chain.
+- `users_get_current` returns the signed-in person's email next to the name.
+  An access token carries no identity claims, so the analytics agent reads
+  the owner's profile from this tool after Altegio sign-in. The email is the
+  person's own writing and comes back inside the untrusted block.
+- A refused token on a section of Pro (`/mcp/analytics`) is challenged with
+  the protected-resource document of that section (`/pro/analytics`), the
+  address the host connected to.
+- A request admitted on an access token answers with `X-Altegio-User-Id`
+  and, when Altegio names one, `X-Altegio-User-Email`. The proxy cannot read
+  the token: it logs the id as the request's subject, keeps the e-mail for
+  the usage reports and strips both before the response reaches the host.
+
 ### Security
 
 - Updates for advisories published on 2026-10-23: `zod` 4.6.7 (memory
