@@ -41,6 +41,7 @@ import {
   type UntrustedField,
 } from '../tool-result.js';
 import { elsewhereClause } from '../serving-view.js';
+import { curatedToolInstruction } from '../dispatch.js';
 import { CONTACTS_WITHHELD_NOTICE } from '../contacts.js';
 import {
   QUERY_ALIASES,
@@ -522,11 +523,16 @@ function reportedPath(
 export function assertCallable(op: CatalogOperation): void {
   if (op.method !== 'GET') {
     const curated = op.curation?.tool_name;
+    const elsewhere = curated ? elsewhereClause(curated) : undefined;
     throw new ExecutorRefusalError(
       `\`${op.operationId}\` is a ${op.method} operation and will not be executed: ` +
         'writes are available through curated tools; executor writes require the ' +
         'allowlist from ADR-001 D2.' +
-        (curated ? ` Use the curated tool \`${curated}\`.` : ''),
+        (!curated
+          ? ''
+          : elsewhere === undefined
+            ? ` ${curatedToolInstruction(curated)}`
+            : ` The curated tool \`${curated}\` performs it, but this address does not serve it; ${elsewhere}.`),
       { operationId: op.operationId, method: op.method }
     );
   }

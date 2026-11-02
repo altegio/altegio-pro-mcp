@@ -954,6 +954,88 @@ describe('names on a view', () => {
     await client.close();
   });
 
+  describe('a write whose curated tool the caller may lack', () => {
+    // A host keeps the tool list it fetched: a ChatGPT or Codex app listed
+    // 94 tools from early October, without visits_add_payment or the
+    // dispatcher, and reported payments as missing (2026-11-02).
+    const PAYMENT = 'create_payment_with_loyalty_methods';
+    const REFRESH = 'refresh this app’s tools';
+
+    it('names the dispatcher on the compact listing, and what to do without it', async () => {
+      const client = await connect();
+      const text = textOf(
+        await client.callTool({
+          name: 'api_describe_operation',
+          arguments: { operation_id: PAYMENT },
+        })
+      );
+      expect(text).toContain(
+        'Use the curated tool `visits_add_payment` through `tools_call_write` (tool: "visits_add_payment"). If `tools_call_write` is not among your tools, your app holds a tool list from an older release of this server'
+      );
+      expect(text).toContain(REFRESH);
+      await client.close();
+    });
+
+    it('names the tool itself where the view lists it', async () => {
+      const client = await connect(FULL_VIEW);
+      const text = textOf(
+        await client.callTool({
+          name: 'api_describe_operation',
+          arguments: { operation_id: PAYMENT },
+        })
+      );
+      expect(text).toContain(
+        'Use the curated tool `visits_add_payment`. If it is not among your tools,'
+      );
+      await client.close();
+    });
+
+    it('says it on the executor refusal and under a search with a write', async () => {
+      const client = await connect();
+      const refusal = textOf(
+        await client.callTool({
+          name: 'api_call_operation',
+          arguments: { operation_id: PAYMENT, location_id: 1 },
+        })
+      );
+      expect(refusal).toContain('through `tools_call_write`');
+      expect(refusal).toContain(REFRESH);
+      const search = textOf(
+        await client.callTool({
+          name: 'api_search_operations',
+          arguments: { query: PAYMENT, method: 'POST' },
+        })
+      );
+      expect(search).toContain(
+        'A write runs only through its curated tool (or the dispatcher tools_search names for it).'
+      );
+      expect(search).toContain(REFRESH);
+      const reads = textOf(
+        await client.callTool({
+          name: 'api_search_operations',
+          arguments: { query: 'list services', method: 'GET' },
+        })
+      );
+      expect(reads).not.toContain(REFRESH);
+      await client.close();
+    });
+
+    it('sends the read-only view elsewhere instead', async () => {
+      const client = await connect(READONLY_VIEW);
+      const text = textOf(
+        await client.callTool({
+          name: 'api_call_operation',
+          arguments: { operation_id: PAYMENT, location_id: 1 },
+        })
+      );
+      expect(text).toContain(
+        'The curated tool `visits_add_payment` performs it, but this address does not serve it;'
+      );
+      expect(text).not.toContain(REFRESH);
+      await client.close();
+    });
+  });
+
   it('keeps the complete surface’s describe text as it was', async () => {
     const client = await connect('all');
     const text = textOf(

@@ -17,6 +17,7 @@ import { foldCallArguments, takeFoldNotes } from '../executor/input.js';
 import { includeContactsArg } from '../contacts.js';
 import { ExecutorRefusalError } from '../../utils/errors.js';
 import { currentView, elsewhereClause } from '../serving-view.js';
+import { STALE_TOOL_LIST } from '../dispatch.js';
 import { MISSING_OPERATION_NUDGE } from './feedback.tools.js';
 import {
   pageArg,
@@ -167,6 +168,14 @@ export const searchOperationsTool = defineTool({
     const header = curated.length
       ? `Curated tools cover some of these — prefer them: ${curated.join(', ')}.\n\n`
       : '';
+    // A write runs only through its curated tool, so a caller whose host
+    // lacks that tool has no way left here: say why, or it reports a gap.
+    const writeTool = items.some(
+      (hit) => hit.tool && !('tool_served' in hit) && hit.method !== 'GET'
+    );
+    const footer = writeTool
+      ? `\nA write runs only through its curated tool (or the dispatcher tools_search names for it). If that is not among your tools, ${STALE_TOOL_LIST}`
+      : '';
 
     return {
       text:
@@ -174,7 +183,8 @@ export const searchOperationsTool = defineTool({
         `${result.totalMatches} relevant operation(s) for "${input.query}"; showing ${result.hits.length}:\n\n` +
         `${lines.join('\n\n')}\n\n` +
         'Next: `api_describe_operation` for the full contract, then ' +
-        '`api_call_operation` to run a GET.',
+        '`api_call_operation` to run a GET.' +
+        footer,
       structuredContent: {
         items,
         pagination,
