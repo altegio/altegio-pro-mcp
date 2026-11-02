@@ -307,6 +307,33 @@ export function searchTools(
   return { query, matches, total_matches: relevant.length };
 }
 
+/**
+ * What a model whose tool list lacks a served tool tells its user. A host keeps
+ * the `tools/list` it fetched — a ChatGPT or Codex app until someone refreshes
+ * it — so a tool released since is served here and still missing there, and a
+ * model that is not told so reports the capability as missing.
+ */
+export const STALE_TOOL_LIST =
+  'your app holds a tool list from an older release of this server, which does serve it: ' +
+  'ask the user to refresh this app’s tools (ChatGPT and Codex: Settings → Apps → this app → ' +
+  'Refresh, or remove and add it again), then start a new chat.';
+
+/**
+ * The sentence a reply sends the caller to a curated tool with, when the
+ * running call's view serves it: directly where the view lists it, through
+ * its dispatcher where the view only reaches it, and what to do when the
+ * caller lacks that tool.
+ */
+export function curatedToolInstruction(toolName: string): string {
+  const view = currentView();
+  const entry = allToolEntries().find((e) => e.spec.name === toolName);
+  const via =
+    entry && !listedOn(view, toolName) ? dispatcherFor(entry.spec) : undefined;
+  return via
+    ? `Use the curated tool \`${toolName}\` through \`${via}\` (tool: "${toolName}"). If \`${via}\` is not among your tools, ${STALE_TOOL_LIST}`
+    : `Use the curated tool \`${toolName}\`. If it is not among your tools, ${STALE_TOOL_LIST}`;
+}
+
 /** The text a model reads: each match, and how to run it. */
 export function searchText(result: ToolSearchResult): string {
   if (result.matches.length === 0) {

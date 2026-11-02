@@ -32,6 +32,7 @@ import {
   elsewhereClause,
   servesPasswordLogin,
 } from '../serving-view.js';
+import { curatedToolInstruction } from '../dispatch.js';
 
 export interface DescribedParameter {
   /** Canonical name to send. */
@@ -357,7 +358,7 @@ function renderText(
         (!curatedTool
           ? 'Writes are available through curated tools only.'
           : elsewhere === undefined
-            ? `Use the curated tool \`${curatedTool}\`.`
+            ? curatedToolInstruction(curatedTool)
             : `The curated tool \`${curatedTool}\` performs it, but this address does not serve it; ${elsewhere}.`)
     );
   } else if (!isLiveSource(op.source)) {
