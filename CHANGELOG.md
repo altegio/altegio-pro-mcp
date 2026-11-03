@@ -6,6 +6,27 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — runtime, HTTP admission and onboarding integrity
+
+- Supported runtimes are Node 26.13.0 and 24.22.2 or later patches in those
+  majors, with npm 11.20.0. TypeScript 6 and patched MCP SDK v1 are used; SDK v2
+  awaits its platform canary.
+- Local HTTP binds loopback. Hosted HTTP requires a signed proxy or direct
+  token and validates Host/Origin. It never borrows shared user credentials.
+  Configure the proxy's actual backend Host and browser Origin before upgrade;
+  see `.env.example` and the runtime-boundaries document.
+- Upstream reads have bounded deadlines and retries. Ambiguous writes are not
+  retried; cancellation propagates, OAuth lookups coalesce, and shutdown drains
+  active requests within a fixed grace period.
+- Onboarding serializes state changes across manager instances in one process,
+  atomically persists private files, retains sequential batches and schedule
+  metadata, and preserves failed rollback IDs. Uncertain upstream writes stop
+  the batch and remain visible for reconciliation.
+- Public CI runs synthetic catalog fixtures, typed promise lint, coverage and
+  real package/container protocol checks on the supported runtimes. The exact
+  private-spec drift check remains a separate manual gate until its trusted
+  infrastructure is configured.
+
 ### Changed — membership tools call the documented membership URLs (RND-2053)
 
 - The API reference now documents `/loyalty/memberships`,

@@ -22,9 +22,8 @@ The first seven checks run for ordinary PRs. The last requires the protected
 setup in [OPENAPI.md](OPENAPI.md). Do not make it a required check until that
 setup has completed successfully on a reviewed candidate. Public CI explicitly
 reports real-spec drift as **not run**; synthetic generator tests always run.
-[Repository settings](.github/REPOSITORY_SETTINGS.md) records the proposed
-required-check names, ownership constraints and settings changes; documentation
-does not itself enforce merge protection.
+[Repository settings](.github/REPOSITORY_SETTINGS.md) records the active
+GitHub ruleset, required-check sources and the pending private-spec setup.
 
 Default Jest uses two workers with a 384 MB recycle threshold. Coverage runs
 only on Node 26; its floors are rounded below the reviewed baseline. No live

@@ -12,8 +12,7 @@ Use **Report a vulnerability** on the repository's
 when private reporting is available. Include the affected revision, deployment
 mode, impact and a minimal reproduction with synthetic data.
 
-Private reporting was disabled at the 3 November 2026 settings review; enabling
-it is a documented maintainer setup action, not something this file enables.
+Private reporting was enabled and verified on 3 November 2026.
 If the private-report button is unavailable, open a minimal
 [contact-request issue](https://github.com/altegio/altegio-pro-mcp/issues/new)
 asking the verified repository maintainer `@petroff` for a private reporting

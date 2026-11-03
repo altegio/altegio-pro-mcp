@@ -1,8 +1,9 @@
 # Runtime boundaries after the open-source audit
 
-This change addresses F01, F04, F06, F07 and F14, and stages the runtime and
-dependency parts of F08/F10. F09 remains incomplete: the SDK is patched on v1,
-and this change does not claim support for protocol revision 2026-07-28.
+This document covers HTTP isolation, request deadlines, OAuth admission,
+shutdown and runtime compatibility. The SDK is patched on v1; SDK v2 remains
+subject to the platform canary required by the architecture ADR. This change
+does not claim support for protocol revision 2026-07-28.
 
 ## HTTP modes and deployment compatibility
 

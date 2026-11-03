@@ -50,8 +50,7 @@ prerelease tarball, rather than `npx @altegio/mcp-server-pro`.
 6. Complete independent code review and wait for CI and any configured GitHub
    approvals. Merge with a merge commit. [CODEOWNERS](.github/CODEOWNERS)
    routes review, while [repository settings](.github/REPOSITORY_SETTINGS.md)
-   records proposed enforcement and its activation constraints. A proposal in
-   that file does not change the repository's active approval requirements.
+   records active enforcement and the pending private-spec setup.
 
 Maintainers review dependency-bot PRs like other changes. Major SDK/toolchain
 upgrades need compatibility evidence, not an automatic audit-fix downgrade.

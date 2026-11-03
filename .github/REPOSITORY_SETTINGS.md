@@ -1,92 +1,71 @@
-# Repository settings proposal
+# Repository settings
 
-Read-only GitHub API inspection on **3 November 2026** found:
+The owner approved the following administrative changes on **3 November 2026**.
+They were applied through the GitHub API and read back for verification.
+Collaborator permissions and secrets were not changed.
 
-- `main.protected=false`; branch protection returned 404 and effective rulesets
-  were empty. Merge commit, squash and rebase methods were all enabled.
-- Secret scanning and push protection enabled; dependency alerts, automated
-  security fixes and private vulnerability reporting disabled. No CodeQL
-  analysis was present. Discussions were disabled.
-- Default workflow token permissions were read-only, PR review approval by
-  Actions disabled, all Actions allowed and SHA pin enforcement disabled.
-- Repository description/homepage were empty and topics were absent.
+## Active merge policy
 
-No settings or collaborator permissions were changed by this remediation.
-These are exact proposed maintainer deltas, to apply after independent review.
+The active [`main-reviewed-delivery` ruleset](https://github.com/altegio/altegio-pro-mcp/rules/26491479)
+targets `refs/heads/main`, has no bypass actors and requires:
 
-## Main ruleset
+- a pull request, resolved review conversations and a merge commit;
+- an up-to-date branch with successful `Quality`, `Tests (Node 26)`,
+  `Tests (Node 24)`, `Artifacts`, `Package (Node 24)`, `Dependency audit` and
+  `CodeQL analysis` checks, bound to `github-actions` (integration ID **15368**);
+- blocked branch deletion and non-fast-forward updates.
 
-Create an **active branch ruleset** named `main-reviewed-delivery`, target
-`refs/heads/main`, with no routine bypass actors. Require:
+Independent code review is a delivery requirement. The owner's autonomous
+delivery policy keeps **zero mandatory GitHub approvals**; code-owner and
+latest-push approval requirements are disabled. `CODEOWNERS` routes optional
+review to verified collaborators `@petroff` and `@maksimn-altegio`. Adding a
+mandatory human approval is a separate maintainer decision. If such a gate is
+later enabled, automated review cannot satisfy it and must never bypass it.
 
-- pull requests and resolution of review conversations, with **zero required
-  GitHub approvals** to preserve the owner's autonomous delivery policy;
-  independent code review remains a documented delivery requirement. Keep
-  code-owner approval and latest-push approval requirements disabled;
-- required checks, with strict/up-to-date branch policy:
-  `Quality`, `Tests (Node 26)`, `Tests (Node 24)`, `Artifacts`,
-  `Package (Node 24)`, `Dependency audit`, `CodeQL analysis`;
-- non-fast-forward updates and deletion blocked. Do not require linear history:
-  the delivery method uses merge commits.
-
-The seven checks above come from `github-actions` (integration ID **15368**).
+The repository permits merge commits only and deletes merged branches.
 The separate native `CodeQL` result comes from `github-advanced-security`
-(integration ID **57789**); it is distinct from the `CodeQL analysis` job.
-Those names/sources were verified on PR #182.
-
-Use the check names above as emitted by the workflows, not their job IDs or
-older `lint`, `test (22)` and `build` names. Bind status sources to GitHub Actions
-where the ruleset UI supports that integration. First confirm every exact name
-on a real PR; do not add a required name that has never run.
-
-After the protected `catalog-spec` environment and a successful dispatched run
-are verified, also require **`Catalog (pinned spec)`**, posted to the reviewed
-PR head SHA, with `integration_id` set to the dedicated status App's numeric
-App ID (not its installation ID or the generic GitHub Actions App). Until that setup is available, real drift remains an explicit manual
-release gate and F11 enforcement is incomplete. A new PR head invalidates the
-previous SHA-bound status. Do not substitute public fixture success for it.
-
-Set `allow_merge_commit=true`, `allow_squash_merge=false`,
-`allow_rebase_merge=false`; keep `delete_branch_on_merge=true`. Do not enable
-admin bypass as a way to work around missing reviews. Emergency changes still
-need a reviewed PR unless a separate, audited emergency policy is deliberately
-approved.
-
-`CODEOWNERS` uses verified current admin collaborators `@petroff` and
-`@maksimn-altegio` for optional review routing. A mandatory independent human
-approval, code-owner approval or latest-push approval would be a separate
-maintainer decision: an automated review summary cannot satisfy those GitHub
-gates. Never bypass an active review requirement. Existing administrator
-membership was observed, not changed; collaborator access is separate work.
+(integration ID **57789**), distinct from the required `CodeQL analysis` job.
+Check names and sources were verified on real pull requests. Any future change
+to a required job name must coordinate the workflow and ruleset.
 
 ## Security and Actions
 
-Enable dependency alerts, Dependabot security updates and GitHub private
-vulnerability reporting. Keep secret scanning/push protection enabled and the
-read-only workflow-token default. The new reviewed Dependabot configuration
-covers npm, Actions and Docker. The CodeQL workflow uploads public-repo scanning
-results; verify its first analysis and consider a separately reviewed code-
-scanning merge rule if desired. A successful scanner run alone does not establish
-that no alert requires triage.
+Dependency alerts, Dependabot security updates, private vulnerability reporting
+and full-SHA Action pin enforcement are enabled. Secret scanning and push
+protection remain enabled. Workflow tokens remain read-only by default, Actions
+cannot approve pull requests, and the Actions allowlist is unchanged.
+Dependabot configuration covers npm, Actions and Docker.
 
-Enable SHA pin enforcement after verifying every workflow action is pinned.
-Do not change the Actions allowlist without inventorying the pinned Actions in
-CI, Security, Live and Trusted catalog. No publishing permission is needed.
-Keep environment secrets out of fork/ordinary PR jobs.
+CodeQL analysis has run successfully; the API returned no open code-scanning
+alerts at verification. A successful scanner run does not replace review or
+ongoing alert triage. No npm/image publishing permission is configured by this
+remediation. Keep secrets out of ordinary and fork pull-request jobs.
 
-Create a dedicated GitHub App with Commit statuses: write and install it only on
-this repository; no contents-write or administration permission is needed. Create
-`catalog-spec` with main-only deployment branches, an independent required
-reviewer and self-review prevention, then provision its App ID/private key and
-read-only archive secrets as described in [OPENAPI.md](../OPENAPI.md#trusted-pinned-spec-gate). The private
-archive must be reachable by the trusted runner. Existing `live-e2e` opt-in
-business-test configuration is separate and is not required for public CI.
+## Pending private-spec gate
+
+The `catalog-spec` environment and dedicated status App are **not configured**.
+Public synthetic catalog fixtures run in every PR; exact real-spec drift remains
+a manual release gate against the snapshot in [OPENAPI.md](../OPENAPI.md).
+F11 enforcement remains incomplete until the following setup is separately
+authorized and verified:
+
+1. Create a GitHub App with Commit statuses: write, installed only on this
+   repository, and a `catalog-spec` environment restricted to main with an
+   independent required reviewer and self-review prevention.
+2. Provision the App ID/private key and read-only archive credentials described
+   in [OPENAPI.md](../OPENAPI.md#trusted-pinned-spec-gate). The private archive
+   must be reachable by the trusted runner. Never publish the specification.
+3. Run the trusted workflow successfully for an exact reviewed PR head, then
+   require `Catalog (pinned spec)` from that dedicated App's numeric integration
+   ID. A new head invalidates the prior status. Do not bind this private check
+   to the generic GitHub Actions App or substitute public fixture success.
+
+Existing `live-e2e` opt-in business-test configuration is separate.
 
 ## Public profile
 
-Set description to **"MCP server for authenticated Altegio B2B business workflows,
-analytics and onboarding."**, homepage to the repository README, and topics to
+Description: **MCP server for authenticated Altegio B2B business workflows,
+analytics and onboarding.** Homepage points to the repository README. Topics:
 `mcp`, `model-context-protocol`, `altegio`, `typescript`, `business-management`.
-Keep Discussions disabled unless maintainers deliberately choose to moderate it;
-public guides now route questions to Issues. The security policy explains the
-current private-reporting activation gap without inventing a security email.
+Discussions remain disabled; questions use Issues. Sensitive reports use the
+private channel documented in [SECURITY.md](../SECURITY.md).
