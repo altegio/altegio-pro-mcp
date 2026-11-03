@@ -1,0 +1,15 @@
+# Verified repository collaborators with write/admin access on 2026-11-03.
+# Two owners allow an independent review when either owner authors a change.
+* @petroff @maksimn-altegio
+
+# Explicit high-risk boundaries also document where ownership is required.
+/src/auth/ @petroff @maksimn-altegio
+/src/http-server.ts @petroff @maksimn-altegio
+/src/providers/ @petroff @maksimn-altegio
+/src/tools/executor/ @petroff @maksimn-altegio
+/catalog/ @petroff @maksimn-altegio
+/scripts/catalog/ @petroff @maksimn-altegio
+/.github/ @petroff @maksimn-altegio
+/Dockerfile @petroff @maksimn-altegio
+/package.json @petroff @maksimn-altegio
+/package-lock.json @petroff @maksimn-altegio

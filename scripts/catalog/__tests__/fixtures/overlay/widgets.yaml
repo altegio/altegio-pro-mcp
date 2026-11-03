@@ -1,0 +1,12 @@
+version: 1
+operations:
+  list_widgets:
+    tier: pack
+    domain: widgets
+    tool_name: widgets_list
+    projection: [id, title]
+    failures: { '416': No matching widget. }
+  find_widgets:
+    supersedes: [search_widgets]
+  update_widget:
+    supersedes: [old_update_widget]
