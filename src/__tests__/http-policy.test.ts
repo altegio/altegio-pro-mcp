@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { request } from 'node:http';
+import { createHmac } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import { createApp } from '../http-server.js';
 import { ConfigLoader } from '../config/schema.js';
@@ -140,6 +141,24 @@ describe('HTTP credential and browser boundary', () => {
     expect(new Headers(init?.headers).get('authorization')).toContain(
       'User synthetic-server-user'
     );
+  });
+  it('never applies the local shared-credential opt-in to a hosted proxy request', async () => {
+    process.env.MCP_HTTP_MODE = 'hosted';
+    process.env.MCP_HTTP_ALLOW_SHARED_CREDENTIALS = 'true';
+    const key = 'synthetic-proxy-signing-key-at-least-32-chars';
+    process.env.MCP_PROXY_BACKEND_KEY = key;
+    const seconds = Math.floor(Date.now() / 1000);
+    const signature = createHmac('sha256', key)
+      .update(['mcp-proxy-auth/v1', seconds, 'POST', '/mcp'].join('\n'))
+      .digest('hex');
+    const upstream = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(new Response('{"success":true,"data":[]}'));
+    const result = await probe(call, {
+      'x-mcp-proxy-auth': `v1:${seconds}:${signature}`,
+    });
+    expect(result.text).toMatch(/auth|sign|identity/i);
+    expect(upstream).not.toHaveBeenCalled();
   });
   it('rejects new work and reports unhealthy after draining starts', async () => {
     ConfigLoader.getInstance().reset();

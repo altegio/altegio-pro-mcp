@@ -24,6 +24,8 @@ and stateless requests, including GET and DELETE. Routes are case-sensitive so
 Express cannot expose an uppercase alias outside those guards. Stdio remains single-user.
 Location, chain, scope, read-only and confirmation checks retain their existing
 execution boundaries. Direct user tokens never acquire another caller's identity.
+Hosted mode always disables shared credentials, including when the local legacy
+opt-in is set. A proxy signature alone does not identify the business user.
 
 Before rollout, inventory the actual backend Host and browser Origin values in
 the private proxy configuration and set the allowlists accordingly. The default

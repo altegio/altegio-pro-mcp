@@ -1,4 +1,6 @@
 import { RequestActivity } from './utils/request-lifecycle.js';
+import { httpMode } from './utils/http-policy.js';
+import { parseProxyKeys } from './utils/proxy-auth.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { registerTools } from './tools/registry.js';
@@ -101,7 +103,11 @@ export function createServer(options: CreateServerOptions = {}): MCPServer {
       requireDelegatedIdentity:
         config.env.REQUIRE_DELEGATED_IDENTITY ||
         (options.http === true &&
-          !config.env.MCP_HTTP_ALLOW_SHARED_CREDENTIALS),
+          (!config.env.MCP_HTTP_ALLOW_SHARED_CREDENTIALS ||
+            httpMode(
+              config.env,
+              parseProxyKeys(process.env.MCP_PROXY_BACKEND_KEY).length > 0
+            ) === 'hosted')),
     }
   );
 
