@@ -6,6 +6,22 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — an app on an old tool list is asked to refresh it
+
+- ChatGPT and Codex apps keep the `tools/list` they fetched until someone
+  refreshes the app. Reconnecting and starting a new chat do not refresh it.
+  On 2026-11-03, 25 users called `/pro` with a list from before the compact
+  listing, so they had neither `tools_search` nor the tools released since.
+- A direct call by a name the address does not list runs as before. That
+  includes a tool the compact listing leaves to the dispatcher, or a former
+  name. The result now ends with one note asking the user to refresh the app
+  and start a new chat. A user gets the note at most twice a week; a redeploy
+  resets the count. The `tool_call` line carries `stale_list_nudge: true` when
+  the note was added.
+- `api_describe_operation`, the executor's write refusal and an operation
+  search that finds a write say the same when the tool they name may be
+  missing from the caller's list.
+
 ### Changed — Altegio OAuth access tokens on the HTTP surface (RND-1975)
 
 - A connection made through Altegio's own authorization server sends an

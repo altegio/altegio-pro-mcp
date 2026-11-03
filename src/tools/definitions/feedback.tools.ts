@@ -6,6 +6,7 @@ import {
   currentCallCorrelation,
   noteRateLimited,
 } from '../../utils/tool-call-observation.js';
+import { createCallerQuota, quotaCaller } from '../caller-quota.js';
 import { getOperation } from '../executor/catalog.js';
 import { defineTool } from '../factory.js';
 import { feedbackReceiptOutput } from '../output-schemas.js';
@@ -95,28 +96,14 @@ export const MISSING_OPERATION_NUDGE =
  * alone would not bound a looping agent. Process-local, like the sessions.
  */
 export const FEEDBACK_RATE_LIMIT = { reports: 5, windowMs: 10 * 60_000 };
-/** Callers tracked at once; the least recently reporting is forgotten first. */
-const MAX_TRACKED_CALLERS = 10_000;
-const recentReports = new Map<string, number[]>();
-
-/** Count one report for `caller`, or refuse it when the window is full. */
-function admitReport(caller: string, now: number): boolean {
-  const since = now - FEEDBACK_RATE_LIMIT.windowMs;
-  const times = (recentReports.get(caller) ?? []).filter((t) => t > since);
-  const admitted = times.length < FEEDBACK_RATE_LIMIT.reports;
-  if (admitted) times.push(now);
-  recentReports.delete(caller);
-  recentReports.set(caller, times);
-  if (recentReports.size > MAX_TRACKED_CALLERS) {
-    const oldest = recentReports.keys().next().value;
-    if (oldest !== undefined) recentReports.delete(oldest);
-  }
-  return admitted;
-}
+const reportQuota = createCallerQuota({
+  limit: FEEDBACK_RATE_LIMIT.reports,
+  windowMs: FEEDBACK_RATE_LIMIT.windowMs,
+});
 
 /** Forget every caller's recent reports. */
 export function clearFeedbackRateLimit(): void {
-  recentReports.clear();
+  reportQuota.clear();
 }
 
 export const submitFeedbackTool = defineTool({
@@ -169,10 +156,7 @@ export const submitFeedbackTool = defineTool({
   handler: async ({ input }) => {
     const correlation = currentCallCorrelation();
     const principal = requestPrincipalKey();
-    const caller =
-      principal ??
-      (typeof correlation.session === 'string' ? correlation.session : 'local');
-    if (!admitReport(caller, Date.now())) {
+    if (!reportQuota.admit(quotaCaller(correlation.session))) {
       noteRateLimited();
       return {
         isError: true,
