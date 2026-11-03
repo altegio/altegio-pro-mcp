@@ -47,45 +47,149 @@ credentials. A public fixture test passing does not mean real drift was checked.
 
 ## Trusted pinned-spec gate
 
-`.github/workflows/catalog-trusted.yml` is dispatched **from main**, with a
-reviewed PR number and its exact 40-character head SHA. It posts the commit
-status **`Catalog (pinned spec)`** to that SHA. A later push needs a new review
-and run. It cannot trigger automatically from a fork.
+`.github/workflows/catalog-trusted.yml` is dispatched **from main**, after
+independent review of the exact PR head. Inputs are its PR number and complete
+40-character SHA. The dedicated App posts **`Catalog (pinned spec)`** only to
+that SHA. The workflow checks the open PR head before validation and again
+immediately before reporting success. A new head requires a new review/run.
+Public PR CI has no private input or access to this environment.
 
-Maintainers must first create environment `catalog-spec` restricted to `main`,
-require an independent reviewer, and prevent self-review. Install a dedicated
-GitHub App on this repository only, granting **Commit statuses: write** (plus
-GitHub's mandatory metadata read). Put its numeric App ID in environment variable
-`CATALOG_STATUS_APP_ID` and its private key in environment secret
-`CATALOG_STATUS_APP_PRIVATE_KEY`. The short-lived App token is used only for
-status reporting and is revoked by the pinned token action after the job.
-Bind the required status to this App's integration ID; binding only to the name
-or the generic Actions identity would allow another workflow to impersonate it.
-App creation/installation and environment provisioning are separate maintainer
-access changes; this PR does not perform them.
+The `catalog-spec` environment admits the **main branch only**, excluding tags.
+New setup does not add a mandatory human approval: exact-head independent review
+and deliberate dispatch remain the delivery requirements. If the environment
+already has required reviewers or other protection rules, preserve them and
+wait for their approval; never bypass or replace them. This avoids adding a
+recurring human gate to the owner's zero mandatory-PR-approval policy while
+keeping untrusted PR workflows outside the credential boundary.
 
-Add these environment secrets for the input:
+### Dedicated status App
 
-- `SPEC_ARCHIVE_URL`: HTTPS source archive for exactly the revision in
-  `scripts/catalog/spec-pin.json`, with one top-level directory (regular files only, at most 256 MiB extracted);
-- `SPEC_ARCHIVE_TOKEN`: read-only archive access, available only to the fetch step.
+Register a **private**, organization-owned App with only **Commit statuses:
+write** and mandatory Metadata: read, no events, and inactive webhooks. Install
+it on **this repository only**. Existing organization-wide Apps are unsuitable.
+The reviewed configuration is [catalog-status-app-manifest.json](.github/catalog-status-app-manifest.json).
+GitHub's [manifest registration flow](https://docs.github.com/en/apps/sharing-github-apps/registering-a-github-app-from-a-manifest)
+requires an owner browser interaction; a CLI OAuth token cannot directly create
+an App registration. The local helper saves the returned key privately without
+manual token copying, using the operating system's default browser:
 
-The source must be reachable by the trusted runner. If corporate access cannot
-be provided to a GitHub-hosted runner, run an equivalent isolated trusted check
-in corporate CI and publish that same SHA-bound status through a dedicated GitHub
-App. Do not use a persistent corporate runner for arbitrary public PR code.
+```sh
+node scripts/catalog/register-app.mjs --open
+# Finish registration and select only altegio/altegio-pro-mcp for installation.
+# Ctrl-C closes the local callback after installation.
+node scripts/catalog/admin.mjs app-check APP_ID .inventory/catalog-gate-setup/status-app.pem
+```
 
-The workflow installs only trusted-main dependencies, verifies the snapshot's
-aggregate content hash, then runs candidate generator code in a non-root,
-network-disabled, read-only Docker sandbox with memory/process/time/output limits.
-Only generator, overlay and expected-catalog inputs are mounted. No token reaches
-the sandbox; candidate logs and private snapshots are neither printed nor
-uploaded. Success requires byte equality to the candidate's committed catalog.
-Human review of the candidate generator is still required.
+The helper listens on loopback, validates one-use state, saves only the App
+ID/slug and a mode-0600 private key under the ignored `.inventory/` directory,
+and discards unused client/webhook secrets. `app-check` verifies the real key,
+permissions, owner and single-repository installation, then revokes its probe
+token. It rejects existing Apps with broader access. Registration and installation
+are one-time owner actions; never publish the generated key.
 
-The current pin is revision `7ba5aa43c68951605a9bcc43b1f629dc11584164` with a
-content digest recorded in `spec-pin.json`. Refresh that file in a reviewed PR
-using `verify-spec.mjs <snapshot> --print-digest`; never substitute a mutable
-branch for the pin. Run the gate successfully before making its status required.
-The environment and repository-rule activation are separate maintainer settings
-changes, documented in [REPOSITORY_SETTINGS.md](.github/REPOSITORY_SETTINGS.md).
+### Private immutable archive
+
+Use an existing private CI storage bucket with uniform bucket-level access.
+Verify its bucket and inherited IAM do not grant public access, and verify the
+pinned object refuses anonymous reads. Preserve existing public-access prevention
+and unrelated bucket settings; do not create paid infrastructure implicitly. Package **only** the digest-covered `docs/en` subtree:
+
+```sh
+node scripts/catalog/verify-spec.mjs /path/to/reviewed/snapshot
+python3 scripts/catalog/pack-spec.py /path/to/reviewed/snapshot /private/spec.tar.gz
+```
+
+The reproducible bundle's SHA256 must equal `archive_sha256` in
+`scripts/catalog/spec-pin.json`; the extracted subtree must also match `sha256`.
+Upload with a create-only generation precondition. The secret download URL must
+use the Cloud Storage JSON media endpoint and an explicit immutable `generation`.
+Do not publish the URL, archive, private filenames or candidate output.
+
+Use a **dedicated Workload Identity Federation pool/provider**, not a broad
+existing service account or a long-lived archive token. Map `google.subject` to
+`assertion.sub` and `attribute.repository_id` to `assertion.repository_id`.
+Restrict the provider to all of:
+
+- this repository's numeric ID and the organization owner's numeric ID;
+- `ref == refs/heads/main`, `environment == catalog-spec`;
+- `event_name == workflow_dispatch`;
+- `workflow_ref == altegio/altegio-pro-mcp/.github/workflows/catalog-trusted.yml@refs/heads/main`.
+
+The issuer is `https://token.actions.githubusercontent.com`; the allowed
+audience is `https://iam.googleapis.com/PROJECTS_PROVIDER_RESOURCE`. Grant that
+pool's repository-ID principal `roles/storage.objectViewer` **conditionally on
+the exact object resource name**. The condition denies bucket listing and every
+other object; no service-account key or impersonation role is needed. Keep cloud
+project IDs, object paths and exact provisioning commands in private setup notes.
+The trusted GitHub-hosted runner uses OIDC/STS and a short-lived read-only token.
+The fetch step rejects redirects, mutable URLs, more than 64 MiB compressed and
+digest mismatch, removing partial downloads on failure.
+
+### Provision and activate after independent review
+
+Populate these **environment-scoped** values, never repository/fork secrets:
+
+| Kind     | Name                             | Value                                                                            |
+| -------- | -------------------------------- | -------------------------------------------------------------------------------- |
+| Variable | `CATALOG_STATUS_APP_ID`          | Verified numeric App ID                                                          |
+| Secret   | `CATALOG_STATUS_APP_PRIVATE_KEY` | Dedicated App's PEM key                                                          |
+| Secret   | `SPEC_WIF_PROVIDER`              | `projects/NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER` |
+| Secret   | `SPEC_ARCHIVE_URL`               | Private JSON media URL with pinned object generation                             |
+
+The coordinator prepares/applies the exact private cloud plan, then reviews the
+environment plan before applying it. `admin.mjs` defaults to inspection; only
+`--apply` mutates settings. Existing environment reviews and secrets are
+preserved; missing values are provisioned using the authenticated GitHub CLI.
+Changing an existing secret or archive pin is a separate deliberate update.
+
+```sh
+node scripts/catalog/admin.mjs environment APP_ID /private/status-app.pem /private/archive-url.txt /private/wif-provider.txt
+# Repeat the reviewed command with --apply.
+gh workflow run catalog-trusted.yml --ref main -f pull_request=PR_NUMBER -f candidate_sha=REVIEWED_SHA
+# Wait for configured environment reviewers, if any, and workflow completion.
+node scripts/catalog/admin.mjs require APP_ID /private/status-app.pem PR_NUMBER REVIEWED_SHA SUCCESSFUL_RUN_ID
+# Review .inventory/catalog-gate-setup/rules-{before,proposed}.json, then repeat with --apply.
+```
+
+Merge the reviewed workflow under the existing mandatory checks first. Run it
+successfully on an independently reviewed open PR SHA **before** activating the
+required status. That first hosted run must prove OIDC access and actual archive
+reachability from the chosen runner; local or synthetic checks do not establish
+that. The activation helper verifies the open head, successful main-dispatched
+workflow and latest success from the dedicated App linked to that run. It adds
+only the App-bound status to ruleset 26491479, preserving the existing seven
+source-bound checks, strict updates, zero mandatory approvals and no bypass.
+A generic GitHub Actions status with the same name cannot satisfy the rule.
+
+### Sandbox and validation
+
+The image and dependencies come from trusted main. Candidate code gets only
+its generator/overlay inputs and the verified subtree in a non-root,
+network-disabled, read-only container with process, memory, file, time and output
+limits. **The expected catalog is never mounted**. Trusted host code compares
+bounded private output with candidate committed bytes after the generator exits.
+Docker logging is disabled; private output is neither printed nor uploaded.
+Timeout/failure removes the container and temporary output; the workflow also
+cleans its archive/snapshot and reports failure on the old reviewed SHA. A hard
+runner cancellation may leave a pending status, which cannot satisfy the gate.
+Independent generator review remains necessary: isolation and byte equality do
+not prove the intent of arbitrary candidate code.
+
+```sh
+docker build --file scripts/catalog/Dockerfile --tag catalog-sandbox .
+node scripts/catalog/test-sandbox.mjs catalog-sandbox
+node scripts/catalog/run-trusted.mjs /candidate /verified-snapshot catalog-sandbox catalog-local-check
+```
+
+The explicit Docker checks use only synthetic inputs and cover equality, drift,
+credential/mount/network containment, private/excessive output, timeout cleanup
+and links. Ordinary public tests cover status identity, stale/closed heads,
+failures/cancellation, immutable acquisition and optimized-Python archive guards.
+
+The current revision is `7ba5aa43c68951605a9bcc43b1f629dc11584164`. Refresh both
+content and deterministic archive digests in a reviewed PR; never substitute a
+mutable branch. The workflow uses the pin from trusted main, not the candidate:
+coordinate a trusted pin update and its encrypted source configuration before
+validating a catalog against a new snapshot. Until setup and the first hosted success are recorded in
+[REPOSITORY_SETTINGS.md](.github/REPOSITORY_SETTINGS.md), enforcement remains
+**pending**, not complete. No application deployment is needed for this gate.

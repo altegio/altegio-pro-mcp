@@ -1,0 +1,13 @@
+{
+  "name": "Altegio catalog gate",
+  "url": "https://github.com/altegio/altegio-pro-mcp",
+  "public": false,
+  "hook_attributes": {
+    "url": "https://github.com/altegio/altegio-pro-mcp",
+    "active": false
+  },
+  "default_permissions": {
+    "statuses": "write"
+  },
+  "default_events": []
+}

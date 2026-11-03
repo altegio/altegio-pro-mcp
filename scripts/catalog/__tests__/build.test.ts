@@ -65,6 +65,147 @@ function overlay(entries: Record<string, unknown>) {
 }
 
 describe('public catalog generator', () => {
+  it.each([
+    'hardlink',
+    'device',
+    'multiple-roots',
+    'duplicate',
+    'oversize',
+    'absolute',
+  ])(
+    'rejects %s archives even with Python optimization and cleans partial extraction',
+    (kind) => {
+      const archive = path.join(temp, 'unsafe-extra.tar.gz');
+      const destination = path.join(temp, 'extracted');
+      const created = spawnSync(
+        'python3',
+        [
+          '-c',
+          `
+import io, sys, tarfile
+with tarfile.open(sys.argv[1], 'w:gz') as archive:
+    first = tarfile.TarInfo('root/docs/en/first')
+    first.size = 1
+    archive.addfile(first, io.BytesIO(b'x'))
+    kind = sys.argv[2]
+    member = tarfile.TarInfo('root/docs/en/second')
+    if kind == 'hardlink':
+        member.type = tarfile.LNKTYPE
+        member.linkname = 'root/docs/en/first'
+    elif kind == 'device': member.type = tarfile.CHRTYPE
+    elif kind == 'multiple-roots': member.name = 'other/docs/en/second'
+    elif kind == 'duplicate': member.name = first.name
+    elif kind == 'absolute': member.name = '/absolute/file'
+    elif kind == 'oversize': member.size = 257 * 1024 * 1024
+    if kind == 'oversize':
+        header = member.tobuf()
+        archive.fileobj.write(header)
+        archive.offset += len(header)
+    else: archive.addfile(member)
+`,
+          archive,
+          kind,
+        ],
+        { encoding: 'utf8' }
+      );
+      expect(created.status).toBe(0);
+      const result = spawnSync(
+        'python3',
+        [
+          path.join(ROOT, 'scripts/catalog/extract-spec.py'),
+          archive,
+          destination,
+        ],
+        { encoding: 'utf8', env: { ...process.env, PYTHONOPTIMIZE: '2' } }
+      );
+      expect(result.status).not.toBe(0);
+      expect(fs.existsSync(destination)).toBe(false);
+      expect(
+        fs.readdirSync(temp).some((name) => name.startsWith('.spec-extract-'))
+      ).toBe(false);
+    }
+  );
+
+  it.each(['success', 'failure', 'exists'])(
+    'keeps archive bytes private during packing and preserves cleanup on %s',
+    (scenario) => {
+      const destination = path.join(temp, 'private.tar.gz');
+      const result = spawnSync(
+        'python3',
+        [
+          '-c',
+          `
+import os, pathlib, runpy, stat, sys, tarfile
+script, source, target, scenario = sys.argv[1:]
+archive = pathlib.Path(target)
+os.umask(0)
+if scenario == 'exists': archive.write_bytes(b'preserve-existing')
+original = tarfile.open
+observed = False
+def checked_open(*args, **kwargs):
+    global observed
+    if stat.S_IMODE(archive.stat().st_mode) != 0o600:
+        raise AssertionError('Private bytes are readable during archive creation')
+    observed = True
+    if scenario == 'failure': raise OSError('synthetic packing failure')
+    return original(*args, **kwargs)
+tarfile.open = checked_open
+sys.argv = [script, source, target]
+try:
+    runpy.run_path(script, run_name='__main__')
+except FileExistsError:
+    if scenario != 'exists': raise
+except OSError:
+    if scenario != 'failure': raise
+else:
+    if scenario != 'success': raise AssertionError('Expected failure')
+if scenario == 'exists':
+    if observed or archive.read_bytes() != b'preserve-existing':
+        raise AssertionError('Existing archive changed')
+elif not observed or (scenario == 'failure' and archive.exists()):
+    raise AssertionError('Unsafe archive lifecycle')
+`,
+          path.join(ROOT, 'scripts/catalog/pack-spec.py'),
+          SPEC,
+          destination,
+          scenario,
+        ],
+        { encoding: 'utf8' }
+      );
+      expect(result.stderr).toBe('');
+      expect(result.status).toBe(0);
+    }
+  );
+
+  it('packs reproducibly and exposes only the digest-covered subtree', () => {
+    const source = path.join(temp, 'source');
+    fs.cpSync(SPEC, source, { recursive: true });
+    fs.writeFileSync(
+      path.join(source, 'unverified.txt'),
+      'not covered by the pin'
+    );
+    const first = path.join(temp, 'first.tar.gz');
+    const second = path.join(temp, 'second.tar.gz');
+    for (const archive of [first, second]) {
+      const result = spawnSync(
+        'python3',
+        [path.join(ROOT, 'scripts/catalog/pack-spec.py'), source, archive],
+        { encoding: 'utf8' }
+      );
+      expect(result.status).toBe(0);
+    }
+    expect(fs.readFileSync(first)).toEqual(fs.readFileSync(second));
+    const destination = path.join(temp, 'packed');
+    const result = spawnSync(
+      'python3',
+      [path.join(ROOT, 'scripts/catalog/extract-spec.py'), first, destination],
+      { encoding: 'utf8' }
+    );
+    expect(result.status).toBe(0);
+    expect(fs.existsSync(path.join(destination, 'unverified.txt'))).toBe(false);
+    expect(build(OVERLAY, destination).status).toBe(0);
+  });
+
   it.each(['../escape', 'root/../../escape', 'link'])(
     'rejects unsafe private-archive input %s',
     (name) => {

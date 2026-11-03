@@ -2,5 +2,6 @@
   "revision": "7ba5aa43c68951605a9bcc43b1f629dc11584164",
   "root": "docs/en",
   "algorithm": "sha256 of sorted relative paths + NUL + SHA256(file bytes) + NUL, recursive directory order",
-  "sha256": "989055d82c10875972648dc01513d592350fa1fb96e678579037e25a17d6c51a"
+  "sha256": "989055d82c10875972648dc01513d592350fa1fb96e678579037e25a17d6c51a",
+  "archive_sha256": "2344bc7a5ae33257864e0a241be07c19f36a16dfbb02b760b70ffe25e897afd5"
 }

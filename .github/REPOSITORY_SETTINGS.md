@@ -46,19 +46,32 @@ remediation. Keep secrets out of ordinary and fork pull-request jobs.
 The `catalog-spec` environment and dedicated status App are **not configured**.
 Public synthetic catalog fixtures run in every PR; exact real-spec drift remains
 a manual release gate against the snapshot in [OPENAPI.md](../OPENAPI.md).
-F11 enforcement remains incomplete until the following setup is separately
-authorized and verified:
+F11 enforcement remains incomplete until the coordinator applies and verifies
+the reviewed setup:
 
 1. Create a GitHub App with Commit statuses: write, installed only on this
-   repository, and a `catalog-spec` environment restricted to main with an
-   independent required reviewer and self-review prevention.
-2. Provision the App ID/private key and read-only archive credentials described
+   repository, and a `catalog-spec` environment restricted to the main branch
+   only. Preserve any existing environment reviewers/protection rules. New
+   setup adds no mandatory human approval; independent exact-head review and
+   deliberate trusted dispatch remain the delivery requirements.
+2. Provision the App ID/private key and dedicated object-only OIDC access described
    in [OPENAPI.md](../OPENAPI.md#trusted-pinned-spec-gate). The private archive
-   must be reachable by the trusted runner. Never publish the specification.
+   must be reachable by the trusted runner. The deterministic archive digest and
+   extracted content digest are both pinned. Never publish the specification,
+   archive URL or candidate-generated output.
 3. Run the trusted workflow successfully for an exact reviewed PR head, then
    require `Catalog (pinned spec)` from that dedicated App's numeric integration
    ID. A new head invalidates the prior status. Do not bind this private check
    to the generic GitHub Actions App or substitute public fixture success.
+
+The reviewed helpers in `scripts/catalog/{register-app,admin}.mjs` prepare the
+one-time App registration, preserve configured environment reviews/secrets and
+default administrative operations to inspection. Required-status activation
+refuses an unverified App, stale head, failed trusted run or weakened existing
+rules. Cloud provisioning remains a private coordinator-reviewed plan; no cloud
+project/object identifiers or private archive are committed here. Local Docker
+and fixture success is not proof of hosted OIDC access; record that first run
+before calling this gate active.
 
 Existing `live-e2e` opt-in business-test configuration is separate.
 
