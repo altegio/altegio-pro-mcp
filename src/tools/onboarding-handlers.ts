@@ -1,6 +1,8 @@
 import { AltegioClient } from '../providers/altegio-client.js';
 import { OnboardingStateManager } from '../providers/onboarding-state-manager.js';
 import { z } from 'zod';
+import { randomInt } from 'node:crypto';
+import { AltegioApiError } from '../utils/errors.js';
 import { parseCSV, parseBooleanCell } from '../utils/csv-parser.js';
 import { logger } from '../utils/logger.js';
 import {
@@ -28,8 +30,10 @@ import {
   ScheduleBatchSchema,
   OnboardingPhaseSchema,
   toAgentPhase,
+  ScheduleSlotInputSchema,
   type OnboardingPhase,
   type OnboardingState,
+  type ScheduleBatchItem,
 } from '../types/onboarding.types.js';
 import type {
   CreateStaffRequest,
@@ -398,39 +402,45 @@ export class OnboardingHandlers {
       // Validate with Zod
       positionsArray = PositionBatchSchema.parse(positionsArray);
 
-      const created: number[] = [];
-      const failures: FailedRow[] = [];
+      await this.requireLocalStateAccess(location_id);
+      return this.stateManager.withSession(location_id, async (session) => {
+        const batch = await session.beginBatch('positions');
+        const created: number[] = [];
+        const failures: FailedRow[] = [];
 
-      for (const position of positionsArray) {
-        try {
-          const positionRequest: CreatePositionRequest = {
-            title: position.title,
-          };
-          const result = await this.client.createPosition(
-            location_id,
-            positionRequest
-          );
-          created.push(result.id);
-        } catch (error) {
-          failures.push(failedRow(position.title, error));
+        for (const position of positionsArray) {
+          let createdId: number;
+          try {
+            const positionRequest: CreatePositionRequest = {
+              title: position.title,
+            };
+            const result = await this.client.createPosition(
+              location_id,
+              positionRequest
+            );
+            createdId = result.id;
+          } catch (error) {
+            failures.push(failedRow(position.title, error));
+            continue;
+          }
+          await session.recordCreated('positions', batch, createdId);
+          created.push(createdId);
         }
-      }
 
-      // Checkpoint
-      await this.stateManager.checkpoint(location_id, 'positions', created);
-      await this.stateManager.updatePhase(location_id, 'staff');
+        await session.finishBatch('positions', batch, 'staff', failures.length);
 
-      return batchResult({
-        location_id,
-        phase: 'staff',
-        created,
-        failures,
-        summary:
-          `Positions batch processing complete:\n\n` +
-          `✓ ${created.length} positions created\n` +
-          `\nCreated position IDs: [${created.join(', ')}]\n` +
-          `Use these position_id values when adding staff.\n` +
-          `\nNext: Add staff with onboarding_add_team_members_batch`,
+        return batchResult({
+          location_id,
+          phase: session.state.phase,
+          created,
+          failures,
+          summary:
+            `Positions batch processing complete:\n\n` +
+            `✓ ${created.length} positions created\n` +
+            `\nCreated position IDs: [${created.join(', ')}]\n` +
+            `Use these position_id values when adding staff.\n` +
+            `\nNext: Add staff with onboarding_add_team_members_batch`,
+        });
       });
     });
   }
@@ -484,54 +494,65 @@ export class OnboardingHandlers {
         };
       }
 
-      const created: number[] = [];
-      const failures: FailedRow[] = [];
-      let paidSeats = 0;
-      let inSchedule = 0;
+      await this.requireLocalStateAccess(location_id);
+      return this.stateManager.withSession(location_id, async (session) => {
+        const batch = await session.beginBatch('staff');
+        const created: number[] = [];
+        const failures: FailedRow[] = [];
+        let paidSeats = 0;
+        let inSchedule = 0;
 
-      for (const { staff, paidSeat, scheduleAccess } of rows) {
-        try {
-          const staffRequest: CreateStaffRequest = {
-            name: staff.name,
-            specialization: staff.specialization || '',
-            position_id: staff.position_id || null,
-            // Quick-create treats these as a link to an existing user and
-            // refuses an unknown one without an invitation (an empty string
-            // fails validation), so batch rows create team members only.
-            user_email: null,
-            user_phone: null,
-            is_user_invite: false,
-            is_paid_staff: paidSeat,
-            has_timetable_access: scheduleAccess,
-          };
-          const result = await this.client.createStaff(
-            location_id,
-            staffRequest
-          );
-          created.push(result.id);
-          if (staffRequest.is_paid_staff) paidSeats++;
-          if (staffRequest.has_timetable_access) inSchedule++;
-        } catch (error) {
-          failures.push(failedRow(staff.name, error));
+        for (const { staff, paidSeat, scheduleAccess } of rows) {
+          let createdId: number;
+          try {
+            const staffRequest: CreateStaffRequest = {
+              name: staff.name,
+              specialization: staff.specialization || '',
+              position_id: staff.position_id || null,
+              // Quick-create treats these as a link to an existing user and
+              // refuses an unknown one without an invitation (an empty string
+              // fails validation), so batch rows create team members only.
+              user_email: null,
+              user_phone: null,
+              is_user_invite: false,
+              is_paid_staff: paidSeat,
+              has_timetable_access: scheduleAccess,
+            };
+            const result = await this.client.createStaff(
+              location_id,
+              staffRequest
+            );
+            createdId = result.id;
+          } catch (error) {
+            failures.push(failedRow(staff.name, error));
+            continue;
+          }
+          await session.recordCreated('staff', batch, createdId);
+          created.push(createdId);
+          if (paidSeat) paidSeats++;
+          if (scheduleAccess) inSchedule++;
         }
-      }
 
-      // Checkpoint
-      await this.stateManager.checkpoint(location_id, 'staff', created);
-      await this.stateManager.updatePhase(location_id, 'categories');
+        await session.finishBatch(
+          'staff',
+          batch,
+          'categories',
+          failures.length
+        );
 
-      return batchResult({
-        location_id,
-        phase: 'categories',
-        created,
-        failures,
-        summary:
-          `Team member batch complete:\n\n` +
-          `✓ ${created.length} team members created ` +
-          `(${paidSeats} on a paid seat, ${inSchedule} in the work schedule)\n` +
-          `\nCreated team member IDs: [${created.join(', ')}]\n` +
-          `Use these team_member_id values in onboarding_set_schedules.\n` +
-          `\nNext: Add service categories with onboarding_add_categories`,
+        return batchResult({
+          location_id,
+          phase: session.state.phase,
+          created,
+          failures,
+          summary:
+            `Team member batch complete:\n\n` +
+            `✓ ${created.length} team members created ` +
+            `(${paidSeats} on a paid seat, ${inSchedule} in the work schedule)\n` +
+            `\nCreated team member IDs: [${created.join(', ')}]\n` +
+            `Use these team_member_id values in onboarding_set_schedules.\n` +
+            `\nNext: Add service categories with onboarding_add_categories`,
+        });
       });
     });
   }
@@ -542,41 +563,52 @@ export class OnboardingHandlers {
 
       const { location_id, categories } = CategoryArgsSchema.parse(args);
 
-      const created: number[] = [];
-      const failures: FailedRow[] = [];
+      await this.requireLocalStateAccess(location_id);
+      return this.stateManager.withSession(location_id, async (session) => {
+        const batch = await session.beginBatch('categories');
+        const created: number[] = [];
+        const failures: FailedRow[] = [];
 
-      for (const category of categories) {
-        try {
-          const categoryRequest: CreateCategoryRequest = {
-            title: category.title,
-            api_id: category.external_id,
-            weight: category.sort_weight,
-          };
-          const result = await this.client.createServiceCategory(
-            location_id,
-            categoryRequest
-          );
-          created.push(result.id);
-        } catch (error) {
-          failures.push(failedRow(category.title, error));
+        for (const category of categories) {
+          let createdId: number;
+          try {
+            const categoryRequest: CreateCategoryRequest = {
+              title: category.title,
+              api_id: category.external_id,
+              weight: category.sort_weight,
+            };
+            const result = await this.client.createServiceCategory(
+              location_id,
+              categoryRequest
+            );
+            createdId = result.id;
+          } catch (error) {
+            failures.push(failedRow(category.title, error));
+            continue;
+          }
+          await session.recordCreated('categories', batch, createdId);
+          created.push(createdId);
         }
-      }
 
-      // Checkpoint
-      await this.stateManager.checkpoint(location_id, 'categories', created);
-      await this.stateManager.updatePhase(location_id, 'services');
+        await session.finishBatch(
+          'categories',
+          batch,
+          'services',
+          failures.length
+        );
 
-      return batchResult({
-        location_id,
-        phase: 'services',
-        created,
-        failures,
-        summary:
-          `Categories batch processing complete:\n\n` +
-          `✓ ${created.length} categories created\n` +
-          `\nCreated category IDs: [${created.join(', ')}]\n` +
-          `Use these category_id values when adding services.\n` +
-          `\nNext: Add services with onboarding_add_services_batch`,
+        return batchResult({
+          location_id,
+          phase: session.state.phase,
+          created,
+          failures,
+          summary:
+            `Categories batch processing complete:\n\n` +
+            `✓ ${created.length} categories created\n` +
+            `\nCreated category IDs: [${created.join(', ')}]\n` +
+            `Use these category_id values when adding services.\n` +
+            `\nNext: Add services with onboarding_add_services_batch`,
+        });
       });
     });
   }
@@ -594,42 +626,53 @@ export class OnboardingHandlers {
       // Validate with Zod
       servicesArray = ServiceBatchSchema.parse(servicesArray);
 
-      const created: number[] = [];
-      const failures: FailedRow[] = [];
+      await this.requireLocalStateAccess(location_id);
+      return this.stateManager.withSession(location_id, async (session) => {
+        const batch = await session.beginBatch('services');
+        const created: number[] = [];
+        const failures: FailedRow[] = [];
 
-      for (const service of servicesArray) {
-        try {
-          const serviceRequest: CreateServiceRequest = {
-            title: service.title,
-            category_id: service.category_id || 0,
-            price_min: service.price_min,
-            price_max: service.price_max,
-            duration: service.duration_seconds,
-          };
-          const result = await this.client.createService(
-            location_id,
-            serviceRequest
-          );
-          created.push(result.id);
-        } catch (error) {
-          failures.push(failedRow(service.title, error));
+        for (const service of servicesArray) {
+          let createdId: number;
+          try {
+            const serviceRequest: CreateServiceRequest = {
+              title: service.title,
+              category_id: service.category_id || 0,
+              price_min: service.price_min,
+              price_max: service.price_max,
+              duration: service.duration_seconds,
+            };
+            const result = await this.client.createService(
+              location_id,
+              serviceRequest
+            );
+            createdId = result.id;
+          } catch (error) {
+            failures.push(failedRow(service.title, error));
+            continue;
+          }
+          await session.recordCreated('services', batch, createdId);
+          created.push(createdId);
         }
-      }
 
-      // Checkpoint
-      await this.stateManager.checkpoint(location_id, 'services', created);
-      await this.stateManager.updatePhase(location_id, 'schedules');
+        await session.finishBatch(
+          'services',
+          batch,
+          'schedules',
+          failures.length
+        );
 
-      return batchResult({
-        location_id,
-        phase: 'schedules',
-        created,
-        failures,
-        summary:
-          `Services batch processing complete:\n\n` +
-          `✓ ${created.length} services created\n` +
-          `\nCreated service IDs: [${created.join(', ')}]\n` +
-          `\nNext: Set work schedules with onboarding_set_schedules`,
+        return batchResult({
+          location_id,
+          phase: session.state.phase,
+          created,
+          failures,
+          summary:
+            `Services batch processing complete:\n\n` +
+            `✓ ${created.length} services created\n` +
+            `\nCreated service IDs: [${created.join(', ')}]\n` +
+            `\nNext: Set work schedules with onboarding_set_schedules`,
+        });
       });
     });
   }
@@ -644,44 +687,120 @@ export class OnboardingHandlers {
         throw new Error('No schedules provided.');
       }
 
-      const request: SetScheduleRequest = {
-        schedules_to_set: schedules.map((s) => ({
-          team_member_id: s.team_member_id,
-          dates: s.dates,
-          slots: s.slots,
-        })),
-      };
+      await this.requireLocalStateAccess(location_id);
+      return this.stateManager.withSession(location_id, async (session) => {
+        const ownedStaff = session.state.checkpoints.staff?.entity_ids ?? [];
+        if (schedules.some((s) => !ownedStaff.includes(s.team_member_id))) {
+          throw new Error(
+            'Onboarding schedules require team members created in this session.'
+          );
+        }
+        // Only new staff/date pairs can be deleted safely by onboarding rollback.
+        // A repeated batch may edit a date already owned by this session.
+        const priorSchedules = (session.state.checkpoints.schedules?.metadata
+          ?.schedules ?? []) as Array<{
+          team_member_id: number;
+          dates: string[];
+        }>;
+        for (const staffId of new Set(schedules.map((s) => s.team_member_id))) {
+          const dates = schedules
+            .filter((s) => s.team_member_id === staffId)
+            .flatMap((s) => s.dates)
+            .sort();
+          const existing = z
+            .array(
+              z
+                .object({
+                  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+                  slots: z.array(ScheduleSlotInputSchema).optional(),
+                  is_working: z.union([z.literal(0), z.literal(1)]).optional(),
+                })
+                .refine(
+                  (day) =>
+                    day.slots !== undefined || day.is_working !== undefined
+                )
+            )
+            .parse(
+              await this.client.getSchedule(
+                location_id,
+                staffId,
+                dates[0]!,
+                dates.at(-1)!
+              )
+            );
+          const ownedDates = new Set(
+            priorSchedules
+              .filter((s) => s.team_member_id === staffId)
+              .flatMap((s) => s.dates)
+          );
+          for (const day of existing) {
+            if (
+              dates.includes(day.date) &&
+              !ownedDates.has(day.date) &&
+              ((day.slots?.length ?? 0) > 0 || day.is_working === 1)
+            ) {
+              throw new Error(
+                'An onboarding schedule would overwrite an existing workday. Use the regular schedule tools.'
+              );
+            }
+          }
+        }
+        const batch = await session.beginBatch('schedules', {
+          schedules: [],
+          requested_schedules: schedules,
+        });
+        const appliedSchedules: ScheduleBatchItem[] = [];
+        const failures: FailedRow[] = [];
+        // Persist each confirmed workday before writing another one. A refused
+        // day must not discard earlier successes from this schedule batch.
+        for (const schedule of schedules) {
+          for (const date of schedule.dates) {
+            const day = { ...schedule, dates: [date] };
+            const request: SetScheduleRequest = { schedules_to_set: [day] };
+            try {
+              await this.client.setSchedule(location_id, request);
+            } catch (error) {
+              failures.push(
+                failedRow(
+                  `team member ${schedule.team_member_id} on ${date}`,
+                  error
+                )
+              );
+              continue;
+            }
+            appliedSchedules.push(day);
+            await session.recordSchedules(batch, appliedSchedules);
+          }
+        }
+        const staffIds = [
+          ...new Set(appliedSchedules.map((s) => s.team_member_id)),
+        ];
+        await session.finishBatch(
+          'schedules',
+          batch,
+          'clients',
+          failures.length
+        );
 
-      await this.client.setSchedule(location_id, request);
+        const summary = appliedSchedules
+          .map(
+            (s) =>
+              `  - team member ${s.team_member_id}: ${s.dates.length} day(s), ${s.slots
+                .map((sl) => `${sl.from}-${sl.to}`)
+                .join(', ')}`
+          )
+          .join('\n');
 
-      const staffIds = [...new Set(schedules.map((s) => s.team_member_id))];
-
-      // Checkpoint — store the full set in metadata so rollback can delete it
-      await this.stateManager.checkpoint(location_id, 'schedules', staffIds, {
-        schedules,
-      });
-      await this.stateManager.updatePhase(location_id, 'clients');
-
-      const summary = schedules
-        .map(
-          (s) =>
-            `  - team member ${s.team_member_id}: ${s.dates.length} day(s), ${s.slots
-              .map((sl) => `${sl.from}-${sl.to}`)
-              .join(', ')}`
-        )
-        .join('\n');
-
-      // One request sets every schedule, so a failure is the whole call's
-      // (an error result) and a success has no failed rows.
-      return batchResult({
-        location_id,
-        phase: 'clients',
-        created: staffIds,
-        failures: [],
-        summary:
-          `Work schedules set for ${staffIds.length} staff member(s):\n\n` +
-          `${summary}\n\n` +
-          `Next: Import clients with onboarding_import_clients`,
+        return batchResult({
+          location_id,
+          phase: session.state.phase,
+          created: staffIds,
+          failures,
+          summary:
+            `Work schedules set for ${staffIds.length} staff member(s):\n\n` +
+            `${summary}\n\n` +
+            `Next: Import clients with onboarding_import_clients`,
+        });
       });
     });
   }
@@ -698,43 +817,54 @@ export class OnboardingHandlers {
       // Validate with Zod
       const clientsArray = ClientBatchSchema.parse(parsedClients);
 
-      const created: number[] = [];
-      const failures: FailedRow[] = [];
+      await this.requireLocalStateAccess(location_id);
+      return this.stateManager.withSession(location_id, async (session) => {
+        const batch = await session.beginBatch('clients');
+        const created: number[] = [];
+        const failures: FailedRow[] = [];
 
-      for (const client of clientsArray) {
-        try {
-          const clientRequest: CreateClientRequest = {
-            name: client.name,
-            phone: client.phone,
-            email: client.email,
-            surname: client.surname,
-            comment: client.comment,
-          };
-          const result = await this.client.createClient(
-            location_id,
-            clientRequest
-          );
-          created.push(result.id);
-        } catch (error) {
-          failures.push(failedRow(client.name, error));
+        for (const client of clientsArray) {
+          let createdId: number;
+          try {
+            const clientRequest: CreateClientRequest = {
+              name: client.name,
+              phone: client.phone,
+              email: client.email,
+              surname: client.surname,
+              comment: client.comment,
+            };
+            const result = await this.client.createClient(
+              location_id,
+              clientRequest
+            );
+            createdId = result.id;
+          } catch (error) {
+            failures.push(failedRow(client.name, error));
+            continue;
+          }
+          await session.recordCreated('clients', batch, createdId);
+          created.push(createdId);
         }
-      }
 
-      // Checkpoint
-      await this.stateManager.checkpoint(location_id, 'clients', created);
-      await this.stateManager.updatePhase(location_id, 'test_bookings');
+        await session.finishBatch(
+          'clients',
+          batch,
+          'test_bookings',
+          failures.length
+        );
 
-      // A client base can run to thousands of rows and no later step takes a
-      // client ID, so the IDs stay in structured content, not in the text.
-      return batchResult({
-        location_id,
-        phase: 'test_bookings',
-        created,
-        failures,
-        summary:
-          `Client import complete:\n\n` +
-          `✓ ${created.length} clients imported\n` +
-          `\nNext: Create test appointments with onboarding_create_test_appointments`,
+        // A client base can run to thousands of rows and no later step takes a
+        // client ID, so the IDs stay in structured content, not in the text.
+        return batchResult({
+          location_id,
+          phase: session.state.phase,
+          created,
+          failures,
+          summary:
+            `Client import complete:\n\n` +
+            `✓ ${created.length} clients imported\n` +
+            `\nNext: Create test appointments with onboarding_create_test_appointments`,
+        });
       });
     });
   }
@@ -746,79 +876,109 @@ export class OnboardingHandlers {
         this.requireAuth();
 
         const { location_id, count } = TestBookingsArgsSchema.parse(args);
-        const state = await this.stateManager.load(location_id);
+        await this.requireLocalStateAccess(location_id);
+        return this.stateManager.withSession(location_id, async (session) => {
+          const state = session.state;
 
-        if (!state) {
-          throw new Error(
-            `No onboarding session found for location ${location_id}`
-          );
-        }
+          const staffIds = state.checkpoints['staff']?.entity_ids || [];
+          const serviceIds = state.checkpoints['services']?.entity_ids || [];
 
-        const staffIds = state.checkpoints['staff']?.entity_ids || [];
-        const serviceIds = state.checkpoints['services']?.entity_ids || [];
-
-        if (staffIds.length === 0 || serviceIds.length === 0) {
-          throw new Error(
-            'No staff or services found. Complete previous steps first.'
-          );
-        }
-
-        const created: number[] = [];
-        const failures: FailedRow[] = [];
-
-        for (let i = 0; i < count; i++) {
-          const staffId = staffIds[i % staffIds.length]!;
-          const serviceId = serviceIds[i % serviceIds.length]!;
-
-          // Generate appointment 1-7 days in future
-          const daysAhead = 1 + (i % 7);
-          const date = new Date();
-          date.setDate(date.getDate() + daysAhead);
-          const datetime = date.toISOString().split('T')[0] + ' 10:00:00';
-
-          try {
-            const appointment = await this.client.createBooking(location_id, {
-              staff_id: staffId,
-              services: [{ id: serviceId }],
-              datetime,
-              // seance_length is required by the API; save_if_busy lets the
-              // sample bookings land even if the test staff has no schedule.
-              seance_length: 3600,
-              save_if_busy: true,
-              client: {
-                name: `Test Client ${i + 1}`,
-                phone: `+100000000${i}`,
-              },
-            });
-            created.push(appointment.id);
-          } catch (error) {
-            logger.warn({ error }, 'Failed to create test appointment');
-            failures.push(
-              failedRow(`test appointment ${i + 1} at ${datetime}`, error)
+          if (staffIds.length === 0 || serviceIds.length === 0) {
+            throw new Error(
+              'No staff or services found. Complete previous steps first.'
             );
           }
-        }
 
-        await this.stateManager.checkpoint(
-          location_id,
-          'test_bookings',
-          created
-        );
-        await this.stateManager.updatePhase(location_id, 'complete');
+          const clientBatch = await session.beginBatch('clients', {
+            source: 'test_appointments',
+          });
+          const batch = await session.beginBatch('test_bookings');
+          const created: number[] = [];
+          const failures: FailedRow[] = [];
+          let failedClients = 0;
 
-        return batchResult({
-          location_id,
-          phase: 'complete',
-          created,
-          failures,
-          summary:
-            `Test appointments created: ${created.length}\n\n` +
-            `Onboarding complete! ✓\n\n` +
-            `Summary:\n` +
-            `  - Staff: ${staffIds.length}\n` +
-            `  - Services: ${serviceIds.length}\n` +
-            `  - Test appointments: ${created.length}\n\n` +
-            `Your platform is ready to use!`,
+          for (let i = 0; i < count; i++) {
+            const staffId = staffIds[i % staffIds.length]!;
+            const serviceId = serviceIds[i % serviceIds.length]!;
+
+            // Generate appointment 1-7 days in future
+            const daysAhead = 1 + (i % 7);
+            const date = new Date();
+            date.setDate(date.getDate() + daysAhead);
+            const datetime = date.toISOString().split('T')[0] + ' 10:00:00';
+
+            const client = {
+              name: `Test Client ${i + 1}`,
+              phone: `+1000${randomInt(1000000, 10000000)}`,
+            };
+            let clientId: number;
+            try {
+              // The create endpoint must create a new client. A conflict is a
+              // failed row; never look up or substitute an existing customer ID.
+              const createdClient = await this.client.createClient(
+                location_id,
+                client
+              );
+              clientId = createdClient.id;
+            } catch (error) {
+              failedClients++;
+              failures.push(failedRow(`test client ${i + 1}`, error));
+              continue;
+            }
+            await session.recordCreated('clients', clientBatch, clientId);
+            let createdId: number;
+            try {
+              const appointment = await this.client.createBooking(location_id, {
+                staff_id: staffId,
+                services: [{ id: serviceId }],
+                datetime,
+                // seance_length is required by the API; save_if_busy lets the
+                // sample bookings land even if the test staff has no schedule.
+                seance_length: 3600,
+                save_if_busy: true,
+                client,
+                send_sms: 0,
+              });
+              createdId = appointment.id;
+            } catch (error) {
+              logger.warn({ error }, 'Failed to create test appointment');
+              failures.push(
+                failedRow(`test appointment ${i + 1} at ${datetime}`, error)
+              );
+              continue;
+            }
+            await session.recordCreated('test_bookings', batch, createdId);
+            created.push(createdId);
+          }
+
+          await session.finishBatch(
+            'clients',
+            clientBatch,
+            state.phase,
+            failedClients
+          );
+          await session.finishBatch(
+            'test_bookings',
+            batch,
+            'complete',
+            failures.length
+          );
+
+          return batchResult({
+            location_id,
+            phase: session.state.phase,
+            created,
+            failures,
+            summary:
+              `Test appointments created: ${created.length}\n` +
+              `Test clients created: ${clientBatch.entity_ids.length}; roll back test appointments before clients.\n\n` +
+              `Onboarding complete! ✓\n\n` +
+              `Summary:\n` +
+              `  - Staff: ${staffIds.length}\n` +
+              `  - Services: ${serviceIds.length}\n` +
+              `  - Test appointments: ${created.length}\n\n` +
+              `Your platform is ready to use!`,
+          });
         });
       }
     );
@@ -918,95 +1078,111 @@ export class OnboardingHandlers {
       const { location_id, phase_name: requestedPhase } =
         RollbackArgsSchema.parse(args);
       // Agent-facing "test_appointments" maps to the internal persisted phase key.
-      const phase_name =
+      const phaseKey =
         requestedPhase === 'test_appointments'
           ? 'test_bookings'
           : requestedPhase;
-      const state = await this.stateManager.load(location_id);
-
-      if (!state || !state.checkpoints[phase_name]) {
-        throw new Error(
-          `No checkpoint found for phase: ${toAgentPhase(requestedPhase)}`
-        );
-      }
-
-      const checkpoint = state.checkpoints[phase_name];
-      const entityIds = checkpoint.entity_ids;
-      const deletedCount = { success: 0, failed: 0 };
-      const failedIds: number[] = [];
-
-      // Delete entities based on phase type
-      for (const id of entityIds) {
-        try {
-          if (phase_name === 'staff') {
-            await this.client.deleteStaff(location_id, id);
-            deletedCount.success++;
-          } else if (phase_name === 'schedules') {
-            // entity_ids are staff IDs; dates come from checkpoint metadata
-            const meta = (checkpoint.metadata?.schedules ?? []) as Array<{
-              team_member_id: number;
-              dates: string[];
-            }>;
-            const dates = meta
-              .filter((s) => s.team_member_id === id)
-              .flatMap((s) => s.dates);
-            if (dates.length > 0) {
-              await this.client.setSchedule(location_id, {
-                schedules_to_delete: [{ team_member_id: id, dates }],
-              });
-            }
-            deletedCount.success++;
-          } else if (phase_name === 'test_bookings') {
-            await this.client.deleteBooking(location_id, id);
-            deletedCount.success++;
-          } else if (phase_name === 'services') {
-            await this.client.deleteService(location_id, id);
-            deletedCount.success++;
-          } else if (phase_name === 'categories') {
-            await this.client.deleteServiceCategory(location_id, id);
-            deletedCount.success++;
-          } else if (phase_name === 'clients') {
-            await this.client.deleteClient(location_id, id);
-            deletedCount.success++;
-          } else if (phase_name === 'positions') {
-            await this.client.deletePosition(location_id, id);
-            deletedCount.success++;
-          } else {
-            deletedCount.success++;
-          }
-        } catch (error) {
-          logger.warn(
-            { error, id, phase_name },
-            `Failed to delete ${phase_name} entity`
+      const phase_name = OnboardingPhaseSchema.parse(phaseKey);
+      await this.requireLocalStateAccess(location_id);
+      return this.stateManager.withSession(location_id, async (session) => {
+        const checkpoint = session.state.checkpoints[phase_name];
+        if (!checkpoint) {
+          throw new Error(
+            `No checkpoint found for phase: ${toAgentPhase(requestedPhase)}`
           );
-          deletedCount.failed++;
-          failedIds.push(id);
         }
-      }
-
-      // Do not discard the only audit trail for entities that the API refused
-      // to delete (for example a chain-owned category returning 403).
-      if (failedIds.length === 0) {
-        delete state.checkpoints[phase_name];
-      } else {
-        checkpoint.entity_ids = failedIds;
-      }
-      state.updated_at = new Date().toISOString();
-      await this.stateManager.save(state);
-
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text:
-              `Rolled back ${toAgentPhase(requestedPhase)}: processed ${entityIds.length} entities\n` +
-              `✓ Successfully handled: ${deletedCount.success}\n` +
-              (deletedCount.failed > 0
-                ? `✗ Failed: ${deletedCount.failed}; checkpoint retained for IDs [${failedIds.join(', ')}]\n`
-                : ''),
-          },
-        ],
-      };
+        // Copy targets: every confirmed deletion updates the live checkpoint.
+        const targets =
+          phase_name === 'schedules'
+            ? [
+                ...new Map(
+                  (
+                    checkpoint.metadata?.schedules as Array<{
+                      team_member_id: number;
+                      dates: string[];
+                    }>
+                  ).flatMap((s) =>
+                    s.dates.map(
+                      (date) =>
+                        [
+                          `${s.team_member_id}/${date}`,
+                          { id: s.team_member_id, date },
+                        ] as const
+                    )
+                  )
+                ).values(),
+              ]
+            : checkpoint.entity_ids.map((id) => ({ id, date: undefined }));
+        const deletedCount = { success: 0, failed: 0 };
+        for (const { id, date } of targets) {
+          try {
+            switch (phase_name) {
+              case 'staff':
+                await this.client.deleteStaff(location_id, id);
+                break;
+              case 'schedules':
+                await this.client.setSchedule(location_id, {
+                  schedules_to_delete: [{ team_member_id: id, dates: [date!] }],
+                });
+                break;
+              case 'test_bookings':
+                await this.client.deleteBooking(location_id, id);
+                break;
+              case 'services':
+                await this.client.deleteService(location_id, id);
+                break;
+              case 'categories':
+                await this.client.deleteServiceCategory(location_id, id);
+                break;
+              case 'clients':
+                await this.client.deleteClient(location_id, id);
+                break;
+              case 'positions':
+                await this.client.deletePosition(location_id, id);
+                break;
+              default:
+                throw new Error('This phase has no rollback operation');
+            }
+          } catch (error) {
+            // A recorded ID already absent after a crash needs no further delete.
+            if (!(
+              error instanceof AltegioApiError && error.statusCode === 404
+            )) {
+              logger.warn(
+                { error, id, phase_name },
+                'Failed to delete onboarding entity'
+              );
+              deletedCount.failed++;
+              continue;
+            }
+          }
+          // Persistence errors abort here, outside the API failure catch. Do not
+          // delete more objects after losing the ability to record progress.
+          await session.removeCreated(phase_name, id, date);
+          deletedCount.success++;
+        }
+        const failedIds =
+          session.state.checkpoints[phase_name]?.entity_ids ?? [];
+        await session.clearEmptyCheckpoint(phase_name);
+        const interrupted =
+          session.state.checkpoints[phase_name]?.completed === false;
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text:
+                `Rolled back ${toAgentPhase(requestedPhase)}: processed ${targets.length} entities\n` +
+                `✓ Successfully handled: ${deletedCount.success}\n` +
+                (deletedCount.failed > 0
+                  ? `✗ Failed: ${deletedCount.failed}; checkpoint retained for IDs [${failedIds.join(', ')}]\n`
+                  : '') +
+                (interrupted
+                  ? 'Interrupted batch history retained. Reconcile any unconfirmed upstream writes before importing again.\n'
+                  : ''),
+            },
+          ],
+        };
+      });
     });
   }
 }

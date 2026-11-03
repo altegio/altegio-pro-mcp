@@ -71,6 +71,7 @@ function altegioStub() {
     createServiceCategory: jest.fn(created),
     createService: jest.fn(created),
     setSchedule: jest.fn(async () => []),
+    getSchedule: jest.fn(async () => []),
     createClient: jest.fn(created),
     createBooking: jest.fn(async () => {
       bookings += 1;

@@ -16,6 +16,7 @@ describe('Onboarding E2E Flow', () => {
     stateManager = new OnboardingStateManager(testDir);
 
     // Create comprehensive mock client with all CRUD methods
+    let testClientId = 1000;
     mockClient = {
       isAuthenticated: jest.fn().mockReturnValue(true),
       getLocation: jest
@@ -26,7 +27,8 @@ describe('Onboarding E2E Flow', () => {
       createStaff: jest.fn(),
       createServiceCategory: jest.fn(),
       createService: jest.fn(),
-      createClient: jest.fn(),
+      createClient: jest.fn(async () => ({ id: testClientId++ })),
+      getSchedule: jest.fn().mockResolvedValue([]),
       createBooking: jest.fn(),
       deleteStaff: jest.fn(),
       deleteBooking: jest.fn(),
@@ -194,7 +196,10 @@ Carol White,Massage Therapist,no,no`;
         .fn()
         .mockResolvedValueOnce({ id: 30, name: 'John Doe' })
         .mockResolvedValueOnce({ id: 31, name: 'Jane Smith' })
-        .mockResolvedValueOnce({ id: 32, name: 'Mike Johnson' });
+        .mockResolvedValueOnce({ id: 32, name: 'Mike Johnson' })
+        .mockImplementation(async () => ({
+          id: 1000 + mockClient.createClient.mock.calls.length,
+        }));
 
       const clientsCSV = `name,phone,email,surname
 John,+1555001001,john.doe@email.com,Doe
@@ -669,7 +674,8 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
       // Verify all bookings have test client data
       bookingCalls.forEach((call, idx) => {
         expect(call.client.name).toBe(`Test Client ${idx + 1}`);
-        expect(call.client.phone).toMatch(/^\+100000000\d$/);
+        expect(call.client.phone).toMatch(/^\+1000\d{7}$/);
+        expect(call.send_sms).toBe(0);
         expect(call.datetime).toMatch(/^\d{4}-\d{2}-\d{2} 10:00:00$/);
       });
     });
