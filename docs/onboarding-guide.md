@@ -528,6 +528,10 @@ crash or storage failure after an upstream mutation but before its checkpoint
 may require manual reconciliation. A storage failure stops the batch immediately
 and reports the known created ID; ambiguous upstream writes are never retried
 automatically. Do not rerun the entire batch to resolve an uncertain outcome.
+Timeouts, cancellations, network failures, malformed success responses and server
+errors stop further creations and leave the batch marked interrupted. Only an
+explicit 4xx refusal (except the ambiguous HTTP 408) counts as a failed row that
+allows the remaining rows to proceed. Status and resume report interrupted history.
 Rollback retains interrupted batch markers even after all known IDs are removed;
 reconcile any unconfirmed writes before clearing that history or importing again.
 

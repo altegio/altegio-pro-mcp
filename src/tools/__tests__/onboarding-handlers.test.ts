@@ -1,6 +1,7 @@
 import { OnboardingHandlers } from '../onboarding-handlers';
 import { AltegioClient } from '../../providers/altegio-client';
 import { OnboardingStateManager } from '../../providers/onboarding-state-manager';
+import { AltegioApiError } from '../../utils/errors';
 import type { ToolResult } from '../tool-result';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -924,7 +925,7 @@ describe('Onboarding Handlers', () => {
       mockClient.createBooking = jest
         .fn()
         .mockResolvedValueOnce({ id: 100 })
-        .mockRejectedValueOnce(new Error('Team member is busy'));
+        .mockRejectedValueOnce(new AltegioApiError('Team member is busy', 409));
 
       const result = await handlers.createTestBookings({
         location_id: 123,
@@ -1077,7 +1078,7 @@ describe('Onboarding Handlers', () => {
       await handlers.start({ location_id: 123 });
       (mockClient as unknown as Record<string, jest.Mock>)[method] = jest
         .fn()
-        .mockRejectedValue(new Error(CANARY));
+        .mockRejectedValue(new AltegioApiError(CANARY, 422));
 
       const result = await run();
       expect(result.isError).toBeUndefined();

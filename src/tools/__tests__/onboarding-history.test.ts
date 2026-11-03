@@ -122,7 +122,7 @@ describe('onboarding batch history and rollback', () => {
       }
       const create = jest.fn().mockResolvedValueOnce({ id: 101 });
       if (example.partial)
-        create.mockRejectedValueOnce(new Error('row refused'));
+        create.mockRejectedValueOnce(new AltegioApiError('row refused', 422));
       create.mockResolvedValueOnce({ id: 102 });
       client[example.create] = create as never;
       const first = await handlers[example.method]({
@@ -194,6 +194,9 @@ describe('onboarding batch history and rollback', () => {
         const clientIds = (await state.load(LOCATION))!.checkpoints.clients!
           .entity_ids;
         expect(clientIds).toHaveLength(example.partial ? 3 : 2);
+        expect(
+          client.createBooking.mock.calls.map((call) => call[1].client.id)
+        ).toEqual(clientIds);
         await other.rollbackPhase({
           location_id: LOCATION,
           phase_name: 'clients',
@@ -246,6 +249,73 @@ describe('onboarding batch history and rollback', () => {
       expect(result.isError).toBeFalsy();
     expect(onDisk().checkpoints.positions).toBeUndefined();
     expect(onDisk().checkpoints.staff.entity_ids).toEqual([2]);
+  });
+
+  it.each(batchCases)(
+    'keeps $phase incomplete and stops after an ambiguous upstream write',
+    async (example) => {
+      if (example.phase === 'test_bookings') {
+        await state.checkpoint(LOCATION, 'staff', [1]);
+        await state.checkpoint(LOCATION, 'services', [10]);
+      }
+      const create = jest
+        .fn()
+        .mockRejectedValueOnce(
+          new DOMException('request timed out', 'TimeoutError')
+        )
+        .mockResolvedValue({ id: 102 });
+      client[example.create] = create as never;
+      const result = await handlers[example.method]({
+        location_id: LOCATION,
+        ...example.args,
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toMatch(/reconcile/i);
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(onDisk().checkpoints[example.phase].completed).toBe(false);
+      const status = await other.status({ location_id: LOCATION });
+      expect(status.content[0]?.text).toContain('Interrupted batches:');
+    }
+  );
+
+  it.each([
+    new TypeError('fetch failed'),
+    new DOMException('cancelled', 'AbortError'),
+    new AltegioApiError('server failed', 502),
+    new AltegioApiError('unconfirmed success body', 200),
+    new AltegioApiError('request timeout', 408),
+  ])(
+    'preserves interrupted history for an uncertain write: %s',
+    async (error) => {
+      client.createPosition = jest.fn().mockRejectedValue(error) as never;
+      const result = await handlers.addPositions({
+        location_id: LOCATION,
+        positions: [{ title: 'One' }, { title: 'Two' }],
+      });
+      expect(result.isError).toBe(true);
+      expect(client.createPosition).toHaveBeenCalledTimes(1);
+      expect(onDisk().checkpoints.positions.completed).toBe(false);
+    }
+  );
+
+  it('stops schedule writes when a workday result is unknown', async () => {
+    await state.checkpoint(LOCATION, 'staff', [1]);
+    client.setSchedule.mockRejectedValueOnce(
+      new DOMException('request timed out', 'TimeoutError')
+    );
+    const result = await handlers.setSchedules({
+      location_id: LOCATION,
+      schedules: [
+        {
+          team_member_id: 1,
+          dates: ['2026-01-01', '2026-01-02'],
+          slots: [{ from: '09:00', to: '17:00' }],
+        },
+      ],
+    });
+    expect(result.isError).toBe(true);
+    expect(client.setSchedule).toHaveBeenCalledTimes(1);
+    expect(onDisk().checkpoints.schedules.completed).toBe(false);
   });
 
   it('records every successful row before the next creation and aborts if that persistence fails', async () => {
@@ -460,7 +530,7 @@ describe('onboarding batch history and rollback', () => {
     const slots = [{ from: '09:00', to: '17:00' }];
     client.setSchedule
       .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error('day refused'))
+      .mockRejectedValueOnce(new AltegioApiError('day refused', 422))
       .mockResolvedValueOnce([]);
     const result = await handlers.setSchedules({
       location_id: LOCATION,

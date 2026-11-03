@@ -1,6 +1,7 @@
 import { OnboardingHandlers } from '../tools/onboarding-handlers';
 import { AltegioClient } from '../providers/altegio-client';
 import { OnboardingStateManager } from '../providers/onboarding-state-manager';
+import { AltegioApiError } from '../utils/errors';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -525,7 +526,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
       mockClient.createStaff = jest
         .fn()
         .mockResolvedValueOnce({ id: 1, name: 'Alice' })
-        .mockRejectedValueOnce(new Error('Network error'))
+        .mockRejectedValueOnce(new AltegioApiError('Row refused', 422))
         .mockResolvedValueOnce({ id: 3, name: 'Carol' });
 
       const result = await handlers.addStaffBatch({
@@ -541,7 +542,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
 
       expect(result.content[0]?.text).toContain('2 team members created');
       expect(result.content[0]?.text).toContain('1 failed');
-      expect(result.content[0]?.text).toContain('Network error');
+      expect(result.content[0]?.text).toContain('Row refused');
 
       // Verify only successful entities were checkpointed
       const state = await stateManager.load(companyId);
@@ -709,7 +710,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
       mockClient.createBooking = jest
         .fn()
         .mockResolvedValueOnce({ id: 100 })
-        .mockRejectedValueOnce(new Error('Booking conflict'))
+        .mockRejectedValueOnce(new AltegioApiError('Booking conflict', 409))
         .mockResolvedValueOnce({ id: 102 });
 
       const result = await handlers.createTestBookings({

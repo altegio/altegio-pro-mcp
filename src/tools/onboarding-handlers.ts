@@ -75,6 +75,31 @@ function failedRow(row: unknown, error: unknown): FailedRow {
   return { row, reason: error instanceof Error ? error.message : error };
 }
 
+/** Only an explicit client-error response proves a row was refused. */
+function requireDefinitiveWriteRejection(error: unknown): void {
+  if (
+    error instanceof AltegioApiError &&
+    error.statusCode !== undefined &&
+    error.statusCode >= 400 &&
+    error.statusCode < 500 &&
+    error.statusCode !== 408
+  )
+    return;
+  throw new Error(
+    'An upstream write could not be confirmed. The batch remains interrupted; stop and reconcile upstream state before retrying or importing more rows.',
+    { cause: error }
+  );
+}
+
+function interruptedHistoryNote(state: OnboardingState): string {
+  const phases = OnboardingPhaseSchema.options.filter(
+    (phase) => state.checkpoints[phase]?.completed === false
+  );
+  return phases.length
+    ? `\nInterrupted batches: ${phases.map(toAgentPhase).join(', ')}. Reconcile unconfirmed upstream writes before importing again.`
+    : '';
+}
+
 /**
  * One failed row as one line, for the fence and for structured content alike.
  *
@@ -196,7 +221,11 @@ function statusView(state: OnboardingState) {
   return {
     location_id: state.company_id,
     phase: toAgentPhase(state.phase),
-    completed: state.phase === 'complete',
+    completed:
+      state.phase === 'complete' &&
+      Object.values(state.checkpoints).every(
+        (checkpoint) => checkpoint.completed
+      ),
     started_at: state.started_at,
     updated_at: state.updated_at,
     checkpoints,
@@ -350,7 +379,8 @@ export class OnboardingHandlers {
               `Current phase: ${view.phase}\n` +
               `Started: ${state.started_at}\n\n` +
               `Completed:\n${completedPhases || '  (none yet)'}\n\n` +
-              `Continue with next step based on current phase.`,
+              `Continue with next step based on current phase.` +
+              interruptedHistoryNote(state),
           },
         ],
       };
@@ -382,7 +412,8 @@ export class OnboardingHandlers {
               `Onboarding Status - Location ${location_id}\n\n` +
               `Phase: ${view.phase}\n` +
               `Total entities created: ${view.total_entities}\n` +
-              `Phases completed: ${view.checkpoints.length}`,
+              `Phases completed: ${Object.values(state.checkpoints).filter((checkpoint) => checkpoint.completed).length}` +
+              interruptedHistoryNote(state),
           },
         ],
       };
@@ -420,6 +451,7 @@ export class OnboardingHandlers {
             );
             createdId = result.id;
           } catch (error) {
+            requireDefinitiveWriteRejection(error);
             failures.push(failedRow(position.title, error));
             continue;
           }
@@ -524,6 +556,7 @@ export class OnboardingHandlers {
             );
             createdId = result.id;
           } catch (error) {
+            requireDefinitiveWriteRejection(error);
             failures.push(failedRow(staff.name, error));
             continue;
           }
@@ -583,6 +616,7 @@ export class OnboardingHandlers {
             );
             createdId = result.id;
           } catch (error) {
+            requireDefinitiveWriteRejection(error);
             failures.push(failedRow(category.title, error));
             continue;
           }
@@ -648,6 +682,7 @@ export class OnboardingHandlers {
             );
             createdId = result.id;
           } catch (error) {
+            requireDefinitiveWriteRejection(error);
             failures.push(failedRow(service.title, error));
             continue;
           }
@@ -760,6 +795,7 @@ export class OnboardingHandlers {
             try {
               await this.client.setSchedule(location_id, request);
             } catch (error) {
+              requireDefinitiveWriteRejection(error);
               failures.push(
                 failedRow(
                   `team member ${schedule.team_member_id} on ${date}`,
@@ -839,6 +875,7 @@ export class OnboardingHandlers {
             );
             createdId = result.id;
           } catch (error) {
+            requireDefinitiveWriteRejection(error);
             failures.push(failedRow(client.name, error));
             continue;
           }
@@ -921,6 +958,7 @@ export class OnboardingHandlers {
               );
               clientId = createdClient.id;
             } catch (error) {
+              requireDefinitiveWriteRejection(error);
               failedClients++;
               failures.push(failedRow(`test client ${i + 1}`, error));
               continue;
@@ -936,11 +974,12 @@ export class OnboardingHandlers {
                 // sample bookings land even if the test staff has no schedule.
                 seance_length: 3600,
                 save_if_busy: true,
-                client,
+                client: { ...client, id: clientId },
                 send_sms: 0,
               });
               createdId = appointment.id;
             } catch (error) {
+              requireDefinitiveWriteRejection(error);
               logger.warn({ error }, 'Failed to create test appointment');
               failures.push(
                 failedRow(`test appointment ${i + 1} at ${datetime}`, error)
