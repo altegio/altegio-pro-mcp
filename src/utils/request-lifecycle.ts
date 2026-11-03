@@ -10,7 +10,16 @@ export class RequestActivity {
   private accepting = true;
   private readonly idle = new Set<() => void>();
   private readonly shutdown = new AbortController();
-  constructor(private readonly parent?: RequestActivity) {}
+  private readonly shutdownSignal: AbortSignal;
+  constructor(private readonly parent?: RequestActivity) {
+    this.shutdownSignal = parent
+      ? AbortSignal.any([this.shutdown.signal, parent.shutdownSignal])
+      : this.shutdown.signal;
+  }
+
+  private isAccepting(): boolean {
+    return this.accepting && (this.parent?.isAccepting() ?? true);
+  }
 
   begin(): () => void {
     this.count++;
@@ -28,13 +37,13 @@ export class RequestActivity {
     signal: AbortSignal | undefined,
     fn: () => Promise<T>
   ): Promise<T> {
-    if (!this.accepting)
+    if (!this.isAccepting())
       throw new DOMException('Server is draining', 'AbortError');
     const finish = this.begin();
     try {
       return await requestSignal.run(
         AbortSignal.any(
-          signal ? [signal, this.shutdown.signal] : [this.shutdown.signal]
+          signal ? [signal, this.shutdownSignal] : [this.shutdownSignal]
         ),
         fn
       );

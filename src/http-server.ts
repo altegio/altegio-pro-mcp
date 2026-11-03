@@ -5,13 +5,17 @@ import { isEntrypoint, installShutdownSignals } from './utils/entrypoint.js';
 import { parseProxyKeys, verifyProxyRequest } from './utils/proxy-auth.js';
 import { browserBoundary, httpMode } from './utils/http-policy.js';
 import { RequestActivity } from './utils/request-lifecycle.js';
+import { UpstreamRateGate } from './utils/upstream-budget.js';
 import { randomUUID } from 'node:crypto';
 import express from 'express';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {
-  ClientRequestSchema,
+  NodeStreamableHTTPServerTransport as StreamableHTTPServerTransport,
+  toNodeHandler,
+} from '@modelcontextprotocol/node';
+import {
+  createMcpHandler,
   isInitializeRequest,
-} from '@modelcontextprotocol/sdk/types.js';
+} from '@modelcontextprotocol/server';
 import { createServer } from './server.js';
 import { loadConfig } from './config/schema.js';
 import {
@@ -30,6 +34,7 @@ import {
 } from './utils/logger.js';
 import {
   requestContextFromHeaders,
+  requestPrincipalKey,
   runWithContext,
   type RequestContext,
 } from './request-context.js';
@@ -44,10 +49,26 @@ const logger = createLogger('http-server');
 
 type TransportRegistry = Record<string, StreamableHTTPServerTransport>;
 
-/** Every request method the protocol defines for a client to send. */
-const MCP_CLIENT_METHODS: ReadonlySet<string> = new Set(
-  ClientRequestSchema.options.map((schema) => schema.shape.method.value)
-);
+/** 2025-era request methods used only by the retained legacy entry. */
+const MCP_CLIENT_METHODS: ReadonlySet<string> = new Set([
+  'initialize',
+  'ping',
+  'tools/list',
+  'tools/call',
+  'resources/list',
+  'resources/templates/list',
+  'resources/read',
+  'resources/subscribe',
+  'resources/unsubscribe',
+  'prompts/list',
+  'prompts/get',
+  'completion/complete',
+  'logging/setLevel',
+  'tasks/get',
+  'tasks/result',
+  'tasks/list',
+  'tasks/cancel',
+]);
 
 /**
  * Methods that mean a session is in real use. A session that only initialized
@@ -242,6 +263,11 @@ export function createApp(
     }
   );
   const leases = new WeakMap<StreamableHTTPServerTransport, HttpSessionLease>();
+  const dualHandlers: Array<ReturnType<typeof createMcpHandler>> = [];
+  // A fresh SDK instance must not reset a caller's upstream rate window.
+  // Shared across views, bounded like the existing per-caller quotas.
+  const rateGates = new Map<string, UpstreamRateGate>();
+  let inFlight = 0;
   const trackPost = (
     transport: StreamableHTTPServerTransport,
     res: express.Response
@@ -493,6 +519,52 @@ export function createApp(
   for (const { path, facet } of FACET_ROUTES) {
     const transports = transportsByFacet[facet];
 
+    if (env.MCP_PROTOCOL_MODE === 'dual') {
+      const handler = createMcpHandler(
+        ({ requestInfo }) =>
+          runWithContext(
+            requestContextFromHeaders(
+              requestInfo ? Object.fromEntries(requestInfo.headers) : {}
+            ),
+            () => {
+              const caller = requestPrincipalKey() ?? 'anonymous';
+              const rateGate =
+                rateGates.get(caller) ??
+                new UpstreamRateGate(
+                  config.altegio.rateLimit.requests,
+                  config.altegio.rateLimit.windowMs
+                );
+              rateGates.delete(caller);
+              rateGates.set(caller, rateGate);
+              if (rateGates.size > 10_000) {
+                const oldest = rateGates.keys().next().value;
+                if (oldest !== undefined) rateGates.delete(oldest);
+              }
+              return createServer({ facet, http: true, activity, rateGate });
+            }
+          ),
+        { maxRequestBodySize: 17 * 1024 * 1024 }
+      );
+      dualHandlers.push(handler);
+      const handle = toNodeHandler(handler);
+      app.all(path, async (req, res) => {
+        if (inFlight >= (options.maxSessions ?? env.MCP_HTTP_MAX_SESSIONS)) {
+          refuseAtCapacity(res, req.body?.id ?? null);
+          return;
+        }
+        inFlight++;
+        res.locals.stateless = true;
+        try {
+          await runWithContext(requestContextFromHeaders(req.headers), () =>
+            handle(req, res, req.body)
+          );
+        } finally {
+          inFlight--;
+        }
+      });
+      continue;
+    }
+
     // POST — client sends JSON-RPC messages
     app.post(path, async (req, res) => {
       const sessionId = req.headers['mcp-session-id'] as string | undefined;
@@ -734,6 +806,8 @@ export function createApp(
       draining = true;
     },
     closeTransports: async () => {
+      await Promise.allSettled(dualHandlers.map((handler) => handler.close()));
+      rateGates.clear();
       await Promise.allSettled(
         [...servers].map((server) => {
           server.activity.abort();

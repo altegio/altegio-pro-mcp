@@ -9,6 +9,7 @@ const nodeGlobals = Object.fromEntries(
     'AbortController',
     'AbortSignal',
     'Buffer',
+    'Request',
     'URL',
     'URLSearchParams',
     '__dirname',

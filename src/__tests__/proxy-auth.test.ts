@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 import { createHmac } from 'node:crypto';
 import { parseProxyKeys, verifyProxyRequest } from '../utils/proxy-auth.js';
-import type { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import type { NodeStreamableHTTPServerTransport as StreamableHTTPServerTransport } from '@modelcontextprotocol/node';
 import { createApp } from '../http-server.js';
 import type { AddressInfo } from 'node:net';
 const key = '0123456789abcdef0123456789abcdef';

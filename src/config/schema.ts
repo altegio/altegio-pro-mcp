@@ -173,6 +173,9 @@ export const EnvSchema = z.object({
     .default('info'),
 
   MCP_HTTP_MODE: z.enum(['local', 'hosted']).optional(),
+  // Keep the production protocol posture until the deployed platform canary
+  // passes ADR D7. `dual` serves both eras without HTTP session state.
+  MCP_PROTOCOL_MODE: z.enum(['legacy', 'dual']).default('legacy'),
   MCP_HTTP_HOST: z.string().min(1).optional(),
   MCP_HTTP_ALLOWED_HOSTS: z.string().optional(),
   MCP_HTTP_ALLOWED_ORIGINS: z.string().optional(),
@@ -355,6 +358,7 @@ export class ConfigLoader {
         NODE_ENV: env.NODE_ENV,
         LOG_LEVEL: env.LOG_LEVEL,
         MCP_HTTP_MODE: env.MCP_HTTP_MODE,
+        MCP_PROTOCOL_MODE: env.MCP_PROTOCOL_MODE,
         MCP_HTTP_HOST: env.MCP_HTTP_HOST,
         MCP_HTTP_ALLOWED_HOSTS: env.MCP_HTTP_ALLOWED_HOSTS,
         MCP_HTTP_ALLOWED_ORIGINS: env.MCP_HTTP_ALLOWED_ORIGINS,

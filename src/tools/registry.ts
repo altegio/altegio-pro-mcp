@@ -1,14 +1,11 @@
 import { RequestActivity } from '../utils/request-lifecycle.js';
 import { ZodError } from 'zod';
 import { createLogger, logSafeToken, sessionLogId } from '../utils/logger.js';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { Server, type ServerContext } from '@modelcontextprotocol/server';
 import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  McpError,
-  ErrorCode,
-  type RequestId,
-} from '@modelcontextprotocol/sdk/types.js';
+  ProtocolError as McpError,
+  ProtocolErrorCode as ErrorCode,
+} from '@modelcontextprotocol/server';
 import { AltegioClient } from '../providers/altegio-client.js';
 import { OnboardingHandlers } from './onboarding-handlers.js';
 import { OnboardingStateManager } from '../providers/onboarding-state-manager.js';
@@ -145,8 +142,8 @@ function outOfFacetError(
 /**
  * Bind the confirmation gate to one MCP request.
  *
- * `relatedRequestId` ties the prompt to the tool call that triggered it, which
- * is what routes it back to the right session on Streamable HTTP.
+ * The SDK context binds legacy elicitation to the tool call that triggered
+ * it. Modern calls use the same confirmation-token fallback as old hosts.
  *
  * The capability check is the point of this function: `elicitInput` throws
  * synchronously on a client that never declared elicitation, and a host that
@@ -154,24 +151,24 @@ function outOfFacetError(
  */
 function confirmationRuntime(
   server: Server,
-  relatedRequestId: RequestId
+  context: ServerContext
 ): ConfirmationRuntime {
   return {
     supportsElicitation: () =>
+      // Modern requests use the existing argument-bound confirmation token.
+      // Push elicitation is legal only on a negotiated legacy connection.
+      !context.mcpReq.envelope &&
       Boolean(server.getClientCapabilities()?.elicitation?.form),
 
     elicit: async (message): Promise<ConfirmationAnswer> => {
-      const result = await server.elicitInput(
-        {
-          mode: 'form',
-          message,
-          // This is a confirmation, with no data to collect. MCP's action
-          // already expresses consent; a second decision field makes hosts
-          // reject an otherwise explicit accept or display two choices.
-          requestedSchema: { type: 'object', properties: {} },
-        },
-        { relatedRequestId }
-      );
+      const result = await context.mcpReq.elicitInput({
+        mode: 'form',
+        message,
+        // This is a confirmation, with no data to collect. MCP's action
+        // already expresses consent; a second decision field makes hosts
+        // reject an otherwise explicit accept or display two choices.
+        requestedSchema: { type: 'object', properties: {} },
+      });
       return result.action;
     },
   };
@@ -517,8 +514,11 @@ export function registerTools(
   };
 
   // list handler — the same list for every connection to this facet
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: listing.tools,
+  server.setRequestHandler('tools/list', async () => ({
+    tools: listing.tools.map((tool) => ({
+      ...tool,
+      inputSchema: { ...tool.inputSchema, type: 'object' as const },
+    })),
   }));
 
   // Own keys only: a name such as `constructor` is not a tool.
@@ -530,7 +530,7 @@ export function registerTools(
 
   // call handler
   const activity = options.activity ?? new RequestActivity();
-  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+  server.setRequestHandler('tools/call', async (request, extra) => {
     const { name: requested, arguments: args } = request.params;
     // What the tool_call log reports about this call, filled in as it runs.
     const call: {
@@ -631,7 +631,7 @@ export function registerTools(
           args: callArgs,
           prepared,
           client,
-          runtime: confirmationRuntime(server, extra.requestId),
+          runtime: confirmationRuntime(server, extra),
           ...(call.via ? { dispatcher: call.via } : {}),
         });
         if ('stop' in gate) {
@@ -651,8 +651,10 @@ export function registerTools(
     // scope surrounding transport.handleRequest(), even though the source-level
     // Jest transform happens to retain it. Re-bind from the SDK's immutable copy
     // of the original HTTP headers at the actual tool-handler boundary. Stdio
-    // has no requestInfo and keeps its existing single-user context.
-    const headers = extra.requestInfo?.headers;
+    // has no HTTP request and keeps its existing single-user context.
+    const headers = extra.http?.req
+      ? Object.fromEntries(extra.http.req.headers)
+      : undefined;
     const onView = async () => {
       const started = performance.now();
       const observation = createToolCallObservation();
@@ -801,7 +803,7 @@ export function registerTools(
         throw error;
       }
     };
-    return activity.run(extra.signal, () =>
+    return activity.run(extra.mcpReq.signal, () =>
       headers
         ? runWithContext(requestContextFromHeaders(headers), onView)
         : onView()

@@ -78,7 +78,8 @@
   },
   "dependencies": {
     "@e965/xlsx": "^0.20.3",
-    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@modelcontextprotocol/node": "^2.1.2",
+    "@modelcontextprotocol/server": "^2.4.0",
     "cheerio": "^1.2.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
@@ -91,6 +92,8 @@
     "@commitlint/cli": "^21.2.1",
     "@commitlint/config-conventional": "^21.2.0",
     "@eslint/js": "^10.0.1",
+    "@modelcontextprotocol/client": "^2.4.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.19.2",
@@ -118,5 +121,9 @@
     "node": "^24.22.2 || ^26.13.0",
     "npm": ">=11.20.0 <12"
   },
-  "packageManager": "npm@11.20.0"
+  "packageManager": "npm@11.20.0",
+  "overrides": {
+    "glob": "^14.0.3",
+    "minimatch": "^11.0.4"
+  }
 }

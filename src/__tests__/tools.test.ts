@@ -5,8 +5,7 @@ import { registerTools } from '../tools/registry.js';
 import { ALL_TOOLS_FACET } from '../tools/facets.js';
 import { AltegioClient } from '../providers/altegio-client.js';
 import { ToolHandlers } from '../tools/handlers.js';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { Server } from '@modelcontextprotocol/server';
 import { getRequestUserToken } from '../request-context.js';
 
 describe('Tool Registration', () => {
@@ -152,14 +151,15 @@ describe('Tool Registration', () => {
         params: { name: string; arguments: Record<string, unknown> };
       },
       extra: {
-        requestInfo?: { headers: Record<string, string>; url: URL };
+        http: { req: Request };
+        mcpReq: { signal: AbortSignal };
       }
     ) => Promise<unknown>;
 
     let callHandler: RegisteredHandler | undefined;
     const server = {
       setRequestHandler: (schema: unknown, handler: RegisteredHandler) => {
-        if (schema === CallToolRequestSchema) callHandler = handler;
+        if (schema === 'tools/call') callHandler = handler;
       },
     } as unknown as Server;
     let tokenSeenByClient: string | undefined;
@@ -180,10 +180,12 @@ describe('Tool Registration', () => {
         },
       },
       {
-        requestInfo: {
-          headers: { 'x-altegio-user-token': 'direct-user-token' },
-          url: new URL('https://mcp.alteg.io/public/pro/mcp'),
+        http: {
+          req: new Request('https://mcp.alteg.io/public/pro/mcp', {
+            headers: { 'x-altegio-user-token': 'direct-user-token' },
+          }),
         },
+        mcpReq: { signal: new AbortController().signal },
       }
     );
 
