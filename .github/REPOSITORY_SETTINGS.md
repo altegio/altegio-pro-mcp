@@ -19,9 +19,10 @@ These are exact proposed maintainer deltas, to apply after independent review.
 Create an **active branch ruleset** named `main-reviewed-delivery`, target
 `refs/heads/main`, with no routine bypass actors. Require:
 
-- pull requests with **one independent approval**, stale-approval dismissal,
-  code-owner review, approval after the latest push and resolution of review
-  conversations;
+- pull requests and resolution of review conversations, with **zero required
+  GitHub approvals** to preserve the owner's autonomous delivery policy;
+  independent code review remains a documented delivery requirement. Keep
+  code-owner approval and latest-push approval requirements disabled;
 - required checks, with strict/up-to-date branch policy:
   `Quality`, `Tests (Node 26)`, `Tests (Node 24)`, `Artifacts`,
   `Package (Node 24)`, `Dependency audit`, `CodeQL analysis`;
@@ -52,12 +53,11 @@ need a reviewed PR unless a separate, audited emergency policy is deliberately
 approved.
 
 `CODEOWNERS` uses verified current admin collaborators `@petroff` and
-`@maksimn-altegio`. Confirm the proposed routing with maintainers before activation.
-An author cannot approve their own PR, and a latest-push approver must be someone
-other than its pusher. An automated review summary is not a second human's
-GitHub approval. If only the author is available, delivery is blocked by the
-review requirement; do not weaken it. Existing broad administrator membership
-was observed, not endorsed or changed; any access review is separate work.
+`@maksimn-altegio` for optional review routing. A mandatory independent human
+approval, code-owner approval or latest-push approval would be a separate
+maintainer decision: an automated review summary cannot satisfy those GitHub
+gates. Never bypass an active review requirement. Existing administrator
+membership was observed, not changed; collaborator access is separate work.
 
 ## Security and Actions
 

@@ -132,7 +132,7 @@ it searches attaches a fresh summary to its pull request.
 ## Release artifact checks
 
 Build and stamp the exact checkout, then test the tarball from a separate
-consumer directory and the container without network access:
+consumer directory and the container through a loopback-published port:
 
 ```sh
 npm run build
@@ -148,7 +148,9 @@ npx tsx examples/basic-usage.ts
 The package check verifies file exclusions, source/lockfile provenance, real MCP
 initialization, current documented tool/prompt names and byte-exact Markdown
 resources from an installed package. The container check verifies Node 26,
-UID 1001, OCI revision, `/health` version/commit and the same MCP resources.
+UID 1001, OCI revision, `/health` version/commit, published-port reachability
+and the same MCP resources. Its synthetic upstream points to a closed loopback
+port.
 All identities are synthetic; neither probe calls a business API.
 
 CI saves and reloads the image and tests that same image ID. Node 24 installs the
