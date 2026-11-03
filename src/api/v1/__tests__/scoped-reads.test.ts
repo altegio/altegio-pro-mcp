@@ -62,7 +62,7 @@ describe('location-scoped reads without the location in the path', () => {
 
     expect(seen.map((s) => s.path.split('?')[0])).toEqual([
       '/client/4564/7',
-      '/loyalty/abonements',
+      '/loyalty/memberships',
     ]);
     expect(seen[1]!.scopedCompany).toBe(4564);
   });

@@ -25,7 +25,7 @@ export interface AltegioHttp {
    * @param init  standard fetch options; `Accept`, `Accept-Language` and
    *              `Authorization` are supplied by the transport.
    * @param scopedCompany  the location the call belongs to when the path does
-   *              not name it (`/loyalty/abonements?location_id=…`, a document
+   *              not name it (`/loyalty/memberships?location_id=…`, a document
    *              read by id): checked against the consent instead of the
    *              first number in the path. `null` means "no location".
    */

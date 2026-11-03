@@ -194,7 +194,7 @@ describe('AltegioClient with an Altegio OAuth access token', () => {
   describe('chains and locations from the grants', () => {
     it('refuses a chain the consent does not cover before any request', async () => {
       await expect(
-        asOauth(() => client.request('GET', '/chains/101/loyalty/abonements'))
+        asOauth(() => client.request('GET', '/chains/101/loyalty/memberships'))
       ).rejects.toThrow(/chain 101/);
       expect(mockedFetch).not.toHaveBeenCalled();
     });
@@ -204,12 +204,12 @@ describe('AltegioClient with an Altegio OAuth access token', () => {
 
       await asOauth(() =>
         runWithRequiredScopes(['chain_loyalty:read'], () =>
-          client.request('GET', '/chains/100/loyalty/abonements')
+          client.request('GET', '/chains/100/loyalty/memberships')
         )
       );
 
       expect(lastRequest().url).toBe(
-        'https://api.alteg.io/api/v1/chains/100/loyalty/abonements'
+        'https://api.alteg.io/api/v1/chains/100/loyalty/memberships'
       );
     });
 

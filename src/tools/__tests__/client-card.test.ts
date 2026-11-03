@@ -155,7 +155,7 @@ describe('clients_get_membership_purchases', () => {
   function membershipClient(overrides: Record<string, unknown> = {}) {
     const routes: Record<string, unknown> = {
       '/client/7/8': data({ phone: '+15550001111' }),
-      '/loyalty/abonements': data([
+      '/loyalty/memberships': data([
         {
           id: 10,
           number: 'A-1',
@@ -165,8 +165,8 @@ describe('clients_get_membership_purchases', () => {
         },
         { id: 11, number: 'B', type: { id: 5 }, goods_transaction_id: 0 },
       ]),
-      '/locations/7/client/8/loyalty/abonements/10/history': data([]),
-      '/locations/7/client/8/loyalty/abonements/11/history':
+      '/locations/7/client/8/loyalty/memberships/10/history': data([]),
+      '/locations/7/client/8/loyalty/memberships/11/history':
         new AltegioApiError('not found', 404),
       '/storage_operations/goods_transactions/7/20': data({
         id: 20,
@@ -247,7 +247,7 @@ describe('clients_get_membership_purchases', () => {
   it('reports refused sources as evidence gaps, not as errors', async () => {
     const result = await run(
       membershipClient({
-        '/locations/7/client/8/loyalty/abonements/11/history':
+        '/locations/7/client/8/loyalty/memberships/11/history':
           new AltegioApiError('forbidden', 403),
         '/locations/7/sale/30': new AltegioApiError('forbidden', 403),
       })
