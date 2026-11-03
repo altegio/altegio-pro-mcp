@@ -1,0 +1,27 @@
+openapi: 3.0.3
+info: { title: Synthetic canonical widgets, version: '2.0' }
+paths:
+  /widgets/{id}:
+    get:
+      operationId: get_widget_v2
+      responses: { '200': { description: OK } }
+    put:
+      operationId: update_widget_v2
+      responses: { '204': { description: OK } }
+  /widgets/search:
+    get:
+      operationId: find_widgets_v2
+      responses: { '200': { description: OK } }
+  /locations/{location_id}/widgets:
+    get:
+      operationId: list_widgets_v2
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { type: string } }
+                  meta: { type: object }

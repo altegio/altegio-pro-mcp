@@ -1,0 +1,8 @@
+openapi: 3.0.3
+info: { title: Synthetic preview, version: '3.0' }
+paths:
+  /preview/widgets:
+    get:
+      operationId: preview_widgets
+      x-altegio-status: preview
+      responses: { '200': { description: OK } }

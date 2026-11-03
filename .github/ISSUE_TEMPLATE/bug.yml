@@ -1,0 +1,36 @@
+name: Bug report
+description: Report a reproducible defect using synthetic data.
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        For sensitive vulnerabilities, follow SECURITY.md. Do not include tokens,
+        customer data, private endpoints or credential files in this public report.
+  - type: input
+    id: revision
+    attributes:
+      label: Version and commit
+      description: Include the exact checkout or /health commit, not just a moving branch.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Runtime and connection
+      placeholder: Node version, OS, source/tarball/container, stdio or HTTP view, MCP host
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Steps and synthetic inputs. Describe authentication mode without credentials.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: Include relevant sanitized errors and the checks you ran.
+    validations:
+      required: true

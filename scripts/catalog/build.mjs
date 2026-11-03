@@ -16,7 +16,8 @@
  *   node scripts/catalog/build.mjs --check       # fail if the committed file is stale
  *
  * The spec repository is read-only for this project (see OPENAPI.md). When it
- * is absent — CI does not clone it — the script prints a notice and exits 0.
+ * is absent, the command exits 2 (unavailable); public CI runs synthetic
+ * fixtures instead. The separate trusted gate verifies the pinned real spec.
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -378,7 +379,8 @@ function derefSchema(node, ctx, depth = 0, refStack = []) {
       ctx.warnings.push(`unresolved $ref ${ref} (from ${ctx.file})`);
       return { 'x-unresolved-ref': ref };
     }
-    const { $ref: _ignored, ...siblings } = node;
+    const siblings = { ...node };
+    delete siblings.$ref;
     const inner = derefSchema(
       resolved.value,
       { ...ctx, file: resolved.file },
@@ -1100,15 +1102,12 @@ function main(argv) {
 
   const docsRoot = resolveDocsRoot(args.docs);
   if (!docsRoot) {
-    console.log(
-      'catalog: OpenAPI spec repository not found — skipping.\n' +
-        '  Expected a `biz.erp.api.docs` checkout next to this repository, or\n' +
-        '  pass --docs <path> / set ALTEGIO_API_DOCS. See OPENAPI.md.\n' +
-        (args.check
-          ? '  --check is a no-op without the spec (CI does not clone it).'
-          : `  Nothing written; the committed ${path.relative(REPO_ROOT, outFile)} is unchanged.`)
+    console.error(
+      'catalog: OpenAPI spec repository not found.\n' +
+        '  Pass --docs <path> / set ALTEGIO_API_DOCS. See OPENAPI.md.\n' +
+        '  Real-spec validation is unavailable; no catalog check passed.'
     );
-    return 0;
+    return 2;
   }
 
   let catalog;

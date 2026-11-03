@@ -123,13 +123,13 @@ what makes it work inside a git worktree.
 
 ### Behaviour without the spec repository
 
-The spec repository is private and CI does not clone it. When it is absent both
-commands print a notice and exit 0 — `catalog:check` is **skipped with a notice
-in CI**, and only fails when the spec _is_ present and the committed catalog is
-stale. Practically that means the drift gate runs on a developer machine (and in
-the `scripts/catalog/__tests__/build.test.ts` suite, which skips the same way);
-CI protects against nothing worse than a missed rebuild, which the reviewer sees
-as an unexpected `catalog.json` diff.
+The private spec is unavailable in public CI. Generator tests always execute
+against public synthetic fixtures; the separate real-spec integration test is
+visibly skipped unless a snapshot is explicitly selected. `catalog:check`
+returns exit 2 when unavailable, so it cannot masquerade as successful drift
+validation. The reviewed, pinned trusted check is documented in
+[OPENAPI.md](../../OPENAPI.md#trusted-pinned-spec-gate). No private spec is
+committed or uploaded as a public artifact.
 
 ## The overlay
 

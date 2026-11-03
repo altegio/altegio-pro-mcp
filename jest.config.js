@@ -32,6 +32,11 @@ export default {
   // limit, so a long-lived worker grows towards that limit (gigabytes) unless
   // it is replaced. Two workers, each recycled once its heap passes 384 MB,
   // keep a full run near 1.5 GB on any machine.
+  // Floors rounded below the reviewed ff9aa383 coverage baseline. Behavioral
+  // regression suites remain the primary guard; a percentage is not a safety proof.
+  coverageThreshold: {
+    global: { statements: 90, branches: 75, functions: 88, lines: 91 },
+  },
   maxWorkers: 2,
   workerIdleMemoryLimit: '384MB',
 };

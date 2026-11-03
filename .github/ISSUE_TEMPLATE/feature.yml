@@ -1,0 +1,22 @@
+name: Feature proposal
+description: Explain the workflow, expected result and boundaries.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: What does a business owner or administrator need to accomplish?
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Proposed behavior
+      description: Include read/write scope, confirmation expectations and a synthetic example.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Current alternatives
+      description: Can existing tools, a named view or the read-only explorer cover this?
