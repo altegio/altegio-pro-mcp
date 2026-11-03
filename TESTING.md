@@ -32,6 +32,21 @@ selects an available snapshot. `npm run catalog:check` exits 2 when unavailable,
 not success. See [OPENAPI.md](OPENAPI.md) for the pinned trusted check. The
 surface check is self-contained; regenerate with `npm run surface:build`.
 
+Trusted catalog changes additionally require the explicit Docker containment
+checks (synthetic inputs only):
+
+```sh
+docker build --file scripts/catalog/Dockerfile --tag catalog-sandbox .
+node scripts/catalog/test-sandbox.mjs catalog-sandbox
+```
+
+They verify host-side equality, drift rejection, non-root/read-only/network
+containment, private and excessive output, timeout cleanup and rejected links.
+Public fixtures also cover stale-head/status identity, OIDC acquisition failure
+and optimized-Python archive guards. An actual successful trusted-main run is
+required before activating the private status; local success does not prove
+hosted archive access. See [OPENAPI.md](OPENAPI.md#trusted-pinned-spec-gate).
+
 Coverage floors protect the reviewed baseline: 90% statements, 75% branches,
 88% functions and 91% lines. Coverage runs once on Node 26 in CI; behavioral
 regressions and scope/refusal tests matter more than percentages. Lint probes
