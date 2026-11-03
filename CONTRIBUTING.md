@@ -1,222 +1,71 @@
-# Contributing to Altegio.Pro MCP Server
+# Contributing to Altegio Pro MCP
 
-Thanks for your interest in contributing! This guide will help you get started.
+Use [Issues](https://github.com/altegio/altegio-pro-mcp/issues) for reproducible
+bugs and feature proposals. Follow the [code of conduct](CODE_OF_CONDUCT.md).
+Report sensitive vulnerabilities through [SECURITY.md](SECURITY.md), without
+putting tokens or customer data in a public issue.
 
-## Code of Conduct
+## Development
 
-By participating, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md).
+Use Node.js **26.13.0** with its bundled npm **11.20.0**. Node.js **24.22.2**
+is the compatibility target. Python 3 is needed for the archive-safety fixtures
+(the shipped server runs on Node only). Node 20 and 22 are outside this project's supported
+matrix; this minimum-version change is intentional.
 
-## How to Contribute
-
-### Reporting Bugs
-
-Before creating bug reports, check existing issues. Include:
-
-- Clear title and description
-- Steps to reproduce
-- Expected vs actual behavior
-- Environment details (Node.js version, OS)
-- Error messages and stack traces
-
-### Suggesting Features
-
-Feature requests are tracked as GitHub issues. Include:
-
-- Clear description of the proposed functionality
-- Why this would be useful
-- Alternatives you've considered
-
-### Pull Requests
-
-1. Fork the repo and create your branch from `main`
-2. Follow coding standards below
-3. Add tests for new functionality
-4. Update documentation
-5. Ensure tests pass: `npm test && npm run lint`
-
-## Development Setup
-
-### Prerequisites
-
-- Node.js >= 20.17
-- npm
-- Git
-- Altegio Partner Token from [developer.alteg.io](https://developer.alteg.io)
-
-### Setup
-
-```bash
-# Clone your fork
-git clone https://github.com/YOUR_USERNAME/altegio-pro-mcp.git
+```sh
+git clone https://github.com/altegio/altegio-pro-mcp.git
 cd altegio-pro-mcp
-
-# Install dependencies
 npm ci
-
-# Configure environment
-cp .env.example .env
-# Edit .env and add ALTEGIO_API_TOKEN
-
-# Build and test
 npm run build
+npm run typecheck
+npm run lint
+npm run format:check
 npm test
+npm run surface:check
 ```
 
-### Project Structure
+Default tests use synthetic credentials, mocked API responses and temporary
+state; a partner account and private spec checkout are unnecessary. Do not
+set `ALTEGIO_E2E=1` for ordinary development. See [TESTING.md](TESTING.md) for
+resource limits, coverage floors and opt-in live checks.
 
-```
-src/
-  config/        # Configuration and validation
-  providers/     # API clients (altegio-client.ts)
-  tools/         # MCP tool handlers & registry
-  types/         # TypeScript interfaces
-  utils/         # Logging, errors, helpers
-  __tests__/     # Jest unit tests
-  index.ts       # stdio server entry
-  http-server.ts # HTTP server entry
+The package is an unpublished alpha. Use a source checkout or a verified
+prerelease tarball, rather than `npx @altegio/mcp-server-pro`.
 
-examples/        # Usage examples
-docs/            # Documentation
-```
+## Changes and review
 
-## Coding Standards
+1. Branch from `main`; keep each pull request focused on one behavior.
+2. Preserve per-request identity, location/chain scopes, read-only enforcement,
+   confirmation gates, canonical vocabulary and the no-retry rule for ambiguous
+   writes. Use isolated credential/state directories in every test.
+3. Add a regression test for a changed behavior. TypeScript is strict; avoid
+   `any`, unexplained casts and rule suppressions. Async work must be awaited or
+   explicitly handled, including event callbacks.
+4. Run the relevant checks above. For scripts, workflows or public-guide edits,
+   also run the expanded Prettier command in [CI-CD.md](CI-CD.md). Examples are
+   typechecked in CI and only inspect the local MCP protocol.
+5. Use [Conventional Commits](https://www.conventionalcommits.org/) such as
+   `fix(auth): isolate request credentials`. Describe the problem, resulting
+   behavior, meaningful validation and any remaining limitations in the PR.
+6. Complete independent code review and wait for CI and any configured GitHub
+   approvals. Merge with a merge commit. [CODEOWNERS](.github/CODEOWNERS)
+   routes review, while [repository settings](.github/REPOSITORY_SETTINGS.md)
+   records active enforcement and the pending private-spec setup.
 
-### TypeScript
+Maintainers review dependency-bot PRs like other changes. Major SDK/toolchain
+upgrades need compatibility evidence, not an automatic audit-fix downgrade.
 
-- Use strict mode (already enabled)
-- Type all function parameters and return values
-- Avoid `any` - use `unknown` with type guards
-- Use `interface` for objects, `type` for unions
+## Generated contracts
 
-### Formatting
+- `src/generated/catalog.json` is generated from a private read-only spec plus
+  `catalog/overlay/`. Public synthetic generator fixtures always run. The real
+  drift check requires the exact snapshot in [OPENAPI.md](OPENAPI.md); its
+  absence is explicitly unavailable, never a passing drift result.
+- `docs/architecture/tool-surface.md` is generated by `npm run surface:build`;
+  `npm run surface:check` detects drift without private inputs.
+- Regenerate affected contracts and review their diff. Never hand-edit the
+  inventories or copy private specifications into this public repository.
 
-- **Prettier** handles formatting (run `npm run format`)
-- 2 spaces indentation
-- Single quotes for strings
-- Trailing commas in multiline
-
-### Linting
-
-```bash
-npm run lint      # Check issues
-npm run lint:fix  # Auto-fix issues
-```
-
-All warnings must be resolved before merging.
-
-### Testing
-
-- Write tests for all new features
-- Cover behavior and regressions; avoid assertions that only duplicate implementation or prose
-- Use Jest with descriptive test names
-- Mock external dependencies
-- Test edge cases and errors
-
-Example test structure:
-
-```typescript
-describe('Feature', () => {
-  it('should do something specific', async () => {
-    // Arrange
-    const client = new AltegioClient(config, testDir);
-
-    // Act
-    const result = await client.someMethod();
-
-    // Assert
-    expect(result).toBeDefined();
-  });
-});
-```
-
-Run tests:
-
-```bash
-npm test              # All tests
-npm run test:watch    # Watch mode
-npm run test:coverage # With coverage
-```
-
-### Commit Messages
-
-Follow [Conventional Commits](https://www.conventionalcommits.org/):
-
-```
-<type>: <description>
-
-[optional body]
-```
-
-**Types:**
-
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation only
-- `refactor`: Code refactoring
-- `test`: Test changes
-- `chore`: Build/tooling changes
-- `ci`: CI/CD changes
-
-**Examples:**
-
-```
-feat: add support for client management tools
-fix: handle expired token refresh correctly
-docs: update Claude Desktop setup guide
-```
-
-## Documentation
-
-### Code Comments
-
-Use JSDoc for public APIs:
-
-```typescript
-/**
- * Login to Altegio with email and password
- *
- * @param email - User's Altegio email
- * @param password - User's password
- * @returns Promise with login response
- * @throws {AuthenticationError} If credentials invalid
- */
-async login(email: string, password: string): Promise<AltegioLoginResponse>
-```
-
-### README Updates
-
-Update README.md when:
-
-- Adding new tools
-- Changing configuration options
-- Modifying installation steps
-
-## Development Workflow
-
-1. **Create branch:** `git checkout -b feature/my-feature`
-2. **Make changes:** Follow coding standards
-3. **Test:** `npm test && npm run lint`
-4. **Commit:** Use conventional commits
-5. **Push:** `git push origin feature/my-feature`
-6. **PR:** Open pull request with clear description
-
-## CI/CD
-
-Push to `main` triggers:
-
-1. GitHub Actions CI (lint, test, build, security audit)
-2. VM auto-deploy within 2 minutes (git pull + docker compose rebuild)
-
-See [CI-CD.md](CI-CD.md) for details.
-
-## Questions?
-
-- Open an issue for general questions
-- Check [GitHub Discussions](https://github.com/altegio/altegio-pro-mcp/discussions)
-- Review existing documentation
-
-## Recognition
-
-Contributors are recognized in GitHub contributors page and release notes.
-
-Thank you for contributing!
+Read the [architecture ADR](docs/architecture/2026-09-07-mcp-platform-architecture.md)
+before reshaping tool exposure, and the relevant product docs before changing
+API behavior. Specification corrections belong in the specification repository.

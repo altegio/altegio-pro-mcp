@@ -26,6 +26,7 @@ import {
   type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { registerTools } from '../tools/registry.js';
+import { AltegioApiError } from '../utils/errors.js';
 import { onboardingTools } from '../tools/onboarding-registry.js';
 import type { AltegioClient } from '../providers/altegio-client.js';
 
@@ -64,17 +65,20 @@ function altegioStub() {
     // legal result too, not only the all-green path.
     createStaff: jest.fn(
       async (_location: number, request: { name: string }) => {
-        if (request.name === 'Bob') throw new Error(HOSTILE_REASON);
+        if (request.name === 'Bob')
+          throw new AltegioApiError(HOSTILE_REASON, 422);
         return created();
       }
     ),
     createServiceCategory: jest.fn(created),
     createService: jest.fn(created),
     setSchedule: jest.fn(async () => []),
+    getSchedule: jest.fn(async () => []),
     createClient: jest.fn(created),
     createBooking: jest.fn(async () => {
       bookings += 1;
-      if (bookings === 2) throw new Error('Team member is busy at this time');
+      if (bookings === 2)
+        throw new AltegioApiError('Team member is busy at this time', 409);
       return created();
     }),
     deleteBooking: jest.fn(async () => undefined),

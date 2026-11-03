@@ -28,6 +28,7 @@ export function prepareClientFile(
     filename.length < 1 ||
     filename.length > 255 ||
     filename !== filename.trim() ||
+    // eslint-disable-next-line no-control-regex -- Reject control bytes in multipart filenames.
     /[\\/\u0000-\u001f\u007f\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/u.test(
       filename
     )

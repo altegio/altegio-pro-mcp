@@ -36,7 +36,12 @@ import {
   noteUpstreamRetry,
 } from '../utils/tool-call-observation.js';
 import { upstreamDetail } from '../tools/tool-result.js';
-import { v2Path } from '../api/altegio-http.js';
+import { v2Path, type AltegioTransport } from '../api/altegio-http.js';
+import {
+  UpstreamBudget,
+  UpstreamRateGate,
+  fetchWithDeadline,
+} from '../utils/upstream-budget.js';
 import { hexColor } from '../utils/color.js';
 import {
   assertChainAllowed,
@@ -106,9 +111,6 @@ function rateLimitWaitMs(headers: Headers | undefined): number | undefined {
   const ms = seconds * 1000;
   return ms <= RATE_LIMIT_MAX_WAIT_MS ? Math.max(ms, 100) : undefined;
 }
-
-const pause = (ms: number) =>
-  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 function companyIdFromPath(endpoint: string): number | undefined {
   const path = endpoint.split('?')[0] ?? endpoint;
@@ -244,7 +246,7 @@ export interface LegacyWebRequest {
   query?: Readonly<Record<string, LegacyWebQueryValue>>;
 }
 
-export class AltegioClient {
+export class AltegioClient implements AltegioTransport {
   private apiUrl: string;
   private legacyWebUrl: string;
   private partnerToken: string;
@@ -254,12 +256,27 @@ export class AltegioClient {
   private requireDelegatedIdentity: boolean;
   /** Per-identity token cache backing the credential files (HTTP mode). */
   private tokenCache = new Map<string, string>();
+  private readonly timeoutMs: number;
+  private readonly retries: number;
+  private readonly retryDelayMs: number;
+  private readonly maxRetryDelayMs: number;
+  private readonly rateGate: UpstreamRateGate;
 
   constructor(
     config: AltegioConfig,
     credentialsDir?: string,
     options?: AltegioClientOptions
   ) {
+    this.timeoutMs = config.timeout ?? 30_000;
+    this.retries = config.retryConfig?.maxAttempts ?? 1;
+    this.retryDelayMs =
+      config.retryConfig?.initialDelay ?? NETWORK_RETRY_DELAY_MS;
+    this.maxRetryDelayMs =
+      config.retryConfig?.maxDelay ?? RATE_LIMIT_MAX_WAIT_MS;
+    this.rateGate = new UpstreamRateGate(
+      config.rateLimit?.requests ?? 200,
+      config.rateLimit?.windowMs ?? 60_000
+    );
     this.apiUrl = config.apiBase || 'https://api.alteg.io/api/v1';
     this.legacyWebUrl = (
       config.legacyWebBase || 'https://app.alteg.io'
@@ -338,7 +355,7 @@ export class AltegioClient {
   /**
    * Internal fetch wrapper with common headers
    */
-  private async apiRequest(
+  async apiRequest(
     endpoint: string,
     options: RequestInit = {},
     scopedCompanyOverride?: number | null
@@ -388,44 +405,54 @@ export class AltegioClient {
       endpoint = `${path}?${params.toString()}`;
     }
 
-    // A read is sent once more when it got no response at all (the dropped
-    // connection is gone) or a 429 (the rate window moves on), and a repeated
-    // GET changes nothing. A write is never repeated — it may have been
-    // applied before the connection dropped — and a timeout is not either,
-    // having waited long enough already. One repeat at most, whatever the
-    // cause.
     const repeatable = IDEMPOTENT_METHODS.has(
       (options.method ?? 'GET').toUpperCase()
     );
-    // The status (never the body) feeds the tool_call log's error class.
-    for (let attempt = 1; ; attempt += 1) {
-      let response: Response;
-      try {
-        response = await fetch(`${this.apiUrl}${endpoint}`, {
-          ...options,
-          headers,
-        });
-      } catch (error) {
-        if (repeatable && attempt === 1 && !isTimeout(error)) {
-          noteUpstreamRetry();
-          await pause(NETWORK_RETRY_DELAY_MS);
-          continue;
+    const budget = new UpstreamBudget(this.timeoutMs, options.signal);
+    try {
+      for (let attempt = 0; ; attempt++) {
+        await this.rateGate.admit(budget);
+        let response: Response;
+        try {
+          response = await budget.fetch(`${this.apiUrl}${endpoint}`, {
+            ...options,
+            headers,
+          });
+        } catch (error) {
+          // Cancellation/deadlines never replay a call. Writes are never retried,
+          // even when no response arrived: the upstream may have committed them.
+          if (
+            repeatable &&
+            attempt < this.retries &&
+            !budget.signal.aborted &&
+            !isTimeout(error) &&
+            !(error instanceof Error && error.name === 'AbortError')
+          ) {
+            noteUpstreamRetry();
+            await budget.pause(
+              Math.min(this.retryDelayMs * 2 ** attempt, this.maxRetryDelayMs)
+            );
+            continue;
+          }
+          throw error;
         }
-        noteUpstreamFailure(error);
-        throw error;
-      }
-      if (response.status === 429 && repeatable && attempt === 1) {
-        const wait = rateLimitWaitMs(response.headers);
-        if (wait !== undefined) {
-          await response.body?.cancel().catch(() => undefined);
-          noteUpstreamRetry();
-          await pause(wait);
-          continue;
+        if (response.status === 429 && repeatable && attempt < this.retries) {
+          const wait = rateLimitWaitMs(response.headers);
+          if (wait !== undefined && wait <= this.maxRetryDelayMs) {
+            await response.body?.cancel().catch(() => undefined);
+            noteUpstreamRetry();
+            await budget.pause(wait);
+            continue;
+          }
         }
+        noteUpstreamResponse(response.status);
+        if (response.status === 401) this.forgetRefusedToken();
+        return budget.response(response);
       }
-      noteUpstreamResponse(response.status);
-      if (response.status === 401) this.forgetRefusedToken();
-      return response;
+    } catch (error) {
+      budget.close();
+      noteUpstreamFailure(error);
+      throw error;
     }
   }
 
@@ -496,18 +523,22 @@ export class AltegioClient {
 
     let response: Response;
     try {
-      response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json, text/html, application/vnd.ms-excel',
-          'X-Requested-With': 'XMLHttpRequest',
-          ...(credential.header !== undefined
-            ? { Authorization: credential.header }
-            : {}),
+      response = await fetchWithDeadline(
+        url,
+        {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json, text/html, application/vnd.ms-excel',
+            'X-Requested-With': 'XMLHttpRequest',
+            ...(credential.header !== undefined
+              ? { Authorization: credential.header }
+              : {}),
+          },
+          redirect: 'manual',
+          credentials: 'omit',
         },
-        redirect: 'manual',
-        credentials: 'omit',
-      });
+        this.timeoutMs
+      );
     } catch {
       // Deliberately discard the native fetch error: it may include the URL,
       // whose query carries the user token.
@@ -1008,18 +1039,22 @@ export class AltegioClient {
     }
     let response: Response;
     try {
-      response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          Accept: 'text/html',
-          'X-Requested-With': 'XMLHttpRequest',
-          ...(credential.header !== undefined
-            ? { Authorization: credential.header }
-            : {}),
+      response = await fetchWithDeadline(
+        url,
+        {
+          method: 'GET',
+          headers: {
+            Accept: 'text/html',
+            'X-Requested-With': 'XMLHttpRequest',
+            ...(credential.header !== undefined
+              ? { Authorization: credential.header }
+              : {}),
+          },
+          redirect: 'manual',
+          credentials: 'omit',
         },
-        redirect: 'manual',
-        credentials: 'omit',
-      });
+        this.timeoutMs
+      );
     } catch {
       // The native error may carry the URL, whose query holds the token.
       return null;

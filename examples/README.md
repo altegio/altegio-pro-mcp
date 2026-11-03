@@ -1,194 +1,38 @@
-# Altegio.Pro MCP Examples
+# Examples
 
-This directory contains examples demonstrating how to use the Altegio.Pro MCP Server.
+Build the unpublished alpha from a checkout with Node.js 26.13.0 and npm 11.20.0
+(Node.js 24.22.2 is the compatibility target):
 
-## Examples
-
-### 1. Basic Usage (`basic-usage.ts`)
-
-Demonstrates direct usage of the Altegio client:
-
-- Logging in with email/password
-- Fetching locations
-- Getting location details
-- Retrieving appointments
-- Getting appointment details
-- Logging out
-
-**Run:**
-
-```bash
-# Set up environment
-cp ../.env.example ../.env
-# Edit .env with your credentials
-
-# Run example
+```sh
+git clone https://github.com/altegio/altegio-pro-mcp.git
+cd altegio-pro-mcp
+npm ci
+npm run build
 npx tsx examples/basic-usage.ts
 ```
 
-### 2. Using with Claude Desktop
+Run these commands from the repository root. [basic-usage.ts](basic-usage.ts)
+uses the installed MCP SDK client to start the built stdio CLI. It lists tools,
+lists workflow prompts, reads a product resource and closes the process. It
+uses a temporary credential directory and synthetic tokens, and makes no
+business API calls.
 
-The primary use case is integration with AI assistants like Claude Desktop.
+For an actual desktop connection, follow
+[desktop setup](../CLAUDE_DESKTOP_SETUP.md), set your partner token in the host's
+protected environment, and authenticate using `auth_login`. Discover the current
+names through `tools/list` and `prompts/list`; examples include `locations_list`,
+`appointments_list`, `api_search_operations` and `onboarding_walkthrough`.
+[Generated tool membership](../docs/architecture/tool-surface.md) distinguishes
+stdio from HTTP views.
 
-**Setup in Claude Desktop:**
+The supported install path is a source checkout or a verified alpha tarball;
+`npx @altegio/mcp-server-pro` cannot work while the package is unpublished.
+The root entry is the CLI. The existing advanced embedding subpath exports
+`createServer` and `startServer` from `@altegio/mcp-server-pro/server`; it does
+not export `AltegioClient`, `MCPServer` as a class, or tool-registration helpers
+from the package root. Use the MCP protocol for client integrations rather than
+importing private source paths.
 
-1. Open Claude Desktop configuration:
-
-   ```bash
-   # macOS
-   ~/Library/Application\ Support/Claude/claude_desktop_config.json
-
-   # Windows
-   %APPDATA%\Claude\claude_desktop_config.json
-   ```
-
-2. Add the Altegio.Pro MCP server:
-
-   ```json
-   {
-     "mcpServers": {
-       "altegio": {
-         "command": "npx",
-         "args": ["@altegio/mcp-server-pro"],
-         "env": {
-           "ALTEGIO_API_TOKEN": "your_partner_token_here"
-         }
-       }
-     }
-   }
-   ```
-
-3. Restart Claude Desktop
-
-4. Use natural language to interact:
-   ```
-   "I need to set up Altegio integration for my business"
-   "Show me today's appointments for my barbershop"
-   "What locations do I have access to?"
-   ```
-
-### 3. Custom MCP Server Integration
-
-If you want to integrate this with your own MCP client:
-
-```typescript
-import { MCPServer } from '@altegio/mcp-server-pro';
-import { AltegioClient } from '@altegio/mcp-server-pro';
-import { registerTools, registerPrompts } from '@altegio/mcp-server-pro';
-
-// Create client
-const client = new AltegioClient({
-  apiBase: 'https://api.alteg.io/api/v1',
-  partnerToken: process.env.ALTEGIO_API_TOKEN!,
-});
-
-// Create MCP server
-const mcpServer = new MCPServer({
-  name: 'my-altegio-server',
-  version: '1.0.0',
-});
-
-// Register tools and prompts
-registerTools(mcpServer, client);
-registerPrompts(mcpServer, client);
-
-// Start server
-await mcpServer.start();
-```
-
-## Available Tools
-
-The MCP server exposes these tools:
-
-### Authentication
-
-- `auth_login` - Login with email/password
-- `auth_logout` - Logout and clear credentials
-
-### Locations
-
-- `locations_list` - Get all accessible locations
-
-### Appointments
-
-- `list_appointments` - List appointments with filters
-- `get_appointment` - Get appointment details
-
-## Available Prompts
-
-Prompts provide guided workflows:
-
-### altegio_setup
-
-Guides through authentication and location selection.
-
-**Usage in AI assistant:**
-
-```
-"I need to set up Altegio"
-```
-
-### altegio_get_appointments
-
-Helps retrieve appointments for a specific location and date range.
-
-**Usage in AI assistant:**
-
-```
-"Show me this week's appointments"
-"Get appointments for location 12345"
-```
-
-## Environment Variables
-
-Required:
-
-- `ALTEGIO_API_TOKEN` - Your Partner API token from Altegio
-
-Optional:
-
-- `ALTEGIO_USER_TOKEN` - Pre-authenticated user token
-- `ALTEGIO_API_BASE` - API base URL (default: https://api.alteg.io/api/v1)
-- `LOG_LEVEL` - Logging level (default: info)
-- `CREDENTIALS_DIR` - Custom credentials directory
-- `CREDENTIALS_ENCRYPTION_KEY` - Encryption key for credentials
-
-## Getting Your API Token
-
-1. Visit [Altegio Developer Portal](https://developer.alteg.io)
-2. Log in to your account
-3. Navigate to "Account Settings" → "Account Details"
-4. Copy your Partner Token
-
-## Security Notes
-
-- Never commit your API tokens to version control
-- User credentials are stored locally in `~/.altegio-mcp/credentials.json`
-- Credentials are automatically encrypted if `CREDENTIALS_ENCRYPTION_KEY` is set
-- File permissions are set to 0600 (owner read/write only)
-
-## Troubleshooting
-
-**"Authentication failed"**
-
-- Verify your Partner API token is correct
-- Check that you're using the correct email/password
-- Ensure your account has API access enabled
-
-**"Location not found"**
-
-- Run `locations_list` to see available locations
-- Verify the location ID is correct
-- Check that your user has access to the location
-
-**"Rate limit exceeded"**
-
-- Default: 200 requests per minute
-- Adjust with `RATE_LIMIT_REQUESTS` env var
-- Wait for the rate limit window to reset
-
-## Need Help?
-
-- [Documentation](https://github.com/altegio/altegio-pro-mcp)
-- [Issues](https://github.com/altegio/altegio-pro-mcp/issues)
-- [Discussions](https://github.com/altegio/altegio-pro-mcp/discussions)
+Report a reproducible example failure in
+[Issues](https://github.com/altegio/altegio-pro-mcp/issues). Sensitive reports
+follow [SECURITY.md](../SECURITY.md).

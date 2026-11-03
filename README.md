@@ -1,18 +1,18 @@
 # Altegio.Pro MCP Server
 
+[![CI](https://github.com/altegio/altegio-pro-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/altegio/altegio-pro-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A TypeScript [Model Context Protocol](https://modelcontextprotocol.io) server for
 Altegio business owners, administrators, and team members. It provides
 administrative B2B operations, client workflows, onboarding, and analytics.
 
-**171 tools served (177 defined, 6 withheld from every view)** — see the generated
-[tool surface](docs/architecture/tool-surface.md) for exact membership and gates.
-The surface includes a 28-tool analytics pack, a 15-tool group events pack, a
-13-tool memberships pack, 15 visit, payment, finance and payroll tools, an 18-tool inventory
-pack, a 3-tool API explorer, a 4-tool curated-tool dispatcher, and 12 onboarding wizard tools. The API explorer executes reads only; administrative
-writes use curated tools. The six unavailable report-builder tools are withheld
-because their upstream report-data service is not usable.
+**171 tools served (177 defined, 6 withheld from every view)**.
+See the generated [tool surface](docs/architecture/tool-surface.md) for current
+counts, view membership and gates. The server includes analytics, clients,
+group events, memberships, inventory, finance, payroll and onboarding workflows.
+The API explorer executes reads only; administrative writes use curated tools.
+Unavailable report-builder tools remain withheld from every view.
 
 ## Connect
 
@@ -24,9 +24,8 @@ locations the connection may touch and the permissions it holds in each; the
 server enforces exactly that. Password-login tools are not served on HTTP. The
 read-only endpoint is `https://mcp.alteg.io/pro/readonly`.
 
-`/pro` lists 37 tools, about 50 KB: the most used tools (about 96 % of
-interactive calls) plus a dispatcher that reaches every other tool a generic
-agent may hold. `tools_search` finds a tool by the task in the user's words and
+`/pro` lists the most used tools plus a dispatcher that reaches every other
+tool a generic agent may hold. `tools_search` finds a tool by the task in the user's words and
 returns its schema and the dispatcher that runs it, one per risk tier:
 
 | Dispatcher               | Runs                                        | Annotations              |
@@ -42,9 +41,9 @@ apply exactly as on a direct call, and a tool called directly by name runs
 whether `/pro` lists it or not. The same listing is served at
 `https://mcp.alteg.io/pro/compact`.
 
-`https://mcp.alteg.io/pro/full` lists every tool flat (96 tools, about 120 KB)
-with no dispatcher: what `/pro` listed until 2026-10-21, for gateways and
-scripts that want the whole list up front.
+`https://mcp.alteg.io/pro/full` serves a flat listing without a dispatcher, for
+gateways and scripts that want tools up front. Exact counts and the groups
+available through other views are in the generated inventory linked above.
 
 **What restricts an agent.** `/pro/readonly` and the token's scope are the
 boundary, enforced by the server on every call. A host's per-tool allow and
@@ -69,10 +68,12 @@ rights are enforced independently of view membership. The
 
 ## Run locally
 
-Requires Node.js 20.17 or later and npm. This package is not published to npm;
-build from a checkout:
+Use Node.js 26.13.0 with npm 11.20.0; Node.js 24.22.2 is also tested. This
+package is not published to npm; build from a checkout:
 
 ```sh
+git clone https://github.com/altegio/altegio-pro-mcp.git
+cd altegio-pro-mcp
 npm ci
 cp .env.example .env
 # Set ALTEGIO_API_TOKEN in .env.
@@ -113,7 +114,19 @@ an unknown JSON-RPC method gets error -32601.
 
 ## Self-hosting and authentication
 
-The HTTP backend expects a trusted proxy in front of it. It does not implement
+Local HTTP binds to loopback by default and cannot borrow the stdio user's
+stored credentials. Pass a per-request `x-altegio-user-token` for business calls.
+`MCP_HTTP_ALLOW_SHARED_CREDENTIALS=true` is an explicit local-only legacy opt-in.
+
+Hosted mode (`MCP_HTTP_MODE=hosted`, also inferred from a proxy signing key or
+`REQUIRE_DELEGATED_IDENTITY=true`) requires a signed proxy request or a direct
+Altegio token. Configure `MCP_HTTP_ALLOWED_HOSTS` for the Host actually forwarded
+by the proxy and `MCP_HTTP_ALLOWED_ORIGINS` for permitted browser origins.
+Both checks apply before OAuth lookup and dispatch. See the
+[runtime policy](docs/architecture/2026-11-03-runtime-boundaries.md) and
+[configuration example](.env.example) for defaults, deadlines and graceful shutdown.
+
+The HTTP backend supports a trusted proxy in front of it. It does not implement
 an OAuth authorization server; Altegio's own does the sign-in and consent. Keep
 the backend listener private; strip caller-supplied identity headers and
 forward only what the proxy verified. Never expose a shared server token as an
@@ -253,18 +266,20 @@ npm run lint
 npm run format:check
 npm test
 npm run build
-npm run catalog:check
 npm run surface:check
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [TESTING.md](TESTING.md).
 The generated catalog is committed so ordinary contributors do not need access
 to a separate specification checkout. Set `ALTEGIO_API_DOCS` when rebuilding it;
-see [OPENAPI.md](OPENAPI.md). Never edit generated artifacts by hand.
+see [OPENAPI.md](OPENAPI.md). Without a spec, the real drift check is unavailable;
+public synthetic generator tests still run. Never edit generated artifacts by hand.
+For verified tarballs and container archives, see [RELEASING.md](RELEASING.md).
 
 ## License and support
 
 [MIT](LICENSE). Report reproducible problems through
-[GitHub Issues](https://github.com/altegio/altegio-pro-mcp/issues).
+[GitHub Issues](https://github.com/altegio/altegio-pro-mcp/issues). Sensitive reports
+follow [SECURITY.md](SECURITY.md).
 
 Hosted VM deployments can enable `GCP_STRUCTURED_LOGGING=true` to write bounded batches directly to Cloud Logging using their existing metadata service account. Entries expose root severity and indexed service, version, commit, request ID and outcome fields. Failed writes fall back to stderr with a 30-second retry cooldown; shutdown waits at most five seconds to flush. Local and stdio clients continue to use stderr.

@@ -1,0 +1,19 @@
+parameters:
+  - { name: company_id, in: path, required: true, schema: { type: integer } }
+get:
+  operationId: legacy_widgets
+  tags: [Widgets]
+  parameters:
+    - { name: Authorization, in: header, schema: { type: string } }
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success: { type: boolean }
+              data:
+                type: array
+                items: { $ref: '#/components/schemas/Widget' }

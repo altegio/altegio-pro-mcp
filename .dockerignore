@@ -1,66 +1,16 @@
-# Node
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Build
-dist/
-build/
-*.tsbuildinfo
-
-# Environment
-.env
-.env.local
-.env.*.local
-
-# Credentials
-.altegio-mcp/
-credentials.json
-
-# Git
-.git/
-.gitignore
-.gitattributes
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Test
-coverage/
-*.lcov
-.nyc_output/
-tests/
-*.test.ts
-*.spec.ts
-
-# Documentation
-examples/
-*.md
-!README.md
+# Only the inputs consumed by Dockerfile enter the build context. Private spec
+# snapshots, local credentials, agent worktrees and test fixtures stay outside.
+**
+!package.json
+!package-lock.json
+!tsconfig.json
+!src/
+!src/**
+!docs/
 !docs/product-logic.md
 !docs/onboarding-guide.md
-
-# CI/CD
-.github/
-.husky/
-.commitlintrc
-.prettierrc
-.eslintrc
-
-# Misc
-logs/
-*.log
-tmp/
-temp/
-*.tmp
-
-# Local agent state and worktrees
-.claude/
-.agents/
-.inventory/
+src/**/__tests__/**
+src/**/__fixtures__/**
+src/**/fixtures/**
+src/**/*.test.ts
+src/**/*.spec.ts

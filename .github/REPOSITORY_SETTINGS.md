@@ -1,0 +1,71 @@
+# Repository settings
+
+The owner approved the following administrative changes on **3 November 2026**.
+They were applied through the GitHub API and read back for verification.
+Collaborator permissions and secrets were not changed.
+
+## Active merge policy
+
+The active [`main-reviewed-delivery` ruleset](https://github.com/altegio/altegio-pro-mcp/rules/26491479)
+targets `refs/heads/main`, has no bypass actors and requires:
+
+- a pull request, resolved review conversations and a merge commit;
+- an up-to-date branch with successful `Quality`, `Tests (Node 26)`,
+  `Tests (Node 24)`, `Artifacts`, `Package (Node 24)`, `Dependency audit` and
+  `CodeQL analysis` checks, bound to `github-actions` (integration ID **15368**);
+- blocked branch deletion and non-fast-forward updates.
+
+Independent code review is a delivery requirement. The owner's autonomous
+delivery policy keeps **zero mandatory GitHub approvals**; code-owner and
+latest-push approval requirements are disabled. `CODEOWNERS` routes optional
+review to verified collaborators `@petroff` and `@maksimn-altegio`. Adding a
+mandatory human approval is a separate maintainer decision. If such a gate is
+later enabled, automated review cannot satisfy it and must never bypass it.
+
+The repository permits merge commits only and deletes merged branches.
+The separate native `CodeQL` result comes from `github-advanced-security`
+(integration ID **57789**), distinct from the required `CodeQL analysis` job.
+Check names and sources were verified on real pull requests. Any future change
+to a required job name must coordinate the workflow and ruleset.
+
+## Security and Actions
+
+Dependency alerts, Dependabot security updates, private vulnerability reporting
+and full-SHA Action pin enforcement are enabled. Secret scanning and push
+protection remain enabled. Workflow tokens remain read-only by default, Actions
+cannot approve pull requests, and the Actions allowlist is unchanged.
+Dependabot configuration covers npm, Actions and Docker.
+
+CodeQL analysis has run successfully; the API returned no open code-scanning
+alerts at verification. A successful scanner run does not replace review or
+ongoing alert triage. No npm/image publishing permission is configured by this
+remediation. Keep secrets out of ordinary and fork pull-request jobs.
+
+## Pending private-spec gate
+
+The `catalog-spec` environment and dedicated status App are **not configured**.
+Public synthetic catalog fixtures run in every PR; exact real-spec drift remains
+a manual release gate against the snapshot in [OPENAPI.md](../OPENAPI.md).
+F11 enforcement remains incomplete until the following setup is separately
+authorized and verified:
+
+1. Create a GitHub App with Commit statuses: write, installed only on this
+   repository, and a `catalog-spec` environment restricted to main with an
+   independent required reviewer and self-review prevention.
+2. Provision the App ID/private key and read-only archive credentials described
+   in [OPENAPI.md](../OPENAPI.md#trusted-pinned-spec-gate). The private archive
+   must be reachable by the trusted runner. Never publish the specification.
+3. Run the trusted workflow successfully for an exact reviewed PR head, then
+   require `Catalog (pinned spec)` from that dedicated App's numeric integration
+   ID. A new head invalidates the prior status. Do not bind this private check
+   to the generic GitHub Actions App or substitute public fixture success.
+
+Existing `live-e2e` opt-in business-test configuration is separate.
+
+## Public profile
+
+Description: **MCP server for authenticated Altegio B2B business workflows,
+analytics and onboarding.** Homepage points to the repository README. Topics:
+`mcp`, `model-context-protocol`, `altegio`, `typescript`, `business-management`.
+Discussions remain disabled; questions use Issues. Sensitive reports use the
+private channel documented in [SECURITY.md](../SECURITY.md).

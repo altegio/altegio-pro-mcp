@@ -1,519 +1,391 @@
-/**
- * Catalog build tests (ADR-001 D4).
- *
- * These run the real script against the real spec repository, so they are
- * skipped with a notice when `biz.erp.api.docs` is not checked out — the same
- * contract as `npm run catalog:check` in CI.
- */
-import { execFileSync } from 'node:child_process';
+/** Exercise the real generator with public synthetic inputs, without credentials. */
+import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-const REPO_ROOT = path.resolve(__dirname, '../../..');
-const BUILD_SCRIPT = path.join(REPO_ROOT, 'scripts/catalog/build.mjs');
-const COMMITTED = path.join(REPO_ROOT, 'src/generated/catalog.json');
+const ROOT = path.resolve(__dirname, '../../..');
+const SCRIPT = path.join(ROOT, 'scripts/catalog/build.mjs');
+const FIXTURES = path.join(__dirname, 'fixtures');
+const SPEC = path.join(FIXTURES, 'spec');
+const OVERLAY = path.join(FIXTURES, 'overlay');
 
-function findDocsRoot(): string | null {
-  const explicit = process.env.ALTEGIO_API_DOCS;
-  if (explicit) {
-    return fs.existsSync(path.join(explicit, 'docs/en/b2b-v1/openapi.yaml'))
-      ? explicit
-      : null;
-  }
-  let dir = REPO_ROOT;
-  for (let i = 0; i < 8; i++) {
-    const candidate = path.join(dir, '..', 'biz.erp.api.docs');
-    if (fs.existsSync(path.join(candidate, 'docs/en/b2b-v1/openapi.yaml'))) {
-      return candidate;
-    }
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return null;
+type Operation = {
+  operationId: string;
+  specOperationId?: string;
+  source: string;
+  path: string;
+  displayPath: string;
+  domain: string;
+  status?: string;
+  parameters?: Array<{ name: string }>;
+  response?: { envelope?: string; schema?: unknown };
+  security?: { required: boolean };
+  curation?: Record<string, unknown>;
+};
+type Catalog = {
+  operations: Operation[];
+  superseded: Array<Operation & { reason: string; supersededBy: string }>;
+  curatedCount: number;
+  sources: Array<{ source: string }>;
+};
+
+function run(args: string[]) {
+  return spawnSync(process.execPath, [SCRIPT, ...args], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
 }
 
-const docsRoot = findDocsRoot();
-const specAvailable = docsRoot !== null;
+let temp: string;
+beforeEach(() => {
+  temp = fs.mkdtempSync(path.join(os.tmpdir(), 'catalog-fixture-'));
+});
+afterEach(() => fs.rmSync(temp, { recursive: true, force: true }));
 
-if (!specAvailable) {
-  console.warn(
-    'OpenAPI spec repository not found next to this repo — skipping catalog ' +
-      'build tests. See OPENAPI.md.'
+function build(overlay = OVERLAY, spec = SPEC) {
+  const out = path.join(temp, 'catalog.json');
+  const result = run(['--docs', spec, '--overlay', overlay, '--out', out]);
+  return { ...result, out };
+}
+function read(out: string): Catalog {
+  return JSON.parse(fs.readFileSync(out, 'utf8')) as Catalog;
+}
+function overlay(entries: Record<string, unknown>) {
+  const dir = path.join(temp, 'overlay');
+  fs.mkdirSync(dir, { recursive: true });
+  // JSON is valid YAML. These inputs are independent of any private spec.
+  fs.writeFileSync(
+    path.join(dir, 'test.yaml'),
+    JSON.stringify({ version: 1, operations: entries })
   );
+  return dir;
 }
 
-/** Run the build script, returning stdout/stderr and the exit status. */
-function runBuild(args: string[]): {
-  status: number;
-  stdout: string;
-  stderr: string;
-} {
-  try {
-    const stdout = execFileSync('node', [BUILD_SCRIPT, ...args], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    return { status: 0, stdout, stderr: '' };
-  } catch (error) {
-    const err = error as { status?: number; stdout?: string; stderr?: string };
-    return {
-      status: err.status ?? 1,
-      stdout: err.stdout ?? '',
-      stderr: err.stderr ?? '',
+describe('public catalog generator', () => {
+  it.each(['../escape', 'root/../../escape', 'link'])(
+    'rejects unsafe private-archive input %s',
+    (name) => {
+      const archive = path.join(temp, 'unsafe.tar.gz');
+      const created = spawnSync(
+        'python3',
+        [
+          '-c',
+          `
+import sys, tarfile
+with tarfile.open(sys.argv[1], 'w:gz') as archive:
+    member = tarfile.TarInfo(sys.argv[2])
+    if sys.argv[2] == 'link':
+        member.name = 'root/link'
+        member.type = tarfile.SYMTYPE
+        member.linkname = '/etc/passwd'
+    archive.addfile(member)
+`,
+          archive,
+          name,
+        ],
+        { encoding: 'utf8' }
+      );
+      expect(created.status).toBe(0);
+      const result = spawnSync(
+        'python3',
+        [
+          path.join(ROOT, 'scripts/catalog/extract-spec.py'),
+          archive,
+          path.join(temp, 'sandbox/nested/extracted'),
+        ],
+        { encoding: 'utf8', env: { ...process.env, PYTHONOPTIMIZE: '1' } }
+      );
+      expect(result.status).not.toBe(0);
+      expect(fs.existsSync(path.join(temp, 'sandbox/escape'))).toBe(false);
+    }
+  );
+
+  it('extracts a normal source archive and verifies its synthetic contents', () => {
+    const archive = path.join(temp, 'safe.tar.gz');
+    const created = spawnSync(
+      'python3',
+      [
+        '-c',
+        `
+import sys, tarfile
+with tarfile.open(sys.argv[1], 'w:gz') as archive:
+    archive.add(sys.argv[2], arcname='snapshot')
+`,
+        archive,
+        SPEC,
+      ],
+      { encoding: 'utf8' }
+    );
+    expect(created.status).toBe(0);
+    const destination = path.join(temp, 'extracted');
+    const extracted = spawnSync(
+      'python3',
+      [
+        path.join(ROOT, 'scripts/catalog/extract-spec.py'),
+        archive,
+        destination,
+      ],
+      { encoding: 'utf8' }
+    );
+    expect(extracted.stderr).toBe('');
+    expect(extracted.status).toBe(0);
+    const result = build(OVERLAY, destination);
+    expect(result.status).toBe(0);
+    expect(read(result.out).operations.length).toBeGreaterThan(0);
+  });
+
+  it('refuses a snapshot whose content does not match the real-spec pin', () => {
+    const result = spawnSync(
+      process.execPath,
+      [path.join(ROOT, 'scripts/catalog/verify-spec.mjs'), SPEC],
+      { encoding: 'utf8' }
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'Private spec content differs from the reviewed pin'
+    );
+  });
+
+  it('is byte-deterministic, including when the input path order changes', () => {
+    const first = build();
+    expect(first.stderr).toBe('');
+    expect(first.status).toBe(0);
+    const bytes = fs.readFileSync(first.out, 'utf8');
+    const copy = path.join(temp, 'spec');
+    fs.cpSync(SPEC, copy, { recursive: true });
+    const file = path.join(copy, 'docs/en/b2b-v1/openapi.yaml');
+    // Re-encode with reversed path order; semantic inputs are unchanged.
+    const yaml = createRequire(__filename)('js-yaml') as {
+      load(text: string): { paths: Record<string, unknown> };
     };
-  }
-}
-
-describe('catalog build', () => {
-  let tmpDir: string;
-
-  beforeAll(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'catalog-build-test-'));
+    const doc = yaml.load(fs.readFileSync(file, 'utf8'));
+    doc.paths = Object.fromEntries(Object.entries(doc.paths).reverse());
+    fs.writeFileSync(file, JSON.stringify(doc));
+    expect(build(OVERLAY, copy).status).toBe(0);
+    expect(fs.readFileSync(first.out, 'utf8')).toBe(bytes);
   });
 
-  afterAll(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+  it('resolves external path items, root schema refs, cycles and legacy aliases', () => {
+    const result = build();
+    expect(result.status).toBe(0);
+    const op = read(result.out).operations.find(
+      (o) => o.operationId === 'legacy_widgets'
+    );
+    expect(op?.path).toBe('/legacy/{company_id}/widgets');
+    expect(op?.displayPath).toBe('/legacy/{location_id}/widgets');
+    expect(op?.parameters?.map((p) => p.name)).toEqual(['company_id']);
+    expect(op?.response?.envelope).toBe('v1');
+    expect(JSON.stringify(op?.response?.schema)).toContain('x-circular');
+    expect(op?.security).toMatchObject({ required: true });
+    expect(
+      read(result.out).operations.find((o) => o.operationId === 'standalone')
+        ?.security
+    ).toMatchObject({ required: false });
   });
 
-  it('is deterministic — two builds produce byte-identical output', () => {
-    if (!specAvailable) return;
-
-    const a = path.join(tmpDir, 'a.json');
-    const b = path.join(tmpDir, 'b.json');
-
-    expect(runBuild(['--out', a, '--quiet']).status).toBe(0);
-    expect(runBuild(['--out', b, '--quiet']).status).toBe(0);
-
-    expect(fs.readFileSync(a, 'utf8')).toBe(fs.readFileSync(b, 'utf8'));
+  it('keeps canonical ids, preview status and curated domain/projection/failures', () => {
+    const result = build();
+    expect(result.status).toBe(0);
+    const catalog = read(result.out);
+    expect(catalog.sources.map((s) => s.source)).toEqual(['v1', 'v2', 'v3']);
+    expect(
+      catalog.operations.find((o) => o.operationId === 'preview_widgets')
+        ?.status
+    ).toBe('preview');
+    expect(
+      catalog.operations.find((o) => o.operationId === 'list_widgets')
+    ).toMatchObject({
+      specOperationId: 'list_widgets_v2',
+      domain: 'widgets',
+      curation: {
+        tool_name: 'widgets_list',
+        tier: 'pack',
+        projection: ['id', 'title'],
+        failures: { '416': 'No matching widget.' },
+      },
+      response: {
+        envelope: 'jsonapi',
+        schema: { type: 'array', items: { type: 'string' } },
+      },
+    });
+    expect(catalog.curatedCount).toBe(1);
   });
 
-  it('the committed catalog is up to date (this is what CI checks)', () => {
-    if (!specAvailable) return;
+  it('retires same-id, same-path and declared twins, retaining read filters only', () => {
+    const result = build();
+    expect(result.status).toBe(0);
+    const retired = read(result.out).superseded;
+    expect(retired).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          operationId: 'get_widget',
+          reason: 'same-id',
+          supersededBy: 'get_widget',
+        }),
+        expect.objectContaining({
+          operationId: 'old_widget_list',
+          reason: 'same-path',
+          parameters: [
+            {
+              name: 'staff_id',
+              in: 'query',
+              required: false,
+              schema: { type: 'integer' },
+            },
+          ],
+        }),
+        expect.objectContaining({
+          operationId: 'search_widgets',
+          reason: 'declared',
+          parameters: [
+            {
+              name: 'category',
+              in: 'query',
+              required: false,
+              schema: { type: 'string' },
+            },
+          ],
+        }),
+      ])
+    );
+    expect(
+      retired.find((o) => o.operationId === 'old_update_widget')?.parameters
+    ).toBeUndefined();
+  });
 
-    const result = runBuild(['--check']);
+  it('detects drift instead of rewriting the target in check mode', () => {
+    const result = build();
+    expect(result.status).toBe(0);
+    const args = [
+      '--docs',
+      SPEC,
+      '--overlay',
+      OVERLAY,
+      '--out',
+      result.out,
+      '--check',
+    ];
+    expect(run(args).status).toBe(0);
+    fs.writeFileSync(result.out, '{}\n');
+    expect(run(args).status).toBe(1);
+    expect(fs.readFileSync(result.out, 'utf8')).toBe('{}\n');
+  });
+
+  it.each([[[]], [['--check']]])(
+    'fails explicitly when a requested spec is unavailable (%j)',
+    (args) => {
+      const result = run(['--docs', temp, ...args]);
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain('spec repository not found');
+      expect(result.stdout).not.toContain('catalog:check OK');
+    }
+  );
+
+  it.each([
+    [
+      'unknown overlay field',
+      { list_widgets: { nonsense: true } },
+      'unknown overlay field',
+    ],
+    ['invalid tier', { list_widgets: { tier: 'whatever' } }, 'invalid tier'],
+    [
+      'malformed supersedes',
+      { list_widgets: { supersedes: 'search_widgets' } },
+      'invalid supersedes list',
+    ],
+    [
+      'success failure code',
+      { list_widgets: { failures: { '200': 'Fine.' } } },
+      'invalid failures map',
+    ],
+    [
+      'authentication failure override',
+      { list_widgets: { failures: { '401': 'Sign in.' } } },
+      'invalid failures map',
+    ],
+    [
+      'empty failure sentence',
+      { list_widgets: { failures: { '416': '' } } },
+      'invalid failures map',
+    ],
+    [
+      'non-superseding source',
+      { standalone: { supersedes: ['legacy_widgets'] } },
+      'not an operation of a spec that supersedes',
+    ],
+    [
+      'missing twin',
+      { find_widgets: { supersedes: ['absent'] } },
+      'not a v1 operation',
+    ],
+    [
+      'already retired twin',
+      { find_widgets: { supersedes: ['get_widget'] } },
+      'already supersedes by the same id',
+    ],
+    [
+      'twin claimed twice',
+      {
+        find_widgets: { supersedes: ['search_widgets'] },
+        list_widgets: { supersedes: ['search_widgets'] },
+      },
+      'is superseded twice',
+    ],
+    [
+      'curated declared twin',
+      {
+        find_widgets: { supersedes: ['search_widgets'] },
+        search_widgets: { tool_name: 'stale' },
+      },
+      'move its curation to "find_widgets"',
+    ],
+    [
+      'curated path twin',
+      { old_widget_list: { tool_name: 'stale' } },
+      'supersedes by its path',
+    ],
+  ])('rejects %s', (_name, entries, message) => {
+    const result = build(overlay(entries));
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(message);
+    expect(fs.existsSync(result.out)).toBe(false);
+  });
+
+  it('rejects duplicate overlay entries across files', () => {
+    const dir = overlay({ list_widgets: { tier: 'pack' } });
+    fs.copyFileSync(
+      path.join(dir, 'test.yaml'),
+      path.join(dir, 'duplicate.yaml')
+    );
+    expect(build(dir).stderr).toContain('duplicate overlay entry');
+  });
+
+  it('rejects unrelated operation id clashes instead of silently overriding', () => {
+    const copy = path.join(temp, 'duplicate-spec');
+    fs.cpSync(SPEC, copy, { recursive: true });
+    const file = path.join(copy, 'docs/en/b2b-v3/openapi.yaml');
+    fs.writeFileSync(
+      file,
+      fs.readFileSync(file, 'utf8').replace('preview_widgets', 'standalone')
+    );
+    const result = build(OVERLAY, copy);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('duplicate operationId');
+  });
+});
+
+// Real drift is a separate, visibly skipped integration test. Opt in with an
+// explicit snapshot; never discover a colleague's mutable checkout implicitly.
+const docs = process.env.ALTEGIO_API_DOCS;
+const realSpec =
+  docs && fs.existsSync(path.join(docs, 'docs/en/b2b-v1/openapi.yaml'));
+(realSpec ? describe : describe.skip)('real pinned specification', () => {
+  it('matches the committed catalog', () => {
+    const result = run(['--docs', docs!, '--check']);
     expect(`${result.stdout}${result.stderr}`).toContain('catalog:check OK');
     expect(result.status).toBe(0);
-  });
-
-  it('skips with a notice, not a failure, when the spec repo is absent', () => {
-    // An empty directory is a valid "no spec here" answer.
-    const empty = path.join(tmpDir, 'no-spec');
-    fs.mkdirSync(empty, { recursive: true });
-
-    const result = runBuild(['--docs', empty, '--check']);
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('spec repository not found');
-  });
-
-  describe('committed catalog', () => {
-    const catalog = JSON.parse(fs.readFileSync(COMMITTED, 'utf8')) as {
-      catalogVersion: number;
-      operationCount: number;
-      curatedCount: number;
-      supersededCount: number;
-      canonicalAliases: Record<string, string>;
-      sources: Array<{ source: string; operations: number }>;
-      superseded: Array<{
-        operationId: string;
-        source: string;
-        supersededBy: string;
-        reason: string;
-      }>;
-      operations: Array<{
-        operationId: string;
-        method: string;
-        path: string;
-        displayPath: string;
-        source: string;
-        specOperationId?: string;
-        status?: string;
-        curation?: { tool_name?: string; projection?: string[] };
-      }>;
-    };
-
-    it('has one entry per operation with a unique operationId', () => {
-      expect(catalog.operations).toHaveLength(catalog.operationCount);
-      const ids = new Set(catalog.operations.map((o) => o.operationId));
-      expect(ids.size).toBe(catalog.operations.length);
-    });
-
-    it('carries every spec source and marks V3 entries with a status', () => {
-      expect(catalog.sources.map((s) => s.source)).toEqual(['v1', 'v2', 'v3']);
-      const v3 = catalog.operations.filter((o) => o.source === 'v3');
-      expect(v3.length).toBeGreaterThan(0);
-      for (const op of v3) expect(op.status).toBeDefined();
-    });
-
-    it('keeps V2 canonical: a same-id V1 twin leaves the catalog', () => {
-      const events = catalog.operations.filter(
-        (o) => o.operationId === 'get_event'
-      );
-      expect(events).toHaveLength(1);
-      expect(events[0]?.source).toBe('v2');
-      expect(events[0]?.path).toBe(
-        '/locations/{location_id}/events/{event_id}'
-      );
-      expect(catalog.superseded).toContainEqual(
-        expect.objectContaining({
-          operationId: 'get_event',
-          source: 'v1',
-          supersededBy: 'get_event',
-          reason: 'same-id',
-        })
-      );
-      expect(catalog.superseded).toHaveLength(catalog.supersededCount);
-    });
-
-    it('retires the V1 twins the overlay declares under supersedes', () => {
-      expect(catalog.superseded).toContainEqual(
-        expect.objectContaining({
-          operationId: 'search_events',
-          supersededBy: 'list_events',
-          reason: 'declared',
-        })
-      );
-      const ids = new Set(catalog.operations.map((o) => o.operationId));
-      for (const retired of catalog.superseded) {
-        expect(ids.has(retired.supersededBy)).toBe(true);
-        if (retired.operationId !== retired.supersededBy) {
-          expect(ids.has(retired.operationId)).toBe(false);
-        }
-      }
-    });
-
-    it('retires a V1 operation a V2 one serves at the same method and path', () => {
-      const survivors = catalog.operations.filter(
-        (o) =>
-          o.method === 'GET' &&
-          o.displayPath === '/locations/{location_id}/appointments' &&
-          o.source !== 'v3'
-      );
-      expect(survivors.map((o) => o.operationId)).toEqual([
-        'list_appointments',
-      ]);
-      const twin = catalog.superseded.find(
-        (s) => s.operationId === 'get_appointment_list'
-      ) as
-        | {
-            supersededBy: string;
-            reason: string;
-            parameters?: Array<{ name: string }>;
-          }
-        | undefined;
-      expect(twin).toMatchObject({
-        supersededBy: 'list_appointments',
-        reason: 'same-path',
-      });
-      // The twin keeps its filters as the fallback route for what V2 lacks.
-      expect(twin?.parameters?.map((p) => p.name)).toContain('team_member_id');
-
-      // No live method + path is served twice.
-      const routes = catalog.operations
-        .filter((o) => o.source !== 'v3')
-        .map((o) => `${o.method} ${o.displayPath.replace(/\{[^}]+\}/g, '{}')}`);
-      expect(new Set(routes).size).toBe(routes.length);
-    });
-
-    it('drops the spec’s _v2 suffix and keeps the spec id internally', () => {
-      const strategies = catalog.operations.find(
-        (o) => o.operationId === 'list_event_duplication_strategies'
-      );
-      expect(strategies?.source).toBe('v2');
-      expect(strategies?.specOperationId).toBe(
-        'list_event_duplication_strategies_v2'
-      );
-      expect(
-        catalog.operations.filter((o) => o.operationId.endsWith('_v2'))
-      ).toEqual([]);
-    });
-
-    it('renames legacy path segments only in displayPath', () => {
-      const appointment = catalog.operations.find(
-        (o) => o.operationId === 'get_appointment'
-      );
-      expect(appointment?.path).toBe(
-        '/locations/{location_id}/appointments/{record_id}'
-      );
-      expect(appointment?.displayPath).toBe(
-        '/locations/{location_id}/appointments/{appointment_id}'
-      );
-    });
-
-    it('exposes the canonical alias table', () => {
-      expect(catalog.canonicalAliases).toMatchObject({
-        company_id: 'location_id',
-        staff_id: 'team_member_id',
-        record_id: 'appointment_id',
-        good_id: 'product_id',
-      });
-    });
-
-    it('merges the overlay into curation for the hand-written tools', () => {
-      const services = catalog.operations.find(
-        (o) => o.operationId === 'list_services'
-      );
-      expect(services?.curation?.tool_name).toBe('services_list');
-      expect(services?.curation?.projection).toContain(
-        'company_links.price_min'
-      );
-      // A curated tool moves to the V2 survivor with its twin.
-      const staff = catalog.operations.find(
-        (o) => o.operationId === 'list_team_members'
-      );
-      expect(staff?.curation?.tool_name).toBe('team_members_list');
-
-      // An entry that only names the twins it retires is not curation.
-      const curated = catalog.operations.filter(
-        (o) =>
-          o.curation &&
-          Object.keys(o.curation).some((field) => field !== 'supersedes')
-      ).length;
-      expect(curated).toBe(catalog.curatedCount);
-    });
-  });
-
-  describe('overlay merge', () => {
-    it('merges a custom overlay directory and validates its fields', () => {
-      if (!specAvailable) return;
-
-      const overlayDir = path.join(tmpDir, 'overlay');
-      fs.mkdirSync(overlayDir, { recursive: true });
-      fs.writeFileSync(
-        path.join(overlayDir, 'probe.yaml'),
-        [
-          'version: 1',
-          'operations:',
-          '  get_resource_list:',
-          '    domain: probe_domain',
-          '    tier: pack',
-          '    tool_name: probe_tool',
-          '    projection: [id, name]',
-          '',
-        ].join('\n')
-      );
-
-      const out = path.join(tmpDir, 'overlaid.json');
-      expect(
-        runBuild(['--overlay', overlayDir, '--out', out, '--quiet']).status
-      ).toBe(0);
-
-      const built = JSON.parse(fs.readFileSync(out, 'utf8')) as {
-        curatedCount: number;
-        operations: Array<{
-          operationId: string;
-          domain: string;
-          curation?: { tool_name?: string; tier?: string };
-        }>;
-      };
-      const staff = built.operations.find(
-        (o) => o.operationId === 'get_resource_list'
-      );
-      expect(staff?.curation?.tool_name).toBe('probe_tool');
-      expect(staff?.curation?.tier).toBe('pack');
-      // `domain` in the overlay overrides the domain inferred from the tag.
-      expect(staff?.domain).toBe('probe_domain');
-      expect(built.curatedCount).toBe(1);
-    });
-
-    it('fails the build on an unknown overlay field', () => {
-      if (!specAvailable) return;
-
-      const overlayDir = path.join(tmpDir, 'bad-overlay');
-      fs.mkdirSync(overlayDir, { recursive: true });
-      fs.writeFileSync(
-        path.join(overlayDir, 'bad.yaml'),
-        'version: 1\noperations:\n  get_team_member_list:\n    nonsense: true\n'
-      );
-
-      const result = runBuild([
-        '--overlay',
-        overlayDir,
-        '--out',
-        path.join(tmpDir, 'bad.json'),
-        '--quiet',
-      ]);
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('unknown overlay field');
-    });
-
-    it('fails the build on an invalid tier', () => {
-      if (!specAvailable) return;
-
-      const overlayDir = path.join(tmpDir, 'bad-tier');
-      fs.mkdirSync(overlayDir, { recursive: true });
-      fs.writeFileSync(
-        path.join(overlayDir, 'bad.yaml'),
-        'version: 1\noperations:\n  get_team_member_list:\n    tier: whatever\n'
-      );
-
-      const result = runBuild([
-        '--overlay',
-        overlayDir,
-        '--out',
-        path.join(tmpDir, 'bad-tier.json'),
-        '--quiet',
-      ]);
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('invalid tier');
-    });
-
-    /** Build with one overlay file and return the result. */
-    function buildWith(name: string, overlay: string[]) {
-      const overlayDir = path.join(tmpDir, name);
-      fs.mkdirSync(overlayDir, { recursive: true });
-      fs.writeFileSync(
-        path.join(overlayDir, 'probe.yaml'),
-        ['version: 1', 'operations:', ...overlay, ''].join('\n')
-      );
-      const out = path.join(tmpDir, `${name}.json`);
-      return {
-        out,
-        ...runBuild(['--overlay', overlayDir, '--out', out, '--quiet']),
-      };
-    }
-
-    it('keeps a failures map in the curation', () => {
-      if (!specAvailable) return;
-      const result = buildWith('failures-ok', [
-        '  list_team_members:',
-        "    failures: { '416': No scheme applies. }",
-      ]);
-      expect(result.status).toBe(0);
-      const built = JSON.parse(fs.readFileSync(result.out, 'utf8')) as {
-        operations: Array<{
-          operationId: string;
-          curation?: { failures?: Record<string, string> };
-        }>;
-      };
-      expect(
-        built.operations.find((o) => o.operationId === 'list_team_members')
-          ?.curation?.failures
-      ).toEqual({ '416': 'No scheme applies.' });
-    });
-
-    it('retires a declared twin and records it under superseded', () => {
-      if (!specAvailable) return;
-      const result = buildWith('supersedes-ok', [
-        '  list_team_members:',
-        '    supersedes: [get_team_member_list]',
-      ]);
-      expect(result.status).toBe(0);
-      const built = JSON.parse(fs.readFileSync(result.out, 'utf8')) as {
-        curatedCount: number;
-        operations: Array<{ operationId: string }>;
-        superseded: Array<{ operationId: string; supersededBy: string }>;
-      };
-      expect(
-        built.operations.some((o) => o.operationId === 'get_team_member_list')
-      ).toBe(false);
-      expect(built.superseded).toContainEqual(
-        expect.objectContaining({
-          operationId: 'get_team_member_list',
-          supersededBy: 'list_team_members',
-        })
-      );
-      expect(built.curatedCount).toBe(0);
-    });
-
-    it('keeps a retired read at another path as a fallback route, and a retired write without one', () => {
-      if (!specAvailable) return;
-      const result = buildWith('supersedes-fallback', [
-        '  list_services:',
-        '    supersedes: [get_service_list]',
-        '  update_tag:',
-        '    supersedes: [update_tag_by_tag_id]',
-      ]);
-      expect(result.status).toBe(0);
-      const built = JSON.parse(fs.readFileSync(result.out, 'utf8')) as {
-        superseded: Array<{
-          operationId: string;
-          path: string;
-          parameters?: Array<{ name: string }>;
-        }>;
-      };
-      const read = built.superseded.find(
-        (s) => s.operationId === 'get_service_list'
-      );
-      expect(read?.path).toBe('/services/{location_id}');
-      expect(read?.parameters?.map((p) => p.name)).toEqual(
-        expect.arrayContaining(['category_id', 'team_member_id'])
-      );
-      const write = built.superseded.find(
-        (s) => s.operationId === 'update_tag_by_tag_id'
-      );
-      expect(write).toBeDefined();
-      expect(write?.parameters).toBeUndefined();
-    });
-
-    it.each([
-      [
-        'a survivor from a spec that supersedes nothing',
-        ['  get_location_list:', '    supersedes: [get_resource_list]'],
-        'not an operation of a spec that supersedes another',
-      ],
-      [
-        'a twin that is not a V1 operation',
-        ['  list_events:', '    supersedes: [no_such_operation]'],
-        'which is not a v1 operation',
-      ],
-      [
-        'a twin already retired by its shared id',
-        ['  list_events:', '    supersedes: [get_event]'],
-        'already supersedes by the same id',
-      ],
-      [
-        'one twin claimed by two survivors',
-        [
-          '  list_events:',
-          '    supersedes: [search_events]',
-          '  list_event_dates:',
-          '    supersedes: [search_events]',
-        ],
-        'is superseded twice',
-      ],
-      [
-        'curation left on a retired twin',
-        [
-          '  list_events:',
-          '    supersedes: [search_events]',
-          '  search_events:',
-          '    tool_name: stale_tool',
-        ],
-        'move its curation to "list_events"',
-      ],
-      [
-        'curation left on a twin retired by its path',
-        ['  get_appointment_list:', '    tool_name: stale_tool'],
-        'supersedes by its path; move its curation to "list_appointments"',
-      ],
-      [
-        'a malformed supersedes list',
-        ['  list_events:', '    supersedes: search_events'],
-        'invalid supersedes list',
-      ],
-      [
-        'a failures entry for a status that is not an error',
-        ['  list_events:', "    failures: { '200': Fine. }"],
-        'invalid failures map',
-      ],
-      [
-        'a failures entry for 401',
-        ['  list_events:', "    failures: { '401': Sign in again. }"],
-        'invalid failures map',
-      ],
-      [
-        'an empty failures sentence',
-        ['  list_events:', "    failures: { '416': '' }"],
-        'invalid failures map',
-      ],
-    ])('fails the build on %s', (name, overlay, message) => {
-      if (!specAvailable) return;
-      const result = buildWith(`bad-${name.replace(/\W+/g, '-')}`, overlay);
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain(message);
-    });
   });
 });

@@ -10,6 +10,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
+const { stripVTControlCharacters } = require('node:util');
 
 const MAX_LINE = 160;
 
@@ -27,9 +28,9 @@ function failureLines(message, rootDir) {
   const lines = message.split('\n').map((l) => l.trim());
   const picked = [];
   const head = lines.find((l) => l.length > 0);
-  if (head) picked.push(head.replace(/\u001b\[[0-9;]*m/g, ''));
+  if (head) picked.push(stripVTControlCharacters(head));
   for (const line of lines) {
-    const plain = line.replace(/\u001b\[[0-9;]*m/g, '');
+    const plain = stripVTControlCharacters(line);
     if (/^(Expected|Received)( [a-z ]+)?:/.test(plain)) picked.push(plain);
   }
   const frame = lines

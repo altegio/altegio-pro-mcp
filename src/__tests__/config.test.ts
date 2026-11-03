@@ -238,7 +238,7 @@ describe('Configuration Schema', () => {
       expect(result.legacyWebBase).toBe('https://app.alteg.io');
       expect(result.partnerToken).toBe('test-token');
       expect(result.timeout).toBe(30000);
-      expect(result.retryConfig.maxAttempts).toBe(3);
+      expect(result.retryConfig.maxAttempts).toBe(1);
     });
 
     it('should fail without partner token', () => {

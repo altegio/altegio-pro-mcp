@@ -1,13 +1,5 @@
-/**
- * Contract test for the transport port.
- *
- * `httpFromClient` reaches `AltegioClient`'s internal request method
- * structurally, which is safe only as long as that method exists. This test is
- * the tripwire: if the transport is refactored, it fails here with a pointer to
- * `src/api/altegio-http.ts` instead of failing at runtime inside a tool.
- */
+/** The adapter port is implemented explicitly by the client. */
 import {
-  CLIENT_REQUEST_METHOD,
   V2_PATH_PREFIX,
   httpFromClient,
   includeParams,
@@ -20,37 +12,26 @@ import { AltegioClient } from '../../providers/altegio-client.js';
 import { AuthenticationError } from '../../utils/errors.js';
 
 describe('httpFromClient', () => {
-  it('borrows the client request method that still exists', () => {
+  it('uses the compiler-checked port owned by the client', () => {
     const client = new AltegioClient(
-      { partnerToken: 'partner', apiBase: 'https://api.example.test/api/v1' },
+      { partnerToken: 'partner' },
       '/tmp/altegio-mcp-http-test'
     );
-    expect(
-      typeof (client as unknown as Record<string, unknown>)[
-        CLIENT_REQUEST_METHOD
-      ]
-    ).toBe('function');
-    expect(() => httpFromClient(client)).not.toThrow();
-  });
-
-  it('fails loudly when the plumbing moves', () => {
-    const stub = {} as unknown as AltegioClient;
-    expect(() => httpFromClient(stub)).toThrow(
-      /update src\/api\/altegio-http\.ts/
-    );
+    expect(typeof client.apiRequest).toBe('function');
+    expect(typeof httpFromClient(client).request).toBe('function');
   });
 
   it('forwards path and options and keeps the client as `this`', async () => {
     const seen: Array<[string, RequestInit | undefined]> = [];
     const fake = {
-      [CLIENT_REQUEST_METHOD](path: string, init?: RequestInit) {
+      apiRequest(path: string, init?: RequestInit) {
         // `this` must be the client, or per-identity token resolution breaks.
         expect(this).toBe(fake);
         seen.push([path, init]);
         return Promise.resolve(new Response('{}'));
       },
       isAuthenticated: () => true,
-    } as unknown as AltegioClient;
+    };
 
     const http = httpFromClient(fake);
     await http.request('/locations/1/analytics/overall', { method: 'GET' });
@@ -63,12 +44,12 @@ describe('httpFromClient', () => {
   it('forwards an explicit location for a path that does not name one', async () => {
     const seen: unknown[][] = [];
     const fake = {
-      [CLIENT_REQUEST_METHOD](...args: unknown[]) {
+      apiRequest(...args: unknown[]) {
         seen.push(args);
         return Promise.resolve(new Response('{}'));
       },
       isAuthenticated: () => true,
-    } as unknown as AltegioClient;
+    };
 
     const http = httpFromClient(fake);
     await http.request('/loyalty/memberships', { method: 'GET' }, 4564);

@@ -1,6 +1,7 @@
 import { OnboardingHandlers } from '../tools/onboarding-handlers';
 import { AltegioClient } from '../providers/altegio-client';
 import { OnboardingStateManager } from '../providers/onboarding-state-manager';
+import { AltegioApiError } from '../utils/errors';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -16,6 +17,7 @@ describe('Onboarding E2E Flow', () => {
     stateManager = new OnboardingStateManager(testDir);
 
     // Create comprehensive mock client with all CRUD methods
+    let testClientId = 1000;
     mockClient = {
       isAuthenticated: jest.fn().mockReturnValue(true),
       getLocation: jest
@@ -26,7 +28,8 @@ describe('Onboarding E2E Flow', () => {
       createStaff: jest.fn(),
       createServiceCategory: jest.fn(),
       createService: jest.fn(),
-      createClient: jest.fn(),
+      createClient: jest.fn(async () => ({ id: testClientId++ })),
+      getSchedule: jest.fn().mockResolvedValue([]),
       createBooking: jest.fn(),
       deleteStaff: jest.fn(),
       deleteBooking: jest.fn(),
@@ -194,7 +197,10 @@ Carol White,Massage Therapist,no,no`;
         .fn()
         .mockResolvedValueOnce({ id: 30, name: 'John Doe' })
         .mockResolvedValueOnce({ id: 31, name: 'Jane Smith' })
-        .mockResolvedValueOnce({ id: 32, name: 'Mike Johnson' });
+        .mockResolvedValueOnce({ id: 32, name: 'Mike Johnson' })
+        .mockImplementation(async () => ({
+          id: 1000 + mockClient.createClient.mock.calls.length,
+        }));
 
       const clientsCSV = `name,phone,email,surname
 John,+1555001001,john.doe@email.com,Doe
@@ -520,7 +526,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
       mockClient.createStaff = jest
         .fn()
         .mockResolvedValueOnce({ id: 1, name: 'Alice' })
-        .mockRejectedValueOnce(new Error('Network error'))
+        .mockRejectedValueOnce(new AltegioApiError('Row refused', 422))
         .mockResolvedValueOnce({ id: 3, name: 'Carol' });
 
       const result = await handlers.addStaffBatch({
@@ -536,7 +542,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
 
       expect(result.content[0]?.text).toContain('2 team members created');
       expect(result.content[0]?.text).toContain('1 failed');
-      expect(result.content[0]?.text).toContain('Network error');
+      expect(result.content[0]?.text).toContain('Row refused');
 
       // Verify only successful entities were checkpointed
       const state = await stateManager.load(companyId);
@@ -669,7 +675,8 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
       // Verify all bookings have test client data
       bookingCalls.forEach((call, idx) => {
         expect(call.client.name).toBe(`Test Client ${idx + 1}`);
-        expect(call.client.phone).toMatch(/^\+100000000\d$/);
+        expect(call.client.phone).toMatch(/^\+1000\d{7}$/);
+        expect(call.send_sms).toBe(0);
         expect(call.datetime).toMatch(/^\d{4}-\d{2}-\d{2} 10:00:00$/);
       });
     });
@@ -703,7 +710,7 @@ Mike,+1555001003,mike.johnson@email.com,Johnson`;
       mockClient.createBooking = jest
         .fn()
         .mockResolvedValueOnce({ id: 100 })
-        .mockRejectedValueOnce(new Error('Booking conflict'))
+        .mockRejectedValueOnce(new AltegioApiError('Booking conflict', 409))
         .mockResolvedValueOnce({ id: 102 });
 
       const result = await handlers.createTestBookings({

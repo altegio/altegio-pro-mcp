@@ -6,103 +6,159 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  HUSKY: '0'
+  ALTEGIO_E2E: '0'
+
 jobs:
   lint:
+    name: Quality
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run linter
-        run: npm run lint
-
-      - name: Check formatting
-        run: npm run format:check
-
-      - name: Type check
-        run: npm run typecheck
-
-      # Catalog drift (ADR-001 D4). The OpenAPI spec repository is private and
-      # not cloned here, so this step reports "skipped" with a notice; it fails
-      # only when the spec IS available and src/generated/catalog.json is stale.
-      - name: Catalog drift check
-        run: npm run catalog:check
-
-      # Tool-surface drift (ADR-001 D4 addendum): docs/architecture/tool-surface.md
-      # is generated from src/tools/surface.ts and must be regenerated whenever a
-      # tool moves between views.
-      - name: Tool surface drift check
-        run: npm run surface:check
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26.13.0'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run lint
+      - run: npm run format:check
+      - name: Check scripts, configuration and public guides
+        run: >-
+          npx prettier --check .github scripts/catalog scripts/smoke scripts/quality
+          eslint.config.js jest.config.js README.md CONTRIBUTING.md CI-CD.md
+          RELEASING.md TESTING.md OPENAPI.md CLAUDE_DESKTOP_SETUP.md examples SECURITY.md
+      - run: npm run typecheck
+      - name: Compile and run the protocol example
+        run: |
+          npx tsc --ignoreConfig --types node --noEmit --strict --target ES2023 --module NodeNext --moduleResolution NodeNext --skipLibCheck examples/basic-usage.ts
+          npm run build
+          npx tsx examples/basic-usage.ts
+      - run: node scripts/catalog/validate-overlay.mjs
+      - run: npm run surface:check
+      - name: Real-spec check availability
+        run: |
+          echo '::notice::Real-spec drift is unavailable in public CI; public generator fixtures run in Tests. See OPENAPI.md for the separate pinned-spec gate.'
+          echo 'Real-spec drift: **not run** (private input). Public fixture tests run without private data or credentials.' >> "$GITHUB_STEP_SUMMARY"
 
   test:
+    name: Tests (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     strategy:
+      fail-fast: false
       matrix:
-        node-version: [20, 22, 24]
-
+        include:
+          - node: 26
+            version: '26.13.0'
+          - node: 24
+            version: '24.22.2'
     steps:
-      - uses: actions/checkout@v5
-
-      - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run tests
-        run: npm test -- --coverage
-
-      - name: Upload coverage
-        if: matrix.node-version == '22'
-        uses: codecov/codecov-action@v5
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage/lcov.info
-          flags: unittests
-          name: codecov-umbrella
+          node-version: ${{ matrix.version }}
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Run tests (coverage on primary runtime)
+        env:
+          CREDENTIALS_DIR: ${{ runner.temp }}/altegio-tests
+          ALTEGIO_API_DOCS: ${{ runner.temp }}/no-private-spec
+        run: |
+          if [ '${{ matrix.node }}' = 26 ]; then
+            npm test -- --coverage
+          else
+            npm test -- --no-coverage
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: matrix.node == 26
+        with:
+          name: coverage-node26
+          path: coverage/
+          retention-days: 7
+          if-no-files-found: error
 
-  build:
+  artifacts:
+    name: Artifacts
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          name: dist
-          path: dist
+          node-version: '26.13.0'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - name: Pack once and test the installed tarball
+        run: |
+          mkdir -p artifacts/package artifacts/container
+          node scripts/smoke/stamp-build.mjs "$GITHUB_SHA"
+          npm sbom --package-lock-only --omit=dev --sbom-format=cyclonedx > artifacts/package/sbom.cdx.json
+          printf '%s\n' "$GITHUB_SHA" > artifacts/package/REVISION
+          npm pack --ignore-scripts --pack-destination artifacts/package
+          node scripts/smoke/package.mjs artifacts/package/*.tgz "$GITHUB_SHA"
+          (cd artifacts/package && sha256sum ./*.tgz sbom.cdx.json REVISION > SHA256SUMS)
+      - name: Build, save and reload the same image
+        env:
+          SOURCE_REVISION: ${{ github.sha }}
+        run: |
+          docker build --build-arg "COMMIT_SHA=$SOURCE_REVISION" --tag altegio-pro-mcp:ci .
+          docker image inspect altegio-pro-mcp:ci --format '{{.Id}}' > artifacts/container/IMAGE_ID
+          docker save --output artifacts/container/image.tar altegio-pro-mcp:ci
+          printf '%s\n' "$SOURCE_REVISION" > artifacts/container/REVISION
+          (cd artifacts/container && sha256sum image.tar IMAGE_ID REVISION > SHA256SUMS)
+          docker image rm altegio-pro-mcp:ci
+          (cd artifacts/container && sha256sum --check SHA256SUMS)
+          docker load --input artifacts/container/image.tar
+          test "$(docker image inspect altegio-pro-mcp:ci --format '{{.Id}}')" = "$(cat artifacts/container/IMAGE_ID)"
+          node scripts/smoke/container.mjs "$(cat artifacts/container/IMAGE_ID)" "$SOURCE_REVISION"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: package
+          path: artifacts/package/
+          retention-days: 7
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          name: container
+          path: |
+            artifacts/container/
+          retention-days: 7
+          compression-level: 0
+          if-no-files-found: error
 
-  security:
+  package-compat:
+    name: Package (Node 24)
+    needs: artifacts
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-
-      - name: Run security audit
-        run: npm audit --audit-level=high
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.22.2'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package
+          path: artifacts/package
+      - run: |
+          (cd artifacts/package && sha256sum --check SHA256SUMS)
+          node scripts/smoke/package.mjs artifacts/package/*.tgz "$GITHUB_SHA"

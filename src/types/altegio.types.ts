@@ -415,6 +415,8 @@ export interface CreateBookingRequest {
   datetime: string;
   seance_length?: number;
   client: {
+    /** Existing client card; when supplied, the API takes contact details from it. */
+    id?: number;
     name: string;
     phone: string;
     email?: string;

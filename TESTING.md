@@ -1,6 +1,8 @@
 # Testing
 
-Use the committed lockfile and a supported Node.js version:
+Use the committed lockfile with Node.js 26.13.0 (npm 11.20.0), or the
+Node.js 24.22.2 compatibility runtime. Install Python 3 for the synthetic
+archive-safety tests; Docker is needed only for container checks:
 
 ```sh
 npm ci
@@ -9,7 +11,6 @@ npm run format:check
 npm run typecheck
 npm test
 npm run build
-npm run catalog:check
 npm run surface:check
 ```
 
@@ -24,10 +25,23 @@ file loads its own copy of the server, and V8 frees old copies only near its
 heap limit, so one long-lived process grows to gigabytes: avoid `--runInBand`
 and a raised `--maxWorkers` for the whole suite.
 
-The catalog check requires an OpenAPI checkout. Set `ALTEGIO_API_DOCS` to its
-root; without it, the check reports a skip. Tests still validate the committed
-catalog. Regenerate with `npm run catalog:build` after reviewing spec changes.
-The surface check is self-contained; regenerate with `npm run surface:build`.
+Public catalog generator tests always run using synthetic fixtures, including
+negative overlay cases, refs, supersession and determinism. The additional
+real-spec drift test uses `describe.skip` unless `ALTEGIO_API_DOCS` explicitly
+selects an available snapshot. `npm run catalog:check` exits 2 when unavailable,
+not success. See [OPENAPI.md](OPENAPI.md) for the pinned trusted check. The
+surface check is self-contained; regenerate with `npm run surface:build`.
+
+Coverage floors protect the reviewed baseline: 90% statements, 75% branches,
+88% functions and 91% lines. Coverage runs once on Node 26 in CI; behavioral
+regressions and scope/refusal tests matter more than percentages. Lint probes
+exercise actual ESLint rules against unsafe promises and JavaScript mistakes.
+
+Every test must supply an isolated `testDir` or temporary `CREDENTIALS_DIR`.
+For an isolated full run, create a directory with `mktemp -d`, set
+`CREDENTIALS_DIR` to a child path and remove only that temporary directory after
+the run. Never use the live credential store or enable live flags to make a unit
+test pass.
 
 ## Live integration tests
 
@@ -117,6 +131,28 @@ it searches attaches a fresh summary to its pull request.
 
 ## Release artifact checks
 
-After a clean build, inspect `npm pack --dry-run --json`. The package must contain
-both runtime documentation resources and the generated catalog, and must exclude
-test helpers, fixtures, credentials, and local agent state.
+Build and stamp the exact checkout, then test the tarball from a separate
+consumer directory and the container through a loopback-published port:
+
+```sh
+npm run build
+node scripts/smoke/stamp-build.mjs "$(git rev-parse HEAD)"
+mkdir -p /tmp/altegio-release-check
+npm pack --ignore-scripts --pack-destination /tmp/altegio-release-check
+node scripts/smoke/package.mjs /tmp/altegio-release-check/*.tgz "$(git rev-parse HEAD)"
+docker build --build-arg COMMIT_SHA="$(git rev-parse HEAD)" -t altegio-pro-mcp:check .
+node scripts/smoke/container.mjs altegio-pro-mcp:check "$(git rev-parse HEAD)"
+npx tsx examples/basic-usage.ts
+```
+
+The package check verifies file exclusions, source/lockfile provenance, real MCP
+initialization, current documented tool/prompt names and byte-exact Markdown
+resources from an installed package. The container check verifies Node 26,
+UID 1001, OCI revision, `/health` version/commit, published-port reachability
+and the same MCP resources. Its synthetic upstream points to a closed loopback
+port.
+All identities are synthetic; neither probe calls a business API.
+
+CI saves and reloads the image and tests that same image ID. Node 24 installs the
+same tarball built on Node 26 after checking its digest. Release promotion follows
+[RELEASING.md](RELEASING.md); no npm/image publication is implied.

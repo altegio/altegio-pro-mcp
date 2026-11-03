@@ -1,5 +1,5 @@
 # Multi-stage build for optimal image size
-FROM node:22-alpine AS builder
+FROM node:26-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94 AS builder
 
 # Set working directory
 WORKDIR /app
@@ -18,7 +18,7 @@ COPY src ./src
 RUN npm run build
 
 # Production stage
-FROM node:22-alpine
+FROM node:26-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94
 
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
@@ -44,6 +44,7 @@ COPY --chown=nodejs:nodejs ["docs/product-logic.md", "docs/onboarding-guide.md",
 
 ARG COMMIT_SHA=unknown
 ENV COMMIT_SHA=${COMMIT_SHA}
+ENV MCP_HTTP_HOST=0.0.0.0
 LABEL org.opencontainers.image.revision=${COMMIT_SHA}
 
 # Switch to non-root user

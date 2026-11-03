@@ -1,0 +1,40 @@
+# Entirely synthetic: this file is not a corporate specification excerpt.
+openapi: 3.0.3
+info: { title: Synthetic legacy widgets, version: '1.0' }
+security: [{ partner: [] }]
+paths:
+  /legacy/{company_id}/widgets:
+    $ref: './widgets.yaml'
+  /legacy/{company_id}/widgets/{record_id}:
+    get:
+      operationId: get_widget
+      tags: [Widgets]
+      responses: { '200': { description: OK } }
+  /locations/{location_id}/widgets:
+    get:
+      operationId: old_widget_list
+      parameters:
+        - { name: staff_id, in: query, schema: { type: integer } }
+      responses: { '200': { description: OK } }
+  /legacy/widgets/search:
+    get:
+      operationId: search_widgets
+      parameters:
+        - { name: category, in: query, schema: { type: string } }
+      responses: { '200': { description: OK } }
+  /legacy/widgets/{id}:
+    put:
+      operationId: old_update_widget
+      responses: { '204': { description: OK } }
+  /standalone:
+    get:
+      operationId: standalone
+      security: []
+      responses: { '200': { description: OK } }
+components:
+  schemas:
+    Widget:
+      type: object
+      properties:
+        id: { type: integer }
+        child: { $ref: '#/components/schemas/Widget' }

@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 import './config/env.js';
+import type { Server as HttpServer } from 'node:http';
+import { isEntrypoint, installShutdownSignals } from './utils/entrypoint.js';
 import { parseProxyKeys, verifyProxyRequest } from './utils/proxy-auth.js';
+import { browserBoundary, httpMode } from './utils/http-policy.js';
+import { RequestActivity } from './utils/request-lifecycle.js';
 import { randomUUID } from 'node:crypto';
 import express from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -35,7 +39,6 @@ import {
   type HttpSessionLease,
 } from './utils/http-sessions.js';
 import { oauthDoor } from './auth/oauth-door.js';
-import { oauthOriginFromApiBase } from './auth/oauth-access.js';
 
 const logger = createLogger('http-server');
 
@@ -200,10 +203,22 @@ export function createApp(
   /** The default `/mcp` session registry. */
   transports: TransportRegistry;
   transportsByFacet: Record<FacetKey, TransportRegistry>;
+  activity: RequestActivity;
+  beginDrain(): void;
+  closeTransports(): Promise<void>;
 } {
   const app = express();
+  // Keep Express route matching aligned with the canonical /mcp policy guards.
+  app.enable('case sensitive routing');
   const config = loadConfig();
   const env = config.env;
+  const activity = new RequestActivity();
+  const servers = new Set<ReturnType<typeof createServer>>();
+  const serverForTransport = new WeakMap<
+    StreamableHTTPServerTransport,
+    ReturnType<typeof createServer>
+  >();
+  let draining = false;
   const budget = new HttpSessionBudget(
     options.maxSessions ?? env.MCP_HTTP_MAX_SESSIONS,
     {
@@ -233,8 +248,19 @@ export function createApp(
   ) => {
     const finish = leases.get(transport)?.beginPost();
     if (finish) {
-      res.once('finish', finish);
-      res.once('close', finish);
+      let ending = false;
+      const complete = () => {
+        if (ending) return;
+        ending = true;
+        const server = serverForTransport.get(transport);
+        if (server)
+          void server.activity
+            .drain(env.ALTEGIO_REQUEST_TIMEOUT_MS)
+            .finally(finish);
+        else finish();
+      };
+      res.once('finish', complete);
+      res.once('close', complete);
     }
   };
 
@@ -264,14 +290,20 @@ export function createApp(
       return;
     }
     const finish = lease.beginPost();
-    const server = createServer({ facet });
+    const server = createServer({ facet, http: true, activity });
+    servers.add(server);
     let done = false;
     const cleanup = () => {
       if (done) return;
       done = true;
-      finish();
-      lease.release();
-      void server.close().catch(() => undefined);
+      void (async () => {
+        if (!(await server.activity.drain(env.ALTEGIO_REQUEST_TIMEOUT_MS)))
+          server.activity.abort();
+        await server.close().catch(() => undefined);
+        servers.delete(server);
+        finish();
+        lease.release();
+      })();
     };
     res.once('finish', cleanup);
     res.once('close', cleanup);
@@ -297,12 +329,25 @@ export function createApp(
   ) {
     throw new Error('MCP_PROXY_BACKEND_KEY contains no usable signing key');
   }
-  if (proxyKeys.length === 0) {
-    logger.warn(
-      { event: 'proxy_trust_unconfigured' },
-      'Proxy signatures are not enforced; configure the existing backend key before enabling delegated clients'
-    );
-  }
+  const hosted = httpMode(env, proxyKeys.length > 0) === 'hosted';
+  app.use(browserBoundary(env, hosted));
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/mcp')) {
+      if (draining) {
+        res
+          .status(503)
+          .set('Retry-After', '5')
+          .json({ error: 'server_draining' });
+        return;
+      }
+      if (req.method !== 'GET') {
+        const finish = activity.begin();
+        res.once('finish', finish);
+        res.once('close', finish);
+      }
+    }
+    next();
+  });
   app.use((req, res, next) => {
     if (!req.path.startsWith('/mcp')) return next();
     const localRequestId = randomUUID();
@@ -310,13 +355,15 @@ export function createApp(
       name.startsWith('x-mcp-auth-')
     );
     const signed = req.headers['x-mcp-proxy-auth'] !== undefined;
-    if (proxyKeys.length > 0 && (delegated || signed)) {
+    let verified = false;
+    if ((proxyKeys.length > 0 || hosted) && (delegated || signed)) {
       const verification = verifyProxyRequest({
         keys: proxyKeys,
         method: req.method,
         path: req.originalUrl,
         headers: req.headers,
       });
+      verified = verification.ok;
       if (!verification.ok) {
         logger.warn(
           {
@@ -333,6 +380,14 @@ export function createApp(
         res.status(401).json({ error: 'proxy_auth_required' });
         return;
       }
+    }
+    if (
+      hosted &&
+      !verified &&
+      !requestContextFromHeaders(req.headers).userToken
+    ) {
+      res.status(401).json({ error: 'caller_authentication_required' });
+      return;
     }
     // The SDK copies these headers and later rebinds its asynchronous handler
     // context. Only a verified proxy may supply the correlation identifier.
@@ -422,8 +477,8 @@ export function createApp(
 
   // Health check endpoint
   app.get('/health', (_req, res) => {
-    res.json({
-      status: 'ok',
+    res.status(draining ? 503 : 200).json({
+      status: draining ? 'draining' : 'ok',
       service: 'altegio-pro-mcp',
       version: PACKAGE_VERSION,
       commit: COMMIT_SHA,
@@ -494,6 +549,8 @@ export function createApp(
 
           transport.onclose = () => {
             lease.release();
+            const server = serverForTransport.get(transport);
+            if (server) servers.delete(server);
             const sid = transport.sessionId;
             if (sid && transports[sid]) {
               delete transports[sid];
@@ -511,7 +568,9 @@ export function createApp(
           };
 
           try {
-            const server = createServer({ facet });
+            const server = createServer({ facet, http: true, activity });
+            servers.add(server);
+            serverForTransport.set(transport, server);
             await server.connect(transport);
             await runWithContext(requestContext, () =>
               transport.handleRequest(req, res, req.body)
@@ -670,56 +729,87 @@ export function createApp(
     app,
     transports: transportsByFacet[DEFAULT_FACET],
     transportsByFacet,
+    activity,
+    beginDrain: () => {
+      draining = true;
+    },
+    closeTransports: async () => {
+      await Promise.allSettled(
+        [...servers].map((server) => {
+          server.activity.abort();
+          return server.close();
+        })
+      );
+      servers.clear();
+    },
   };
 }
 
-async function startHTTPServer(): Promise<void> {
-  const port = parseInt(process.env.PORT || '3000', 10);
-  // Load once up front so a misconfigured deployment fails at boot rather than
-  // on the first request, and so the posture below is read from the same
-  // cached config every session will see.
-  const config = loadConfig();
-  const { app } = createApp();
-
-  // Start Express server
-  app.listen(port, () => {
-    logger.info(`Streamable HTTP server listening on port ${port}`);
-    logger.info(`HTTP session capacity: ${config.env.MCP_HTTP_MAX_SESSIONS}`);
-    for (const { path } of FACET_ROUTES) {
-      logger.info(`MCP endpoint: http://localhost:${port}${path}`);
-    }
-    // The tool surface an HTTP deployment hands out is a security posture, so
-    // state it in the boot log instead of leaving it to be inferred.
-    logger.info(
-      config.env.ALTEGIO_EXPOSE_PASSWORD_LOGIN
-        ? 'Password login (auth_login/auth_logout) is SERVED on the HTTP views — intended only for the closed staff deployment (ALTEGIO_EXPOSE_PASSWORD_LOGIN=true)'
-        : 'Password login (auth_login/auth_logout) is withheld from the HTTP views; callers authenticate through the proxy'
-    );
-    logger.info(
-      `Read-only view on /mcp/${READONLY_VIEW}: serves only tools annotated readOnlyHint, and refuses every other tool by name. Addresses named to callers are based on ${config.env.MCP_PUBLIC_BASE_URL}`
-    );
-    logger.info(
-      `Altegio OAuth access tokens (ag_at_) are accepted on the HTTP views and verified against ${oauthOriginFromApiBase(config.altegio.apiBase)}/oauth/accessible-resources; a refused token is answered 401 with resource_metadata`
-    );
-  });
+export interface HttpRuntime {
+  listener: HttpServer;
+  shutdown(): Promise<void>;
 }
 
-// Handle process signals
-process.on('SIGINT', async () => {
-  logger.info('Received SIGINT, shutting down...');
-  await flushLogs();
-  process.exit(0);
-});
+async function startHTTPServer(
+  options: { port?: number; host?: string; handleSignals?: boolean } = {}
+): Promise<HttpRuntime> {
+  const config = loadConfig();
+  const port = options.port ?? Number(process.env.PORT || '3000');
+  const mode = httpMode(
+    config.env,
+    parseProxyKeys(process.env.MCP_PROXY_BACKEND_KEY).length > 0
+  );
+  const host =
+    options.host ??
+    config.env.MCP_HTTP_HOST ??
+    (mode === 'hosted' ? '0.0.0.0' : '127.0.0.1');
+  const runtime = createApp();
+  const listener = runtime.app.listen(port, host);
+  await new Promise<void>((resolve, reject) => {
+    listener.once('listening', resolve);
+    listener.once('error', reject);
+  });
+  logger.info({ host, port, mode }, 'Streamable HTTP server listening');
+  let stopping: Promise<void> | undefined;
+  let removeSignals: (() => void) | undefined;
+  const shutdown = (): Promise<void> => {
+    stopping ??= (async () => {
+      runtime.beginDrain();
+      const closed = new Promise<void>((resolve) =>
+        listener.close(() => resolve())
+      );
+      let deadline: ReturnType<typeof setTimeout>;
+      const forced = new Promise<void>((resolve) => {
+        deadline = setTimeout(() => {
+          runtime.activity.abort();
+          listener.closeAllConnections();
+          resolve();
+        }, config.env.MCP_SHUTDOWN_TIMEOUT_MS);
+      });
+      try {
+        await Promise.race([
+          (async () => {
+            await runtime.activity.drain(config.env.MCP_SHUTDOWN_TIMEOUT_MS);
+            await runtime.closeTransports();
+          })(),
+          forced,
+        ]);
+        listener.closeAllConnections();
+        await closed;
+        await flushLogs();
+      } finally {
+        clearTimeout(deadline!);
+        removeSignals?.();
+      }
+    })();
+    return stopping;
+  };
+  if (options.handleSignals) removeSignals = installShutdownSignals(shutdown);
+  return { listener, shutdown };
+}
 
-process.on('SIGTERM', async () => {
-  logger.info('Received SIGTERM, shutting down...');
-  await flushLogs();
-  process.exit(0);
-});
-
-// Run if executed directly (not when imported by tests)
-if (process.argv[1] && !process.argv[1].includes('jest')) {
-  startHTTPServer().catch(async (error) => {
+if (isEntrypoint()) {
+  startHTTPServer({ handleSignals: true }).catch(async (error) => {
     logger.error(
       { error_type: error instanceof Error ? error.name : 'unknown' },
       'Failed to start HTTP server'

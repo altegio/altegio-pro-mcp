@@ -172,6 +172,25 @@ export const EnvSchema = z.object({
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
     .default('info'),
 
+  MCP_HTTP_MODE: z.enum(['local', 'hosted']).optional(),
+  MCP_HTTP_HOST: z.string().min(1).optional(),
+  MCP_HTTP_ALLOWED_HOSTS: z.string().optional(),
+  MCP_HTTP_ALLOWED_ORIGINS: z.string().optional(),
+  // Deliberate legacy single-user HTTP opt-in. Never inferred from saved credentials.
+  MCP_HTTP_ALLOW_SHARED_CREDENTIALS: BooleanFlagSchema,
+  MCP_SHUTDOWN_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(100)
+    .max(120000)
+    .default(30000),
+  ALTEGIO_REQUEST_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(100)
+    .max(120000)
+    .default(30000),
+
   // Retained HTTP servers; deployments tune this against their JS heap budget.
   MCP_HTTP_MAX_SESSIONS: z.coerce.number().int().min(1).default(512),
   // Idle expiry of an HTTP session after it made a tool call, and before it
@@ -222,13 +241,13 @@ export const EnvSchema = z.object({
   MCP_DEFAULT_VIEW: z.enum(DEFAULT_VIEW_LISTINGS).default(DEFAULT_VIEW_LISTING),
 
   // Rate limiting
-  RATE_LIMIT_REQUESTS: z.coerce.number().min(1).default(200),
+  RATE_LIMIT_REQUESTS: z.coerce.number().int().min(1).max(100000).default(200),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().min(1000).default(60000), // 1 minute
 
   // Retry config
-  MAX_RETRY_ATTEMPTS: z.coerce.number().min(0).default(3),
-  INITIAL_RETRY_DELAY_MS: z.coerce.number().min(100).default(1000),
-  MAX_RETRY_DELAY_MS: z.coerce.number().min(1000).default(30000),
+  MAX_RETRY_ATTEMPTS: z.coerce.number().int().min(0).max(5).default(1),
+  INITIAL_RETRY_DELAY_MS: z.coerce.number().min(100).default(150),
+  MAX_RETRY_DELAY_MS: z.coerce.number().min(100).default(5000),
 });
 
 export type EnvConfig = z.infer<typeof EnvSchema>;
@@ -275,12 +294,12 @@ export const AltegioConfigSchema = z.object({
   legacyWebBase: z.string().url().default(DEFAULT_LEGACY_WEB_BASE),
   partnerToken: z.string().min(1),
   userToken: z.string().optional(),
-  timeout: z.number().min(1000).default(30000),
+  timeout: z.number().int().min(100).max(120000).default(30000),
   retryConfig: z
     .object({
-      maxAttempts: z.number().min(0).default(3),
-      initialDelay: z.number().min(100).default(1000),
-      maxDelay: z.number().min(1000).default(30000),
+      maxAttempts: z.number().int().min(0).max(5).default(1),
+      initialDelay: z.number().min(100).default(150),
+      maxDelay: z.number().min(100).default(5000),
     })
     .prefault({}),
   rateLimit: z
@@ -335,6 +354,14 @@ export class ConfigLoader {
         ALTEGIO_LEGACY_WEB_BASE: env.ALTEGIO_LEGACY_WEB_BASE,
         NODE_ENV: env.NODE_ENV,
         LOG_LEVEL: env.LOG_LEVEL,
+        MCP_HTTP_MODE: env.MCP_HTTP_MODE,
+        MCP_HTTP_HOST: env.MCP_HTTP_HOST,
+        MCP_HTTP_ALLOWED_HOSTS: env.MCP_HTTP_ALLOWED_HOSTS,
+        MCP_HTTP_ALLOWED_ORIGINS: env.MCP_HTTP_ALLOWED_ORIGINS,
+        MCP_HTTP_ALLOW_SHARED_CREDENTIALS:
+          env.MCP_HTTP_ALLOW_SHARED_CREDENTIALS,
+        MCP_SHUTDOWN_TIMEOUT_MS: env.MCP_SHUTDOWN_TIMEOUT_MS,
+        ALTEGIO_REQUEST_TIMEOUT_MS: env.ALTEGIO_REQUEST_TIMEOUT_MS,
         MCP_HTTP_MAX_SESSIONS: env.MCP_HTTP_MAX_SESSIONS,
         MCP_HTTP_SESSION_IDLE_SECONDS: env.MCP_HTTP_SESSION_IDLE_SECONDS,
         MCP_HTTP_UNUSED_SESSION_IDLE_SECONDS:
@@ -367,6 +394,7 @@ export class ConfigLoader {
         legacyWebBase: envConfig.ALTEGIO_LEGACY_WEB_BASE,
         partnerToken: envConfig.ALTEGIO_API_TOKEN,
         userToken: envConfig.ALTEGIO_USER_TOKEN,
+        timeout: envConfig.ALTEGIO_REQUEST_TIMEOUT_MS,
         retryConfig: {
           maxAttempts: envConfig.MAX_RETRY_ATTEMPTS,
           initialDelay: envConfig.INITIAL_RETRY_DELAY_MS,

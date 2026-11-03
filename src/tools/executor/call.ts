@@ -912,8 +912,8 @@ export async function callOperation(
   });
 
   const label = `${op.operationId} payload`;
-  let value: unknown = cleaned;
-  let truncated = false;
+  let value: unknown;
+  let truncated: boolean;
   let omittedFields: string[] | undefined;
   let pagination: Pagination | undefined;
   let listCounts: { returned: number; received: number } | undefined;

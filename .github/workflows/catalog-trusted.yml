@@ -1,0 +1,154 @@
+name: Trusted catalog
+
+# Deliberate dispatch on trusted main, after reviewing the exact PR head.
+# No pull_request_target or workflow_run consumes untrusted code with secrets.
+on:
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Reviewed pull request number
+        required: true
+      candidate_sha:
+        description: Reviewed 40-character PR head SHA
+        required: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: catalog-${{ inputs.pull_request }}
+  cancel-in-progress: false
+
+jobs:
+  catalog:
+    name: Pinned-spec validation
+    if: github.repository == 'altegio/altegio-pro-mcp' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: catalog-spec
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: trusted
+          persist-credentials: false
+      - name: Validate the reviewed PR head
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pull_request }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        run: |
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]
+          [[ "$CANDIDATE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$RUNNER_TEMP/pr.json"
+          node --input-type=module -e '
+            import assert from "node:assert/strict";
+            import { readFileSync } from "node:fs";
+            const pr = JSON.parse(readFileSync(process.env.RUNNER_TEMP + "/pr.json"));
+            assert.equal(pr.state, "open");
+            assert.equal(pr.base.ref, "main");
+            assert.equal(pr.head.sha, process.env.CANDIDATE_SHA);
+          '
+          echo "sha=$CANDIDATE_SHA" >> "$GITHUB_OUTPUT"
+      - name: Obtain the dedicated status identity
+        id: status-app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
+        with:
+          app-id: ${{ vars.CATALOG_STATUS_APP_ID }}
+          private-key: ${{ secrets.CATALOG_STATUS_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: altegio-pro-mcp
+          permission-statuses: write
+      - name: Mark the exact revision pending
+        env:
+          GH_TOKEN: ${{ steps.status-app.outputs.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          gh api --silent --method POST "repos/$GITHUB_REPOSITORY/statuses/$CANDIDATE_SHA" \
+            -f state=pending -f context='Catalog (pinned spec)' \
+            -f description='Validating the reviewed pinned specification'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.candidate.outputs.sha }}
+          path: candidate
+          persist-credentials: false
+      - name: Reject links or special files in candidate mounts
+        run: |
+          python3 - <<'PYTHON'
+          import pathlib
+          base = pathlib.Path('candidate').absolute()
+          mounts = [base / 'scripts/catalog', base / 'catalog/overlay', base / 'src/generated/catalog.json']
+          for mount in mounts:
+              if mount.resolve() != mount:
+                  raise ValueError('Candidate mount resolves outside its expected path')
+              for item in [mount, *mount.rglob('*')]:
+                  if item.is_symlink() or not (item.is_dir() or item.is_file()):
+                      raise ValueError('Candidate mounts must contain regular files without links')
+          PYTHON
+      - name: Build the sandbox from trusted dependencies
+        run: docker build --file trusted/scripts/catalog/Dockerfile --tag catalog-sandbox trusted
+      - name: Fetch the private snapshot
+        env:
+          SPEC_ARCHIVE_URL: ${{ secrets.SPEC_ARCHIVE_URL }}
+          SPEC_ARCHIVE_TOKEN: ${{ secrets.SPEC_ARCHIVE_TOKEN }}
+        run: |
+          test -n "$SPEC_ARCHIVE_URL" && test -n "$SPEC_ARCHIVE_TOKEN"
+          # The immutable archive URL has one top-level directory (GitHub/GitLab
+          # source-archive layout). Never echo the URL, token or private files.
+          if ! curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+            --header "Authorization: Bearer $SPEC_ARCHIVE_TOKEN" \
+            --output "$RUNNER_TEMP/spec.tar.gz" "$SPEC_ARCHIVE_URL" 2> "$RUNNER_TEMP/private-fetch.log"; then
+            echo '::error::Private specification download failed; inspect access privately.'
+            exit 1
+          fi
+          umask 022
+          if ! python3 trusted/scripts/catalog/extract-spec.py \
+            "$RUNNER_TEMP/spec.tar.gz" "$RUNNER_TEMP/private-spec" > "$RUNNER_TEMP/private-extract.log" 2>&1; then
+            echo '::error::Private specification archive layout or limits are invalid.'
+            exit 1
+          fi
+      - name: Verify the pinned input and generate without credentials or network
+        id: validate
+        run: |
+          if ! node trusted/scripts/catalog/verify-spec.mjs "$RUNNER_TEMP/private-spec" > "$RUNNER_TEMP/private-verify.log" 2>&1; then
+            echo '::error::Private specification is unavailable or differs from the reviewed pin.'
+            exit 1
+          fi
+          # Mount only generator/overlay inputs and the expected catalog, read-only.
+          # PR code has no network, host credentials, writable checkout or logs in
+          # the public run. tmpfs bounds its output; no private artifact is uploaded.
+          timeout --kill-after=5s 120s docker run --rm --name "catalog-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 64 --memory 512m --cpus 1 \
+            --tmpfs /tmp:rw,noexec,nosuid,size=32m,uid=65534,gid=65534 \
+            --mount "type=bind,src=$RUNNER_TEMP/private-spec,dst=/spec,readonly" \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/candidate/scripts/catalog,dst=/app/scripts/catalog,readonly" \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/candidate/catalog/overlay,dst=/app/catalog/overlay,readonly" \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/candidate/src/generated/catalog.json,dst=/expected/catalog.json,readonly" \
+            catalog-sandbox sh -c 'node scripts/catalog/build.mjs --docs /spec --out /tmp/catalog.json --quiet && cmp -s /tmp/catalog.json /expected/catalog.json' \
+            > /dev/null 2>&1
+          echo 'Pinned-spec generator comparison passed.'
+      - name: Report the exact reviewed revision
+        if: always() && steps.candidate.outputs.sha != '' && steps.status-app.outputs.token != ''
+        env:
+          GH_TOKEN: ${{ steps.status-app.outputs.token }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+          VALIDATION: ${{ steps.validate.outcome }}
+        run: |
+          state=failure
+          if [ "$VALIDATION" = success ]; then state=success; fi
+          gh api --silent --method POST "repos/$GITHUB_REPOSITORY/statuses/$CANDIDATE_SHA" \
+            -f "state=$state" -f context='Catalog (pinned spec)' \
+            -f description='Reviewed source against the pinned private specification' \
+            -f "target_url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+      - name: Remove private material
+        if: always()
+        run: |
+          docker rm --force "catalog-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" > /dev/null 2>&1 || true
+          python3 - <<'PY'
+          import os, pathlib, shutil
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          shutil.rmtree(root / 'private-spec', ignore_errors=True)
+          for name in ('spec.tar.gz', 'private-fetch.log', 'private-extract.log', 'private-verify.log', 'pr.json'):
+              (root / name).unlink(missing_ok=True)
+          PY
