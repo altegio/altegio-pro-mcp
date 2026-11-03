@@ -6,14 +6,7 @@
  * single-user credential file in stdio mode. Adapters must not duplicate that
  * logic, so they take this port instead of building requests themselves, and
  * `httpFromClient` bridges an `AltegioClient` to it.
- *
- * The bridge reaches the client's internal request method structurally. That
- * method is `private` in TypeScript only — a compile-time marker, not a runtime
- * barrier — so this module keeps the coupling in one documented place and fails
- * loudly if the plumbing ever moves. `src/api/__tests__/altegio-http.test.ts`
- * guards the assumption.
  */
-import type { AltegioClient } from '../providers/altegio-client.js';
 import { notSignedIn } from './http-failure.js';
 
 /** Everything an adapter needs from the transport. */
@@ -38,34 +31,18 @@ export interface AltegioHttp {
   isAuthenticated(): boolean;
 }
 
-/** Shape of the internal request plumbing the bridge borrows. */
-interface ClientInternals {
-  apiRequest?: (
-    path: string,
-    init?: RequestInit,
-    scopedCompany?: number | null
-  ) => Promise<Response>;
+/** Public client contract implemented at the single auth/scope boundary. */
+export interface AltegioTransport {
+  apiRequest: AltegioHttp['request'];
+  isAuthenticated(): boolean;
 }
 
-/**
- * Name of the internal method the bridge depends on. Exported so the contract
- * test can assert its presence without repeating the string.
- */
-export const CLIENT_REQUEST_METHOD = 'apiRequest';
-
-export function httpFromClient(client: AltegioClient): AltegioHttp {
-  const internals = client as unknown as ClientInternals;
-  const request = internals[CLIENT_REQUEST_METHOD];
-  if (typeof request !== 'function') {
-    throw new Error(
-      `AltegioClient no longer exposes ${CLIENT_REQUEST_METHOD}; update src/api/altegio-http.ts to the new transport port.`
-    );
-  }
+export function httpFromClient(client: AltegioTransport): AltegioHttp {
   return {
     request: (path, init, scopedCompany) =>
       scopedCompany === undefined
-        ? request.call(client, path, init)
-        : request.call(client, path, init, scopedCompany),
+        ? client.apiRequest(path, init)
+        : client.apiRequest(path, init, scopedCompany),
     isAuthenticated: () => client.isAuthenticated(),
   };
 }

@@ -1,3 +1,4 @@
+import { RequestActivity } from './utils/request-lifecycle.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { registerTools } from './tools/registry.js';
@@ -21,6 +22,7 @@ import {
 } from './config/schema.js';
 
 export interface MCPServer extends Server {
+  activity: RequestActivity;
   name: string;
   version: string;
   /** Which static view of the tool surface this instance serves (ADR-001 D3). */
@@ -34,6 +36,8 @@ export interface CreateServerOptions {
    * gets everything.
    */
   facet?: FacetKey;
+  http?: boolean;
+  activity?: RequestActivity;
 }
 
 export function createServer(options: CreateServerOptions = {}): MCPServer {
@@ -76,6 +80,7 @@ export function createServer(options: CreateServerOptions = {}): MCPServer {
     }
   ) as MCPServer;
 
+  server.activity = new RequestActivity(options.activity);
   server.name = config.server.name;
   server.version = config.server.version;
   server.facet = facet;
@@ -87,9 +92,17 @@ export function createServer(options: CreateServerOptions = {}): MCPServer {
       legacyWebBase: config.altegio.legacyWebBase,
       partnerToken: config.altegio.partnerToken,
       userToken: config.altegio.userToken,
+      timeout: config.altegio.timeout,
+      retryConfig: config.altegio.retryConfig,
+      rateLimit: config.altegio.rateLimit,
     },
     config.env.CREDENTIALS_DIR,
-    { requireDelegatedIdentity: config.env.REQUIRE_DELEGATED_IDENTITY }
+    {
+      requireDelegatedIdentity:
+        config.env.REQUIRE_DELEGATED_IDENTITY ||
+        (options.http === true &&
+          !config.env.MCP_HTTP_ALLOW_SHARED_CREDENTIALS),
+    }
   );
 
   // Register tools with client, filtered to this facet
@@ -98,6 +111,7 @@ export function createServer(options: CreateServerOptions = {}): MCPServer {
     exposePasswordLogin: config.env.ALTEGIO_EXPOSE_PASSWORD_LOGIN,
     defaultListing,
     publicBaseUrl,
+    activity: server.activity,
   });
 
   // Resources and prompts are the same on every facet: they describe the

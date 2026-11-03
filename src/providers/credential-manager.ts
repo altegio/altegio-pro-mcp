@@ -18,7 +18,10 @@ export class CredentialManager {
 
   constructor(customDir?: string, encryptionKey?: string) {
     this.logger = createLogger('credential-manager');
-    this.credentialsDir = customDir || join(homedir(), '.altegio-mcp');
+    this.credentialsDir =
+      customDir ||
+      process.env.CREDENTIALS_DIR ||
+      join(homedir(), '.altegio-mcp');
     this.credentialsFile = join(this.credentialsDir, 'credentials.json');
     this.encryptionKey =
       encryptionKey || process.env.CREDENTIALS_ENCRYPTION_KEY;

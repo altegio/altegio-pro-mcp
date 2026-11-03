@@ -1,3 +1,4 @@
+import { RequestActivity } from '../utils/request-lifecycle.js';
 import { ZodError } from 'zod';
 import { createLogger, logSafeToken, sessionLogId } from '../utils/logger.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -90,6 +91,7 @@ type CallHandler = (
 type PrepareConfirmation = (args: unknown) => PreparedConfirmation | undefined;
 
 export interface RegisterToolsOptions {
+  readonly activity?: RequestActivity;
   /** Which static view to serve. Defaults to the full default view. */
   readonly facet?: FacetKey;
   /**
@@ -527,6 +529,7 @@ export function registerTools(
       : undefined);
 
   // call handler
+  const activity = options.activity ?? new RequestActivity();
   server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     const { name: requested, arguments: args } = request.params;
     // What the tool_call log reports about this call, filled in as it runs.
@@ -798,9 +801,11 @@ export function registerTools(
         throw error;
       }
     };
-    return headers
-      ? runWithContext(requestContextFromHeaders(headers), onView)
-      : onView();
+    return activity.run(extra.signal, () =>
+      headers
+        ? runWithContext(requestContextFromHeaders(headers), onView)
+        : onView()
+    );
   });
 
   return listing.tools.map((tool) => tool.name);

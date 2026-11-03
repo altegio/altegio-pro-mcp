@@ -17,7 +17,7 @@ import { AuthenticationError } from '../utils/errors.js';
 import {
   OauthGrantsUnavailableError,
   OauthTokenRejectedError,
-  fetchOauthGrants,
+  refreshOauthGrants,
   isOauthAccessToken,
   oauthGrantsCache,
   resolveOauthGrants,
@@ -143,7 +143,7 @@ export async function assertOauthTokenLive(
   if (token === undefined || !isOauthAccessToken(token)) return;
   const { altegio } = loadConfig();
   try {
-    const grants = await fetchOauthGrants({
+    const grants = await refreshOauthGrants({
       token,
       apiBase: altegio.apiBase,
       partnerToken: altegio.partnerToken,

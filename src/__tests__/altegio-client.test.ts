@@ -66,6 +66,7 @@ describe('AltegioClient', () => {
 
       expect(fetch).toHaveBeenCalledWith('https://api.alteg.io/api/v1/auth', {
         method: 'POST',
+        signal: expect.any(AbortSignal),
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/vnd.api.v2+json',
@@ -383,6 +384,7 @@ describe('AltegioClient', () => {
       expect(fetch).toHaveBeenLastCalledWith(
         'https://api.alteg.io/api/v1/user/data',
         expect.objectContaining({
+          signal: expect.any(AbortSignal),
           headers: expect.objectContaining({
             Authorization: 'Bearer test-partner-token, User test-user-token',
           }),
@@ -443,6 +445,7 @@ describe('AltegioClient', () => {
       expect(fetch).toHaveBeenLastCalledWith(
         'https://api.alteg.io/api/v1/locations?my=1',
         {
+          signal: expect.any(AbortSignal),
           headers: {
             Accept: 'application/vnd.api.v2+json',
             Authorization: 'Bearer test-partner-token, User test-user-token',
@@ -492,6 +495,7 @@ describe('AltegioClient', () => {
       expect(fetch).toHaveBeenLastCalledWith(
         'https://api.alteg.io/api/v1/locations?my=1',
         {
+          signal: expect.any(AbortSignal),
           headers: {
             Accept: 'application/vnd.api.v2+json',
             Authorization: 'Bearer test-partner-token, User test-user-token',
@@ -541,6 +545,7 @@ describe('AltegioClient', () => {
       expect(fetch).toHaveBeenLastCalledWith(
         'https://api.alteg.io/api/v1/locations?page=1&count=10&my=1',
         {
+          signal: expect.any(AbortSignal),
           headers: {
             Accept: 'application/vnd.api.v2+json',
             Authorization: 'Bearer test-partner-token, User test-user-token',
@@ -636,6 +641,7 @@ describe('AltegioClient', () => {
       expect(fetch).toHaveBeenLastCalledWith(
         'https://api.alteg.io/api/v1/locations/1/appointments',
         {
+          signal: expect.any(AbortSignal),
           headers: {
             Accept: 'application/vnd.api.v2+json',
             Authorization: 'Bearer test-partner-token, User test-user-token',
@@ -719,6 +725,7 @@ describe('AltegioClient', () => {
         expect(fetch).toHaveBeenLastCalledWith(
           'https://api.alteg.io/api/v1/locations/4564/team_members',
           {
+            signal: expect.any(AbortSignal),
             headers: {
               Accept: 'application/vnd.api.v2+json',
               Authorization: 'Bearer test-partner-token, User test-user-token',
@@ -779,6 +786,7 @@ describe('AltegioClient', () => {
         expect(fetch).toHaveBeenLastCalledWith(
           'https://api.alteg.io/api/v1/locations/4564/team_members',
           {
+            signal: expect.any(AbortSignal),
             headers: {
               Accept: 'application/vnd.api.v2+json',
               Authorization: 'Bearer partner123, User user456',
@@ -831,6 +839,7 @@ describe('AltegioClient', () => {
         expect(fetch).toHaveBeenLastCalledWith(
           'https://api.alteg.io/api/v1/services/4564',
           {
+            signal: expect.any(AbortSignal),
             headers: {
               Accept: 'application/vnd.api.v2+json',
               Authorization: 'Bearer test-partner-token, User test-token-123',
@@ -908,6 +917,7 @@ describe('AltegioClient', () => {
         expect(fetch).toHaveBeenLastCalledWith(
           'https://api.alteg.io/api/v1/service_categories/4564/0',
           {
+            signal: expect.any(AbortSignal),
             headers: {
               Accept: 'application/vnd.api.v2+json',
               Authorization: 'Bearer test-partner-token',
@@ -954,6 +964,7 @@ describe('AltegioClient', () => {
       expect(fetch).toHaveBeenLastCalledWith(
         'https://api.alteg.io/api/v1/locations?my=1',
         {
+          signal: expect.any(AbortSignal),
           headers: {
             Accept: 'application/vnd.api.v2+json',
             Authorization: 'Bearer test-partner-token, User token-A',
@@ -1013,6 +1024,7 @@ describe('AltegioClient', () => {
       expect(fetch).toHaveBeenLastCalledWith(
         'https://api.alteg.io/api/v1/locations?my=1',
         {
+          signal: expect.any(AbortSignal),
           headers: {
             Accept: 'application/vnd.api.v2+json',
             Authorization: 'Bearer test-partner-token, User legacy-token',
@@ -1067,6 +1079,7 @@ describe('AltegioClient', () => {
       expect(fetch).toHaveBeenLastCalledWith(
         'https://api.alteg.io/api/v1/locations?my=1',
         {
+          signal: expect.any(AbortSignal),
           headers: {
             Accept: 'application/vnd.api.v2+json',
             Authorization: 'Bearer test-partner-token, User client-token',
@@ -1098,6 +1111,7 @@ describe('AltegioClient', () => {
       expect(fetch).toHaveBeenLastCalledWith(
         'https://api.alteg.io/api/v1/locations?my=1',
         {
+          signal: expect.any(AbortSignal),
           headers: {
             Accept: 'application/vnd.api.v2+json',
             Authorization: 'Bearer test-partner-token, User header-token',
@@ -1146,6 +1160,7 @@ describe('AltegioClient', () => {
         expect(fetch).toHaveBeenLastCalledWith(
           'https://api.alteg.io/api/v1/locations?my=1',
           {
+            signal: expect.any(AbortSignal),
             headers: {
               Accept: 'application/vnd.api.v2+json',
               // The caller's partner token, NOT the server's test-partner-token.
@@ -1169,6 +1184,7 @@ describe('AltegioClient', () => {
         expect(fetch).toHaveBeenLastCalledWith(
           'https://api.alteg.io/api/v1/locations/4564/team_members',
           {
+            signal: expect.any(AbortSignal),
             headers: {
               Accept: 'application/vnd.api.v2+json',
               Authorization: 'Bearer request-partner, User request-user',
@@ -1188,6 +1204,7 @@ describe('AltegioClient', () => {
         expect(fetch).toHaveBeenLastCalledWith(
           'https://api.alteg.io/api/v1/locations?my=1',
           {
+            signal: expect.any(AbortSignal),
             headers: {
               Accept: 'application/vnd.api.v2+json',
               // The server's own partner token (from mockConfig).
