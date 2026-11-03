@@ -94,12 +94,12 @@ with tarfile.open(sys.argv[1], 'w:gz') as archive:
         [
           path.join(ROOT, 'scripts/catalog/extract-spec.py'),
           archive,
-          path.join(temp, 'extracted'),
+          path.join(temp, 'sandbox/nested/extracted'),
         ],
-        { encoding: 'utf8' }
+        { encoding: 'utf8', env: { ...process.env, PYTHONOPTIMIZE: '1' } }
       );
       expect(result.status).not.toBe(0);
-      expect(fs.existsSync(path.join(temp, 'escape'))).toBe(false);
+      expect(fs.existsSync(path.join(temp, 'sandbox/escape'))).toBe(false);
     }
   );
 

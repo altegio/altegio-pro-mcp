@@ -80,10 +80,11 @@ jobs:
           base = pathlib.Path('candidate').absolute()
           mounts = [base / 'scripts/catalog', base / 'catalog/overlay', base / 'src/generated/catalog.json']
           for mount in mounts:
-              assert mount.resolve() == mount, 'Candidate mount resolves outside its expected path'
+              if mount.resolve() != mount:
+                  raise ValueError('Candidate mount resolves outside its expected path')
               for item in [mount, *mount.rglob('*')]:
-                  assert not item.is_symlink(), 'Candidate mounts cannot contain links'
-                  assert item.is_dir() or item.is_file(), 'Candidate mounts must contain regular files'
+                  if item.is_symlink() or not (item.is_dir() or item.is_file()):
+                      raise ValueError('Candidate mounts must contain regular files without links')
           PYTHON
       - name: Build the sandbox from trusted dependencies
         run: docker build --file trusted/scripts/catalog/Dockerfile --tag catalog-sandbox trusted
