@@ -15,7 +15,7 @@ Node 26 Alpine base. Updating those pins is a reviewed compatibility change.
 | `Artifacts`             | Build once; install/smoke the tarball; save/reload and smoke the same container image                                                                           |
 | `Package (Node 24)`     | Verify checksums, install and smoke the Node 26-built tarball on Node 24                                                                                        |
 | `Dependency audit`      | Fail high/critical advisories in the complete tree and any untriaged runtime advisory                                                                           |
-| `CodeQL`                | JavaScript/TypeScript scanning, also run weekly                                                                                                                 |
+| `CodeQL analysis`       | JavaScript/TypeScript scanning, also run weekly                                                                                                                 |
 | `Catalog (pinned spec)` | Separate trusted manual gate against an exact private snapshot and reviewed PR head                                                                             |
 
 The first seven checks run for ordinary PRs. The last requires the protected

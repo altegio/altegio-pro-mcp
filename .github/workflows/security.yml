@@ -28,7 +28,7 @@ jobs:
         run: node scripts/quality/audit.mjs
 
   codeql:
-    name: CodeQL
+    name: CodeQL analysis
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
