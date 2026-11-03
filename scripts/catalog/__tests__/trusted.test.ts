@@ -182,6 +182,26 @@ describe('private immutable archive acquisition', () => {
   });
 });
 
+describe('private sandbox cleanup', () => {
+  it('fails closed when Docker state or removal cannot be verified', () => {
+    run(`
+      import assert from 'node:assert/strict';
+      import {removeSandbox} from ${moduleURL('run-trusted.mjs')};
+      const name='catalog-cleanup-test';
+      const calls=[];
+      const absent=(bin,args)=>{calls.push([bin,args]);return {status:0,stdout:''};};
+      removeSandbox(name,absent);
+      assert.equal(calls.length,1);
+      assert.ok(calls[0][1].includes('name=^/'+name+'$'));
+      assert.throws(()=>removeSandbox(name,()=>({status:1,stdout:''})));
+      assert.throws(()=>removeSandbox(name,(bin,args)=>args[0]==='container' ? {status:0,stdout:'fixture-id'} : {status:1,stdout:''}));
+      let removed=false;
+      removeSandbox(name,(bin,args)=>{if(args[0]==='container')return {status:0,stdout:'fixture-id'};removed=true;return {status:0,stdout:''};});
+      assert.equal(removed,true);
+    `);
+  });
+});
+
 describe('administrative rule activation', () => {
   it('preserves existing rules and rejects weakened checks or a different issuer', () => {
     run(`

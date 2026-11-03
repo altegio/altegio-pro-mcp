@@ -97,16 +97,21 @@ jobs:
       - name: Remove private material
         if: always()
         run: |
-          docker rm --force "catalog-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" > /dev/null 2>&1 || true
+          cleanup_status=0
+          node trusted/scripts/catalog/run-trusted.mjs --cleanup \
+            "catalog-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" || cleanup_status=$?
+          # Continue filesystem cleanup even if Docker cleanup fails, then fail the step.
           python3 - <<'PY'
           import os, pathlib, shutil
           root = pathlib.Path(os.environ['RUNNER_TEMP'])
-          shutil.rmtree(root / 'private-spec', ignore_errors=True)
+          if (root / 'private-spec').exists():
+              shutil.rmtree(root / 'private-spec')
           for name in ('spec.tar.gz', 'spec.tar.gz.part', 'private-extract.log', 'private-verify.log'):
               (root / name).unlink(missing_ok=True)
           for item in root.glob('catalog-output-*'):
-              shutil.rmtree(item, ignore_errors=True)
+              shutil.rmtree(item)
           PY
+          exit "$cleanup_status"
       - name: Recheck the head and report the exact reviewed revision
         if: always() && steps.candidate.outputs.sha != '' && steps.status-app.outputs.token != ''
         env:

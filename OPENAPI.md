@@ -89,8 +89,10 @@ are one-time owner actions; never publish the generated key.
 
 ### Private immutable archive
 
-Use a private Cloud Storage object with public-access prevention and uniform
-bucket-level access. Package **only** the digest-covered `docs/en` subtree:
+Use an existing private CI storage bucket with uniform bucket-level access.
+Verify its bucket and inherited IAM do not grant public access, and verify the
+pinned object refuses anonymous reads. Preserve existing public-access prevention
+and unrelated bucket settings; do not create paid infrastructure implicitly. Package **only** the digest-covered `docs/en` subtree:
 
 ```sh
 node scripts/catalog/verify-spec.mjs /path/to/reviewed/snapshot

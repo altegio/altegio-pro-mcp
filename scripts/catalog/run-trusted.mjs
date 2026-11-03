@@ -40,6 +40,30 @@ async function regularTree(root, directory) {
   }
 }
 
+/** A Docker daemon failure is not proof that private mounts were removed. */
+export function removeSandbox(name, execute = spawnSync) {
+  assert.match(name, /^catalog-[a-zA-Z0-9_-]+$/);
+  const options = {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 15_000,
+  };
+  const listed = execute(
+    'docker',
+    ['container', 'ls', '--all', '--quiet', '--filter', `name=^/${name}$`],
+    options
+  );
+  assert.equal(
+    listed.status,
+    0,
+    'Sandbox cleanup could not verify container state'
+  );
+  if (listed.stdout.trim()) {
+    const removed = execute('docker', ['rm', '--force', name], options);
+    assert.equal(removed.status, 0, 'Sandbox cleanup failed');
+  }
+}
+
 /** Run only candidate generator inputs; compare bytes exclusively on the host. */
 export async function runSandbox({
   candidate,
@@ -129,12 +153,12 @@ export async function runSandbox({
     clearTimeout(timer);
     child?.kill('SIGKILL');
     // Killing the Docker client alone does not reliably stop the container.
-    spawnSync('docker', ['rm', '--force', name], {
-      stdio: 'ignore',
-      timeout: 15_000,
-    });
-    await output.close();
-    await rm(temp, { recursive: true, force: true });
+    try {
+      removeSandbox(name);
+    } finally {
+      await output.close();
+      await rm(temp, { recursive: true, force: true });
+    }
   }
 }
 
@@ -143,16 +167,20 @@ if (
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   try {
-    await runSandbox({
-      candidate: process.argv[2],
-      snapshot: process.argv[3],
-      image: process.argv[4],
-      name: process.argv[5],
-    });
-    console.log('Pinned-spec generator comparison passed.');
+    if (process.argv[2] === '--cleanup') {
+      removeSandbox(process.argv[3]);
+    } else {
+      await runSandbox({
+        candidate: process.argv[2],
+        snapshot: process.argv[3],
+        image: process.argv[4],
+        name: process.argv[5],
+      });
+      console.log('Pinned-spec generator comparison passed.');
+    }
   } catch {
     console.error(
-      'Private catalog sandbox/comparison failed; candidate output was discarded.'
+      'Private catalog execution or cleanup failed; candidate output was discarded.'
     );
     process.exitCode = 1;
   }

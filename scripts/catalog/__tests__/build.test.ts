@@ -126,6 +126,57 @@ with tarfile.open(sys.argv[1], 'w:gz') as archive:
     }
   );
 
+  it.each(['success', 'failure', 'exists'])(
+    'keeps archive bytes private during packing and preserves cleanup on %s',
+    (scenario) => {
+      const destination = path.join(temp, 'private.tar.gz');
+      const result = spawnSync(
+        'python3',
+        [
+          '-c',
+          `
+import os, pathlib, runpy, stat, sys, tarfile
+script, source, target, scenario = sys.argv[1:]
+archive = pathlib.Path(target)
+os.umask(0)
+if scenario == 'exists': archive.write_bytes(b'preserve-existing')
+original = tarfile.open
+observed = False
+def checked_open(*args, **kwargs):
+    global observed
+    if stat.S_IMODE(archive.stat().st_mode) != 0o600:
+        raise AssertionError('Private bytes are readable during archive creation')
+    observed = True
+    if scenario == 'failure': raise OSError('synthetic packing failure')
+    return original(*args, **kwargs)
+tarfile.open = checked_open
+sys.argv = [script, source, target]
+try:
+    runpy.run_path(script, run_name='__main__')
+except FileExistsError:
+    if scenario != 'exists': raise
+except OSError:
+    if scenario != 'failure': raise
+else:
+    if scenario != 'success': raise AssertionError('Expected failure')
+if scenario == 'exists':
+    if observed or archive.read_bytes() != b'preserve-existing':
+        raise AssertionError('Existing archive changed')
+elif not observed or (scenario == 'failure' and archive.exists()):
+    raise AssertionError('Unsafe archive lifecycle')
+`,
+          path.join(ROOT, 'scripts/catalog/pack-spec.py'),
+          SPEC,
+          destination,
+          scenario,
+        ],
+        { encoding: 'utf8' }
+      );
+      expect(result.stderr).toBe('');
+      expect(result.status).toBe(0);
+    }
+  );
+
   it('packs reproducibly and exposes only the digest-covered subtree', () => {
     const source = path.join(temp, 'source');
     fs.cpSync(SPEC, source, { recursive: true });
