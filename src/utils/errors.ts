@@ -2,7 +2,7 @@
  * Custom error classes for better error handling
  */
 
-import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { ProtocolErrorCode as ErrorCode } from '@modelcontextprotocol/server';
 import type { AltegioError } from '../types/altegio.types.js';
 import { noteError } from './tool-call-observation.js';
 

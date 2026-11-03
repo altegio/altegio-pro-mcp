@@ -1,8 +1,9 @@
 import { RequestActivity } from './utils/request-lifecycle.js';
+import type { UpstreamRateGate } from './utils/upstream-budget.js';
 import { httpMode } from './utils/http-policy.js';
 import { parseProxyKeys } from './utils/proxy-auth.js';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { Server } from '@modelcontextprotocol/server';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { registerTools } from './tools/registry.js';
 import {
   COMPACT_VIEW,
@@ -40,6 +41,7 @@ export interface CreateServerOptions {
   facet?: FacetKey;
   http?: boolean;
   activity?: RequestActivity;
+  rateGate?: Pick<UpstreamRateGate, 'admit'>;
 }
 
 export function createServer(options: CreateServerOptions = {}): MCPServer {
@@ -100,6 +102,7 @@ export function createServer(options: CreateServerOptions = {}): MCPServer {
     },
     config.env.CREDENTIALS_DIR,
     {
+      rateGate: options.rateGate,
       requireDelegatedIdentity:
         config.env.REQUIRE_DELEGATED_IDENTITY ||
         (options.http === true &&

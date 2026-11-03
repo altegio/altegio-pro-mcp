@@ -10,14 +10,12 @@
  * `prompts/list` is sorted by name, for the same reason `tools/list` is
  * deterministic (ADR-001 D7).
  */
-import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import type { Server } from '@modelcontextprotocol/server';
 import {
-  ErrorCode,
-  GetPromptRequestSchema,
-  ListPromptsRequestSchema,
-  McpError,
+  ProtocolErrorCode as ErrorCode,
+  ProtocolError as McpError,
   type PromptMessage,
-} from '@modelcontextprotocol/sdk/types.js';
+} from '@modelcontextprotocol/server';
 
 export interface PromptArgumentSpec {
   name: string;
@@ -104,7 +102,7 @@ export function registerPrompts(
 ): string[] {
   const prompts = collectPrompts(modules);
 
-  server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+  server.setRequestHandler('prompts/list', async () => ({
     prompts: prompts.map((entry) => ({
       name: entry.name,
       ...(entry.title ? { title: entry.title } : {}),
@@ -123,7 +121,7 @@ export function registerPrompts(
     })),
   }));
 
-  server.setRequestHandler(GetPromptRequestSchema, async (request) =>
+  server.setRequestHandler('prompts/get', async (request) =>
     getPrompt(modules, request.params.name, request.params.arguments ?? {})
   );
 

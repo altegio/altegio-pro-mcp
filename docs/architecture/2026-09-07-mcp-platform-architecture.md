@@ -227,6 +227,13 @@ This is the biggest cross-team dependency: the MCP audience, the protected-resou
 
 Stay on SDK 1.x / protocol 2025-11-25 in production, but write code that is already legal under 2026-07-28: static tool lists, no session-scoped tool state, cross-call state (onboarding sessions) passed as server-minted handles in tool arguments, long-running imports designed as poll-able jobs (Tasks extension candidates), deterministic `tools/list` ordering. Migrate to SDK v2 (`createMcpHandler`, dual era) after the platform's canary on a low-risk server; remove `StreamableHTTPServerTransport` session bookkeeping then.
 
+Staged implementation (2026-11-03): the split v2 packages can serve the
+existing legacy production protocol while `MCP_PROTOCOL_MODE=dual` enables
+the sessionless dual-era entry for reviewed canary testing. The default
+remains `legacy` until deployed platform evidence satisfies this gate. See
+[`../sdk-v2-migration.md`](../sdk-v2-migration.md) for the precise behavior,
+compatibility checks and rollout order; local tests do not satisfy the gate.
+
 ### D8 — Context economy rules for every tool
 
 - Structured result = projection of the API object (allowlisted fields), never the raw payload; text = a short summary the model can quote.

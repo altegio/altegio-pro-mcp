@@ -227,6 +227,8 @@ function appointmentTagFromJsonApi(
 }
 
 export interface AltegioClientOptions {
+  /** Shared across HTTP request instances for the same caller. */
+  rateGate?: Pick<UpstreamRateGate, 'admit'>;
   /**
    * When true (set in the HTTP deployment), anonymous requests — HTTP requests
    * without a proxy-verified identity — get no user token and cannot login.
@@ -260,7 +262,7 @@ export class AltegioClient implements AltegioTransport {
   private readonly retries: number;
   private readonly retryDelayMs: number;
   private readonly maxRetryDelayMs: number;
-  private readonly rateGate: UpstreamRateGate;
+  private readonly rateGate: Pick<UpstreamRateGate, 'admit'>;
 
   constructor(
     config: AltegioConfig,
@@ -273,10 +275,12 @@ export class AltegioClient implements AltegioTransport {
       config.retryConfig?.initialDelay ?? NETWORK_RETRY_DELAY_MS;
     this.maxRetryDelayMs =
       config.retryConfig?.maxDelay ?? RATE_LIMIT_MAX_WAIT_MS;
-    this.rateGate = new UpstreamRateGate(
-      config.rateLimit?.requests ?? 200,
-      config.rateLimit?.windowMs ?? 60_000
-    );
+    this.rateGate =
+      options?.rateGate ??
+      new UpstreamRateGate(
+        config.rateLimit?.requests ?? 200,
+        config.rateLimit?.windowMs ?? 60_000
+      );
     this.apiUrl = config.apiBase || 'https://api.alteg.io/api/v1';
     this.legacyWebUrl = (
       config.legacyWebBase || 'https://app.alteg.io'

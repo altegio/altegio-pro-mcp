@@ -1,11 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { Server } from '@modelcontextprotocol/server';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
 import { runWithIdentity, getRequestIdentity } from '../request-context.js';
 
 /**
@@ -30,7 +26,7 @@ describe('SDK identity propagation', () => {
       { name: 'test', version: '1.0.0' },
       { capabilities: { tools: {} } }
     );
-    server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    server.setRequestHandler('tools/list', async () => ({
       tools: [
         {
           name: 'probe',
@@ -39,7 +35,7 @@ describe('SDK identity propagation', () => {
         },
       ],
     }));
-    server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    server.setRequestHandler('tools/call', async (request) => {
       // Yield first, so concurrent calls interleave and a leaked context shows.
       await new Promise((resolve) => setTimeout(resolve, 5));
       const identity = getRequestIdentity();
