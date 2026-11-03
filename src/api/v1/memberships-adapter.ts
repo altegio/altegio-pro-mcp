@@ -3,9 +3,11 @@
  *
  * V2 has no membership operation (checked against the backend routes,
  * 2026-09-30), so every call runs on V1: the chain's membership types under
- * `/chains/{id}/loyalty/abonement_types`, its sold memberships under
- * `/chains/{id}/loyalty/abonements`, and one client's memberships through the
- * location-level phone lookup `/loyalty/abonements`. The model never learns
+ * `/chains/{id}/loyalty/membership_types`, its sold memberships under
+ * `/chains/{id}/loyalty/memberships`, and one client's memberships through the
+ * location-level phone lookup `/loyalty/memberships`. These are the spec's
+ * `membership*` URLs, which the backend serves as aliases of its legacy
+ * `abonement*` routes (RND-2053, checked live 2026-11-03). The model never learns
  * the wire vocabulary: `abonement`, `salon_group`, `cost`, `is_united_balance`,
  * `is_allow_empty_code`, `expiration_type_id`, `balance_container` and
  * `service_price_correction` stop here.
@@ -440,7 +442,7 @@ export class MembershipsAdapter implements MembershipsApi {
   }
 
   private typesPath(chainId: number, typeId?: number): string {
-    return `/chains/${chainId}/loyalty/abonement_types${typeId === undefined ? '' : `/${typeId}`}`;
+    return `/chains/${chainId}/loyalty/membership_types${typeId === undefined ? '' : `/${typeId}`}`;
   }
 
   async listChains(): Promise<ChainAccess[]> {
@@ -609,12 +611,12 @@ export class MembershipsAdapter implements MembershipsApi {
     query: MembershipListQuery
   ): Promise<Membership[]> {
     const { data } = await this.call(
-      `/chains/${chainId}/loyalty/abonements`,
+      `/chains/${chainId}/loyalty/memberships`,
       `list the memberships of chain ${chainId}`,
       {
         query: {
           ...(query.ids?.length
-            ? { abonements_ids: query.ids }
+            ? { membership_ids: query.ids }
             : {
                 created_after: query.created_from,
                 created_before: query.created_to,
@@ -647,7 +649,7 @@ export class MembershipsAdapter implements MembershipsApi {
     const phone = text(asRow(card.data).phone);
     if (!phone) return [];
     const { data } = await this.call(
-      '/loyalty/abonements',
+      '/loyalty/memberships',
       `list the memberships of client ${clientId} in location ${locationId}`,
       {
         query: { location_id: locationId, phone, chain_id: chainId },
@@ -687,7 +689,7 @@ export class MembershipsAdapter implements MembershipsApi {
     invalid: string
   ): Promise<unknown> {
     const { data } = await this.call(
-      `/chains/${chainId}/loyalty/abonements/${membershipId}/${action}`,
+      `/chains/${chainId}/loyalty/memberships/${membershipId}/${action}`,
       `${context} in chain ${chainId}`,
       {
         method: 'POST',

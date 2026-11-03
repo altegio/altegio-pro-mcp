@@ -930,31 +930,31 @@ export const apiMapping: Record<string, ApiMapping> = {
     pathParams: [],
   },
   memberships_list_types: {
-    path: '/chains/{chain_id}/loyalty/abonement_types',
+    path: '/chains/{chain_id}/loyalty/membership_types',
     method: 'get',
     operationId: 'chain_loyalty_membership_types_list',
     pathParams: ['chain_id'],
     queryParams: ['title', 'is_archived', 'page', 'limit'],
   },
   memberships_get_type: {
-    path: '/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}',
+    path: '/chains/{chain_id}/loyalty/membership_types/{loyalty_membership_type_id}',
     method: 'get',
     operationId: 'chain_loyalty_membership_types_read',
     pathParams: ['chain_id', 'loyalty_membership_type_id'],
   },
   memberships_delete_type: {
-    path: '/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}',
+    path: '/chains/{chain_id}/loyalty/membership_types/{loyalty_membership_type_id}',
     method: 'delete',
     operationId: 'chain_loyalty_membership_types_delete',
     pathParams: ['chain_id', 'loyalty_membership_type_id'],
   },
   memberships_list: {
-    path: '/chains/{chain_id}/loyalty/abonements',
+    path: '/chains/{chain_id}/loyalty/memberships',
     method: 'get',
     operationId: 'get_membership_list',
     pathParams: ['chain_id'],
     queryParams: [
-      'abonements_ids',
+      'membership_ids',
       'created_after',
       'created_before',
       'page',
@@ -1584,14 +1584,14 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       pathParams: ['location_id', 'id'],
     },
     {
-      path: '/loyalty/abonements',
+      path: '/loyalty/memberships',
       method: 'get',
       operationId: 'get_client_memberships',
       pathParams: [],
       queryParams: ['company_id', 'phone'],
     },
     {
-      path: '/locations/{location_id}/client/{client_id}/loyalty/abonements/{membership_id}/history',
+      path: '/locations/{location_id}/client/{client_id}/loyalty/memberships/{membership_id}/history',
       method: 'get',
       operationId: 'get_client_membership_activity_history',
       pathParams: ['location_id', 'client_id', 'membership_id'],
@@ -2121,7 +2121,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
   // --- Memberships: tools that read before or after they write ---
   memberships_create_type: [
     {
-      path: '/chains/{chain_id}/loyalty/abonement_types',
+      path: '/chains/{chain_id}/loyalty/membership_types',
       method: 'post',
       operationId: 'chain_loyalty_membership_types_create',
       pathParams: ['chain_id'],
@@ -2158,7 +2158,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       ],
     },
     {
-      path: '/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}',
+      path: '/chains/{chain_id}/loyalty/membership_types/{loyalty_membership_type_id}',
       method: 'put',
       operationId: 'chain_loyalty_membership_types_update',
       pathParams: ['chain_id', 'loyalty_membership_type_id'],
@@ -2197,13 +2197,13 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
   ],
   memberships_update_type: [
     {
-      path: '/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}',
+      path: '/chains/{chain_id}/loyalty/membership_types/{loyalty_membership_type_id}',
       method: 'get',
       operationId: 'chain_loyalty_membership_types_read',
       pathParams: ['chain_id', 'loyalty_membership_type_id'],
     },
     {
-      path: '/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}',
+      path: '/chains/{chain_id}/loyalty/membership_types/{loyalty_membership_type_id}',
       method: 'put',
       operationId: 'chain_loyalty_membership_types_update',
       pathParams: ['chain_id', 'loyalty_membership_type_id'],
@@ -2242,13 +2242,13 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
   ],
   memberships_archive_type: [
     {
-      path: '/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}',
+      path: '/chains/{chain_id}/loyalty/membership_types/{loyalty_membership_type_id}',
       method: 'get',
       operationId: 'chain_loyalty_membership_types_read',
       pathParams: ['chain_id', 'loyalty_membership_type_id'],
     },
     {
-      path: '/chains/{chain_id}/loyalty/abonement_types/{loyalty_membership_type_id}',
+      path: '/chains/{chain_id}/loyalty/membership_types/{loyalty_membership_type_id}',
       method: 'patch',
       operationId: 'chain_loyalty_membership_types_archive',
       pathParams: ['chain_id', 'loyalty_membership_type_id'],
@@ -2263,7 +2263,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       pathParams: ['location_id', 'id'],
     },
     {
-      path: '/loyalty/abonements',
+      path: '/loyalty/memberships',
       method: 'get',
       operationId: 'get_client_memberships',
       pathParams: [],
@@ -2272,19 +2272,19 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
   ],
   memberships_freeze: [
     {
-      path: '/chains/{chain_id}/loyalty/abonements/{membership_id}/freeze',
+      path: '/chains/{chain_id}/loyalty/memberships/{membership_id}/freeze',
       method: 'post',
       operationId: 'chain_loyalty_memberships_freeze',
       pathParams: ['chain_id', 'membership_id'],
       bodyParams: ['freeze_till'],
     },
     {
-      path: '/chains/{chain_id}/loyalty/abonements',
+      path: '/chains/{chain_id}/loyalty/memberships',
       method: 'get',
       operationId: 'get_membership_list',
       pathParams: ['chain_id'],
       queryParams: [
-        'abonements_ids',
+        'membership_ids',
         'created_after',
         'created_before',
         'page',
@@ -2294,18 +2294,18 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
   ],
   memberships_unfreeze: [
     {
-      path: '/chains/{chain_id}/loyalty/abonements/{membership_id}/unfreeze',
+      path: '/chains/{chain_id}/loyalty/memberships/{membership_id}/unfreeze',
       method: 'post',
       operationId: 'chain_loyalty_memberships_unfreeze',
       pathParams: ['chain_id', 'membership_id'],
     },
     {
-      path: '/chains/{chain_id}/loyalty/abonements',
+      path: '/chains/{chain_id}/loyalty/memberships',
       method: 'get',
       operationId: 'get_membership_list',
       pathParams: ['chain_id'],
       queryParams: [
-        'abonements_ids',
+        'membership_ids',
         'created_after',
         'created_before',
         'page',
@@ -2315,12 +2315,12 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
   ],
   memberships_set_balance: [
     {
-      path: '/chains/{chain_id}/loyalty/abonements',
+      path: '/chains/{chain_id}/loyalty/memberships',
       method: 'get',
       operationId: 'get_membership_list',
       pathParams: ['chain_id'],
       queryParams: [
-        'abonements_ids',
+        'membership_ids',
         'created_after',
         'created_before',
         'page',
@@ -2328,7 +2328,7 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
       ],
     },
     {
-      path: '/chains/{chain_id}/loyalty/abonements/{membership_id}/set_balance',
+      path: '/chains/{chain_id}/loyalty/memberships/{membership_id}/set_balance',
       method: 'post',
       operationId: 'chain_loyalty_memberships_set_balance',
       pathParams: ['chain_id', 'membership_id'],
@@ -2337,19 +2337,19 @@ export const multiApiMapping: Record<string, ApiMapping[]> = {
   ],
   memberships_set_validity: [
     {
-      path: '/chains/{chain_id}/loyalty/abonements/{membership_id}/set_period',
+      path: '/chains/{chain_id}/loyalty/memberships/{membership_id}/set_period',
       method: 'post',
       operationId: 'chain_loyalty_memberships_set_period',
       pathParams: ['chain_id', 'membership_id'],
       bodyParams: ['period', 'period_unit_id'],
     },
     {
-      path: '/chains/{chain_id}/loyalty/abonements',
+      path: '/chains/{chain_id}/loyalty/memberships',
       method: 'get',
       operationId: 'get_membership_list',
       pathParams: ['chain_id'],
       queryParams: [
-        'abonements_ids',
+        'membership_ids',
         'created_after',
         'created_before',
         'page',

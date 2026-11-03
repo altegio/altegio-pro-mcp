@@ -878,7 +878,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       args: { chain_id: 9 },
       routes: [
         {
-          match: /\/chains\/9\/loyalty\/abonement_types/,
+          match: /\/chains\/9\/loyalty\/membership_types/,
           body: ok(envelope([membershipTypeRow()], { total_count: 1 })),
         },
       ],
@@ -890,7 +890,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       args: { chain_id: 9, type_id: 71 },
       routes: [
         {
-          match: /\/chains\/9\/loyalty\/abonement_types\/71/,
+          match: /\/chains\/9\/loyalty\/membership_types\/71/,
           body: ok(envelope(membershipTypeRow())),
         },
       ],
@@ -909,7 +909,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       },
       routes: [
         {
-          match: /\/chains\/9\/loyalty\/abonement_types/,
+          match: /\/chains\/9\/loyalty\/membership_types/,
           body: ok(envelope({ ...membershipTypeRow(), title: 'Ten visits' })),
         },
       ],
@@ -921,7 +921,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       args: { chain_id: 9, type_id: 71, location_ids: [1] },
       routes: [
         {
-          match: /\/chains\/9\/loyalty\/abonement_types\/71/,
+          match: /\/chains\/9\/loyalty\/membership_types\/71/,
           body: ok(envelope(membershipTypeRow())),
         },
       ],
@@ -933,7 +933,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       args: { chain_id: 9, type_id: 71, archived: false },
       routes: [
         {
-          match: /\/chains\/9\/loyalty\/abonement_types\/71/,
+          match: /\/chains\/9\/loyalty\/membership_types\/71/,
           body: ok(envelope(membershipTypeRow())),
         },
       ],
@@ -945,7 +945,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       args: { chain_id: 9, membership_ids: [81] },
       routes: [
         {
-          match: /\/chains\/9\/loyalty\/abonements/,
+          match: /\/chains\/9\/loyalty\/memberships/,
           body: ok(envelope([membershipRow()])),
         },
       ],
@@ -961,7 +961,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
           body: ok(envelope({ id: 21, phone: '+10000000000' })),
         },
         {
-          match: /\/loyalty\/abonements/,
+          match: /\/loyalty\/memberships/,
           body: ok(envelope([membershipRow()])),
         },
       ],
@@ -973,7 +973,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       args: { chain_id: 9, membership_id: 81 },
       routes: [
         {
-          match: /\/abonements\/81\/freeze/,
+          match: /\/memberships\/81\/freeze/,
           body: ok(envelope({ ...membershipRow(), is_frozen: true })),
         },
       ],
@@ -985,7 +985,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       args: { chain_id: 9, membership_id: 81 },
       routes: [
         {
-          match: /\/abonements\/81\/unfreeze/,
+          match: /\/memberships\/81\/unfreeze/,
           body: ok(envelope(membershipRow())),
         },
       ],
@@ -997,11 +997,11 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       args: { chain_id: 9, membership_id: 81, shared_visits: 3 },
       routes: [
         {
-          match: /\/abonements\/81\/set_balance/,
+          match: /\/memberships\/81\/set_balance/,
           body: ok({ success: true, data: null }),
         },
         {
-          match: /\/chains\/9\/loyalty\/abonements/,
+          match: /\/chains\/9\/loyalty\/memberships/,
           body: ok(envelope([membershipRow()])),
         },
       ],
@@ -1017,7 +1017,7 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       },
       routes: [
         {
-          match: /\/abonements\/81\/set_period/,
+          match: /\/memberships\/81\/set_period/,
           body: ok(envelope(membershipRow())),
         },
       ],

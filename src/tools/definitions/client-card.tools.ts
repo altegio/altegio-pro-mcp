@@ -251,7 +251,7 @@ export const clientsGetMembershipPurchasesTool = defineTool({
       (
         await client.request<unknown>(
           'GET',
-          '/loyalty/abonements',
+          '/loyalty/memberships',
           { company_id: input.location_id, phone },
           input.location_id
         )
@@ -272,7 +272,7 @@ export const clientsGetMembershipPurchasesTool = defineTool({
       const owner = await probe(() =>
         client.request<unknown>(
           'GET',
-          `/locations/${input.location_id}/client/${input.client_id}/loyalty/abonements/${membershipId}/history`
+          `/locations/${input.location_id}/client/${input.client_id}/loyalty/memberships/${membershipId}/history`
         )
       );
       if (owner.status !== 'ok') {

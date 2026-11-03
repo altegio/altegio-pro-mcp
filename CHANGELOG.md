@@ -6,6 +6,16 @@ is declared stable.
 
 ## [Unreleased]
 
+### Changed — membership tools call the documented membership URLs (RND-2053)
+
+- The API reference now documents `/loyalty/memberships`,
+  `/loyalty/membership_types` and the `membership_ids` filter instead of the
+  legacy `abonement*` paths and `abonements_ids`. The membership tools and
+  `clients_get_membership_purchases` call those URLs; Altegio serves them as
+  aliases of the same routes, so answers do not change. Tool names and
+  arguments stay the same.
+- The operation catalog is rebuilt from the API reference at `7ba5aa43`.
+
 ### Changed — an app on an old tool list is asked to refresh it
 
 - ChatGPT and Codex apps keep the `tools/list` they fetched until someone

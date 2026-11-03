@@ -71,8 +71,8 @@ describe('httpFromClient', () => {
     } as unknown as AltegioClient;
 
     const http = httpFromClient(fake);
-    await http.request('/loyalty/abonements', { method: 'GET' }, 4564);
-    expect(seen).toEqual([['/loyalty/abonements', { method: 'GET' }, 4564]]);
+    await http.request('/loyalty/memberships', { method: 'GET' }, 4564);
+    expect(seen).toEqual([['/loyalty/memberships', { method: 'GET' }, 4564]]);
   });
 });
 

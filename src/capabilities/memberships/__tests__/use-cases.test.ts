@@ -205,7 +205,7 @@ describe('memberships_list_types', () => {
       [
         [
           'GET',
-          /^\/chains\/9\/loyalty\/abonement_types$/,
+          /^\/chains\/9\/loyalty\/membership_types$/,
           200,
           ok([typeRow({ attached_salon_ids: null, abonements_count: 5 })], {
             total_count: 30,
@@ -276,7 +276,7 @@ describe('memberships_create_type', () => {
       [
         [
           'POST',
-          /^\/chains\/9\/loyalty\/abonement_types$/,
+          /^\/chains\/9\/loyalty\/membership_types$/,
           200,
           ok(typeRow({ expiration_type_id: 2 })),
         ],
@@ -311,7 +311,7 @@ describe('memberships_create_type', () => {
       [
         [
           'POST',
-          /^\/chains\/9\/loyalty\/abonement_types$/,
+          /^\/chains\/9\/loyalty\/membership_types$/,
           200,
           ok(
             typeRow({ expiration_type_id: 2, balance_container: { links: [] } })
@@ -319,7 +319,7 @@ describe('memberships_create_type', () => {
         ],
         [
           'PUT',
-          /^\/chains\/9\/loyalty\/abonement_types\/71$/,
+          /^\/chains\/9\/loyalty\/membership_types\/71$/,
           200,
           ok(typeRow({ expiration_type_id: 2 })),
         ],
@@ -347,8 +347,8 @@ describe('memberships_create_type', () => {
     const empty = ok(typeRow({ balance_container: { links: [] } }));
     const client = fakeClient(
       [
-        ['POST', /abonement_types$/, 200, empty],
-        ['PUT', /abonement_types\/71$/, 200, empty],
+        ['POST', /membership_types$/, 200, empty],
+        ['PUT', /membership_types\/71$/, 200, empty],
       ],
       calls
     );
@@ -400,7 +400,7 @@ describe('memberships_create_type', () => {
     ];
     const created: Route = [
       'POST',
-      /^\/chains\/9\/loyalty\/abonement_types$/,
+      /^\/chains\/9\/loyalty\/membership_types$/,
       200,
       ok(typeRow({ expiration_type_id: 2, cost: 299.5 })),
     ];
@@ -439,10 +439,10 @@ describe('memberships_update_type', () => {
     const calls: Call[] = [];
     const client = fakeClient(
       [
-        ['GET', /abonement_types\/71$/, 200, ok(typeRow())],
+        ['GET', /membership_types\/71$/, 200, ok(typeRow())],
         [
           'PUT',
-          /abonement_types\/71$/,
+          /membership_types\/71$/,
           200,
           ok(typeRow({ title: 'Twelve haircuts' })),
         ],
@@ -477,10 +477,10 @@ describe('memberships_update_type', () => {
     const calls: Call[] = [];
     const client = fakeClient(
       [
-        ['GET', /abonement_types\/71$/, 200, ok(typeRow())],
+        ['GET', /membership_types\/71$/, 200, ok(typeRow())],
         [
           'PUT',
-          /abonement_types\/71$/,
+          /membership_types\/71$/,
           200,
           ok(typeRow({ title: 'New title' })),
         ],
@@ -503,7 +503,7 @@ describe('memberships_update_type', () => {
       [
         [
           'GET',
-          /abonement_types\/71$/,
+          /membership_types\/71$/,
           200,
           ok(typeRow({ is_archived: true, date_archived: '2026-09-01' })),
         ],
@@ -527,13 +527,13 @@ describe('memberships_archive_type and memberships_delete_type', () => {
       [
         [
           'GET',
-          /abonement_types\/71$/,
+          /membership_types\/71$/,
           200,
           () => ok(typeRow({ is_archived: archived })),
         ],
         [
           'PATCH',
-          /abonement_types\/71$/,
+          /membership_types\/71$/,
           204,
           () => {
             archived = true;
@@ -559,7 +559,7 @@ describe('memberships_archive_type and memberships_delete_type', () => {
       [
         [
           'GET',
-          /abonement_types\/71$/,
+          /membership_types\/71$/,
           403,
           { success: false, meta: { message: 'Insufficient rights' } },
         ],
@@ -575,10 +575,10 @@ describe('memberships_archive_type and memberships_delete_type', () => {
   it('quotes the field errors behind the API’s generic message', async () => {
     const client = fakeClient(
       [
-        ['GET', /abonement_types\/71$/, 200, ok(typeRow())],
+        ['GET', /membership_types\/71$/, 200, ok(typeRow())],
         [
           'PATCH',
-          /abonement_types\/71$/,
+          /membership_types\/71$/,
           422,
           {
             success: false,
@@ -603,7 +603,7 @@ describe('memberships_archive_type and memberships_delete_type', () => {
       [
         [
           'DELETE',
-          /abonement_types\/71$/,
+          /membership_types\/71$/,
           400,
           { success: false, meta: { message: 'Cannot delete' } },
         ],
@@ -620,7 +620,7 @@ describe('memberships_archive_type and memberships_delete_type', () => {
       [
         [
           'GET',
-          /abonement_types$/,
+          /membership_types$/,
           403,
           { success: false, meta: { message: 'Insufficient rights' } },
         ],
@@ -640,7 +640,7 @@ describe('sold memberships', () => {
       [
         [
           'GET',
-          /^\/chains\/9\/loyalty\/abonements$/,
+          /^\/chains\/9\/loyalty\/memberships$/,
           200,
           ok([membershipRow()]),
         ],
@@ -653,7 +653,7 @@ describe('sold memberships', () => {
       page: 1,
       page_size: 25,
     });
-    expect(calls[0]!.query.getAll('abonements_ids[]')).toEqual(['81', '82']);
+    expect(calls[0]!.query.getAll('membership_ids[]')).toEqual(['81', '82']);
     expect(calls[0]!.query.get('count')).toBe('25');
     const [m] = (
       result.structuredContent as { items: Record<string, unknown>[] }
@@ -679,7 +679,7 @@ describe('sold memberships', () => {
       [
         [
           'GET',
-          /abonements$/,
+          /memberships$/,
           200,
           ok([membershipRow({ status: { id: 4, slug: 'wasted' } })]),
         ],
@@ -721,7 +721,7 @@ describe('sold memberships', () => {
         ['GET', /^\/client\/1\/21$/, 200, ok({ id: 21, phone: '+420111' })],
         [
           'GET',
-          /^\/loyalty\/abonements$/,
+          /^\/loyalty\/memberships$/,
           200,
           ok([membershipRow({ status: { id: 1, slug: 'created' } })]),
         ],
@@ -752,7 +752,7 @@ describe('sold memberships', () => {
       [
         [
           'POST',
-          /abonements\/81\/freeze$/,
+          /memberships\/81\/freeze$/,
           200,
           ok(membershipRow({ is_frozen: true })),
         ],
@@ -782,7 +782,7 @@ describe('sold memberships', () => {
       [
         [
           'GET',
-          /abonements$/,
+          /memberships$/,
           200,
           () =>
             ok([
@@ -800,7 +800,7 @@ describe('sold memberships', () => {
         ],
         [
           'POST',
-          /abonements\/81\/set_balance$/,
+          /memberships\/81\/set_balance$/,
           200,
           () => {
             after = true;
@@ -828,7 +828,7 @@ describe('sold memberships', () => {
   it('refuses a balance that does not fit the membership', async () => {
     const calls: Call[] = [];
     const client = fakeClient(
-      [['GET', /abonements$/, 200, ok([membershipRow()])]],
+      [['GET', /memberships$/, 200, ok([membershipRow()])]],
       calls
     );
     await expect(
@@ -845,7 +845,7 @@ describe('sold memberships', () => {
   });
 
   it('reports a membership missing from the chain', async () => {
-    const client = fakeClient([['GET', /abonements$/, 200, ok([])]], []);
+    const client = fakeClient([['GET', /memberships$/, 200, ok([])]], []);
     await expect(
       setBalance(client, { chain_id: 9, membership_id: 81, shared_visits: 3 })
     ).rejects.toThrow(MembershipsNotFoundError);
@@ -857,7 +857,7 @@ describe('sold memberships', () => {
       [
         [
           'POST',
-          /abonements\/81\/set_period$/,
+          /memberships\/81\/set_period$/,
           200,
           ok(membershipRow({ period: 2, period_unit_id: 4 })),
         ],

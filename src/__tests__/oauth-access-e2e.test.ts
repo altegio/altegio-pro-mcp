@@ -132,7 +132,7 @@ describe('Altegio OAuth lane, end to end', () => {
           ],
         });
       }
-      if (target.includes('/chains/100/loyalty/abonement_types')) {
+      if (target.includes('/chains/100/loyalty/membership_types')) {
         return json({
           success: true,
           data: {
@@ -447,7 +447,7 @@ describe('Altegio OAuth lane, end to end', () => {
     );
     expect(
       upstream.some((u) =>
-        u.url.includes('/chains/100/loyalty/abonement_types')
+        u.url.includes('/chains/100/loyalty/membership_types')
       )
     ).toBe(true);
   });

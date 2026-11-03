@@ -32,7 +32,7 @@ describe('executorScopeFor', () => {
     ).toBe('chain_clients:read');
     expect(
       executorScopeFor(
-        chainOp('memberships', '/chains/{chain_id}/loyalty/abonements')
+        chainOp('memberships', '/chains/{chain_id}/loyalty/memberships')
       )
     ).toBe('chain_loyalty:read');
     expect(
