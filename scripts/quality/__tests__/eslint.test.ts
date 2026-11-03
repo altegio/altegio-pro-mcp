@@ -1,26 +1,43 @@
 /** Real ESLint probes: configuration regressions must not silently remove rules. */
 import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
 
 const ROOT = path.resolve(__dirname, '../../..');
 function rules(source: string, filePath: string) {
-  const result = spawnSync(
-    process.execPath,
-    [
-      '--input-type=module',
-      '-e',
-      `
+  // CI uses TypeScript's immutable program cache. lintText against an existing
+  // path can then receive that file's on-disk types instead of the probe's.
+  const directory = mkdtempSync(
+    path.join(ROOT, path.dirname(filePath), 'eslint-probe-')
+  );
+  const probe = path.join(directory, `probe${path.extname(filePath)}`);
+  try {
+    writeFileSync(probe, source);
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `
     import { ESLint } from 'eslint';
     const eslint = new ESLint();
-    const [result] = await eslint.lintText(${JSON.stringify(source)}, { filePath: ${JSON.stringify(filePath)} });
+    const [result] = await eslint.lintFiles([${JSON.stringify(probe)}]);
     console.log(JSON.stringify(result.messages.map(m => m.ruleId)));
   `,
-    ],
-    { cwd: ROOT, encoding: 'utf8', timeout: 60_000 }
-  );
-  expect(result.stderr).toBe('');
-  expect(result.status).toBe(0);
-  return JSON.parse(result.stdout) as string[];
+      ],
+      {
+        cwd: ROOT,
+        encoding: 'utf8',
+        timeout: 60_000,
+        env: { ...process.env, TSESTREE_SINGLE_RUN: 'true' },
+      }
+    );
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+    return JSON.parse(result.stdout) as string[];
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 }
 
 describe('lint correctness configuration', () => {
