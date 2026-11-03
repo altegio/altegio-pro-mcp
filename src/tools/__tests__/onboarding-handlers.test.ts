@@ -38,9 +38,14 @@ describe('Onboarding Handlers', () => {
     testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'onboarding-test-'));
     stateManager = new OnboardingStateManager(testDir);
 
+    let nextClientId = 1000;
     mockClient = {
       isAuthenticated: jest.fn().mockReturnValue(true),
       getLocation: jest.fn().mockResolvedValue({ id: 123 }),
+      getSchedule: jest.fn().mockResolvedValue([]),
+      createClient: jest
+        .fn()
+        .mockImplementation(async () => ({ id: nextClientId++ })),
     } as unknown as jest.Mocked<AltegioClient>;
 
     handlers = new OnboardingHandlers(mockClient, stateManager);
@@ -739,6 +744,7 @@ describe('Onboarding Handlers', () => {
   describe('setSchedules', () => {
     it('should set work schedules and advance phase to clients', async () => {
       await handlers.start({ location_id: 123 });
+      await stateManager.checkpoint(123, 'staff', [1, 2]);
 
       mockClient.setSchedule = jest.fn().mockResolvedValue([]);
 
@@ -872,6 +878,7 @@ describe('Onboarding Handlers', () => {
 
     it('reports the scheduled team members, once each, as the created IDs', async () => {
       await handlers.start({ location_id: 123 });
+      await stateManager.checkpoint(123, 'staff', [1, 2]);
       mockClient.setSchedule = jest.fn().mockResolvedValue([]);
       const slots = [{ from: '09:00', to: '18:00' }];
 

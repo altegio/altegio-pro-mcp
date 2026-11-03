@@ -28,23 +28,39 @@ export function toAgentPhase(phase: string): string {
 export const AGENT_ONBOARDING_PHASES: readonly string[] =
   OnboardingPhaseSchema.options.map(toAgentPhase);
 
-// Checkpoint structure
+const EntityIdSchema = z.number().int().positive();
+const TimestampSchema = z.string().datetime({ offset: true });
+
+// Batches remain distinct: schedule metadata describes staff/date pairs, not IDs.
+export const CheckpointBatchSchema = z.object({
+  id: z.string().min(1),
+  completed: z.boolean(),
+  entity_ids: z.array(EntityIdSchema),
+  timestamp: TimestampSchema,
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type CheckpointBatch = z.infer<typeof CheckpointBatchSchema>;
+
+// Checkpoint structure. `batches` is optional only for pre-v2 persisted files.
 export const CheckpointSchema = z.object({
   completed: z.boolean(),
-  entity_ids: z.array(z.number()),
-  timestamp: z.string(),
+  entity_ids: z.array(EntityIdSchema),
+  timestamp: TimestampSchema,
   metadata: z.record(z.string(), z.unknown()).optional(),
+  batches: z.array(CheckpointBatchSchema).optional(),
 });
 
 export type Checkpoint = z.infer<typeof CheckpointSchema>;
 
 // Main state structure
 export const OnboardingStateSchema = z.object({
-  company_id: z.number(),
+  version: z.literal(2).optional(),
+  company_id: EntityIdSchema,
   phase: OnboardingPhaseSchema,
-  started_at: z.string(),
-  updated_at: z.string(),
-  checkpoints: z.record(z.string(), CheckpointSchema),
+  started_at: TimestampSchema,
+  updated_at: TimestampSchema,
+  checkpoints: z.partialRecord(OnboardingPhaseSchema, CheckpointSchema),
   conversation_context: z.record(z.string(), z.unknown()),
 });
 

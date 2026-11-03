@@ -392,7 +392,7 @@ onboarding_rollback_phase({
 // After confirmation:
 // "Successfully rolled back phase: test_appointments
 //  Deleted 5 appointments
-//  State reset to phase: clients
+//  State reset to phase: test_appointments
 //  You can now re-run onboarding_create_test_appointments() with different parameters"
 ```
 
@@ -495,30 +495,102 @@ callers onboarding the same location never share checkpoints:
 ~/.altegio-mcp/onboarding/principals/{principal_key}/{company_id}/state.json
 ```
 
-**Example state file:**
+### Durability and repeated batches
+
+The file store supports **one Node.js process per onboarding directory** on a
+local filesystem with atomic rename and file/directory synchronization. All
+manager and handler instances in that process share a queue keyed by principal
+and location. Imports, phase transitions, repeated starts and rollback hold that
+queue through their API calls and state updates. Different principals and
+locations remain independent. Multiple processes or replicas must use separate
+directories; sharing a directory between simultaneous processes is unsupported.
+A stopped or killed process can be replaced by a new process using the same
+directory.
+
+A session must exist and its state must validate and accept a checkpoint before
+an import creates anything. Starting an existing session preserves its history.
+Each successful row is persisted before the next row is created; completing the
+batch and moving to its next phase happen in one state update. Retry only the
+failed rows: successful IDs remain recorded across batches. Each checkpoint's
+`entity_ids` is the distinct set still eligible for rollback, and its `batches`
+retain the individual IDs, timestamps and metadata. `completed: false` marks an
+interrupted batch. Batch `metadata.failed_rows` counts refused rows, while
+`metadata.source: "test_appointments"` identifies explicitly created test clients.
+
+Writes use private directories (`0700`) and unique private files (`0600`), sync
+file contents, replace `state.json` atomically and sync its directory. Existing
+state permissions are tightened when loading. An interruption leaves the old or
+new complete JSON file; an abandoned private `.tmp` file is ignored and may be
+removed while the writer is stopped.
+
+The local file and the upstream API cannot commit one transaction together. A
+crash or storage failure after an upstream mutation but before its checkpoint
+may require manual reconciliation. A storage failure stops the batch immediately
+and reports the known created ID; ambiguous upstream writes are never retried
+automatically. Do not rerun the entire batch to resolve an uncertain outcome.
+Rollback retains interrupted batch markers even after all known IDs are removed;
+reconcile any unconfirmed writes before clearing that history or importing again.
+
+Schedule batches retain their exact staff/date pairs and slots separately.
+`metadata.requested_schedules` on each batch holds the original request, while
+`metadata.schedules` holds only confirmed workdays and the checkpoint combines
+that applied history. Each workday is written and checkpointed separately; a
+refused later date retains the earlier successes and counts as a failed row. Onboarding accepts
+schedules only for team members created in the session and refuses to overwrite
+an existing unowned workday. A repeated batch may edit a day already recorded by
+this session. Rollback deduplicates those staff/date pairs, records each confirmed
+deletion, and retains only failed dates for retry. Other phases likewise retain
+only IDs whose deletion has not been confirmed. A documented HTTP 404 for a
+recorded ID counts as already absent. Rollback rewinds the wizard to the affected
+phase, without removing any other phase's checkpoint.
+
+Test appointments create their synthetic clients explicitly, persist their IDs
+under `clients`, and disable appointment SMS. A client creation conflict is a
+failed row; the wizard never looks up or substitutes an existing customer. Even
+if an appointment fails, its already-created client remains available for
+`clients` rollback. Roll back appointments before clients.
+
+### Persisted format compatibility
+
+New writes use `version: 2`. Unversioned state is accepted and its surviving
+checkpoint is treated as a single `legacy-<phase>` batch. The next mutation writes
+the v2 format without changing those IDs. The current reader also accepts files
+without batch records. Older servers must not write v2 files: they would overwrite
+batch history. Stop the writer and keep a backup before changing server versions.
+
+History already lost by an older server cannot be reconstructed automatically.
+Legacy schedule checkpoints without complete staff/date metadata, unknown format
+versions, malformed files and mismatched location IDs fail closed. Reconcile or
+restore such a file before importing; starting onboarding does not overwrite it.
+The wizard never discovers rollback targets by listing all location objects.
+
+**Example v2 checkpoint:**
 
 ```json
 {
+  "version": 2,
   "company_id": 123456,
-  "phase": "services",
-  "started_at": "2025-01-29T10:30:00.000Z",
-  "updated_at": "2025-01-29T10:45:00.000Z",
+  "phase": "categories",
+  "started_at": "2026-11-03T10:30:00.000Z",
+  "updated_at": "2026-11-03T10:32:45.000Z",
   "checkpoints": {
-    "categories": {
-      "completed": true,
-      "entity_ids": [501, 502, 503],
-      "timestamp": "2025-01-29T10:31:15.000Z"
-    },
     "staff": {
       "completed": true,
-      "entity_ids": [101, 102, 103],
-      "timestamp": "2025-01-29T10:32:45.000Z"
+      "entity_ids": [101, 102],
+      "timestamp": "2026-11-03T10:32:45.000Z",
+      "batches": [
+        {
+          "id": "6d152ad9-76ef-48b3-a229-8f40c68d87db",
+          "completed": true,
+          "entity_ids": [101, 102],
+          "timestamp": "2026-11-03T10:32:45.000Z",
+          "metadata": { "failed_rows": 0 }
+        }
+      ],
+      "metadata": { "failed_rows": 0 }
     }
   },
-  "conversation_context": {
-    "parsed_staff": [...],
-    "parsed_services": [...]
-  }
+  "conversation_context": {}
 }
 ```
 
