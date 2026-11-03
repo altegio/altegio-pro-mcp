@@ -24,9 +24,14 @@ Create an **active branch ruleset** named `main-reviewed-delivery`, target
   conversations;
 - required checks, with strict/up-to-date branch policy:
   `Quality`, `Tests (Node 26)`, `Tests (Node 24)`, `Artifacts`,
-  `Package (Node 24)`, `Dependency audit`, `CodeQL`;
+  `Package (Node 24)`, `Dependency audit`, `CodeQL analysis`;
 - non-fast-forward updates and deletion blocked. Do not require linear history:
   the delivery method uses merge commits.
+
+The seven checks above come from `github-actions` (integration ID **15368**).
+The separate native `CodeQL` result comes from `github-advanced-security`
+(integration ID **57789**); it is distinct from the `CodeQL analysis` job.
+Those names/sources were verified on PR #182.
 
 Use the check names above as emitted by the workflows, not their job IDs or
 older `lint`, `test (22)` and `build` names. Bind status sources to GitHub Actions
