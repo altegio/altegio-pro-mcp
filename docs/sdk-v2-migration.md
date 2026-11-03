@@ -39,6 +39,17 @@ use form elicitation. No request gains scope by confirming; scope and view
 refusals precede the gate. A token repeat crosses independent requests and
 must pass the same identity, scope, company and business preconditions.
 
+Legacy-era cancellation is a compatibility limit of stateless HTTP: both
+SDK v1 and v2 legacy clients send `notifications/cancelled` as a separate
+request, which a fresh factory cannot correlate with the running exchange.
+The caller stops awaiting its result, but work continues until its configured
+deadline unless the host also closes the HTTP transport. Modern cancellation
+and closing a legacy transport abort work and reclaim admission; the platform
+canary tests both behaviors explicitly. Retained-session `legacy` mode keeps
+its notification cancellation behavior. Do not claim cancellation parity for
+a legacy host on `dual`; supported-host signoff must account for this limit
+before rollout. The canary's success is not permission to ignore this gate.
+
 ## Rollout gate and rollback
 
 This Pro PR must not be merged or deployed before the platform canary gate
