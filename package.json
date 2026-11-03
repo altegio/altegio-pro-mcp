@@ -90,6 +90,7 @@
     "@apidevtools/swagger-parser": "^12.1.0",
     "@commitlint/cli": "^21.2.1",
     "@commitlint/config-conventional": "^21.2.0",
+    "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.19.2",
@@ -114,8 +115,8 @@
     ]
   },
   "engines": {
-    "node": "^24.0.0 || ^26.0.0",
-    "npm": ">=11.0.0 <12"
+    "node": "^24.22.2 || ^26.13.0",
+    "npm": ">=11.20.0 <12"
   },
-  "packageManager": "npm@11.19.0"
+  "packageManager": "npm@11.20.0"
 }

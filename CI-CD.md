@@ -83,11 +83,14 @@ curl --fail http://localhost:3000/health
 
 The image runs as UID 1001 and includes runtime resources. `/health` must report
 both the expected version and exact `commit`, matching the OCI revision label.
+It binds to `0.0.0.0` inside the container; the published address above remains
+loopback. A proxy deployment must configure its actual backend Host and browser
+Origin allowlists before rollout. Local source execution defaults to loopback.
 
 ## Maintained hosted service
 
 Merge reviewed PRs with a merge commit after required checks and independent
-approval; do not bypass protection. The maintained deployment follows `main`.
+code review; do not bypass protection. The maintained deployment follows `main`.
 A green CI run is not a rollout: verify the deployed image/revision and `/health`
 through the private deployment runbook. Roll back to the previous verified
 image/digest if health or revision checks fail, then verify that revision again.

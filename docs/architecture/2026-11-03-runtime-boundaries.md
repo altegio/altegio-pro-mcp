@@ -73,7 +73,7 @@ transformer or testing a different entrypoint implementation.
 ## Supported stack and remaining work
 
 The package supports Node 24 and 26, with Node 26 the primary deployment target,
-and npm 11 (`packageManager: npm@11.19.0`). Node 20/22 and odd-numbered releases
+and npm 11.20.0 (`packageManager: npm@11.20.0`). Node 20/22 and odd-numbered releases
 are outside the new advertised range. TypeScript 6.0.3 keeps the compiler API and
 fits ts-jest 29.4.15's `>=4.3 <7` peer requirement. Cheerio 1.2 and compatible
 dependency updates are validated against the existing parser fixtures.

@@ -195,6 +195,7 @@ const INVISIBLE = new RegExp(
 
 /** C0/C1 control characters, keeping tab and newline. Escaped for the same reason. */
 const CONTROLS = new RegExp(
+  // eslint-disable-next-line no-control-regex -- Strip C0/C1 controls while preserving tab and newline.
   '[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F-\\u009F]',
   'g'
 );

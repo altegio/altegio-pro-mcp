@@ -44,6 +44,7 @@ COPY --chown=nodejs:nodejs ["docs/product-logic.md", "docs/onboarding-guide.md",
 
 ARG COMMIT_SHA=unknown
 ENV COMMIT_SHA=${COMMIT_SHA}
+ENV MCP_HTTP_HOST=0.0.0.0
 LABEL org.opencontainers.image.revision=${COMMIT_SHA}
 
 # Switch to non-root user

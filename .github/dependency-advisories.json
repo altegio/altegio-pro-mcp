@@ -1,9 +1,1 @@
-[
-  {
-    "id": "GHSA-rmxm-3fg6-px4f",
-    "package": "@hono/node-server",
-    "owner": "@petroff",
-    "expires": "2026-12-03",
-    "reason": "Transitive MCP SDK v1 dependency. This service uses Express and does not call Hono serveStatic, the affected API. Reachability is not established. Prefer the compatible SDK patch; remove this triage when resolved. Reassess if the HTTP stack or static serving changes."
-  }
-]
+[]

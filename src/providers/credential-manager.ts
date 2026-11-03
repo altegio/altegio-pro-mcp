@@ -88,7 +88,9 @@ export class CredentialManager {
       return decrypted;
     } catch (error) {
       this.logger.error({ error }, 'Failed to decrypt credentials');
-      throw new Error('Invalid credentials or encryption key');
+      throw new Error('Invalid credentials or encryption key', {
+        cause: error,
+      });
     }
   }
 

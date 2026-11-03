@@ -6,7 +6,8 @@ and image-registry publication require a separate distribution decision.
 
 1. Update `package.json`, `package-lock.json` and `CHANGELOG.md` in a release PR.
    Run the [required checks](CI-CD.md#checks), artifact probes and trusted pinned
-   spec check. Get independent approval and merge with a merge commit.
+   spec check. Complete independent code review and any configured GitHub
+   approvals, then merge with a merge commit.
 2. Wait for the successful **push-to-main** CI run for that exact merged SHA.
    Verify its `event`, `head_branch`, `head_sha` and `conclusion` using the GitHub
    API before selecting artifacts. A same-named artifact from a PR run is not a

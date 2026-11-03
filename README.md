@@ -114,7 +114,19 @@ an unknown JSON-RPC method gets error -32601.
 
 ## Self-hosting and authentication
 
-The HTTP backend expects a trusted proxy in front of it. It does not implement
+Local HTTP binds to loopback by default and cannot borrow the stdio user's
+stored credentials. Pass a per-request `x-altegio-user-token` for business calls.
+`MCP_HTTP_ALLOW_SHARED_CREDENTIALS=true` is an explicit local-only legacy opt-in.
+
+Hosted mode (`MCP_HTTP_MODE=hosted`, also inferred from a proxy signing key or
+`REQUIRE_DELEGATED_IDENTITY=true`) requires a signed proxy request or a direct
+Altegio token. Configure `MCP_HTTP_ALLOWED_HOSTS` for the Host actually forwarded
+by the proxy and `MCP_HTTP_ALLOWED_ORIGINS` for permitted browser origins.
+Both checks apply before OAuth lookup and dispatch. See the
+[runtime policy](docs/architecture/2026-11-03-runtime-boundaries.md) and
+[configuration example](.env.example) for defaults, deadlines and graceful shutdown.
+
+The HTTP backend supports a trusted proxy in front of it. It does not implement
 an OAuth authorization server; Altegio's own does the sign-in and consent. Keep
 the backend listener private; strip caller-supplied identity headers and
 forward only what the proxy verified. Never expose a shared server token as an

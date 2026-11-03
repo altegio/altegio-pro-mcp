@@ -117,7 +117,7 @@ function serviceLine(service: AltegioService): string {
   const active =
     service.active === undefined
       ? null
-      : Boolean(Number(service.active))
+      : Number(service.active)
         ? 'active'
         : 'inactive';
   const team =

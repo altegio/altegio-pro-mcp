@@ -47,10 +47,11 @@ prerelease tarball, rather than `npx @altegio/mcp-server-pro`.
 5. Use [Conventional Commits](https://www.conventionalcommits.org/) such as
    `fix(auth): isolate request credentials`. Describe the problem, resulting
    behavior, meaningful validation and any remaining limitations in the PR.
-6. Wait for CI and an independent reviewer. Merge with a merge commit; an author
-   cannot approve their own pull request. [CODEOWNERS](.github/CODEOWNERS)
+6. Complete independent code review and wait for CI and any configured GitHub
+   approvals. Merge with a merge commit. [CODEOWNERS](.github/CODEOWNERS)
    routes review, while [repository settings](.github/REPOSITORY_SETTINGS.md)
-   describes the required enforcement and its activation constraints.
+   records proposed enforcement and its activation constraints. A proposal in
+   that file does not change the repository's active approval requirements.
 
 Maintainers review dependency-bot PRs like other changes. Major SDK/toolchain
 upgrades need compatibility evidence, not an automatic audit-fix downgrade.

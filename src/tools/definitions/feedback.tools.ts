@@ -26,6 +26,7 @@ const text = (field: FeedbackTextField) =>
   z.string().trim().min(1).max(FEEDBACK_TEXT_LIMITS[field]);
 
 /** Control characters other than tab and newline. */
+// eslint-disable-next-line no-control-regex -- Explicitly remove control bytes from untrusted feedback.
 const CONTROL_CHARACTERS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 
 /**

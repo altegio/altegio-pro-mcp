@@ -56,7 +56,7 @@ export async function scanRecords(
   const records: ServiceRecord[] = [];
   const ids = new Set<number>();
   let expected: number | undefined;
-  let pages = 0;
+  let pages: number;
   const scannedAt = new Date().toISOString();
   for (let page = 1; ; page += 1) {
     const path = `/locations/${locationId}/appointments${queryString({
