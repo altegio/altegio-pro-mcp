@@ -16,9 +16,11 @@ import {
   dispatcherFor,
   isDispatchCall,
   resolveDispatch,
+  staleListNudge,
   type Dispatcher,
   type DispatchTargets,
 } from './dispatch.js';
+import { createCallerQuota, quotaCaller } from './caller-quota.js';
 import {
   readOnlyRefusalMessage,
   DEFAULT_FACET,
@@ -286,6 +288,25 @@ function invitesFeedback(
   );
 }
 
+/**
+ * How often one caller reads the stale-list nudge: a reminder, not a line on
+ * every call of a host that cannot refresh its list by itself. Process-local,
+ * so a redeploy starts it over.
+ */
+export const STALE_LIST_NUDGE_LIMIT = {
+  nudges: 2,
+  windowMs: 7 * 24 * 60 * 60_000,
+};
+const staleListQuota = createCallerQuota({
+  limit: STALE_LIST_NUDGE_LIMIT.nudges,
+  windowMs: STALE_LIST_NUDGE_LIMIT.windowMs,
+});
+
+/** Forget whom the stale-list nudge has reached. */
+export function clearStaleListNudges(): void {
+  staleListQuota.clear();
+}
+
 /** UTF-8 bytes of what a result carries: text blocks plus structured content. */
 function resultBytes(result: ToolResult): number {
   let bytes = 0;
@@ -517,6 +538,8 @@ export function registerTools(
       errorClass?: ToolErrorClass;
       validation?: ValidationIssue[];
       confirmation?: boolean;
+      /** Named directly by a name this view does not list. */
+      unlisted?: boolean;
     } = { tool: 'unknown' };
     // The arguments the tool runs with: a former name's, translated.
     let callArgs = args;
@@ -563,6 +586,10 @@ export function registerTools(
         call.errorClass = 'out_of_view';
         throw outOfFacetError(name, facet, facetIndex, publicBaseUrl);
       }
+      // A host calls only what its list names, so a name this view does not
+      // list — a former one, or one the compact listing leaves to the
+      // dispatcher — comes from a list an older release served.
+      if (!call.via && !visible.has(requested)) call.unlisted = true;
       if (aliasIssues) {
         call.errorClass = 'validation';
         call.validation = summarizeIssues(aliasIssues);
@@ -714,13 +741,30 @@ export function registerTools(
             ? 'error'
             : 'success';
         const failed = outcome === 'error' ? failure() : undefined;
+        const feedbackNudge =
+          failed !== undefined &&
+          invitesFeedback(call.tool, observation, failed);
+        const staleListNudged =
+          call.unlisted === true &&
+          outcome !== 'confirmation_required' &&
+          staleListQuota.admit(quotaCaller(observation.correlation.session));
         const result =
-          failed && invitesFeedback(call.tool, observation, failed)
+          feedbackNudge || staleListNudged
             ? {
                 ...completed,
                 content: [
                   ...completed.content,
-                  { type: 'text' as const, text: FEEDBACK_NUDGE },
+                  ...(feedbackNudge
+                    ? [{ type: 'text' as const, text: FEEDBACK_NUDGE }]
+                    : []),
+                  ...(staleListNudged
+                    ? [
+                        {
+                          type: 'text' as const,
+                          text: staleListNudge(requested),
+                        },
+                      ]
+                    : []),
                 ],
               }
             : completed;
@@ -732,7 +776,8 @@ export function registerTools(
               ? { error_class: 'confirmation_required' }
               : {}),
             ...(failed ? { error_type: 'tool_result', ...failed } : {}),
-            ...(result !== completed ? { feedback_nudge: true } : {}),
+            ...(feedbackNudge ? { feedback_nudge: true } : {}),
+            ...(staleListNudged ? { stale_list_nudge: true } : {}),
             response_bytes: resultBytes(result),
             latency_ms: Math.round(performance.now() - started),
           },

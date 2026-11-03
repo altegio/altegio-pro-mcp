@@ -313,10 +313,25 @@ export function searchTools(
  * it — so a tool released since is served here and still missing there, and a
  * model that is not told so reports the capability as missing.
  */
-export const STALE_TOOL_LIST =
-  'your app holds a tool list from an older release of this server, which does serve it: ' +
+const REFRESH_TOOL_LIST =
   'ask the user to refresh this app’s tools (ChatGPT and Codex: Settings → Apps → this app → ' +
   'Refresh, or remove and add it again), then start a new chat.';
+
+export const STALE_TOOL_LIST =
+  'your app holds a tool list from an older release of this server, which does serve it: ' +
+  REFRESH_TOOL_LIST;
+
+/**
+ * What a direct call of a tool this address no longer lists ends with: only a
+ * host holding an older `tools/list` names one (Codex re-reads it neither on
+ * reconnect nor in a new chat), so the call ran and the list is still stale.
+ */
+export function staleListNudge(requested: string): string {
+  return (
+    `Your app holds a tool list from an older release of this server: this address no longer lists \`${requested}\`, ` +
+    `and the tools added since are missing from your list. When this task is done, ${REFRESH_TOOL_LIST}`
+  );
+}
 
 /**
  * The sentence a reply sends the caller to a curated tool with, when the
