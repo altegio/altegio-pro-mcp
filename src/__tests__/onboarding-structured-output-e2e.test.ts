@@ -16,12 +16,10 @@ import * as os from 'os';
 import * as path from 'path';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { Server } from '@modelcontextprotocol/server';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import {
-  CallToolRequestSchema,
   ElicitRequestSchema,
-  ListToolsRequestSchema,
   type CallToolResult,
   type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -151,10 +149,15 @@ describe('onboarding results through an SDK client', () => {
       { capabilities: { tools: {} } }
     );
     const spec = onboardingTools.find((t) => t.name === 'onboarding_status')!;
-    server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: [spec],
+    server.setRequestHandler('tools/list', async () => ({
+      tools: [
+        {
+          ...spec,
+          inputSchema: { ...spec.inputSchema, type: 'object' as const },
+        },
+      ],
     }));
-    server.setRequestHandler(CallToolRequestSchema, async () => ({
+    server.setRequestHandler('tools/call', async () => ({
       content: [{ type: 'text', text: 'Phase: init' }],
     }));
 

@@ -341,7 +341,14 @@ describe('sessionless tool calls, end to end', () => {
         { code: 'unrecognized_keys', path: '', keys: ['surprise_key'] },
       ]),
     });
-    expect(JSON.stringify(fields)).not.toMatch(/300|secret value/);
+    // A random correlation id may contain the digits "300". Assert the
+    // value-free validation records exactly, and keep the whole-log sentinel.
+    expect(fields.validation_issues).toEqual([
+      { code: 'too_big', path: 'page_size' },
+      { code: 'unrecognized_keys', path: '', keys: ['surprise_key'] },
+    ]);
+    expect(fields).not.toHaveProperty('arguments');
+    expect(JSON.stringify(fields)).not.toContain('secret value');
     expect(
       fetchSpy.mock.calls.filter(([input]) =>
         String(input).startsWith('https://api.alteg.io/')

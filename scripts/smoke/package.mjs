@@ -5,6 +5,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { smokeStdio } from './stdio.mjs';
+import { smokeSdkV2 } from './sdk-v2.mjs';
 
 const tarball = path.resolve(process.argv[2] ?? '');
 const revision = process.argv[3];
@@ -101,6 +102,7 @@ try {
     'Packaged lockfile provenance'
   );
   const result = await smokeStdio(packageRoot);
+  const sdkV2 = await smokeSdkV2(packageRoot);
   assert.equal(await digest(), before, 'Tested tarball changed');
   console.log(
     JSON.stringify({
@@ -108,6 +110,7 @@ try {
       sha256: before,
       node: process.version,
       ...result,
+      sdkV2,
     })
   );
 } finally {

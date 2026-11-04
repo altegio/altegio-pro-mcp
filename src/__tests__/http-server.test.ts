@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import type { AddressInfo } from 'net';
-import type { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import type { NodeStreamableHTTPServerTransport as StreamableHTTPServerTransport } from '@modelcontextprotocol/node';
 import { createApp, FACET_ROUTES } from '../http-server.js';
 import { loadConfig } from '../config/schema.js';
 import {

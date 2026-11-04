@@ -8,7 +8,7 @@
  * one that declares `elicitation`, and one that does not.
  */
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { Server } from '@modelcontextprotocol/server';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import {
   ElicitRequestSchema,

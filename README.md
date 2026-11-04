@@ -126,6 +126,10 @@ Both checks apply before OAuth lookup and dispatch. See the
 [runtime policy](docs/architecture/2026-11-03-runtime-boundaries.md) and
 [configuration example](.env.example) for defaults, deadlines and graceful shutdown.
 
+The staged SDK v2 entry is described in [the migration guide](docs/sdk-v2-migration.md).
+`MCP_PROTOCOL_MODE=legacy` remains the default until the deployed platform
+canary passes; `dual` enables stateless HTTP and stdio for both protocol eras.
+
 The HTTP backend supports a trusted proxy in front of it. It does not implement
 an OAuth authorization server; Altegio's own does the sign-in and consent. Keep
 the backend listener private; strip caller-supplied identity headers and
