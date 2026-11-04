@@ -62,16 +62,24 @@ backend on existing VM loopback, with no public route or business upstream.
 Local and CI matrix results are **not** deployed-canary evidence. Before
 Pro cutover, the coordinator must independently inspect and test both PRs,
 deploy the reviewed platform canary on the existing VM, record its exact
-commit/image, run old and modern clients and inspect actual supported hosts.
-The canary README lists the observation evidence and its limits.
+commit/image, run old and modern SDK clients through the synthetic backend
+and actual proxy code, and complete the bounded observation. The canary
+README lists that evidence and its limits.
 
-Only after that gate passes, enable `dual` for the reviewed Pro candidate,
-verify the exact revision/health and signed old/new protocol probes on both
-staff and customer lanes, and observe identity/refusal/cancellation behavior.
-Rollback uses the previous verified Pro image and `legacy` configuration.
-Removing the legacy rollback path and changing the default are subsequent
-reviewed steps once deployed compatibility is established. This branch
-neither deploys nor claims that the production gate passed.
+After that gate passes, first merge and deploy the split SDK packages with
+`legacy` retained. Verify the exact revision/health, signed legacy protocol,
+identity/refusal behavior and cancellation on both hosted lanes. This stage
+updates the SDK implementation while preserving the established host protocol.
+It does not claim real-host compatibility with the modern protocol.
+
+Enabling `dual` is a separate subsequent rollout: inspect the actual supported
+staff/customer hosts with synthetic calls and explicitly account for the
+legacy notification-cancellation and elicitation differences above. Then
+verify signed old/new protocol probes on both lanes and observe their behavior.
+Keep the default and retained-session rollback path until that compatibility
+is established. Rollback uses the previous verified Pro image and `legacy`
+configuration. Local tests and the SDK-client matrix alone do not satisfy the
+real-host gate for `dual`. This branch does not itself deploy either mode.
 
 ## Development dependency compatibility
 
