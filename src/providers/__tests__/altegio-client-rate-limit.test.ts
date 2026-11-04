@@ -81,7 +81,7 @@ describe('AltegioClient - a read refused with HTTP 429', () => {
     await expect(pending).resolves.toEqual([{ id: 7 }]);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(observation).toMatchObject({
-      upstreamResponses: 1,
+      upstreamResponses: 2,
       upstreamRetries: 1,
     });
     expect(observation.upstreamErrorStatus).toBeUndefined();
