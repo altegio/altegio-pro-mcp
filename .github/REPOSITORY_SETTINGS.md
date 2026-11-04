@@ -43,17 +43,22 @@ remediation. Keep secrets out of ordinary and fork pull-request jobs.
 
 ## Pending private-spec gate
 
-The `catalog-spec` environment and dedicated status App are **not configured**.
-Public synthetic catalog fixtures run in every PR; exact real-spec drift remains
-a manual release gate against the snapshot in [OPENAPI.md](../OPENAPI.md).
-F11 enforcement remains incomplete until the coordinator applies and verifies
-the reviewed setup:
+On **4 November 2026**, the coordinator verified the `catalog-spec`
+environment admits the main branch only, excludes tags and disables administrator
+bypass. Its immutable archive URL and object-scoped WIF provider are provisioned
+as environment secrets; no prior reviews or secrets were replaced.
+
+The dedicated status App is **not registered/installed**. Its ID/key, the first
+hosted OIDC validation and the App-bound required status remain pending. Public
+synthetic catalog fixtures run in every PR; exact real-spec drift remains a
+manual release gate against [OPENAPI.md](../OPENAPI.md). F11 enforcement is
+incomplete until the remaining reviewed setup is verified:
 
 1. Create a GitHub App with Commit statuses: write, installed only on this
-   repository, and a `catalog-spec` environment restricted to the main branch
-   only. Preserve any existing environment reviewers/protection rules. New
-   setup adds no mandatory human approval; independent exact-head review and
-   deliberate trusted dispatch remain the delivery requirements.
+   repository. Preserve the existing main-only `catalog-spec` environment and
+   any configured reviewers/protection rules. New setup adds no mandatory human
+   approval; independent exact-head review and deliberate trusted dispatch remain
+   the delivery requirements.
 2. Provision the App ID/private key and dedicated object-only OIDC access described
    in [OPENAPI.md](../OPENAPI.md#trusted-pinned-spec-gate). The private archive
    must be reachable by the trusted runner. The deterministic archive digest and
