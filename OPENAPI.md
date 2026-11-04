@@ -190,6 +190,8 @@ The current revision is `7ba5aa43c68951605a9bcc43b1f629dc11584164`. Refresh both
 content and deterministic archive digests in a reviewed PR; never substitute a
 mutable branch. The workflow uses the pin from trusted main, not the candidate:
 coordinate a trusted pin update and its encrypted source configuration before
-validating a catalog against a new snapshot. Until setup and the first hosted success are recorded in
-[REPOSITORY_SETTINGS.md](.github/REPOSITORY_SETTINGS.md), enforcement remains
-**pending**, not complete. No application deployment is needed for this gate.
+validating a catalog against a new snapshot. Setup, the first hosted success and
+App-bound required-status activation on 4 November 2026 are recorded in
+[REPOSITORY_SETTINGS.md](.github/REPOSITORY_SETTINGS.md). Each new open PR head
+still requires independent review and a new trusted dispatch. No application
+deployment is needed for this gate.

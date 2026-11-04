@@ -18,12 +18,13 @@ Node 26 Alpine base. Updating those pins is a reviewed compatibility change.
 | `CodeQL analysis`       | JavaScript/TypeScript scanning, also run weekly                                                                                                                 |
 | `Catalog (pinned spec)` | Separate trusted manual gate against an exact private snapshot and reviewed PR head                                                                             |
 
-The first seven checks run for ordinary PRs. The last requires the protected
-setup in [OPENAPI.md](OPENAPI.md). Do not make it a required check until that
-setup has completed successfully on a reviewed candidate. Public CI explicitly
-reports real-spec drift as **not run**; synthetic generator tests always run.
-[Repository settings](.github/REPOSITORY_SETTINGS.md) records the active
-GitHub ruleset, required-check sources and the pending private-spec setup.
+The first seven checks run automatically for ordinary PRs. The required private
+catalog check uses the protected setup in [OPENAPI.md](OPENAPI.md), verified on
+4 November 2026. Review each exact open PR head and deliberately dispatch
+`catalog-trusted.yml` from main; a new head needs a new run. Public CI jobs
+report real-spec drift as **not run**; synthetic generator tests always run.
+[Repository settings](.github/REPOSITORY_SETTINGS.md) records the successful
+hosted validation, active ruleset and all required-check sources.
 
 Default Jest uses two workers with a 384 MB recycle threshold. Coverage runs
 only on Node 26; its floors are rounded below the reviewed baseline. No live
