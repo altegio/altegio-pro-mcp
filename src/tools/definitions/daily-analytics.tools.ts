@@ -45,7 +45,7 @@ export const analyticsGetTeamWorkloadTool = defineTool({
   name: 'analytics_get_team_workload',
   category: 'Analytics',
   description:
-    'Daily booked share and working dates for all visible active team members, or a selected group of up to 50 IDs. Find quiet working days for promotions and distinguish a closed day from free booked capacity. Returns fractions 0…1, not percent, plus coverage for missing working days. Aggregate of the selected team, never rows per person; use analytics_get_team_member_occupancy for individual percentages and analytics_get_team_member_capacity for idle hours. Maximum 93 days. Needs Digital schedule access.',
+    'Daily booked share and working dates for all visible active team members, or a selected group of up to 50 IDs. Find quiet working days for promotions and distinguish a closed day from free booked capacity. Returns booked-time / scheduled-time ratios, not percent, plus coverage for missing working days. Ratios can exceed 1 when appointments extend beyond scheduled time. Aggregate of the selected team, never rows per person; use analytics_get_team_member_occupancy for individual percentages and analytics_get_team_member_capacity for idle hours. Maximum 93 days. Needs Digital schedule access.',
   annotations: {
     title: 'Analytics: selected team daily workload',
     ...annotations,

@@ -19,17 +19,15 @@ function numeric(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-/** The documented workload is a fraction; never guess percent from magnitude. */
+/** Booked time / scheduled time; appointments outside the schedule can exceed 1. */
 export function bookedShare(value: unknown): number | null {
   const parsed = numeric(value);
   if (parsed === null) {
     if (value === null || value === undefined) return null;
     return unavailable('The workload source returned an invalid booked share.');
   }
-  if (parsed < 0 || parsed > 1) {
-    return unavailable(
-      'The workload source returned a booked share outside 0…1.'
-    );
+  if (parsed < 0) {
+    return unavailable('The workload source returned a negative booked share.');
   }
   return parsed;
 }
