@@ -12,6 +12,7 @@ import {
   analyticsGetTeamWorkloadTool,
 } from '../../../tools/definitions/daily-analytics.tools.js';
 import { getAppointmentsTool } from '../../../tools/definitions/bookings.tools.js';
+import { analyticsGetTeamMemberOccupancyTool } from '../../../tools/definitions/analytics.tools.js';
 import { clearTimezoneCache } from '../location-timezone.js';
 import { runWithContext } from '../../../request-context.js';
 import { mapAnalyticsHttpError } from '../errors.js';
@@ -106,13 +107,57 @@ it('uses the single selector for one person; an absent selector means the visibl
   expect(requests[1]).not.toContain('team_member_id');
 });
 
-it('keeps null distinct from zero and rejects units outside the documented fraction', () => {
+it('keeps null distinct from zero and preserves nonnegative ratios without guessing units', () => {
   expect(bookedShare(0.69)).toBe(0.69);
   expect(bookedShare('0')).toBe(0);
   expect(bookedShare(null)).toBeNull();
-  for (const value of [69, -1, 'bad', false, ''])
+  expect(bookedShare(69)).toBe(69);
+  for (const value of [-1, Infinity, NaN, 'bad', false, ''])
     expect(() => bookedShare(value)).toThrow();
 });
+
+it.each([1.27, 4])(
+  'returns overload ratio %s through both workload tools',
+  async (ratio) => {
+    const { fake } = client();
+    fake.apiRequest = async (url) =>
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: url.includes('working_days')
+            ? [period.date_from]
+            : [{ date: period.date_from, workload: ratio }],
+        })
+      );
+    const aggregate =
+      await analyticsGetTeamWorkloadTool.createHandler(fake)(period);
+    const individual = await analyticsGetTeamMemberOccupancyTool.createHandler(
+      fake
+    )({
+      ...period,
+      team_member_ids: [11],
+    });
+    expect(aggregate.isError).toBeUndefined();
+    expect(aggregate.structuredContent).toMatchObject({
+      points: [{ date: period.date_from, booked_share: ratio }],
+    });
+    expect(individual.isError).toBeUndefined();
+    expect(individual.structuredContent).toMatchObject({
+      team_members: [
+        { team_member_id: 11, points: [[period.date_from, ratio * 100]] },
+      ],
+    });
+    for (const [tool, result] of [
+      [analyticsGetTeamWorkloadTool, aggregate],
+      [analyticsGetTeamMemberOccupancyTool, individual],
+    ] as const) {
+      const validate = new Ajv({ strict: false }).compile(
+        tool.toMcpTool().outputSchema!
+      );
+      expect(validate(result.structuredContent)).toBe(true);
+    }
+  }
+);
 
 it('reports missing working-day measurements and refuses malformed or duplicate source rows', async () => {
   const fake = client().fake;

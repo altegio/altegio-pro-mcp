@@ -184,7 +184,7 @@ export function getAnalyticsPrompt(
       text = [
         `Find up to three quiet working days at location ${locationId} for period=${period}. Choose and disclose a booked-share threshold, such as 0.5.`,
         `1. analytics_get_team_workload with location_id=${locationId}, period=${period}${ids ? `, team_member_ids=[${ids}]` : ''}. The result aggregates the selected visible active team; it is not a per-person table.`,
-        '2. In CodeMode intersect points with working_days, exclude null measurements, verify shares are between 0 and 1 and rank days below the threshold by booked_share then date. Convert a fraction to a displayed percentage by multiplying by 100 exactly once.',
+        '2. In CodeMode intersect points with working_days, exclude null measurements, verify shares are nonnegative and rank days below the threshold by booked_share then date. Convert a fraction to a displayed percentage by multiplying by 100 exactly once.',
         '3. Check coverage.missing_working_days before claiming a complete ranking. Missing means unknown, and a closed day is not free capacity. Use analytics_get_team_member_capacity for scheduled/booked/idle hours and analytics_get_team_member_occupancy when an individual ranking is requested.',
         'Return dates, the measured booked share, selection, threshold, denominators and missing coverage. Propose a promotion as a hypothesis, not a guaranteed effect or a claim that specific appointment slots are available.',
       ].join('\n');
@@ -229,7 +229,7 @@ export function getAnalyticsPrompt(
         ids
           ? `3. analytics_get_team_member_occupancy for team_member_ids=[${ids}] — their day-by-day booked share.`
           : '3. Call analytics_get_team_member_occupancy for up to ten team members who stand out — their day-by-day booked share.',
-        '4. For quiet days across the visible active team, analytics_get_team_workload reads the aggregate booked share and working dates in one tool call. Fractions 0…1 differ from individual occupancy percentages. Before concluding about anyone with no occupancy at all, check their scheduled hours in the capacity table: no schedule means no occupancy, not poor performance.',
+        '4. For quiet days across the visible active team, analytics_get_team_workload reads the aggregate booked share and working dates in one tool call. Booked-time / scheduled-time ratios differ from individual occupancy percentages; ratios above 1 indicate booked time exceeds the schedule. Before concluding about anyone with no occupancy at all, check their scheduled hours in the capacity table: no schedule means no occupancy, not poor performance.',
         '',
         'Conclude with who is at capacity, who has room for more bookings, and whether the schedule or the price list is the constraint. Remember that a team member with no work schedule shows no occupancy at all — say that rather than reporting zero as poor performance.',
       ].join('\n');
