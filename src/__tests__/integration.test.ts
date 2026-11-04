@@ -1,5 +1,4 @@
 import { describe, it, expect } from '@jest/globals';
-import { createServer } from '../server.js';
 import { AltegioClient } from '../providers/altegio-client.js';
 import { ToolHandlers } from '../tools/handlers.js';
 import { mkdtempSync, rmSync } from 'fs';
@@ -15,26 +14,6 @@ describe('Tool Integration', () => {
 
   afterEach(() => {
     rmSync(credentialsDir, { recursive: true, force: true });
-  });
-
-  it('should create server with tools registered', () => {
-    const server = createServer();
-    expect(server).toBeDefined();
-    expect(server.name).toBe('@altegio/mcp-server-pro');
-  });
-
-  it('should create ToolHandlers with AltegioClient', () => {
-    const client = new AltegioClient(
-      { partnerToken: 'test-token' },
-      credentialsDir
-    );
-    const handlers = new ToolHandlers(client);
-
-    expect(handlers).toBeDefined();
-    expect(typeof handlers.login).toBe('function');
-    expect(typeof handlers.logout).toBe('function');
-    expect(typeof handlers.listLocations).toBe('function');
-    expect(typeof handlers.getAppointments).toBe('function');
   });
 
   it('should handle login with proper response structure', async () => {

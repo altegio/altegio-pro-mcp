@@ -1,9 +1,20 @@
 import { AltegioClient } from '../altegio-client.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { AltegioConfig } from '../../types/altegio.types.js';
 import {
   createToolCallObservation,
   runObservingToolCall,
 } from '../../utils/tool-call-observation.js';
+
+jest.mock('node:timers/promises', () => ({
+  ...jest.requireActual('node:timers/promises'),
+  setTimeout: jest.requireActual('../../__tests__/helpers/promise-timers.js')
+    .clockTimeout,
+}));
+
+const originalFetch = global.fetch;
 
 const config: AltegioConfig = {
   partnerToken: 'test-token',
@@ -26,15 +37,21 @@ function ok(body: unknown) {
 describe('AltegioClient - a read that got no response', () => {
   let client: AltegioClient;
   let fetchMock: jest.Mock;
+  let testDir: string;
 
   beforeEach(() => {
-    client = new AltegioClient(config, '/tmp/test-credentials');
+    jest.useFakeTimers();
+    testDir = mkdtempSync(join(tmpdir(), 'altegio-network-retry-'));
+    client = new AltegioClient(config, testDir);
     fetchMock = jest.fn();
     global.fetch = fetchMock;
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     jest.restoreAllMocks();
+    global.fetch = originalFetch;
+    rmSync(testDir, { recursive: true, force: true });
   });
 
   it('is sent once more after a dropped connection, and the call succeeds', async () => {
@@ -43,11 +60,14 @@ describe('AltegioClient - a read that got no response', () => {
       .mockResolvedValueOnce(ok({ success: true, data: [{ id: 7 }] }));
     const observation = createToolCallObservation();
 
-    const staff = await runObservingToolCall(observation, () =>
+    const pending = runObservingToolCall(observation, () =>
       client.getStaff(4564)
     );
+    await jest.advanceTimersByTimeAsync(149);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(1);
 
-    expect(staff).toEqual([{ id: 7 }]);
+    await expect(pending).resolves.toEqual([{ id: 7 }]);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[1]?.[0]).toBe(fetchMock.mock.calls[0]?.[0]);
     expect(observation).toMatchObject({
@@ -63,9 +83,13 @@ describe('AltegioClient - a read that got no response', () => {
       .mockRejectedValueOnce(droppedConnection());
     const observation = createToolCallObservation();
 
-    await expect(
+    const rejected = expect(
       runObservingToolCall(observation, () => client.getStaff(4564))
     ).rejects.toThrow('fetch failed');
+    await jest.advanceTimersByTimeAsync(149);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(1);
+    await rejected;
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(observation).toMatchObject({

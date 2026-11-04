@@ -19,11 +19,22 @@ in watch mode. Default tests use mocked upstream responses and local HTTP
 servers; no real credentials or business data are needed.
 
 Jest transpiles without type checking; `npm run typecheck` checks the sources
-and, through `tsconfig.test.json`, the tests. A full run uses two workers and
+and, through `tsconfig.test.json`, the tests and `*.typecheck.ts` request
+examples. Type-only examples belong there instead of runtime tests asserting
+their own object literals. A full run uses two workers and
 replaces a worker once its heap passes 384 MB, about 1.5 GB in all. Every test
 file loads its own copy of the server, and V8 frees old copies only near its
 heap limit, so one long-lived process grows to gigabytes: avoid `--runInBand`
 and a raised `--maxWorkers` for the whole suite.
+
+The mocked-fetch retry suites bridge `node:timers/promises` onto Jest's clock:
+otherwise advancing fake global timers leaves those sleeps running in real
+time and cannot verify retry boundaries. Keep this mock local to those suites.
+The real HTTP transport, cancellation and process-lifecycle tests retain
+native timers. To profile a run, add `--json --outputFile=<local-path>` to
+`npm test --`; compare per-case/per-suite durations and wall time on the same
+runtime and worker configuration, with coverage measured separately. A warmed
+transform cache and concurrent machine load affect whole-suite timings.
 
 Public catalog generator tests always run using synthetic fixtures, including
 negative overlay cases, refs, supersession and determinism. The additional
