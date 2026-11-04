@@ -48,14 +48,18 @@ environment admits the main branch only, excludes tags and disables administrato
 bypass. Its immutable archive URL and object-scoped WIF provider are provisioned
 as environment secrets; no prior reviews or secrets were replaced.
 
-The dedicated status App is **not registered/installed**. Its ID/key, the first
-hosted OIDC validation and the App-bound required status remain pending. Public
+The private organization-owned `altegio-catalog-gate` App (ID **5612704**) is
+registered and installed on this repository only, with Metadata: read and Commit
+statuses: write, no events and inactive webhooks. Its real permissions and
+single-repository installation were independently verified, and only the missing
+App ID/key were added to the existing environment. The first hosted OIDC
+validation and the App-bound required status remain pending. Public
 synthetic catalog fixtures run in every PR; exact real-spec drift remains a
 manual release gate against [OPENAPI.md](../OPENAPI.md). F11 enforcement is
 incomplete until the remaining reviewed setup is verified:
 
-1. Create a GitHub App with Commit statuses: write, installed only on this
-   repository. Preserve the existing main-only `catalog-spec` environment and
+1. The dedicated status App is registered and independently verified. Preserve
+   its repository-only access, the existing main-only `catalog-spec` environment and
    any configured reviewers/protection rules. New setup adds no mandatory human
    approval; independent exact-head review and deliberate trusted dispatch remain
    the delivery requirements.
