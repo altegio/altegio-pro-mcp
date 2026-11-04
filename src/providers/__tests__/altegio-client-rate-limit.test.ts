@@ -1,10 +1,21 @@
 import { AltegioClient, retryAfterSeconds } from '../altegio-client.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { AltegioConfig } from '../../types/altegio.types.js';
 import { AltegioApiError } from '../../utils/errors.js';
 import {
   createToolCallObservation,
   runObservingToolCall,
 } from '../../utils/tool-call-observation.js';
+
+jest.mock('node:timers/promises', () => ({
+  ...jest.requireActual('node:timers/promises'),
+  setTimeout: jest.requireActual('../../__tests__/helpers/promise-timers.js')
+    .clockTimeout,
+}));
+
+const originalFetch = global.fetch;
 
 const config: AltegioConfig = {
   partnerToken: 'test-token',
@@ -37,10 +48,12 @@ const newStaff = {
 describe('AltegioClient - a read refused with HTTP 429', () => {
   let client: AltegioClient;
   let fetchMock: jest.Mock;
+  let testDir: string;
 
   beforeEach(() => {
     jest.useFakeTimers();
-    client = new AltegioClient(config, '/tmp/test-credentials');
+    testDir = mkdtempSync(join(tmpdir(), 'altegio-rate-limit-'));
+    client = new AltegioClient(config, testDir);
     fetchMock = jest.fn();
     global.fetch = fetchMock;
   });
@@ -48,6 +61,8 @@ describe('AltegioClient - a read refused with HTTP 429', () => {
   afterEach(() => {
     jest.useRealTimers();
     jest.restoreAllMocks();
+    global.fetch = originalFetch;
+    rmSync(testDir, { recursive: true, force: true });
   });
 
   it('waits a second without Retry-After, reads again and succeeds', async () => {
@@ -83,6 +98,7 @@ describe('AltegioClient - a read refused with HTTP 429', () => {
     await jest.advanceTimersByTimeAsync(1);
 
     await expect(pending).resolves.toEqual([{ id: 7 }]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('fails at once on a long Retry-After, saying how long to wait', async () => {
@@ -145,6 +161,32 @@ describe('AltegioClient - a read refused with HTTP 429', () => {
     expect((error as AltegioApiError).statusCode).toBe(429);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it.each(['caller', 'deadline'] as const)(
+    'stops a scheduled repeat when the %s cancels it',
+    async (cancellation) => {
+      fetchMock.mockResolvedValueOnce(rateLimited());
+      const controller = new AbortController();
+      const reason = new DOMException('stop waiting', 'AbortError');
+      if (cancellation === 'deadline') {
+        client = new AltegioClient({ ...config, timeout: 500 }, testDir);
+      }
+
+      const pending = client
+        .apiRequest('/staff/4564', { signal: controller.signal })
+        .catch((error: unknown) => error);
+      await jest.advanceTimersByTimeAsync(499);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      if (cancellation === 'caller') controller.abort(reason);
+      else await jest.advanceTimersByTimeAsync(1);
+
+      if (cancellation === 'caller') expect(await pending).toBe(reason);
+      else expect(await pending).toMatchObject({ name: 'TimeoutError' });
+      await jest.advanceTimersByTimeAsync(1_000);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(jest.getTimerCount()).toBe(0);
+    }
+  );
 });
 
 describe('retryAfterSeconds', () => {

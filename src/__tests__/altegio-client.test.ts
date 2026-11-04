@@ -44,12 +44,6 @@ describe('AltegioClient', () => {
     }
   });
 
-  describe('constructor', () => {
-    it('should create client instance with config', () => {
-      expect(client).toBeInstanceOf(AltegioClient);
-    });
-  });
-
   describe('login', () => {
     it('should login successfully with correct credentials', async () => {
       const mockResponse = {
