@@ -255,6 +255,15 @@ that matches nothing end with one sentence pointing at the tool; validation,
 access and transient failures do not. Each user may file 5 reports per 10
 minutes.
 
+Failed `tool_call` events include bounded upstream diagnostics: failure kind
+(`timeout`, `cancelled`, or `network`), phase (`admission`, `headers`, `body`,
+or `retry_wait`), HTTP method, a fixed route template (or `other`), and request
+and response counts. A body failure can therefore have a successful HTTP response;
+an admission timeout can have zero requests sent. These fields never contain
+URLs, query strings, arguments, response contents, or error messages. Cash-flow
+structure failures add a fixed `cash_flow_parse_reason` code. These diagnostics
+do not change retry policy: ambiguous writes are never replayed automatically.
+
 ## Resources and prompts
 
 MCP resources include the product model, glossary, onboarding guide, analytics
