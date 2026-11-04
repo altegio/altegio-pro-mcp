@@ -202,7 +202,63 @@ describe('private sandbox cleanup', () => {
   });
 });
 
+const activationFixture = `
+import assert from 'node:assert/strict';
+import {verifyActivation} from ${moduleURL('admin.mjs')};
+const sha='a'.repeat(40);
+const pr={state:'open',base:{ref:'main',repo:{full_name:'altegio/altegio-pro-mcp'}},head:{sha}};
+const workflow={event:'workflow_dispatch',head_branch:'main',path:'.github/workflows/catalog-trusted.yml',conclusion:'success'};
+const success={context:'Catalog (pinned spec)',state:'success',creator:{login:'fixture-catalog[bot]',type:'Bot'},target_url:'https://github.com/altegio/altegio-pro-mcp/actions/runs/456'};
+let statuses=[{context:'other',state:'failure'},success,{...success,state:'pending'}];
+const request=async (endpoint,token)=>{
+  assert.equal(token,'read-only-fixture');
+  if(endpoint==='/repos/altegio/altegio-pro-mcp/pulls/123') return pr;
+  if(endpoint==='/repos/altegio/altegio-pro-mcp/actions/runs/456') return workflow;
+  assert.equal(endpoint,'/repos/altegio/altegio-pro-mcp/commits/'+sha+'/statuses?per_page=100');
+  return statuses;
+};
+const input={app:{slug:'fixture-catalog'},pr:'123',sha,runID:'456',token:'read-only-fixture',request};
+`;
+
 describe('administrative rule activation', () => {
+  it('reads individual statuses with issuer metadata from the successful trusted run', () => {
+    run(`${activationFixture}
+      await verifyActivation(input);
+    `);
+  });
+
+  it.each([
+    'missingissuer',
+    'wrongissuer',
+    'humanissuer',
+    'wrongrun',
+    'newerfailure',
+    'newerpending',
+    'missingstatus',
+    'combinedresponse',
+    'untrustedbranch',
+    'failedrun',
+    'stalehead',
+    'closedpr',
+  ])('refuses activation evidence with %s', (reason) => {
+    run(`${activationFixture}
+      const reason=${JSON.stringify(reason)};
+      if(reason==='missingissuer') delete success.creator;
+      if(reason==='wrongissuer') success.creator.login='other-app[bot]';
+      if(reason==='humanissuer') success.creator.type='User';
+      if(reason==='wrongrun') success.target_url+='/other';
+      if(reason==='newerfailure') statuses.unshift({...success,state:'failure'});
+      if(reason==='newerpending') statuses.unshift({...success,state:'pending'});
+      if(reason==='missingstatus') statuses=[];
+      if(reason==='combinedresponse') statuses={state:'success',statuses:[success]};
+      if(reason==='untrustedbranch') workflow.head_branch='candidate';
+      if(reason==='failedrun') workflow.conclusion='failure';
+      if(reason==='stalehead') pr.head.sha='b'.repeat(40);
+      if(reason==='closedpr') pr.state='closed';
+      await assert.rejects(verifyActivation(input));
+    `);
+  });
+
   it('preserves existing rules and rejects weakened checks or a different issuer', () => {
     run(`
       import assert from 'node:assert/strict';
