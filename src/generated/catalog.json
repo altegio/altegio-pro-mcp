@@ -35,7 +35,7 @@
     "staff_id": "team_member_id"
   },
   "operationCount": 359,
-  "curatedCount": 123,
+  "curatedCount": 134,
   "domains": [
     {
       "domain": "altegio_plan",
@@ -970,6 +970,14 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "gift_cards",
+        "tier": "pack",
+        "facets": [
+          "marketing"
+        ],
+        "tool_name": "gift_cards_list_types"
       }
     },
     {
@@ -1260,6 +1268,15 @@
           },
           "type": "object"
         }
+      },
+      "curation": {
+        "domain": "gift_cards",
+        "tier": "pack",
+        "facets": [
+          "marketing"
+        ],
+        "tool_name": "gift_cards_create_type",
+        "write_allowed": false
       }
     },
     {
@@ -1417,6 +1434,15 @@
           },
           "type": "object"
         }
+      },
+      "curation": {
+        "domain": "gift_cards",
+        "tier": "pack",
+        "facets": [
+          "marketing"
+        ],
+        "tool_name": "gift_cards_get_type",
+        "notes": "Also read by gift_cards_update_type (PUT takes every field, so the tool reads the type and sends every field back) and by the gift_cards_delete_type confirmation.\n"
       }
     },
     {
@@ -1712,6 +1738,16 @@
           },
           "type": "object"
         }
+      },
+      "curation": {
+        "domain": "gift_cards",
+        "tier": "pack",
+        "facets": [
+          "marketing"
+        ],
+        "tool_name": "gift_cards_update_type",
+        "write_allowed": false,
+        "notes": "The API refuses to change a type with sold gift cards; the tool refuses first when the type reports a sold count.\n"
       }
     },
     {
@@ -1760,6 +1796,15 @@
         "schema": {
           "type": "null"
         }
+      },
+      "curation": {
+        "domain": "gift_cards",
+        "tier": "pack",
+        "facets": [
+          "marketing"
+        ],
+        "tool_name": "gift_cards_delete_type",
+        "write_allowed": false
       }
     },
     {
@@ -8960,6 +9005,15 @@
       "response": {
         "contentType": "application/json",
         "statusCode": "200"
+      },
+      "curation": {
+        "domain": "client_accounts",
+        "tier": "pack",
+        "facets": [
+          "finance"
+        ],
+        "tool_name": "client_accounts_list",
+        "notes": "The backend reads `min_balance`/`max_balance`, not the documented `balance_from`/`balance_to`, so the tool offers no balance filter.\n"
       }
     },
     {
@@ -9085,6 +9139,14 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "client_accounts",
+        "tier": "pack",
+        "facets": [
+          "finance"
+        ],
+        "tool_name": "client_accounts_get_history"
       }
     },
     {
@@ -9128,6 +9190,14 @@
       "response": {
         "contentType": "application/json",
         "statusCode": "200"
+      },
+      "curation": {
+        "domain": "client_accounts",
+        "tier": "pack",
+        "facets": [
+          "finance"
+        ],
+        "tool_name": "client_accounts_find_by_phone"
       }
     },
     {
@@ -18947,6 +19017,11 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "gift_cards",
+        "tier": "executor-only",
+        "notes": "Reads types by an `ids[]` query the spec does not document; no curated tool. gift_cards_get_type reads one type by id at the chain level.\n"
       }
     },
     {
@@ -19064,6 +19139,14 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "gift_cards",
+        "tier": "pack",
+        "facets": [
+          "marketing"
+        ],
+        "tool_name": "gift_cards_list_location_types"
       }
     },
     {
@@ -29093,6 +29176,15 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "gift_cards",
+        "tier": "pack",
+        "facets": [
+          "marketing"
+        ],
+        "tool_name": "gift_cards_list_for_client",
+        "notes": "Looked up by the phone on the client card (get_client); a card sold under an earlier phone is missed.\n"
       }
     },
     {

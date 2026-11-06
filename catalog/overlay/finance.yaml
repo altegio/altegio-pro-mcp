@@ -81,6 +81,24 @@ operations:
     notes: >
       The `deposit` operation. The tool refuses when the balance differs from
       the one the caller read.
+  get_client_account_list_by_chain:
+    domain: client_accounts
+    tier: pack
+    facets: [finance]
+    tool_name: client_accounts_list
+    notes: >
+      The backend reads `min_balance`/`max_balance`, not the documented
+      `balance_from`/`balance_to`, so the tool offers no balance filter.
+  get_client_account_by_chain_and_phone:
+    domain: client_accounts
+    tier: pack
+    facets: [finance]
+    tool_name: client_accounts_find_by_phone
+  get_chain_client_account_history:
+    domain: client_accounts
+    tier: pack
+    facets: [finance]
+    tool_name: client_accounts_get_history
 
   # --- accounts and cash registers ---------------------------------------------
   get_account_list:

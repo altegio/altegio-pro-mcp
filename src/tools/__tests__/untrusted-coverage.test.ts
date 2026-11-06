@@ -172,6 +172,42 @@ function membershipTypeRow(): Record<string, unknown> {
   };
 }
 
+/** A V1 gift card type (legacy `certificate` type) whose free text is the canary. */
+function giftCardTypeRow(): Record<string, unknown> {
+  return {
+    id: 72,
+    company_group_id: 9,
+    title: CANARY,
+    balance: 1000,
+    is_multi: true,
+    item_type_id: 0,
+    expiration_type_id: 0,
+    balance_edit_type_id: 2,
+    is_allow_empty_code: false,
+    is_archived: false,
+    online_sale_is_enabled: false,
+    online_sale_title: CANARY,
+    online_sale_description: CANARY,
+    online_sale_price: 0,
+    released_total: 0,
+    service_ids: [],
+    salon_ids: [1],
+  };
+}
+
+/** A V1 sold gift card whose type title is the canary. */
+function giftCardRow(): Record<string, unknown> {
+  return {
+    id: 91,
+    number: '888',
+    balance: 500,
+    default_balance: 1000,
+    type_id: 72,
+    status_id: 2,
+    type: { id: 72, title: CANARY, company_group_id: 9, is_multi: true },
+  };
+}
+
 /** A V1 sold membership whose number and titles are the canary. */
 function membershipRow(): Record<string, unknown> {
   return {
@@ -951,6 +987,149 @@ const FREE_TEXT: Record<string, FreeTextEntry> = {
       ],
     },
   },
+  gift_cards_list_types: {
+    what: 'gift card type titles and online-sale texts',
+    canary: {
+      args: { chain_id: 9 },
+      routes: [
+        {
+          match: /\/chains\/9\/loyalty\/gift_card_types/,
+          body: ok(envelope([giftCardTypeRow()], { total_count: 1 })),
+        },
+      ],
+    },
+  },
+  gift_cards_list_location_types: {
+    what: 'gift card type titles and online-sale texts',
+    canary: {
+      args: { location_id: 1 },
+      routes: [
+        {
+          match: /\/locations\/1\/loyalty\/gift_card_types\/search/,
+          body: ok(envelope([giftCardTypeRow()], { count: 1 })),
+        },
+      ],
+    },
+  },
+  gift_cards_get_type: {
+    what: 'the gift card type’s title and online-sale texts',
+    canary: {
+      args: { chain_id: 9, type_id: 72 },
+      routes: [
+        {
+          match: /\/chains\/9\/loyalty\/gift_card_types\/72/,
+          body: ok(envelope(giftCardTypeRow())),
+        },
+      ],
+    },
+  },
+  gift_cards_create_type: {
+    what: 'the created type’s free text as the API stored it',
+    canary: {
+      args: { chain_id: 9, title: CANARY, value: 1000, location_ids: [1] },
+      routes: [
+        {
+          match: /\/chains\/9\/loyalty\/gift_card_types/,
+          body: ok(envelope(giftCardTypeRow())),
+        },
+      ],
+    },
+  },
+  gift_cards_update_type: {
+    what: 'the updated type’s free text as the API stored it',
+    canary: {
+      args: { chain_id: 9, type_id: 72, title: CANARY },
+      routes: [
+        {
+          match: /\/chains\/9\/loyalty\/gift_card_types\/72/,
+          body: ok(envelope(giftCardTypeRow())),
+        },
+      ],
+    },
+  },
+  gift_cards_list_for_client: {
+    what: 'gift card type titles',
+    canary: {
+      args: { location_id: 1, client_id: 21 },
+      routes: [
+        {
+          match: /\/client\/1\/21/,
+          body: ok(envelope({ id: 21, phone: '+10000000000' })),
+        },
+        {
+          match: /\/loyalty\/gift_cards/,
+          body: ok(envelope([giftCardRow()])),
+        },
+      ],
+    },
+  },
+  client_accounts_list: {
+    what: 'client account type titles and client names',
+    canary: {
+      args: { chain_id: 9 },
+      routes: [
+        {
+          match: /\/chains\/9\/client_accounts/,
+          body: ok(
+            envelope(
+              [
+                {
+                  deposit: { id: 5, salon_group_id: 9, balance: 100 },
+                  deposit_type: { id: 3, title: CANARY },
+                  client: { id: 21, name: CANARY, phone: '+10000000000' },
+                },
+              ],
+              { count: 1 }
+            )
+          ),
+        },
+      ],
+    },
+  },
+  client_accounts_find_by_phone: {
+    what: 'client account type titles',
+    canary: {
+      args: { chain_id: 9, phone: '10000000000' },
+      routes: [
+        {
+          match: /\/chains\/9\/client_accounts\/phone\/10000000000/,
+          body: ok(
+            envelope([
+              {
+                deposit: { id: 5, salon_group_id: 9, balance: 100 },
+                deposit_type: { id: 3, title: CANARY },
+              },
+            ])
+          ),
+        },
+      ],
+    },
+  },
+  client_accounts_get_history: {
+    what: 'movement type names and comments',
+    canary: {
+      args: { chain_id: 9, client_account_id: 5 },
+      routes: [
+        {
+          match: /\/chains\/9\/client_accounts\/5\/history/,
+          body: ok(
+            envelope([
+              {
+                deposit_transaction: {
+                  id: 7,
+                  amount: 100,
+                  balance_after: 100,
+                  comment: CANARY,
+                  date_create: '2026-11-01T10:00:00.000000Z',
+                },
+                deposit_transaction_type: { id: 1, comment: CANARY },
+              },
+            ])
+          ),
+        },
+      ],
+    },
+  },
   memberships_list_for_client: {
     what: 'membership numbers, type titles and covered service titles',
     canary: {
@@ -1431,6 +1610,7 @@ const NO_FREE_TEXT: Record<string, string> = {
   product_categories_delete: 'the category and location ids only',
   products_archive: 'the product and location ids and the outcome only',
   memberships_delete_type: 'the membership type and chain ids only',
+  gift_cards_delete_type: 'the gift card type and chain ids only',
   events_duplicate: 'ids, start times and seat counts of the copies only',
   events_delete_duplication_strategy: 'the pattern and location ids only',
   locations_diagnose_access:
