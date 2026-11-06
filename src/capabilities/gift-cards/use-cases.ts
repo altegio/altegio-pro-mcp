@@ -184,7 +184,7 @@ export async function listLocationTypes(
     page.total,
     { location_id: input.location_id },
     [
-      'This location read reports neither the selling locations nor the sold count; gift_cards_get_type with the type’s chain_id does.',
+      'This location read reports neither the selling locations nor the sold count; gift_cards_get_type with the type’s chain_id does, when the user has loyalty rights in that chain (memberships_list_chains).',
     ]
   );
 }
@@ -399,12 +399,12 @@ function notApplied(
   const check = (key: keyof TypeFieldsInput, ok: boolean) => {
     if (changed[key] !== undefined && !ok) missed.push(key);
   };
-  const sameSet = (a: readonly number[], b: readonly number[] | null) =>
-    b !== null &&
-    a.length === b.length &&
-    [...a]
-      .sort((x, y) => x - y)
-      .every((v, i) => v === [...b].sort((x, y) => x - y)[i]);
+  const sorted = (v: readonly number[]) => [...v].sort((x, y) => x - y);
+  const sameSet = (a: readonly number[], b: readonly number[] | null) => {
+    if (b === null || a.length !== b.length) return false;
+    const [x, y] = [sorted(a), sorted(b)];
+    return x.every((v, i) => v === y[i]);
+  };
   check('title', saved.title === wanted.title);
   check(
     'value',
@@ -505,6 +505,18 @@ export async function updateType(
   ) {
     draft.service_ids = [];
   }
+  // PUT re-sends the stored expiry, and the API refuses a fixed date that has
+  // passed, whatever else changes.
+  if (
+    changed.expiry === undefined &&
+    draft.expiry.type === 'fixed_date' &&
+    draft.expiry.date !== undefined &&
+    draft.expiry.date.slice(0, 10) < new Date().toISOString().slice(0, 10)
+  ) {
+    throw new GiftCardsInputError(
+      `Gift card type ${input.type_id} expires on a fixed date that has passed (${draft.expiry.date.slice(0, 10)}), and the API refuses to save it again. Pass a new expiry with the change, e.g. { type: "never" } or a future fixed_date.`
+    );
+  }
   checkDraft(draft);
   const fields = await typeWrite(client, draft, changed);
   const saved = await port.updateType(input.chain_id, input.type_id, fields);
@@ -558,7 +570,7 @@ export async function describeType(
 
 function giftCardLine(g: GiftCard): string {
   return (
-    `- Gift card ${g.id}${g.number ? ` number ${g.number}` : ' (no number)'}: ${g.status.replace('_', ' ')}` +
+    `- Gift card ${g.id}${g.number ? '' : ' (no number)'}: ${g.status.replace('_', ' ')}` +
     ` · balance ${g.balance ?? 'not reported'} of ${g.initial_balance ?? '?'}` +
     ` · type ${g.type_id ?? '?'}${g.chain_id ? ` (chain ${g.chain_id})` : ''}` +
     ` · expires ${g.expires_at ?? 'never or not reported'}`
@@ -584,10 +596,10 @@ export async function listClientGiftCards(
           : []),
         `Gift cards are found by the phone on the client card; one sold under an earlier phone is missed.${currency ? ` Balances are in ${currency}.` : ''}`,
       ].join('\n'),
-      items.map((g) => ({
-        label: `gift card ${g.id} type title`,
-        value: g.type_title,
-      })),
+      items.flatMap((g) => [
+        { label: `gift card ${g.id} number`, value: g.number },
+        { label: `gift card ${g.id} type title`, value: g.type_title },
+      ]),
       { maxChars: FIELD_MAX_CHARS }
     ),
     structuredContent: {

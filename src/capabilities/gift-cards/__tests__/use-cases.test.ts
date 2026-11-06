@@ -338,6 +338,30 @@ describe('gift card types: writes', () => {
     expect(result.isError).toBeUndefined();
   });
 
+  it('asks for a new expiry when the stored fixed date has passed', async () => {
+    const calls: Call[] = [];
+    const client = fakeClient(
+      [
+        [
+          'GET',
+          /^\/chains\/9\/loyalty\/gift_card_types\/72$/,
+          200,
+          ok(
+            typeRow({
+              expiration_type_id: 1,
+              expiration_date: '2020-01-31T00:00:00+04:00',
+            })
+          ),
+        ],
+      ],
+      calls
+    );
+    await expect(
+      updateType(client, { chain_id: 9, type_id: 72, title: 'New' })
+    ).rejects.toThrow(/fixed date that has passed \(2020-01-31\)/);
+    expect(calls.some((c) => c.method === 'PUT')).toBe(false);
+  });
+
   it('refuses to change a type with sold gift cards', async () => {
     const calls: Call[] = [];
     const client = fakeClient(
@@ -450,6 +474,8 @@ describe('a client’s gift cards', () => {
     });
     expect(summaryOf(result.text)).not.toContain('ignore');
     expect(summaryOf(result.text)).not.toContain('+420');
+    expect(summaryOf(result.text)).not.toContain('888');
+    expect(result.text).toContain('gift card 91 number: 888');
   });
 
   it('finds none without a phone on the card', async () => {
