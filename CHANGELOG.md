@@ -46,10 +46,10 @@ is declared stable.
   served on `/mcp/finance` and through the dispatcher.
 - `client_accounts_deposit` calls `/locations/{id}/client_account_operations`
   with `client_account_id`. Its name and arguments do not change.
-- The operation catalog stays built from the pinned API reference `7ba5aa43`,
-  with the new tools' curation: `api_call_operation` still shows the legacy
-  `certificate*` and `deposit*` paths, which Altegio keeps serving. Moving the
-  pin to the reference that documents the new paths is a separate change.
+- The operation catalog is rebuilt from the API reference at `57c5e3c3` (the
+  spec pin moved in #198): twelve gift card and client account operations move
+  to the new paths, and `get_team_member_workload` takes a workload ratio above
+  one (api.docs #171).
 
 ### Changed — membership tools call the documented membership URLs (RND-2053)
 
