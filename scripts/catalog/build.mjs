@@ -24,7 +24,7 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import yaml from 'js-yaml';
+import { load as loadYaml, loadAll as loadYamlDocuments } from 'js-yaml';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '../..');
@@ -303,7 +303,7 @@ const docCache = new Map();
 function loadDoc(file) {
   const key = path.resolve(file);
   if (!docCache.has(key)) {
-    docCache.set(key, yaml.load(fs.readFileSync(key, 'utf8')));
+    docCache.set(key, loadYaml(fs.readFileSync(key, 'utf8')));
   }
   return docCache.get(key);
 }
@@ -769,7 +769,15 @@ export function loadOverlay(overlayDir) {
 
   for (const file of files) {
     const full = path.join(overlayDir, file);
-    const doc = yaml.load(fs.readFileSync(full, 'utf8')) ?? {};
+    // An empty or comment-only overlay adds nothing. js-yaml's `load` rejects
+    // such a file, so read the documents and require at most one.
+    const docs = loadYamlDocuments(fs.readFileSync(full, 'utf8'));
+    if (docs.length > 1) {
+      throw new Error(
+        `${file}: expected one YAML document, found ${docs.length}`
+      );
+    }
+    const doc = docs[0] ?? {};
     for (const [operationId, raw] of Object.entries(doc.operations ?? {})) {
       if (!raw || typeof raw !== 'object') continue;
 
