@@ -2,6 +2,7 @@
 import { load, type CheerioAPI } from 'cheerio';
 import * as XLSX from '@e965/xlsx';
 import { AltegioApiError } from '../../utils/errors.js';
+import { noteCashFlowParseFailure } from '../../utils/tool-call-observation.js';
 import type {
   CashAccountType,
   CashFlowBreakdownReport,
@@ -37,6 +38,7 @@ export class LegacyAnalyticsParseError extends Error {
       `The temporary ${report} report returned an unexpected structure (${detail}). The ERP markup may have changed; retry later or use a neighboring analytics tool.`
     );
     this.name = 'LegacyAnalyticsParseError';
+    if (report === 'cash-flow breakdown') noteCashFlowParseFailure(detail);
   }
 }
 

@@ -31,9 +31,11 @@ import {
 } from '../api/http-failure.js';
 import {
   isTimeout,
-  noteUpstreamFailure,
+  upstreamFailureRecorder,
+  noteUpstreamRequest,
   noteUpstreamResponse,
   noteUpstreamRetry,
+  type UpstreamPhase,
 } from '../utils/tool-call-observation.js';
 import { upstreamDetail } from '../tools/tool-result.js';
 import { v2Path, type AltegioTransport } from '../api/altegio-http.js';
@@ -413,11 +415,16 @@ export class AltegioClient implements AltegioTransport {
       (options.method ?? 'GET').toUpperCase()
     );
     const budget = new UpstreamBudget(this.timeoutMs, options.signal);
+    const recordFailure = upstreamFailureRecorder(endpoint, options.method);
+    let phase: UpstreamPhase = 'admission';
     try {
       for (let attempt = 0; ; attempt++) {
         await this.rateGate.admit(budget);
         let response: Response;
         try {
+          budget.signal.throwIfAborted();
+          phase = 'headers';
+          noteUpstreamRequest();
           response = await budget.fetch(`${this.apiUrl}${endpoint}`, {
             ...options,
             headers,
@@ -433,9 +440,11 @@ export class AltegioClient implements AltegioTransport {
             !(error instanceof Error && error.name === 'AbortError')
           ) {
             noteUpstreamRetry();
+            phase = 'retry_wait';
             await budget.pause(
               Math.min(this.retryDelayMs * 2 ** attempt, this.maxRetryDelayMs)
             );
+            phase = 'admission';
             continue;
           }
           throw error;
@@ -443,19 +452,24 @@ export class AltegioClient implements AltegioTransport {
         if (response.status === 429 && repeatable && attempt < this.retries) {
           const wait = rateLimitWaitMs(response.headers);
           if (wait !== undefined && wait <= this.maxRetryDelayMs) {
+            noteUpstreamResponse(response.status, false);
             await response.body?.cancel().catch(() => undefined);
             noteUpstreamRetry();
+            phase = 'retry_wait';
             await budget.pause(wait);
+            phase = 'admission';
             continue;
           }
         }
         noteUpstreamResponse(response.status);
         if (response.status === 401) this.forgetRefusedToken();
-        return budget.response(response);
+        return budget.response(response, (error) =>
+          recordFailure(error, 'body', budget.cancelled)
+        );
       }
     } catch (error) {
       budget.close();
-      noteUpstreamFailure(error);
+      recordFailure(error, phase, budget.cancelled);
       throw error;
     }
   }
@@ -526,6 +540,7 @@ export class AltegioClient implements AltegioTransport {
     }
 
     let response: Response;
+    const recordFailure = upstreamFailureRecorder(request.path, 'GET');
     try {
       response = await fetchWithDeadline(
         url,
@@ -541,7 +556,12 @@ export class AltegioClient implements AltegioTransport {
           redirect: 'manual',
           credentials: 'omit',
         },
-        this.timeoutMs
+        this.timeoutMs,
+        (url, init) => {
+          noteUpstreamRequest();
+          return fetch(url, init);
+        },
+        recordFailure
       );
     } catch {
       // Deliberately discard the native fetch error: it may include the URL,
@@ -552,6 +572,7 @@ export class AltegioClient implements AltegioTransport {
       );
     }
 
+    noteUpstreamResponse(response.status);
     if (response.status >= 300 && response.status < 400) {
       this.forgetRefusedToken();
       throw new AltegioApiError(

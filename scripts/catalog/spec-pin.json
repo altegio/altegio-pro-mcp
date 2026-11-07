@@ -1,7 +1,7 @@
 {
-  "revision": "7ba5aa43c68951605a9bcc43b1f629dc11584164",
+  "revision": "57c5e3c36942150c232992a5ec44075a0334edac",
   "root": "docs/en",
   "algorithm": "sha256 of sorted relative paths + NUL + SHA256(file bytes) + NUL, recursive directory order",
-  "sha256": "989055d82c10875972648dc01513d592350fa1fb96e678579037e25a17d6c51a",
-  "archive_sha256": "2344bc7a5ae33257864e0a241be07c19f36a16dfbb02b760b70ffe25e897afd5"
+  "sha256": "4215171680573f1173fef535bccb22175d6633691dc526d444a3c74f19e22e23",
+  "archive_sha256": "211533ff6f4207ce3992818d266cf78c3d699b4d6863b442d21b3eed4e87f36c"
 }

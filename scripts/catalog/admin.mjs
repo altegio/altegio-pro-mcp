@@ -275,20 +275,37 @@ async function configureEnvironment({
   );
 }
 
-async function activate({ app, pr, sha, runID, token, apply }) {
-  validateCandidate(await api(`${repositoryAPI}/pulls/${pr}`, token), sha);
-  const run = await api(`${repositoryAPI}/actions/runs/${runID}`, token);
+export async function verifyActivation({
+  app,
+  pr,
+  sha,
+  runID,
+  token,
+  request = api,
+}) {
+  validateCandidate(await request(`${repositoryAPI}/pulls/${pr}`, token), sha);
+  const run = await request(`${repositoryAPI}/actions/runs/${runID}`, token);
   assert.equal(run.event, 'workflow_dispatch');
   assert.equal(run.head_branch, 'main');
   assert.equal(run.path, '.github/workflows/catalog-trusted.yml');
   assert.equal(run.conclusion, 'success');
   const target = `https://github.com/${REPOSITORY}/actions/runs/${runID}`;
-  const status = await api(`${repositoryAPI}/commits/${sha}/status`, token);
-  const latest = status.statuses.find((entry) => entry.context === CONTEXT);
+  // Combined statuses omit creator. Individual statuses include the issuer
+  // and are newest first; never accept an older success over a newer failure.
+  const statuses = await request(
+    `${repositoryAPI}/commits/${sha}/statuses?per_page=100`,
+    token
+  );
+  assert.ok(Array.isArray(statuses));
+  const latest = statuses.find((entry) => entry.context === CONTEXT);
   assert.equal(latest?.state, 'success');
-  assert.equal(latest.creator.login, `${app.slug}[bot]`);
-  assert.equal(latest.creator.type, 'Bot');
+  assert.equal(latest.creator?.login, `${app.slug}[bot]`);
+  assert.equal(latest.creator?.type, 'Bot');
   assert.equal(latest.target_url, target);
+}
+
+async function activate({ app, pr, sha, runID, token, apply }) {
+  await verifyActivation({ app, pr, sha, runID, token });
   const current = await api(`${repositoryAPI}/rulesets/${RULESET}`, token);
   const proposed = requiredRuleset(current, app.id);
   const output = path.resolve('.inventory/catalog-gate-setup');

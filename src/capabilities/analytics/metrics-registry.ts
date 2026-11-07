@@ -27,7 +27,7 @@ export const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     key: 'booked_share',
     name: 'Selected team daily booked share',
     definition:
-      'Fraction 0…1 of the visible active selected team’s working time that is booked on a day. Working dates are returned separately; a missing measured working day stays unknown. This aggregate is not idle hours or a per-person ranking. Individual occupancy is the fraction multiplied by 100.',
+      'Booked time divided by scheduled working time for the visible active selected team on a day. The ratio can exceed 1 when appointments extend beyond the schedule. Working dates are returned separately; a missing measured working day stays unknown. This aggregate is not idle hours or a per-person ranking. Individual occupancy is the fraction multiplied by 100.',
     tool: 'analytics_get_team_workload',
   },
   {
