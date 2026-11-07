@@ -11,7 +11,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import yaml from 'js-yaml';
+import { load as loadYaml } from 'js-yaml';
 
 const args = Object.fromEntries(
   process.argv
@@ -40,7 +40,7 @@ for (const [name, rel] of Object.entries(SPECS)) {
     console.error(`skip ${name}: ${file} not found`);
     continue;
   }
-  const doc = yaml.load(fs.readFileSync(file, 'utf8'));
+  const doc = loadYaml(fs.readFileSync(file, 'utf8'));
   let ops = 0;
   const tagCounts = new Map();
   for (const [p, item] of Object.entries(doc.paths ?? {})) {
@@ -51,7 +51,7 @@ for (const [name, rel] of Object.entries(SPECS)) {
         console.error(`  missing ref for ${p}: ${item.$ref}`);
         continue;
       }
-      pathItem = yaml.load(fs.readFileSync(refFile, 'utf8'));
+      pathItem = loadYaml(fs.readFileSync(refFile, 'utf8'));
     }
     for (const m of METHODS) {
       const op = pathItem?.[m];
