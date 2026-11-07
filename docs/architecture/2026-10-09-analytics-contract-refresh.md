@@ -30,10 +30,15 @@ excludes that extra row and reports the count.
 
 The previous occupancy adapter treated fractions as percentages: `0.69` became
 `0.69%`. Individual occupancy now multiplies by 100 once (`69%`); aggregate
-workload deliberately exposes `booked_share` in 0…1. Missing measurements remain
-unknown. Out-of-range shares and duplicate/invalid dates fail instead of silently
-changing units. Working dates are union dates of the visible selected team,
-not a per-person work schedule. Neither source proves idle hours or bookable slots.
+workload exposes the same ratio as `booked_share`. The original upper bound of
+1 was removed on 2026-11-04: the source divides booked time by scheduled time
+without clipping appointments to the work schedule. Consequently, ratios above
+1 (individual occupancy above 100%) are valid and must not be capped or
+reinterpreted as percentages. This deliberately tolerates the API returning
+values above the current OpenAPI maximum; the source specification needs a
+separate correction. Missing measurements remain unknown. Negative/non-finite
+ratios and duplicate/invalid dates still fail. Working dates are union dates of
+the visible selected team, not a per-person work schedule. Neither source proves idle hours or bookable slots.
 The aggregate tool accepts at most 50 distinct IDs and 93 days, with identical
 selection parameters on both source requests.
 

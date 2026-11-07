@@ -24,6 +24,7 @@ import { defineTool } from '../factory.js';
 import { pageArg, pageSizeArg, paginationOutput } from '../pagination.js';
 import * as finance from '../../capabilities/finance/use-cases.js';
 import { moneyAmount } from './visits.tools.js';
+import { includeContactsArg } from '../contacts.js';
 
 const READ_ONLY = { readOnlyHint: true, openWorldHint: true } as const;
 
@@ -181,6 +182,139 @@ export const clientAccountsDepositTool = defineTool({
   },
   handler: async ({ input, client, confirmation }) =>
     finance.deposit(client, input, confirmation),
+});
+
+// ========== client accounts of a chain ==========
+
+const chainId = z
+  .number()
+  .int()
+  .positive()
+  .describe(
+    'Chain id (client_accounts_list_for_client reports it per account; memberships_list_chains lists the user’s chains).'
+  );
+
+const chainClientAccountSchema = {
+  ...clientAccountSchema,
+  properties: {
+    ...clientAccountSchema.properties,
+    client: {
+      type: ['object', 'null'] as const,
+      properties: {
+        id: { type: 'integer' as const },
+        name: str,
+        phone: str,
+      },
+      required: ['id'],
+    },
+  },
+};
+
+const clientAccountMovementSchema = {
+  type: 'object' as const,
+  properties: {
+    id: { type: 'integer' as const },
+    amount: num,
+    balance_after: num,
+    reserved_balance_after: num,
+    kind: str,
+    comment: str,
+    location_id: int,
+    created_at: str,
+    deleted: { type: 'boolean' as const },
+  },
+  required: ['id', 'amount', 'balance_after', 'deleted'],
+};
+
+export const clientAccountsListTool = defineTool({
+  name: 'client_accounts_list',
+  category: 'Finance',
+  description:
+    'Every client account of a chain with its client and balance — the money the chain holds for clients, not logins: balance, part held for advance payments, type, blocked flag, client id and name. Needs the chain-level client account report right. Paged: follow pagination.next_page. One client: client_accounts_list_for_client; by phone: client_accounts_find_by_phone.',
+  annotations: { title: 'Client accounts: all of a chain', ...READ_ONLY },
+  input: z.object({
+    chain_id: chainId,
+    include_contacts: includeContactsArg,
+    page: pageArg,
+    page_size: pageSizeArg(100),
+  }),
+  outputSchema: {
+    type: 'object' as const,
+    properties: {
+      chain_id: { type: 'integer' as const },
+      currency: { type: 'null' as const },
+      items: { type: 'array' as const, items: chainClientAccountSchema },
+      pagination: paginationOutput,
+    },
+    required: ['chain_id', 'items', 'pagination'],
+  },
+  handler: async ({ input, client }) =>
+    finance.listChainClientAccounts(client, input),
+});
+
+export const clientAccountsFindByPhoneTool = defineTool({
+  name: 'client_accounts_find_by_phone',
+  category: 'Finance',
+  description:
+    'Client accounts in a chain that belong to a phone number — when the client is known by phone, not by a location client card: balance, part held for advance payments, type, blocked flag. Pass the full number with country code. History of one: client_accounts_get_history.',
+  annotations: { title: 'Client accounts: find by phone', ...READ_ONLY },
+  input: z.object({
+    chain_id: chainId,
+    phone: z
+      .string()
+      .min(5)
+      .max(32)
+      .describe(
+        'Client phone with country code, e.g. 420601234567; spaces and + are ignored.'
+      ),
+    page: pageArg,
+    page_size: pageSizeArg(100),
+  }),
+  outputSchema: {
+    type: 'object' as const,
+    properties: {
+      chain_id: { type: 'integer' as const },
+      currency: { type: 'null' as const },
+      items: { type: 'array' as const, items: clientAccountSchema },
+      pagination: paginationOutput,
+    },
+    required: ['chain_id', 'items', 'pagination'],
+  },
+  handler: async ({ input, client }) =>
+    finance.findClientAccountsByPhone(client, input),
+});
+
+export const clientAccountsGetHistoryTool = defineTool({
+  name: 'client_accounts_get_history',
+  category: 'Finance',
+  description:
+    'Balance history of one client account, newest first: each top-up, payment from it and correction with amount (+ added, − spent), balance after, location and type. Take chain_id and client_account_id from client_accounts_list_for_client. Paged: follow pagination.next_page.',
+  annotations: { title: 'Client accounts: balance history', ...READ_ONLY },
+  input: z.object({
+    chain_id: chainId,
+    client_account_id: z
+      .number()
+      .int()
+      .positive()
+      .describe(
+        'Client account id, from client_accounts_list_for_client or client_accounts_find_by_phone.'
+      ),
+    page: pageArg,
+    page_size: pageSizeArg(100),
+  }),
+  outputSchema: {
+    type: 'object' as const,
+    properties: {
+      chain_id: { type: 'integer' as const },
+      client_account_id: { type: 'integer' as const },
+      currency: str,
+      items: { type: 'array' as const, items: clientAccountMovementSchema },
+      pagination: paginationOutput,
+    },
+    required: ['chain_id', 'client_account_id', 'items', 'pagination'],
+  },
+  handler: async ({ input, client }) =>
+    finance.listClientAccountHistory(client, input),
 });
 
 // ========== accounts and cash registers ==========

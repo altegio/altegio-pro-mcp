@@ -185,6 +185,7 @@ export type ToolErrorClass =
   | 'confirmation_required'
   | 'unknown_tool'
   | 'timeout'
+  | 'cancelled'
   | 'rate_limited'
   | 'internal';
 
@@ -339,6 +340,8 @@ function classifyFailure(
   unauthenticated: () => boolean
 ): { error_class: ToolErrorClass; upstream_status?: number } {
   if (observation.rateLimited) return { error_class: 'rate_limited' };
+  if (observation.upstreamFailure === 'cancelled')
+    return { error_class: 'cancelled' };
   const cause = thrown ?? observation.lastError;
   const status = observation.upstreamErrorStatus;
   if (observation.upstreamFailure === 'timeout' || isTimeout(cause)) {
@@ -713,7 +716,7 @@ export function registerTools(
       };
       const inputIssues = () => inputIssuesOf.get(call.tool)?.(callArgs);
       const failure = (thrown?: unknown) => {
-        const classified = call.errorClass
+        const classification = call.errorClass
           ? { error_class: call.errorClass }
           : classifyFailure(
               observation,
@@ -727,6 +730,22 @@ export function registerTools(
                 }
               }
             );
+        const classified = {
+          ...classification,
+          ...(observation.upstreamFailureDetail
+            ? {
+                upstream_failure: observation.upstreamFailure,
+                upstream_phase: observation.upstreamFailureDetail.phase,
+                upstream_method: observation.upstreamFailureDetail.method,
+                upstream_route: observation.upstreamFailureDetail.route,
+                upstream_requests: observation.upstreamRequests ?? 0,
+                upstream_responses: observation.upstreamResponses,
+              }
+            : {}),
+          ...(observation.cashFlowParseReason
+            ? { cash_flow_parse_reason: observation.cashFlowParseReason }
+            : {}),
+        };
         if (classified.error_class !== 'validation') return classified;
         const issues =
           call.validation ??

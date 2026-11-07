@@ -45,7 +45,7 @@ export async function getTeamWorkload(
   );
   const missing = workingDays.filter((date) => !measured.has(date));
   return {
-    text: `Daily booked share for the selected visible active team, ${ctx.period.date_from}…${ctx.period.date_to}: ${workingDays.length} working day(s), ${missing.length} working day(s) without a measured share. Shares are fractions from 0 to 1. This aggregate is not a per-person ranking or idle hours.`,
+    text: `Daily booked share for the selected visible active team, ${ctx.period.date_from}…${ctx.period.date_to}: ${workingDays.length} working day(s), ${missing.length} working day(s) without a measured share. Shares are booked-time / scheduled-time ratios; values above 1 mean booked time exceeds scheduled time. This aggregate is not a per-person ranking or idle hours.`,
     structuredContent: {
       location_id: input.location_id,
       period: { ...ctx.period, timezone: ctx.timezone },

@@ -93,12 +93,18 @@ selector. Full lint, types, test/coverage and artifact checks on both Node
 targets validate the actual consumers. Remove the overrides once the parent
 packages declare fixed ranges and the same checks pass.
 
-The remaining advisory is [deepmerge GHSA-gcqx-w48m-w2h4](https://github.com/advisories/GHSA-gcqx-w48m-w2h4),
-one low-severity root reached only through Jest configuration. The registry's
-latest deepmerge is 4.3.1 and the advisory has no patched version as of
-2026-11-03. The latest supported Jest still depends on it. A clean audit
-therefore reports six low affected entries in that chain, zero moderate/high/
-critical, and zero runtime advisories. No suppression or Jest 25 downgrade
-is applied. A supported upstream fix or a separately reviewed test-runner
-migration is required to remove that last root; swapping the runner solely
-to make the counter zero would add unrelated compatibility work.
+The remaining npm advisory is [deepmerge GHSA-gcqx-w48m-w2h4](https://github.com/advisories/GHSA-gcqx-w48m-w2h4),
+one low-severity root reached only through Jest configuration. Rechecked on
+2026-11-04: the installed Jest 30.5.2, jest-config 30.5.2 and ts-jest 29.4.15
+are the latest supported releases; jest-config still requests deepmerge
+`^4.3.1`, and 4.3.1 remains its latest published version.
+
+The [authoritative CVE record](https://github.com/CVEProject/cvelistV5/blob/main/cves/2026/93xxx/CVE-2026-93753.json)
+was **rejected by VulnCheck on 2026-11-02** because it does not describe a
+security vulnerability. GitHub's advisory still has no withdrawal date or
+patched version. The fresh lockfile audit therefore continues to report six
+low affected entries, zero moderate/high/critical and zero runtime advisories.
+Keep tracking the GitHub/npm metadata correction through the existing dependency
+maintenance process; do not claim the npm audit is clean before it propagates.
+No suppression, replacement package or Jest 25 downgrade is applied. Reassess
+the actual consumers if upstream publishes a supported dependency fix instead.

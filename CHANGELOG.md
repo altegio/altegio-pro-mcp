@@ -27,6 +27,30 @@ is declared stable.
   private-spec drift check remains a separate manual gate until its trusted
   infrastructure is configured.
 
+### Added — gift card tools and chain-wide client account reads (RND-4905)
+
+- The API reference now documents the gift card and client account URLs
+  (`/loyalty/gift_cards`, `/chains/{id}/loyalty/gift_card_types`,
+  `/locations/{id}/loyalty/gift_card_types/search`,
+  `/chains/{id}/client_accounts[/phone/{phone}|/{id}/history]`,
+  `/locations/{id}/client_account_operations`) instead of the legacy
+  `certificate*` and `deposit*` paths. Altegio serves them as aliases of the
+  same routes, so answers keep their fields.
+- New `gift_cards_*` tools: list a chain's gift card types, the types a
+  location sells, read one, create, update (only while none is sold) and delete
+  (confirmed) a type, and list a client's gift cards. They are served on
+  `/mcp/marketing` and through the dispatcher on `/mcp`, not on `/mcp/full`.
+- New chain-level client account reads: `client_accounts_list` (every account of
+  a chain with its client; phones only with `include_contacts`),
+  `client_accounts_find_by_phone` and `client_accounts_get_history`. They are
+  served on `/mcp/finance` and through the dispatcher.
+- `client_accounts_deposit` calls `/locations/{id}/client_account_operations`
+  with `client_account_id`. Its name and arguments do not change.
+- The operation catalog is rebuilt from the API reference at `57c5e3c3` (the
+  spec pin moved in #198): twelve gift card and client account operations move
+  to the new paths, and `get_team_member_workload` takes a workload ratio above
+  one (api.docs #171).
+
 ### Changed — membership tools call the documented membership URLs (RND-2053)
 
 - The API reference now documents `/loyalty/memberships`,

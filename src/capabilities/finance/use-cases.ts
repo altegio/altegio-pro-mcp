@@ -66,8 +66,10 @@ import {
 } from '../../tools/confirmation.js';
 import { FinanceInputError, FinanceNotFoundError } from './errors.js';
 import { financeApi, visitsApi } from './ports.js';
+import { CONTACTS_WITHHELD_NOTICE } from '../../tools/contacts.js';
 import { planConfirmed, planForConfirmation } from '../guarded-change.js';
 import {
+  pageMetadata,
   paginateCollection,
   renderPage,
   type PageInput,
@@ -749,8 +751,14 @@ export async function cancelPayment(
 
 // ========== client accounts ==========
 
-function clientAccountLine(a: ClientAccount, currency: string | null): string {
-  return `- client account ${a.id}${a.chain_id ? ` (chain ${a.chain_id})` : ''}: balance ${amountText(a.balance, currency)}${a.reserved_balance ? ` · ${amountText(a.reserved_balance, currency)} held for advance payments` : ''}${a.blocked ? ' · blocked' : ''}`;
+type AmountFormat = (value: number | null) => string;
+
+/** Chain-level reads name no location, so their amounts carry no currency. */
+const chainAmount: AmountFormat = (value) =>
+  value === null ? 'not reported' : String(roundMajor(value));
+
+function clientAccountLine(a: ClientAccount, amount: AmountFormat): string {
+  return `- client account ${a.id}${a.chain_id ? ` (chain ${a.chain_id})` : ''}: balance ${amount(a.balance)}${a.reserved_balance ? ` · ${amount(a.reserved_balance)} held for advance payments` : ''}${a.blocked ? ' · blocked' : ''}`;
 }
 
 export async function listClientAccounts(
@@ -764,7 +772,7 @@ export async function listClientAccounts(
   const { items, pagination } = paginateCollection(all, input);
   const summary = lines(
     `${pagination.total} client account(s) of client ${input.client_id}, read through location ${input.location_id}; page ${input.page} shows ${items.length}${items.length > 0 ? ':' : '.'}`,
-    ...items.map((a) => clientAccountLine(a, currency)),
+    ...items.map((a) => clientAccountLine(a, (v) => amountText(v, currency))),
     pagination.has_more && `More follow: request page ${pagination.next_page}.`,
     items.length > 0
       ? 'Top one up with client_accounts_deposit (pass its balance as expected_balance); pay a visit from one with visits_add_payment, method client_account.'
@@ -783,6 +791,171 @@ export async function listClientAccounts(
     structuredContent: {
       location_id: input.location_id,
       client_id: input.client_id,
+      currency,
+      items,
+      pagination,
+    },
+  };
+}
+
+/**
+ * Chain-level client account reads name no location, so they cannot read a
+ * currency; their amounts are in the currency of the chain's locations.
+ */
+const CHAIN_CURRENCY_NOTE =
+  'Amounts are in the currency of the chain’s locations; this chain-level read does not report it.';
+
+export async function listChainClientAccounts(
+  client: AltegioClient,
+  input: { chain_id: number; include_contacts?: boolean } & PageInput
+): Promise<FinanceResult> {
+  const includeContacts = input.include_contacts === true;
+  const page = await api(client).listChainClientAccounts(input.chain_id, {
+    page: input.page,
+    page_size: input.page_size,
+  });
+  const items = page.items.map((a) => ({
+    ...a,
+    client: a.client
+      ? {
+          id: a.client.id,
+          name: a.client.name,
+          ...(includeContacts ? { phone: a.client.phone } : {}),
+        }
+      : null,
+  }));
+  return renderPage({
+    input,
+    items,
+    ...(page.total !== null ? { total: page.total } : {}),
+    render: ({ items: shown, pagination }) => ({
+      text: withUntrustedBlock(
+        lines(
+          `${pagination.total ?? shown.length} client account(s) in chain ${input.chain_id}; page ${input.page} shows ${shown.length}${shown.length > 0 ? ':' : '.'}`,
+          ...shown.map(
+            (a) =>
+              `${clientAccountLine(a, chainAmount)}${a.client ? ` · client ${a.client.id}` : ''}`
+          ),
+          pagination.has_more &&
+            `More follow: request page ${pagination.next_page}.`,
+          CHAIN_CURRENCY_NOTE,
+          !includeContacts && shown.some((a) => a.client)
+            ? CONTACTS_WITHHELD_NOTICE
+            : null
+        ),
+        shown.flatMap((a) => [
+          { label: `client account ${a.id} type`, value: a.type_title },
+          ...(a.client
+            ? [
+                {
+                  label: `client ${a.client.id} name`,
+                  value: a.client.name,
+                },
+                ...(includeContacts
+                  ? [
+                      {
+                        label: `client ${a.client.id} phone`,
+                        value: a.client.phone ?? null,
+                      },
+                    ]
+                  : []),
+              ]
+            : []),
+        ]),
+        { maxChars: FIELD_MAX_CHARS }
+      ),
+      structuredContent: {
+        chain_id: input.chain_id,
+        currency: null,
+        items: shown,
+        pagination,
+      },
+    }),
+  });
+}
+
+export async function findClientAccountsByPhone(
+  client: AltegioClient,
+  input: { chain_id: number; phone: string } & PageInput
+): Promise<FinanceResult> {
+  if (input.phone.replace(/\D/g, '').length < 5) {
+    throw new FinanceInputError(
+      'Pass the client’s full phone number with the country code, digits only, e.g. 420601234567.'
+    );
+  }
+  const all = await api(client).findChainClientAccountsByPhone(
+    input.chain_id,
+    input.phone
+  );
+  const { items, pagination } = paginateCollection(all, input);
+  return {
+    text: withUntrustedBlock(
+      lines(
+        `${pagination.total} client account(s) in chain ${input.chain_id} for the given phone number; page ${input.page} shows ${items.length}${items.length > 0 ? ':' : '.'}`,
+        ...items.map((a) => clientAccountLine(a, chainAmount)),
+        pagination.has_more &&
+          `More follow: request page ${pagination.next_page}.`,
+        items.length > 0
+          ? 'History of one: client_accounts_get_history. To top one up, find the client in a location (clients_lookup) and use client_accounts_deposit.'
+          : 'No client account holds this phone number in the chain: check the number, or look the client up in a location (clients_lookup, then client_accounts_list_for_client).',
+        CHAIN_CURRENCY_NOTE
+      ),
+      items.map((a) => ({
+        label: `client account ${a.id} type`,
+        value: a.type_title,
+      })),
+      { maxChars: FIELD_MAX_CHARS }
+    ),
+    structuredContent: {
+      chain_id: input.chain_id,
+      currency: null,
+      items,
+      pagination,
+    },
+  };
+}
+
+export async function listClientAccountHistory(
+  client: AltegioClient,
+  input: { chain_id: number; client_account_id: number } & PageInput
+): Promise<FinanceResult> {
+  const all = await api(client).listClientAccountMovements(
+    input.chain_id,
+    input.client_account_id
+  );
+  // Newest first: the question is nearly always "what happened lately".
+  const ordered = [...all].sort(
+    (a, b) =>
+      (b.created_at ?? '').localeCompare(a.created_at ?? '') || b.id - a.id
+  );
+  const start = (input.page - 1) * input.page_size;
+  const items = ordered.slice(start, start + input.page_size);
+  const locationId = items.find((m) => m.location_id)?.location_id ?? null;
+  const currency = locationId
+    ? await resolveLocationCurrency(client, locationId)
+    : null;
+  const pagination = pageMetadata(input, items.length, ordered.length);
+  return {
+    text: withUntrustedBlock(
+      lines(
+        `${pagination.total} movement(s) of client account ${input.client_account_id} in chain ${input.chain_id}, newest first; page ${input.page} shows ${items.length}${items.length > 0 ? ':' : '.'}`,
+        ...items.map(
+          (m) =>
+            `- ${m.created_at ?? 'date not reported'}: ${m.amount === null ? 'amount not reported' : signed(m.amount, currency)}, balance after ${amountText(m.balance_after, currency)}${m.location_id ? ` · location ${m.location_id}` : ''}${m.deleted ? ' · deleted' : ''} (movement ${m.id})`
+        ),
+        pagination.has_more &&
+          `More follow: request page ${pagination.next_page}.`,
+        ...(items.length > 0 ? currencyNote(currency) : [])
+      ),
+      items.flatMap((m) => [
+        { label: `movement ${m.id} type`, value: m.kind },
+        { label: `movement ${m.id} comment`, value: m.comment },
+      ]),
+      { maxChars: FIELD_MAX_CHARS }
+    ),
+    structuredContent: {
+      chain_id: input.chain_id,
+      client_account_id: input.client_account_id,
       currency,
       items,
       pagination,

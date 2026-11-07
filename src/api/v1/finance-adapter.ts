@@ -6,6 +6,15 @@
  * served, so every call here is V1 (the product owner's rule of 2026-09-29: V2
  * first, V1 only where V2 has nothing). The port speaks the product glossary;
  * the wire names stop here: `deposit`, `expense`, `master`, `salary`, `kkm`.
+ *
+ * Client accounts are called on the spec's `client_account*` URLs, which the
+ * backend serves as aliases of its legacy `deposit*` routes (RND-4905, live
+ * since 2026-11-05): `/chains/{id}/client_accounts[/phone/{phone}|/{id}/history]`
+ * and `/locations/{id}/client_account_operations`, whose body takes
+ * `client_account_id` for the legacy `deposit_id`. The per-client read keeps
+ * `/deposits/company/{location_id}/client/{client_id}`, which has no alias.
+ * Responses keep the legacy keys (`deposit`, `deposit_type`,
+ * `deposits_transactions`, `deposit_transaction`).
  * The visit and its payments are the `VisitsApi` port (`./visits-adapter.ts`).
  *
  * Contract details verified live on the test location (2026-10-19):
@@ -55,7 +64,10 @@ import {
 } from './envelope.js';
 import type {
   CashRegisterOrAccount,
+  ChainClientAccount,
+  ChainClientAccountPage,
   ClientAccount,
+  ClientAccountMovement,
   ClientAccountDepositRequest,
   ClientAccountDepositResult,
   FinanceApi,
@@ -89,6 +101,43 @@ function clientAccountFromWire(row: Row): ClientAccount {
     blocked: flag(account.blocked) === true,
     created_at: text(account.date_create),
   };
+}
+
+function chainClientAccountFromWire(row: Row): ChainClientAccount {
+  const person = asRow(row.client);
+  const clientId = id(person.id);
+  return {
+    ...clientAccountFromWire(row),
+    client:
+      clientId === null
+        ? null
+        : {
+            id: clientId,
+            name: text(person.name),
+            phone: text(person.phone),
+          },
+  };
+}
+
+function movementFromWire(row: Row): ClientAccountMovement {
+  const movement = asRow(row.deposit_transaction);
+  const kind = asRow(row.deposit_transaction_type);
+  return {
+    id: id(movement.id) ?? 0,
+    amount: num(movement.amount),
+    balance_after: num(movement.balance_after),
+    reserved_balance_after: num(movement.reserved_balance_after),
+    kind: text(kind.comment) ?? text(kind.title),
+    comment: text(movement.comment),
+    location_id: id(movement.salon_id),
+    created_at: text(movement.date_create),
+    deleted: flag(movement.deleted) === true,
+  };
+}
+
+/** Digits only: the phone a path segment can carry. */
+function phoneDigits(phone: string): string {
+  return phone.replace(/\D/g, '');
 }
 
 function cashRegisterFromWire(row: Row): CashRegisterOrAccount {
@@ -269,18 +318,83 @@ export class FinanceAdapter implements FinanceApi {
       .filter((account) => account.id > 0);
   }
 
+  async listChainClientAccounts(
+    chainId: number,
+    page: { page: number; page_size: number }
+  ): Promise<ChainClientAccountPage> {
+    const { data, meta } = await this.read(
+      `/chains/${chainId}/client_accounts`,
+      `list the client accounts of chain ${chainId}`,
+      {
+        query: { page: page.page, limit: page.page_size },
+        hints: {
+          forbidden:
+            'Reading every client account of a chain needs the chain-level client account report right; ask the chain owner, or read one client with client_accounts_list_for_client.',
+          notFound: 'Check the chain id with memberships_list_chains.',
+        },
+      }
+    );
+    return {
+      items: rows(data)
+        .map(chainClientAccountFromWire)
+        .filter((account) => account.id > 0),
+      total: num(meta.count),
+    };
+  }
+
+  async findChainClientAccountsByPhone(
+    chainId: number,
+    phone: string
+  ): Promise<ClientAccount[]> {
+    const { data } = await this.read(
+      `/chains/${chainId}/client_accounts/phone/${phoneDigits(phone)}`,
+      `find the client accounts of a phone number in chain ${chainId}`,
+      {
+        hints: {
+          forbidden:
+            'Reading client accounts of a chain needs the chain-level client account right; ask the chain owner, or read one client with client_accounts_list_for_client.',
+          notFound: 'Check the chain id with memberships_list_chains.',
+        },
+      }
+    );
+    return rows(data)
+      .map(clientAccountFromWire)
+      .filter((account) => account.id > 0);
+  }
+
+  async listClientAccountMovements(
+    chainId: number,
+    clientAccountId: number
+  ): Promise<ClientAccountMovement[]> {
+    const { data } = await this.read(
+      `/chains/${chainId}/client_accounts/${clientAccountId}/history`,
+      `read the history of client account ${clientAccountId} in chain ${chainId}`,
+      {
+        hints: {
+          forbidden:
+            'The history needs the chain-level client account operations right, and the client account must belong to this chain (client_accounts_list_for_client reports its chain_id).',
+          notFound:
+            'Check the client account id with client_accounts_list_for_client and the chain id it reports.',
+        },
+      }
+    );
+    return rows(data)
+      .map(movementFromWire)
+      .filter((movement) => movement.id > 0);
+  }
+
   async deposit(
     locationId: number,
     request: ClientAccountDepositRequest
   ): Promise<ClientAccountDepositResult> {
     const { data } = await this.read(
-      `/deposits_operations/${locationId}`,
+      `/locations/${locationId}/client_account_operations`,
       `deposit money to client account ${request.client_account_id}`,
       {
         method: 'POST',
         body: {
           client_id: request.client_id,
-          deposit_id: request.client_account_id,
+          client_account_id: request.client_account_id,
           amount: majorOf(request.amount),
           account_id: request.account_id,
           ...(request.team_member_id !== undefined

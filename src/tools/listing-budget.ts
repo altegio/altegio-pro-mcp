@@ -49,7 +49,9 @@ export const LISTING_BUDGETS: Readonly<Record<HttpViewKey, number>> = {
   // `/mcp` before those. 126,111 and 101 on 2026-10-22, with the Salon AI
   // writes (positions, service categories) and no headroom left.
   full: 132_500,
-  readonly: 123_000, // 116,761 bytes, 84 tools on 2026-10-20
+  // 116,761 bytes, 84 tools on 2026-10-20; 124,141 and 92 on 2026-11-06 with
+  // the gift card reads and the chain-wide client account reads (RND-4905).
+  readonly: 130_500,
   // The same listing as `/mcp`: 50,528 bytes, 37 tools on 2026-10-21, with ten
   // more tools and `tools_call_destructive`; 36,194 and 26 before. Reaches 155.
   compact: 53_500,
@@ -61,7 +63,9 @@ export const LISTING_BUDGETS: Readonly<Record<HttpViewKey, number>> = {
   // and categories) on 2026-10-21; 114,188 and 67 with editing and
   // paying inventory documents the same day.
   finance: 118_000,
-  marketing: 24_000, // 22,856 bytes, 17 tools
+  // 22,856 bytes, 17 tools; 32,810 and 24 on 2026-11-06 with the gift card
+  // pack (RND-4905), which is served here and demoted from the full list.
+  marketing: 34_500,
   analytics: 66_000, // 62,445 bytes, 33 tools
   onboarding: 13_500, // 12,387 bytes, 15 tools
 };

@@ -514,7 +514,7 @@ export const analyticsGetTeamMemberOccupancyTool = defineTool({
   name: 'analytics_get_team_member_occupancy',
   category: 'Analytics',
   description:
-    'Day-by-day occupancy for up to ten named team members: the share of each one’s scheduled working time that is booked. Answers "who has free capacity this week", "is anyone overloaded", "how full is a given stylist". A team member with no work schedule shows no occupancy at all, because occupancy is measured against scheduled time. For the whole location at once use analytics_get_daily_series with metric=occupancy; for scheduled, booked and idle hours and the period occupancy of every team member use analytics_get_team_member_capacity. Needs access to the work schedule of the location.',
+    'Day-by-day occupancy for up to ten named team members: booked time divided by scheduled working time, expressed as a percentage. Values can exceed 100% when appointments extend beyond the schedule. Answers "who has free capacity this week", "is anyone overloaded", "how full is a given stylist". A team member with no work schedule shows no occupancy at all, because occupancy is measured against scheduled time. For the whole location at once use analytics_get_daily_series with metric=occupancy; for scheduled, booked and idle hours and the period occupancy of every team member use analytics_get_team_member_capacity. Needs access to the work schedule of the location.',
   annotations: { title: 'Analytics: team member occupancy', ...READ_ONLY },
   input: z.object({
     location_id: locationId,

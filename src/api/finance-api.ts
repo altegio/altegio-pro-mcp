@@ -41,6 +41,34 @@ export interface ClientAccount {
   created_at: string | null;
 }
 
+/** A client account read at the chain level, with the client it belongs to. */
+export interface ChainClientAccount extends ClientAccount {
+  /** The account's client; `phone` is masked when the user may not see it. */
+  client: { id: number; name: string | null; phone: string | null } | null;
+}
+
+/** One page of a chain's client accounts. */
+export interface ChainClientAccountPage {
+  items: ChainClientAccount[];
+  /** Accounts across all pages, as the API counts them. */
+  total: number | null;
+}
+
+/** One movement of a client account's balance: a top-up, a payment, a correction. */
+export interface ClientAccountMovement {
+  id: number;
+  /** Positive for money added, negative for money spent or taken off. */
+  amount: number | null;
+  balance_after: number | null;
+  reserved_balance_after: number | null;
+  /** The movement type as Altegio names it, e.g. "Top-up". */
+  kind: string | null;
+  comment: string | null;
+  location_id: number | null;
+  created_at: string | null;
+  deleted: boolean;
+}
+
 export interface ClientAccountDepositRequest {
   client_id: number;
   client_account_id: number;
@@ -208,6 +236,18 @@ export interface FinanceApi {
     locationId: number,
     clientId: number
   ): Promise<ClientAccount[]>;
+  listChainClientAccounts(
+    chainId: number,
+    page: { page: number; page_size: number }
+  ): Promise<ChainClientAccountPage>;
+  findChainClientAccountsByPhone(
+    chainId: number,
+    phone: string
+  ): Promise<ClientAccount[]>;
+  listClientAccountMovements(
+    chainId: number,
+    clientAccountId: number
+  ): Promise<ClientAccountMovement[]>;
   deposit(
     locationId: number,
     request: ClientAccountDepositRequest,

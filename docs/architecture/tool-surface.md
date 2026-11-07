@@ -16,13 +16,13 @@ the code disagree, which is how a surface change reaches a reviewer’s diff
 
 ## Counts
 
-**171 tools served (177 defined, 6 withheld from every view).**
+**181 tools served (187 defined, 6 withheld from every view).**
 
 | What | Count | Where |
 | --- | --- | --- |
-| Defined | 177 | 165 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
+| Defined | 187 | 175 in `src/tools/definitions/*.tools.ts` + 12 in `src/tools/onboarding-registry.ts` |
 | Withheld from every view | 6 | `src/tools/disabled-tools.ts` (the report builder) |
-| **Served** | **171** | what some view serves; `stdio` lists all of it but the dispatcher, which only the compact listing lists |
+| **Served** | **181** | what some view serves; `stdio` lists all of it but the dispatcher, which only the compact listing lists |
 
 Served tools per category, in `tools/list` order:
 
@@ -35,7 +35,8 @@ Served tools per category, in `tools/list` order:
 | Clients | 12 |
 | Events | 15 |
 | Feedback | 1 |
-| Finance | 8 |
+| Finance | 11 |
+| Gift cards | 7 |
 | Inventory | 16 |
 | Location | 3 |
 | Memberships | 13 |
@@ -54,19 +55,19 @@ Served tools per category, in `tools/list` order:
 
 ## Views
 
-| View | Address | Lists (of 177 defined) | Reaches | `tools/list` bytes | Budget (used) | Reasons |
+| View | Address | Lists (of 187 defined) | Reaches | `tools/list` bytes | Budget (used) | Reasons |
 | --- | --- | --- | --- | --- | --- | --- |
-| `all` | stdio (no HTTP route) | 167 | 167 | 220,617 | — | all ×167, -off ×6, -cmp ×4 |
-| `default` | `/mcp` | 37 | 168 | 50,922 | 53,500 (95 %) | disp ×131, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
-| `full` | `/mcp/full` | 101 | 101 | 126,184 | 132,500 (95 %) | dflt ×97, -low ×34, -pack ×29, -off ×6, -cmp ×4, base ×3, -pwd ×2, -name ×1, xtra ×1 |
-| `readonly` | `/mcp/readonly` | 85 | 85 | 117,820 | 123,000 (96 %) | ro ×85, -write ×80, -off ×6, -cmp ×4, -pwd ×2 |
-| `compact` | `/mcp/compact` | 37 | 168 | 50,922 | 53,500 (95 %) | disp ×131, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
-| `ops` | `/mcp/ops` | 53 | 53 | 71,259 | 74,500 (96 %) | - ×112, pfx ×27, rule ×23, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
-| `catalog` | `/mcp/catalog` | 38 | 38 | 28,728 | 30,000 (96 %) | - ×127, rule ×35, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
-| `finance` | `/mcp/finance` | 67 | 67 | 114,257 | 118,000 (97 %) | - ×98, pfx ×60, -off ×6, -cmp ×4, rule ×4, base ×3, -pwd ×2 |
-| `marketing` | `/mcp/marketing` | 17 | 17 | 22,863 | 24,000 (95 %) | - ×148, pfx ×13, -off ×6, -cmp ×4, base ×3, -pwd ×2, rule ×1 |
-| `analytics` | `/mcp/analytics` | 33 | 33 | 62,452 | 66,000 (95 %) | - ×132, pfx ×30, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
-| `onboarding` | `/mcp/onboarding` | 15 | 15 | 12,394 | 13,500 (92 %) | - ×150, pfx ×12, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
+| `all` | stdio (no HTTP route) | 177 | 177 | 233,536 | — | all ×177, -off ×6, -cmp ×4 |
+| `default` | `/mcp` | 37 | 178 | 50,922 | 53,500 (95 %) | disp ×141, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
+| `full` | `/mcp/full` | 101 | 101 | 126,184 | 132,500 (95 %) | dflt ×97, -low ×44, -pack ×29, -off ×6, -cmp ×4, base ×3, -pwd ×2, -name ×1, xtra ×1 |
+| `readonly` | `/mcp/readonly` | 92 | 92 | 124,141 | 130,500 (95 %) | ro ×92, -write ×83, -off ×6, -cmp ×4, -pwd ×2 |
+| `compact` | `/mcp/compact` | 37 | 178 | 50,922 | 53,500 (95 %) | disp ×141, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
+| `ops` | `/mcp/ops` | 53 | 53 | 71,259 | 74,500 (96 %) | - ×122, pfx ×27, rule ×23, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
+| `catalog` | `/mcp/catalog` | 38 | 38 | 28,728 | 30,000 (96 %) | - ×137, rule ×35, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
+| `finance` | `/mcp/finance` | 70 | 70 | 117,712 | 118,000 (100 %) | - ×105, pfx ×63, -off ×6, -cmp ×4, rule ×4, base ×3, -pwd ×2 |
+| `marketing` | `/mcp/marketing` | 24 | 24 | 32,918 | 34,500 (95 %) | - ×151, pfx ×20, -off ×6, -cmp ×4, base ×3, -pwd ×2, rule ×1 |
+| `analytics` | `/mcp/analytics` | 33 | 33 | 62,618 | 66,000 (95 %) | - ×142, pfx ×30, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
+| `onboarding` | `/mcp/onboarding` | 15 | 15 | 12,394 | 13,500 (92 %) | - ×160, pfx ×12, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
 
 `tools/list` bytes is the serialized result the view sends in the default
 deployment — what a host that loads the whole list pays on every connection,
@@ -95,6 +96,8 @@ compact listing reaches them through its dispatcher. The full list’s
 | client files | `/mcp/ops` | `clients_list_files`, `clients_upload_file` |
 | membership freeze, balance and validity changes | `/mcp/marketing` | `memberships_freeze`, `memberships_set_balance`, `memberships_set_validity`, `memberships_unfreeze` |
 | archiving or deleting a membership type | `/mcp/marketing` | `memberships_archive_type`, `memberships_delete_type` |
+| gift cards | `/mcp/marketing` | `gift_cards_create_type`, `gift_cards_delete_type`, `gift_cards_get_type`, `gift_cards_list_for_client`, `gift_cards_list_location_types`, `gift_cards_list_types`, `gift_cards_update_type` |
+| chain-wide client accounts | `/mcp/finance` | `client_accounts_find_by_phone`, `client_accounts_get_history`, `client_accounts_list` |
 | creating or deleting a booking form | `/mcp/catalog` | `booking_forms_create`, `booking_forms_delete` |
 | managing products and product categories, editing inventory documents and paying product receipts | `/mcp/finance` | `inventory_pay_document`, `inventory_update_document`, `product_categories_create`, `product_categories_delete`, `product_categories_update`, `products_archive`, `products_create`, `products_update` |
 
@@ -267,12 +270,27 @@ after it is accepted, in the order `src/tools/registry.ts` checks them.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `accounts_and_cash_registers_list` | `all` | `disp` | `dflt` | `ro` | `disp` | `rule` | `-` | `pfx` | `-` | `-` | `-` | finance:read |
 | `client_accounts_deposit` | `all` | `disp` | `dflt` | `-write` | `disp` | `rule` | `-` | `pfx` | `-` | `-` | `-` | client_accounts:write, confirm |
+| `client_accounts_find_by_phone` | `all` | `disp` | `-low` | `ro` | `disp` | `-` | `-` | `pfx` | `-` | `-` | `-` | chain_client_accounts:read |
+| `client_accounts_get_history` | `all` | `disp` | `-low` | `ro` | `disp` | `-` | `-` | `pfx` | `-` | `-` | `-` | chain_client_accounts:read |
+| `client_accounts_list` | `all` | `disp` | `-low` | `ro` | `disp` | `-` | `-` | `pfx` | `-` | `-` | `-` | chain_client_accounts:read |
 | `client_accounts_list_for_client` | `all` | `disp` | `dflt` | `ro` | `disp` | `rule` | `-` | `pfx` | `-` | `-` | `-` | client_accounts:read |
 | `financial_transactions_create` | `all` | `disp` | `dflt` | `-write` | `disp` | `-` | `-` | `pfx` | `-` | `-` | `-` | finance:write, confirm |
 | `financial_transactions_delete` | `all` | `disp` | `dflt` | `-write` | `disp` | `-` | `-` | `pfx` | `-` | `-` | `-` | finance:write, confirm |
 | `financial_transactions_list` | `all` | `list` | `dflt` | `ro` | `list` | `-` | `-` | `pfx` | `-` | `-` | `-` | finance:read |
 | `financial_transactions_list_payment_items` | `all` | `disp` | `dflt` | `ro` | `disp` | `-` | `-` | `pfx` | `-` | `-` | `-` | finance:read |
 | `financial_transactions_update` | `all` | `disp` | `dflt` | `-write` | `disp` | `-` | `-` | `pfx` | `-` | `-` | `-` | finance:write, confirm |
+
+### Gift cards
+
+| Tool | stdio | /mcp | /full | /readonly | /compact | /ops | /catalog | /finance | /marketing | /analytics | /onboarding | Gates |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `gift_cards_create_type` | `all` | `disp` | `-low` | `-write` | `disp` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:configure |
+| `gift_cards_delete_type` | `all` | `disp` | `-low` | `-write` | `disp` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:configure, confirm |
+| `gift_cards_get_type` | `all` | `disp` | `-low` | `ro` | `disp` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:read |
+| `gift_cards_list_for_client` | `all` | `disp` | `-low` | `ro` | `disp` | `-` | `-` | `-` | `pfx` | `-` | `-` | clients:read + loyalty:read |
+| `gift_cards_list_location_types` | `all` | `disp` | `-low` | `ro` | `disp` | `-` | `-` | `-` | `pfx` | `-` | `-` | loyalty:read |
+| `gift_cards_list_types` | `all` | `disp` | `-low` | `ro` | `disp` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:read |
+| `gift_cards_update_type` | `all` | `disp` | `-low` | `-write` | `disp` | `-` | `-` | `-` | `pfx` | `-` | `-` | chain_loyalty:configure |
 
 ### Inventory
 

@@ -325,14 +325,14 @@ const FACET_RULES: Record<FacetName, FacetRule> = {
   },
 
   /**
-   * Reaching clients and keeping them: loyalty. The `memberships_*` pack joins
-   * by prefix (membership types, sold memberships, the chains they belong to)
-   * next to the membership purchase evidence; notifications, gift cards and
-   * loyalty programs remain future work.
+   * Reaching clients and keeping them: loyalty. The `memberships_*` and
+   * `gift_cards_*` packs join by prefix (types, sold memberships and gift
+   * cards, the chains they belong to) next to the membership purchase
+   * evidence; notifications and loyalty programs remain future work.
    */
   marketing: {
     tools: ['clients_get_membership_purchases'],
-    prefixes: ['memberships_'],
+    prefixes: ['memberships_', 'gift_cards_'],
   },
 
   /**
@@ -464,6 +464,26 @@ export const DEFAULT_FACET_DEMOTED_GROUPS: readonly DemotedGroup[] = [
     summary: 'archiving or deleting a membership type',
     facet: 'marketing',
     tools: ['memberships_archive_type', 'memberships_delete_type'],
+    prefixes: [],
+  },
+  {
+    // New on 2026-11-06 with the gift card rename (RND-4905); not measured
+    // yet, so the pack starts on its facet rather than growing the flat list.
+    summary: 'gift cards',
+    facet: 'marketing',
+    tools: [],
+    prefixes: ['gift_cards_'],
+  },
+  {
+    // New on 2026-11-06 with the client account rename (RND-4905): the
+    // chain-level reads. A client's accounts and the deposit stay listed.
+    summary: 'chain-wide client accounts',
+    facet: 'finance',
+    tools: [
+      'client_accounts_list',
+      'client_accounts_find_by_phone',
+      'client_accounts_get_history',
+    ],
     prefixes: [],
   },
   {

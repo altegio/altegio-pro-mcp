@@ -10,7 +10,7 @@
  *
  * It is a leaf module on purpose — no imports — so the error classes and the
  * HTTP client can depend on it without an import cycle. Nothing here is ever
- * logged as-is: the registry reduces it to a class name and a status code.
+ * logged as-is: the registry emits only fixed diagnostics and counts.
  *
  * One field travels the other way: `correlation`, the registry's own
  * value-free fields for the call (request, route, session, client), so a tool
@@ -19,8 +19,16 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-/** Why an upstream request produced no HTTP response at all. */
-export type UpstreamFailure = 'timeout' | 'network';
+/** Why an upstream request failed during admission, transport or body reading. */
+export type UpstreamFailure = 'timeout' | 'network' | 'cancelled';
+
+export type UpstreamPhase = 'admission' | 'headers' | 'body' | 'retry_wait';
+
+export interface UpstreamFailureDetail {
+  phase: UpstreamPhase;
+  method: string;
+  route: string;
+}
 
 /**
  * Which argument failed validation and how, for the `tool_call` log: a schema
@@ -40,8 +48,12 @@ export interface ToolCallObservation {
   upstreamResponses: number;
   /** The most recent upstream status of 400 or above, if any. */
   upstreamErrorStatus?: number;
-  /** The most recent upstream request that failed without a response. */
+  /** The most recent upstream failure, including a failed response body. */
   upstreamFailure?: UpstreamFailure;
+  upstreamFailureDetail?: UpstreamFailureDetail;
+  upstreamRequests?: number;
+  /** Fixed parser reason codes only; never report labels, cells or source text. */
+  cashFlowParseReason?: string;
   /** The most recent typed error constructed during the call. */
   lastError?: Error;
   /** The issues of the most recent argument validation that failed. */
@@ -101,11 +113,11 @@ export function runObservingToolCall<T>(
 }
 
 /** Note one upstream HTTP response. A no-op outside a tool call. */
-export function noteUpstreamResponse(status: number): void {
+export function noteUpstreamResponse(status: number, terminal = true): void {
   const observation = storage.getStore();
   if (!observation) return;
   observation.upstreamResponses += 1;
-  if (status >= 400) observation.upstreamErrorStatus = status;
+  if (terminal && status >= 400) observation.upstreamErrorStatus = status;
 }
 
 /** Note that a first page was served below the page size asked for. */
@@ -122,11 +134,73 @@ export function noteUpstreamRetry(): void {
   }
 }
 
-/** Note an upstream request that failed before any response arrived. */
-export function noteUpstreamFailure(error: unknown): void {
+/** Count one HTTP attempt immediately before invoking fetch. */
+export function noteUpstreamRequest(): void {
   const observation = storage.getStore();
-  if (!observation) return;
-  observation.upstreamFailure = isTimeout(error) ? 'timeout' : 'network';
+  if (observation)
+    observation.upstreamRequests = (observation.upstreamRequests ?? 0) + 1;
+}
+
+/** Capture the owning call: body callbacks can run in another async context. */
+export function upstreamFailureRecorder(endpoint: string, method = 'GET') {
+  const observation = storage.getStore();
+  const verb = method.toUpperCase();
+  const safeMethod = /^(GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS)$/.test(verb)
+    ? verb
+    : 'other';
+  const path = endpoint.split('?')[0];
+  // Emit literal templates only. Unrecognized paths never enter diagnostics.
+  const route = /^\/locations\/\d+\/appointments\/\d+\/?$/.test(path ?? '')
+    ? '/locations/{location_id}/appointments/{appointment_id}'
+    : /^\/locations\/\d+\/appointments\/?$/.test(path ?? '')
+      ? '/locations/{location_id}/appointments'
+      : /^\/record\/\d+\/\d+\/?$/.test(path ?? '')
+        ? '/record/{location_id}/{appointment_id}'
+        : /^\/finances_reports\/account_period_search\/\d+\/$/.test(path ?? '')
+          ? '/finances_reports/account_period_search/{location_id}/'
+          : 'other';
+  return (error: unknown, phase: UpstreamPhase, cancelled = false): void => {
+    if (!observation) return;
+    observation.upstreamFailure =
+      cancelled ||
+      ((error instanceof Error || error instanceof DOMException) &&
+        error.name === 'AbortError')
+        ? 'cancelled'
+        : isTimeout(error)
+          ? 'timeout'
+          : 'network';
+    observation.upstreamFailureDetail = { phase, method: safeMethod, route };
+  };
+}
+
+const CASH_FLOW_PARSE_REASONS: Readonly<Record<string, string>> = {
+  'authentication was required': 'authentication_required',
+  'expected a JSON search envelope': 'invalid_json_envelope',
+  'empty search envelope': 'empty_envelope',
+  'the report rejected its filters': 'filters_rejected',
+  'missing HTML content': 'missing_html',
+  'invalid result count': 'invalid_count',
+  'headers missing': 'headers_missing',
+  'inconsistent account columns': 'account_column_count',
+  'account-type columns changed': 'account_type_columns',
+  'account ordering changed': 'account_order',
+  'unexpected or partial continuation row': 'continuation_row',
+  'unexpected aggregate': 'unexpected_aggregate',
+  'partial data row': 'partial_data_row',
+  'partial single-type row': 'partial_single_type_row',
+  'total missing': 'total_missing',
+  'aggregates missing': 'aggregates_missing',
+};
+
+export function noteCashFlowParseFailure(detail: string): void {
+  const observation = storage.getStore();
+  if (observation)
+    observation.cashFlowParseReason = Object.hasOwn(
+      CASH_FLOW_PARSE_REASONS,
+      detail
+    )
+      ? CASH_FLOW_PARSE_REASONS[detail]
+      : 'other';
 }
 
 /**
@@ -191,7 +265,7 @@ export function noteError(error: Error): void {
 
 /** A fetch or abort timeout, by error name or undici's cause code. */
 export function isTimeout(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
+  if (!(error instanceof Error || error instanceof DOMException)) return false;
   if (error.name === 'TimeoutError' || error.name === 'AbortError') return true;
   const cause = (error as { cause?: { code?: unknown } }).cause;
   return typeof cause?.code === 'string' && cause.code.includes('TIMEOUT');

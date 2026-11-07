@@ -180,6 +180,17 @@ export const TASKS: readonly EvalTask[] = [
     expect: ['memberships_list_chains'],
   },
   {
+    id: 'gift-card-types',
+    prompt: 'Which gift cards can we sell at location {location}?',
+    expect: ['gift_cards_list_location_types', 'gift_cards_list_types'],
+  },
+  {
+    id: 'client-account-balances',
+    prompt:
+      'Which clients of the chain location {location} belongs to have money on their client accounts?',
+    expect: ['client_accounts_list'],
+  },
+  {
     id: 'onboarding-status',
     prompt: 'Where did the setup wizard stop for location {location}?',
     expect: ['onboarding_status', 'onboarding_resume'],
