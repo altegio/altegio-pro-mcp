@@ -1,0 +1,69 @@
+# Gift cards — the operations behind the curated `gift_cards_*` tools.
+#
+# Format: catalog/overlay/_schema.yaml. V2 has no gift card operation, so the
+# pack runs on V1 (src/api/v1/gift-cards-adapter.ts), on the spec's
+# `gift_card*` URLs (legacy `certificate*`, RND-4905). Gift card types belong
+# to a chain; a location sells some of them; one client's gift cards are found
+# through a location client card. The pack is served on marketing and demoted
+# from the full list (src/tools/facets.ts).
+
+version: 1
+
+operations:
+  # --- gift card types -------------------------------------------------------
+  chain_loyalty_certificate_types_list:
+    domain: gift_cards
+    tier: pack
+    facets: [marketing]
+    tool_name: gift_cards_list_types
+  get_gift_card_type_list:
+    domain: gift_cards
+    tier: pack
+    facets: [marketing]
+    tool_name: gift_cards_list_location_types
+  get_gift_card_type_list_by_id:
+    domain: gift_cards
+    tier: executor-only
+    notes: >
+      Reads types by an `ids[]` query the spec does not document; no curated
+      tool. gift_cards_get_type reads one type by id at the chain level.
+  chain_loyalty_certificate_types_get:
+    domain: gift_cards
+    tier: pack
+    facets: [marketing]
+    tool_name: gift_cards_get_type
+    notes: >
+      Also read by gift_cards_update_type (PUT takes every field, so the tool
+      reads the type and sends every field back) and by the
+      gift_cards_delete_type confirmation.
+  chain_loyalty_certificate_types_create:
+    domain: gift_cards
+    tier: pack
+    facets: [marketing]
+    tool_name: gift_cards_create_type
+    write_allowed: false
+  chain_loyalty_certificate_types_update:
+    domain: gift_cards
+    tier: pack
+    facets: [marketing]
+    tool_name: gift_cards_update_type
+    write_allowed: false
+    notes: >
+      The API refuses to change a type with sold gift cards; the tool refuses
+      first when the type reports a sold count.
+  chain_loyalty_certificate_types_delete:
+    domain: gift_cards
+    tier: pack
+    facets: [marketing]
+    tool_name: gift_cards_delete_type
+    write_allowed: false
+
+  # --- sold gift cards -------------------------------------------------------
+  get_client_gift_cards:
+    domain: gift_cards
+    tier: pack
+    facets: [marketing]
+    tool_name: gift_cards_list_for_client
+    notes: >
+      Looked up by the phone on the client card (get_client); a card sold under
+      an earlier phone is missed.

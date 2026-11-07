@@ -42,6 +42,24 @@ const MEMBERSHIP_TOOLS = [
   'memberships_update_type',
 ];
 
+/** The gift card pack, served on marketing by prefix and demoted from the full list. */
+const GIFT_CARD_TOOLS = [
+  'gift_cards_create_type',
+  'gift_cards_delete_type',
+  'gift_cards_get_type',
+  'gift_cards_list_for_client',
+  'gift_cards_list_location_types',
+  'gift_cards_list_types',
+  'gift_cards_update_type',
+];
+
+/** Chain-wide client account reads: finance only, demoted from the full list. */
+const CHAIN_CLIENT_ACCOUNT_TOOLS = [
+  'client_accounts_find_by_phone',
+  'client_accounts_get_history',
+  'client_accounts_list',
+];
+
 /** Visit payments, client accounts and the accounts list: reception money. */
 const RECEPTION_MONEY_TOOLS = [
   'accounts_and_cash_registers_list',
@@ -239,6 +257,7 @@ describe('static views', () => {
         ...FACET_BASE_TOOLS,
         'clients_get_membership_purchases',
         ...MEMBERSHIP_TOOLS,
+        ...GIFT_CARD_TOOLS,
       ].sort()
     );
   });
@@ -420,8 +439,8 @@ describe('static views', () => {
     const index = buildFacetIndex(tools);
     const demoted = names.filter((name) => demotedGroupOf(name));
 
-    it('takes 34 tools off /mcp/full', () => {
-      expect(demoted).toHaveLength(34);
+    it('takes 44 tools off /mcp/full', () => {
+      expect(demoted).toHaveLength(44);
       for (const name of demoted) {
         expect(index.includes(FULL_VIEW, name)).toBe(false);
         expect(decideView(FULL_VIEW, toolOf(name)).reason).toBe(
@@ -524,9 +543,17 @@ describe('static views', () => {
           analyticsCount +
           1 +
           RECEPTION_MONEY_TOOLS.length +
+          CHAIN_CLIENT_ACCOUNT_TOOLS.length +
           BACK_OFFICE_MONEY_TOOLS.length +
           INVENTORY_TOOLS.length
       );
+      for (const name of [...CHAIN_CLIENT_ACCOUNT_TOOLS, ...GIFT_CARD_TOOLS]) {
+        expect(index.includes(FULL_VIEW, name)).toBe(false);
+        expect(demotedGroupOf(name)).toBeDefined();
+      }
+      for (const name of CHAIN_CLIENT_ACCOUNT_TOOLS) {
+        expect(index.includes('finance', name)).toBe(true);
+      }
       expect(
         index.includes('finance', 'clients_get_membership_purchases')
       ).toBe(true);

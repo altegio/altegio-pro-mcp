@@ -13,12 +13,15 @@ import {
   deleteFinancialTransaction,
   deposit,
   describeNewPayment,
+  findClientAccountsByPhone,
   describeNewTransaction,
   describeTransactionChange,
   describeTransactionDeletion,
   getPayroll,
   getVisit,
   listCashRegistersAndAccounts,
+  listChainClientAccounts,
+  listClientAccountHistory,
   listClientAccounts,
   listFinancialTransactions,
   listPaymentItems,
@@ -646,7 +649,7 @@ describe('client accounts', () => {
         clientAccountsRoute,
         [
           'POST',
-          /^\/deposits_operations\/4564$/,
+          /^\/locations\/4564\/client_account_operations$/,
           200,
           ok({
             deposits_transactions: [
@@ -668,7 +671,7 @@ describe('client accounts', () => {
     });
     expect(calls.at(-1)!.body).toEqual({
       client_id: 77,
-      deposit_id: 220,
+      client_account_id: 220,
       amount: 500,
       account_id: 35501,
     });
@@ -693,6 +696,165 @@ describe('client accounts', () => {
       })
     ).rejects.toThrow(/balance of 1000 CZK, not the 500 CZK/);
     expect(calls.some((c) => c.method === 'POST')).toBe(false);
+  });
+});
+
+// ========== client accounts of a chain ==========
+
+describe('chain-level client accounts', () => {
+  const chainRow = (id: number, balance: number) => ({
+    deposit: {
+      id,
+      salon_group_id: 9,
+      deposit_type_id: 3,
+      balance,
+      reserved_balance: 0,
+      blocked: false,
+    },
+    deposit_type: { id: 3, title: CANARY },
+    client: { id: 70 + id, name: CANARY, phone: '+420601000000' },
+  });
+
+  it('lists a chain’s accounts on the client_accounts URL, contacts withheld', async () => {
+    const calls: Call[] = [];
+    const client = fakeClient(
+      [
+        [
+          'GET',
+          /^\/chains\/9\/client_accounts$/,
+          200,
+          ok([chainRow(1, 100), chainRow(2, 250)], { count: 30 }),
+        ],
+      ],
+      calls
+    );
+    const result = await listChainClientAccounts(client, {
+      chain_id: 9,
+      page: 2,
+      page_size: 2,
+    });
+    expect(calls[0]!.query.get('page')).toBe('2');
+    expect(calls[0]!.query.get('limit')).toBe('2');
+    expect(calls[0]!.query.has('balance_from')).toBe(false);
+    expect(result.structuredContent).toMatchObject({
+      chain_id: 9,
+      currency: null,
+      items: [
+        { id: 1, balance: 100, client: { id: 71 } },
+        { id: 2, balance: 250, client: { id: 72 } },
+      ],
+      pagination: { total: 30, has_more: true, next_page: 3 },
+    });
+    expect(JSON.stringify(result.structuredContent)).not.toContain('+420');
+    expect(result.text).not.toContain('+420');
+    expect(summaryOf(result.text)).not.toContain('ignore');
+    expect(result.text).toContain('Contacts withheld by default');
+  });
+
+  it('returns the phone only when contacts were asked for', async () => {
+    const client = fakeClient(
+      [
+        [
+          'GET',
+          /^\/chains\/9\/client_accounts$/,
+          200,
+          ok([chainRow(1, 100)], { count: 1 }),
+        ],
+      ],
+      []
+    );
+    const result = await listChainClientAccounts(client, {
+      chain_id: 9,
+      include_contacts: true,
+      page: 1,
+      page_size: 25,
+    });
+    expect(result.structuredContent).toMatchObject({
+      items: [{ client: { id: 71, phone: '+420601000000' } }],
+    });
+    expect(summaryOf(result.text)).not.toContain('+420');
+  });
+
+  it('finds accounts by phone digits on the phone URL', async () => {
+    const calls: Call[] = [];
+    const client = fakeClient(
+      [
+        [
+          'GET',
+          /^\/chains\/9\/client_accounts\/phone\/420601000000$/,
+          200,
+          ok([chainRow(1, 100)]),
+        ],
+      ],
+      calls
+    );
+    const result = await findClientAccountsByPhone(client, {
+      chain_id: 9,
+      phone: '+420 601 000 000',
+      page: 1,
+      page_size: 25,
+    });
+    expect(calls).toHaveLength(1);
+    expect(result.structuredContent).toMatchObject({
+      items: [{ id: 1, chain_id: 9, type_id: 3, balance: 100 }],
+      pagination: { total: 1 },
+    });
+    await expect(
+      findClientAccountsByPhone(client, {
+        chain_id: 9,
+        phone: '12',
+        page: 1,
+        page_size: 25,
+      })
+    ).rejects.toThrow(FinanceInputError);
+  });
+
+  it('reads the history newest first, in the currency of its location', async () => {
+    const calls: Call[] = [];
+    const movement = (id: number, date: string, amount: number) => ({
+      deposit_transaction: {
+        id,
+        salon_id: LOCATION,
+        salon_group_id: 9,
+        amount,
+        balance_after: 1000 + amount,
+        reserved_balance_after: 0,
+        date_create: date,
+        comment: CANARY,
+        deleted: false,
+      },
+      deposit_transaction_type: { id: 1, comment: 'Top-up' },
+    });
+    const client = fakeClient(
+      [
+        [
+          'GET',
+          /^\/chains\/9\/client_accounts\/220\/history$/,
+          200,
+          ok([
+            movement(1, '2026-10-01T10:00:00.000000Z', 500),
+            movement(2, '2026-11-01T10:00:00.000000Z', -200),
+          ]),
+        ],
+      ],
+      calls
+    );
+    const result = await listClientAccountHistory(client, {
+      chain_id: 9,
+      client_account_id: 220,
+      page: 1,
+      page_size: 25,
+    });
+    expect(result.structuredContent).toMatchObject({
+      currency: 'CZK',
+      items: [
+        { id: 2, amount: -200, kind: 'Top-up', location_id: LOCATION },
+        { id: 1, amount: 500 },
+      ],
+      pagination: { total: 2, has_more: false },
+    });
+    expect(summaryOf(result.text)).toContain('-200 CZK');
+    expect(summaryOf(result.text)).not.toContain('ignore');
   });
 });
 

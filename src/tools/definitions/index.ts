@@ -12,6 +12,7 @@ export * from './schedule.tools.js';
 export * from './bookings.tools.js';
 export * from './events.tools.js';
 export * from './memberships.tools.js';
+export * from './gift-cards.tools.js';
 export * from './visits.tools.js';
 export * from './finance.tools.js';
 export * from './payroll.tools.js';
