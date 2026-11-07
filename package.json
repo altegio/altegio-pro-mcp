@@ -109,7 +109,7 @@
     "prettier": "^3.9.5",
     "ts-jest": "^29.4.11",
     "tsx": "^4.23.1",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
