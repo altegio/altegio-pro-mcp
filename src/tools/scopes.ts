@@ -358,6 +358,18 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   memberships_unfreeze: 'chain_loyalty:transact',
   memberships_set_balance: 'chain_loyalty:transact',
   memberships_set_validity: 'chain_loyalty:transact',
+
+  // --- Gift cards ------------------------------------------------------------
+  // The same split as memberships: a chain's types are `chain_loyalty:read`
+  // to read and `chain_loyalty:configure` to change; the types a location
+  // sells and a client's gift cards are location loyalty reads.
+  gift_cards_list_types: 'chain_loyalty:read',
+  gift_cards_get_type: 'chain_loyalty:read',
+  gift_cards_list_location_types: 'loyalty:read',
+  gift_cards_list_for_client: ['clients:read', 'loyalty:read'],
+  gift_cards_create_type: 'chain_loyalty:configure',
+  gift_cards_update_type: 'chain_loyalty:configure',
+  gift_cards_delete_type: 'chain_loyalty:configure',
   // --- Inventory --------------------------------------------------------------
   // The catalog splits `inventory:read` (products, stock, movements),
   // `inventory:operate` (receipt, write-off, transfer, stock audit) and
@@ -411,6 +423,10 @@ export const TOOL_SCOPES: Readonly<Record<string, ScopeRequirement>> = {
   visits_remove_product: ['inventory:sell', 'appointments:write'],
   client_accounts_list_for_client: 'client_accounts:read',
   client_accounts_deposit: 'client_accounts:write',
+  // Addressed by a chain, not a location: the catalog's chain grant.
+  client_accounts_list: 'chain_client_accounts:read',
+  client_accounts_find_by_phone: 'chain_client_accounts:read',
+  client_accounts_get_history: 'chain_client_accounts:read',
   accounts_and_cash_registers_list: 'finance:read',
   financial_transactions_list: 'finance:read',
   financial_transactions_list_payment_items: 'finance:read',

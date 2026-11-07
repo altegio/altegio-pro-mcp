@@ -67,6 +67,17 @@ const MEMBERSHIP_TOOLS = [
   'memberships_update_type',
 ];
 
+/** The gift card pack, also served on the marketing facet. */
+const GIFT_CARD_TOOLS = [
+  'gift_cards_create_type',
+  'gift_cards_delete_type',
+  'gift_cards_get_type',
+  'gift_cards_list_for_client',
+  'gift_cards_list_location_types',
+  'gift_cards_list_types',
+  'gift_cards_update_type',
+];
+
 /**
  * The whole MCP surface as a client sees it, over an in-memory transport: the
  * facet-filtered tool list, the refusal of a tool the facet does not serve,
@@ -207,7 +218,7 @@ describe('tools/list per facet', () => {
     await client.close();
   });
 
-  it('serves membership evidence on the marketing facet', async () => {
+  it('serves memberships and gift cards on the marketing facet', async () => {
     const client = await connect('marketing');
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name).sort()).toEqual(
@@ -215,6 +226,7 @@ describe('tools/list per facet', () => {
         ...FACET_BASE_TOOLS,
         'clients_get_membership_purchases',
         ...MEMBERSHIP_TOOLS,
+        ...GIFT_CARD_TOOLS,
       ].sort()
     );
     await client.close();

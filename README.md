@@ -7,10 +7,11 @@ A TypeScript [Model Context Protocol](https://modelcontextprotocol.io) server fo
 Altegio business owners, administrators, and team members. It provides
 administrative B2B operations, client workflows, onboarding, and analytics.
 
-**171 tools served (177 defined, 6 withheld from every view)**.
+**181 tools served (187 defined, 6 withheld from every view)**.
 See the generated [tool surface](docs/architecture/tool-surface.md) for current
 counts, view membership and gates. The server includes analytics, clients,
-group events, memberships, inventory, finance, payroll and onboarding workflows.
+group events, memberships, gift cards, client accounts, inventory, finance,
+payroll and onboarding workflows.
 The API explorer executes reads only; administrative writes use curated tools.
 Unavailable report-builder tools remain withheld from every view.
 
@@ -254,6 +255,15 @@ like a defect (an API 5xx answer, an untyped error) and an operation search
 that matches nothing end with one sentence pointing at the tool; validation,
 access and transient failures do not. Each user may file 5 reports per 10
 minutes.
+
+Failed `tool_call` events include bounded upstream diagnostics: failure kind
+(`timeout`, `cancelled`, or `network`), phase (`admission`, `headers`, `body`,
+or `retry_wait`), HTTP method, a fixed route template (or `other`), and request
+and response counts. A body failure can therefore have a successful HTTP response;
+an admission timeout can have zero requests sent. These fields never contain
+URLs, query strings, arguments, response contents, or error messages. Cash-flow
+structure failures add a fixed `cash_flow_parse_reason` code. These diagnostics
+do not change retry policy: ambiguous writes are never replayed automatically.
 
 ## Resources and prompts
 

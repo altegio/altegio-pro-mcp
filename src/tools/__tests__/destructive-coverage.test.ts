@@ -51,6 +51,7 @@ describe('destructive tools are gated', () => {
       'events_delete_duplication_strategy',
       'financial_transactions_delete',
       'financial_transactions_update',
+      'gift_cards_delete_type',
       'inventory_delete_document',
       'inventory_update_document',
       'locations_remove_user',

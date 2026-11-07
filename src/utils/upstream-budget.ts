@@ -4,6 +4,7 @@ import { currentRequestSignal } from './request-lifecycle.js';
 /** One budget covers admission, every read attempt, headers and the final body. */
 export class UpstreamBudget {
   readonly signal: AbortSignal;
+  private readonly cancellation: AbortSignal;
   private readonly timer: ReturnType<typeof setTimeout>;
   constructor(timeoutMs: number, signal?: AbortSignal | null) {
     const deadline = new AbortController();
@@ -15,10 +16,16 @@ export class UpstreamBudget {
       timeoutMs
     );
     this.timer.unref();
-    this.signal = AbortSignal.any([
-      deadline.signal,
-      ...[signal, currentRequestSignal()].filter((s): s is AbortSignal => !!s),
-    ]);
+    this.cancellation = AbortSignal.any(
+      [signal, currentRequestSignal()].filter((s): s is AbortSignal => !!s)
+    );
+    this.signal = AbortSignal.any([deadline.signal, this.cancellation]);
+  }
+  get cancelled(): boolean {
+    return (
+      this.cancellation.aborted &&
+      this.signal.reason === this.cancellation.reason
+    );
   }
   close(): void {
     clearTimeout(this.timer);
@@ -41,7 +48,7 @@ export class UpstreamBudget {
   }
 
   /** Retain the deadline until a consumer drains/cancels the body, including streaming readers. */
-  response(response: Response): Response {
+  response(response: Response, onFailure?: (error: unknown) => void): Response {
     if (response.body?.getReader) {
       const reader = response.body.getReader();
       const signal = this.signal;
@@ -57,6 +64,7 @@ export class UpstreamBudget {
         start(controller) {
           abort = () => {
             if (ended) return;
+            onFailure?.(signal.reason);
             controller.error(signal.reason);
             finish();
             void reader.cancel(signal.reason).catch(() => undefined);
@@ -74,6 +82,7 @@ export class UpstreamBudget {
             } else controller.enqueue(value);
           } catch (error) {
             if (!ended) {
+              onFailure?.(signal.aborted ? signal.reason : error);
               finish();
               controller.error(signal.aborted ? signal.reason : error);
             }
@@ -126,12 +135,20 @@ export async function fetchWithDeadline(
   url: string | URL,
   init: RequestInit,
   timeoutMs: number,
-  fetchImpl?: typeof fetch
+  fetchImpl?: typeof fetch,
+  onFailure?: (
+    error: unknown,
+    phase: 'headers' | 'body',
+    cancelled: boolean
+  ) => void
 ): Promise<Response> {
   const budget = new UpstreamBudget(timeoutMs, init.signal);
   try {
-    return budget.response(await budget.fetch(url, init, fetchImpl));
+    return budget.response(await budget.fetch(url, init, fetchImpl), (error) =>
+      onFailure?.(error, 'body', budget.cancelled)
+    );
   } catch (error) {
+    onFailure?.(error, 'headers', budget.cancelled);
     budget.close();
     throw error;
   }
