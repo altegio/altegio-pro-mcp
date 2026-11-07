@@ -290,6 +290,30 @@ with tarfile.open(sys.argv[1], 'w:gz') as archive:
     );
   });
 
+  it('accepts an empty or comment-only overlay file and rejects a multi-document one', () => {
+    const baseline = build();
+    expect(baseline.status).toBe(0);
+    const bytes = fs.readFileSync(baseline.out, 'utf8');
+    const dir = path.join(temp, 'overlay-empty');
+    fs.cpSync(OVERLAY, dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'zz-empty.yaml'), '');
+    fs.writeFileSync(path.join(dir, 'zz-comment.yaml'), '# placeholder\n');
+    const result = build(dir);
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+    expect(fs.readFileSync(result.out, 'utf8')).toBe(bytes);
+
+    fs.writeFileSync(
+      path.join(dir, 'zz-multi.yaml'),
+      'version: 1\n---\nversion: 1\n'
+    );
+    const multi = build(dir);
+    expect(multi.status).not.toBe(0);
+    expect(multi.stderr).toContain(
+      'zz-multi.yaml: expected one YAML document, found 2'
+    );
+  });
+
   it('is byte-deterministic, including when the input path order changes', () => {
     const first = build();
     expect(first.stderr).toBe('');
