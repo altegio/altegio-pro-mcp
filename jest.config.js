@@ -23,7 +23,23 @@ export default {
         },
       },
     ],
+    // @apidevtools/json-schema-ref-parser (via swagger-parser 13) ships ESM
+    // only. Jest runs tests as CommonJS here, so compile that package to CJS.
+    '/node_modules/@apidevtools/json-schema-ref-parser/.+\\.js$': [
+      'ts-jest',
+      {
+        tsconfig: {
+          allowJs: true,
+          module: 'CommonJS',
+          target: 'ES2023',
+          isolatedModules: true,
+        },
+      },
+    ],
   },
+  transformIgnorePatterns: [
+    '/node_modules/(?!@apidevtools/json-schema-ref-parser/)',
+  ],
   testEnvironment: 'node',
   testMatch: ['**/__tests__/**/*.test.ts'],
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
