@@ -75,6 +75,7 @@ import type {
   FinancialTransactionFields,
   FinancialTransactionQuery,
   IncomeExpenseCategory,
+  LastMinuteTransactions,
   PaymentItem,
   PayrollCalculation,
   PayrollReport,
@@ -84,6 +85,19 @@ import type {
 
 /** Saved payroll calculations listed next to the period's payroll. */
 const SAVED_CALCULATIONS_SHOWN = 20;
+
+/**
+ * The last-minute scan reads newest first through the day after `date_to`;
+ * this many pages of this size bound it (a day busier than that stops it).
+ */
+const LAST_MINUTE_PAGE_SIZE = 200;
+const LAST_MINUTE_PAGES = 5;
+
+function dayAfter(day: string): string {
+  const date = new Date(`${day}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
 
 // ========== client accounts, accounts and cash registers ==========
 
@@ -472,6 +486,53 @@ export class FinanceAdapter implements FinanceApi {
       this.zoneOf(locationId),
     ]);
     return rows(data).map((row) => transactionFromWire(row, zone));
+  }
+
+  /**
+   * `/transactions` ends a period at `end_date` 23:59 in the location's time
+   * (`date <= …23:59:00`, biz.erp `PageApiTransactionsController`), so a
+   * transaction in the last 59 seconds of `date_to` is never listed. Read
+   * them by running one day past `date_to`, newest first (the endpoint's only
+   * order), and stop at the first row at or before 23:59:00 of `date_to`.
+   */
+  async listLastMinuteTransactions(
+    locationId: number,
+    query: Omit<FinancialTransactionQuery, 'date_from' | 'page' | 'page_size'>
+  ): Promise<LastMinuteTransactions> {
+    const zone = await this.zoneOf(locationId);
+    // Without the zone the rows' wall time is the server's, not the cut's.
+    if (zone === null) return { items: [], complete: false };
+    const cut = `${query.date_to}T23:59:00`;
+    const end = `${dayAfter(query.date_to)}T00:00:00`;
+    const items: FinancialTransaction[] = [];
+    for (let page = 1; page <= LAST_MINUTE_PAGES; page += 1) {
+      const { data } = await this.read(
+        `/transactions/${locationId}`,
+        'list the financial transactions of this location',
+        {
+          query: {
+            start_date: query.date_to,
+            end_date: dayAfter(query.date_to),
+            account_id: query.account_id,
+            client_id: query.client_id,
+            team_member_id: query.team_member_id,
+            supplier_id: query.supplier_id,
+            page,
+            count: LAST_MINUTE_PAGE_SIZE,
+          },
+        }
+      );
+      const found = rows(data).map((row) => transactionFromWire(row, zone));
+      for (const transaction of found) {
+        const local = transaction.date?.slice(0, 19);
+        if (local === undefined) continue;
+        if (local <= cut) return { items, complete: true };
+        if (local < end) items.push(transaction);
+      }
+      if (found.length < LAST_MINUTE_PAGE_SIZE)
+        return { items, complete: true };
+    }
+    return { items, complete: false };
   }
 
   async getFinancialTransaction(

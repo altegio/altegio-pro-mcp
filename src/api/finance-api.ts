@@ -140,6 +140,16 @@ export interface FinancialTransactionQuery {
   page_size: number;
 }
 
+/**
+ * The transactions a period's listing never returns: the backend ends it at
+ * 23:59:00 of `date_to`, so 23:59:01–23:59:59 falls out.
+ */
+export interface LastMinuteTransactions {
+  items: FinancialTransaction[];
+  /** False when the scan stopped at its page bound or the zone is unknown. */
+  complete: boolean;
+}
+
 /** Every field a financial transaction is written with. */
 export interface FinancialTransactionFields {
   payment_item_id: number;
@@ -263,6 +273,11 @@ export interface FinanceApi {
     locationId: number,
     query: FinancialTransactionQuery
   ): Promise<FinancialTransaction[]>;
+  /** The transactions after 23:59:00 of `date_to`, which the listing omits. */
+  listLastMinuteTransactions(
+    locationId: number,
+    query: Omit<FinancialTransactionQuery, 'date_from' | 'page' | 'page_size'>
+  ): Promise<LastMinuteTransactions>;
   getFinancialTransaction(
     locationId: number,
     transactionId: number
