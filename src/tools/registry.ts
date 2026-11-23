@@ -34,6 +34,7 @@ import type { ToolResult } from './tool-result.js';
 import {
   ELICITATION_TIMEOUT_MS,
   ElicitationTimeout,
+  ElicitationUndeliverable,
   requireConfirmation,
   type ConfirmationAnswer,
   type ConfirmationRuntime,
@@ -153,20 +154,26 @@ function outOfFacetError(
 /**
  * Bind the confirmation gate to one MCP request.
  *
- * The SDK context binds legacy elicitation to the tool call that triggered
- * it. Modern calls use the same confirmation-token fallback as old hosts.
+ * The prompt is related to the tool call that triggered it
+ * (`relatedRequestId`), so Streamable HTTP sends it on that call's own
+ * response stream, which the host is reading. `context.mcpReq.elicitInput`
+ * does not relate it by itself: until 2026-11-23 the prompt went to the
+ * standalone GET stream, which many hosts behind the proxy never open, and
+ * the transport dropped it there silently. Modern calls use the same
+ * confirmation-token fallback as old hosts.
  *
  * The capability check is the point of this function: `elicitInput` throws
  * synchronously on a client that never declared elicitation, and a host that
  * silently ignores the request would otherwise leave the tool call hanging.
- * The timeout bounds the host that declared it and still ignores it: the gate
- * then falls back to the token path before the host's own tool timeout ends
- * the call.
+ * The timeout bounds the host that declared it and still ignores it, before
+ * the host's own tool timeout ends the call. `prompts` is per connection:
+ * whether this host has answered a prompt (`ConfirmationRuntime.hasAnswered`).
  */
 function confirmationRuntime(
   server: Server,
   context: ServerContext,
-  timeoutMs: number
+  timeoutMs: number,
+  prompts: { answered: boolean }
 ): ConfirmationRuntime {
   return {
     supportsElicitation: () =>
@@ -174,6 +181,8 @@ function confirmationRuntime(
       // Push elicitation is legal only on a negotiated legacy connection.
       !context.mcpReq.envelope &&
       Boolean(server.getClientCapabilities()?.elicitation?.form),
+
+    hasAnswered: () => prompts.answered,
 
     elicit: async (message): Promise<ConfirmationAnswer> => {
       try {
@@ -186,21 +195,45 @@ function confirmationRuntime(
             // reject an otherwise explicit accept or display two choices.
             requestedSchema: { type: 'object', properties: {} },
           },
-          { timeout: timeoutMs }
+          {
+            timeout: timeoutMs,
+            relatedRequestId: context.mcpReq.id,
+            signal: context.mcpReq.signal,
+          }
         );
+        prompts.answered = true;
         return result.action;
       } catch (error) {
+        // A cancelled tool call: the SDK reports the abort as a timeout.
+        if (context.mcpReq.signal.aborted) throw error;
+        if (error instanceof SdkError) {
+          if (error.code === SdkErrorCode.RequestTimeout) {
+            throw new ElicitationTimeout(timeoutMs);
+          }
+          if (UNDELIVERABLE.has(error.code)) {
+            throw new ElicitationUndeliverable(error.message);
+          }
+        }
+        // Declared the capability, has no handler for it.
         if (
-          error instanceof SdkError &&
-          error.code === SdkErrorCode.RequestTimeout
+          error instanceof McpError &&
+          error.code === ErrorCode.MethodNotFound
         ) {
-          throw new ElicitationTimeout(timeoutMs);
+          throw new ElicitationUndeliverable(error.message);
         }
         throw error;
       }
     },
   };
 }
+
+/** SDK failures that mean the prompt never reached the host. */
+const UNDELIVERABLE: ReadonlySet<SdkErrorCode> = new Set([
+  SdkErrorCode.NotConnected,
+  SdkErrorCode.ConnectionClosed,
+  SdkErrorCode.SendFailed,
+  SdkErrorCode.CapabilityNotSupported,
+]);
 
 /**
  * How a gate stop is classified in the `tool_call` log. A token issued to a
@@ -212,6 +245,8 @@ const GATE_STOP_ERROR_CLASS: Readonly<
   Record<Exclude<GateStop, 'confirmation_required'>, ToolErrorClass>
 > = {
   elicitation_timeout: 'confirmation_failed',
+  elicitation_undeliverable: 'confirmation_failed',
+  elicitation_unanswered: 'confirmation_failed',
   elicitation_failed: 'confirmation_failed',
   invalid_token: 'confirmation_failed',
   declined: 'confirmation_declined',
@@ -582,6 +617,10 @@ export function registerTools(
 
   // call handler
   const activity = options.activity ?? new RequestActivity();
+  // Whether this connection's host has answered a confirmation prompt. One
+  // `Server` serves one HTTP session (or the stdio process), so this is per
+  // connection; the gate reads it before falling back to the token.
+  const prompts = { answered: false };
   server.setRequestHandler('tools/call', async (request, extra) => {
     const { name: requested, arguments: args } = request.params;
     // What the tool_call log reports about this call, filled in as it runs.
@@ -687,7 +726,8 @@ export function registerTools(
           runtime: confirmationRuntime(
             server,
             extra,
-            options.elicitationTimeoutMs ?? ELICITATION_TIMEOUT_MS
+            options.elicitationTimeoutMs ?? ELICITATION_TIMEOUT_MS,
+            prompts
           ),
           ...(call.via ? { dispatcher: call.via } : {}),
         });

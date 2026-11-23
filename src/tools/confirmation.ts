@@ -33,22 +33,39 @@
  * (Claude Code and Claude Desktop cloud sessions, Cursor, Codex, claude.ai
  * connectors): the capability was declared, no prompt was shown, the request
  * timed out after the SDK's 60 s, and the call failed closed with nothing to
- * continue with. The gate now waits at most `ELICITATION_TIMEOUT_MS`, inside
- * the time a host gives one tool call, and when the prompt times out or
- * cannot be delivered it answers with the token path instead. That keeps the
- * reason the prompt exists:
+ * continue with. Two causes, two fixes:
  *
- * - Only an explicit answer from the host decides. A decline or a cancel is
- *   final. No answer at all proves only that nobody saw the prompt, so it
- *   is neither an approval nor a refusal.
- * - The fallback authorises nothing by itself. It performs nothing; the write
- *   happens only on a second, explicit call that carries a token bound to these
- *   exact arguments, after the caller asked the person. That is the guarantee
- *   every host without elicitation already gets, and the host's own approval
- *   of that second tool call still applies.
+ * - The prompt went to the wrong stream. The SDK sends a server request with
+ *   no `relatedRequestId` on the standalone GET stream, which many hosts
+ *   behind the proxy never open, and the transport drops it there without an
+ *   error. The registry now sends it on the tool call's own response stream,
+ *   which the host is reading.
+ * - Some hosts still show nothing. The gate waits at most
+ *   `ELICITATION_TIMEOUT_MS`, inside the time a host gives one tool call, and
+ *   then may answer with the token path instead.
+ *
+ * The fallback is narrow, so the prompt still reaches a person wherever the
+ * host shows prompts:
+ *
+ * - Only an explicit answer decides. A decline or a cancel is final, with no
+ *   token. A host error that is not a failure to deliver stays a refusal too:
+ *   a host may report a person's rejection that way.
+ * - It applies only when the prompt timed out or could not be delivered, and
+ *   only on a connection where the host has never answered a prompt
+ *   (`ConfirmationRuntime.hasAnswered`). A host that answered one shows them,
+ *   so a later timeout means the person did not answer, which is not a yes:
+ *   the call is refused as before.
+ * - It authorises nothing by itself. It performs nothing; the write happens
+ *   only on a second, explicit call that carries a token bound to these exact
+ *   arguments, after the caller asked the person. That is the guarantee every
+ *   host without elicitation already gets, and the host's own approval of that
+ *   second tool call still applies.
  * - The SDK cancels the timed-out request (`notifications/cancelled`), so the
- *   host can withdraw a prompt it did show, and a late answer is ignored: it
- *   can no longer approve a call that has already answered.
+ *   host can withdraw a prompt it did show, and a late answer is ignored.
+ *
+ * What remains: on a connection's first prompt, a person who sees it and does
+ * not answer within the timeout leaves the caller with a token. That is the
+ * token path's guarantee, not the prompt's.
  *
  * The token is an HMAC over the tool name and the parsed arguments, keyed by a
  * secret minted per process, so it cannot be guessed, cannot be replayed
@@ -183,9 +200,13 @@ export interface ConfirmedCall {
 export type GateStop =
   /** The host has no form elicitation: a token, as designed. */
   | 'confirmation_required'
-  /** The host declared elicitation but did not answer the prompt in time. */
+  /** A host that never answered a prompt did not answer this one in time. */
   | 'elicitation_timeout'
-  /** The host declared elicitation but could not deliver the prompt. */
+  /** A host that never answered a prompt could not be sent this one. */
+  | 'elicitation_undeliverable'
+  /** A host that answered prompts before left this one unanswered: refused. */
+  | 'elicitation_unanswered'
+  /** The host answered the prompt with an error: refused. */
   | 'elicitation_failed'
   | 'declined'
   | 'cancelled'
@@ -413,11 +434,17 @@ export interface ConfirmationRuntime {
   readonly supportsElicitation: () => boolean;
   /**
    * Ask the operator, waiting at most `ELICITATION_TIMEOUT_MS`. Rejects with
-   * `ElicitationTimeout` when the host did not answer in time; any other
-   * rejection means the host could not deliver the prompt. Either way nobody
-   * answered, and the gate falls back to the token path.
+   * `ElicitationTimeout` when the host did not answer in time, and with
+   * `ElicitationUndeliverable` when the prompt could not be sent at all. Any
+   * other rejection is a host error, which the gate treats as a refusal.
    */
   readonly elicit: (message: string) => Promise<ConfirmationAnswer>;
+  /**
+   * Has the host answered a prompt on this connection before (accept,
+   * decline or cancel)? Then it shows prompts, and the gate does not fall
+   * back to the token when one goes unanswered.
+   */
+  readonly hasAnswered: () => boolean;
 }
 
 /** What `ConfirmationRuntime.elicit` rejects with when the host never answered. */
@@ -428,6 +455,17 @@ export class ElicitationTimeout extends Error {
     super(`The host did not answer within ${timeoutMs} ms`);
     this.name = 'ElicitationTimeout';
     this.timeoutMs = timeoutMs;
+  }
+}
+
+/**
+ * What `ConfirmationRuntime.elicit` rejects with when the prompt could not be
+ * sent: no connection to send it on, or a host that has no handler for it.
+ */
+export class ElicitationUndeliverable extends Error {
+  constructor(reason: string) {
+    super(reason);
+    this.name = 'ElicitationUndeliverable';
   }
 }
 
@@ -546,32 +584,52 @@ export async function requireConfirmation(options: {
     try {
       answer = await runtime.elicit(`${headline}\n\n${consequence}`);
     } catch (error) {
-      // The host declared elicitation and gave no answer: the prompt timed
-      // out or never left. Nobody approved and nobody refused, so this falls
-      // back to the token path a host without elicitation gets, which
-      // performs nothing and needs a second call after asking the person (see
-      // the module comment). Failing closed here left those people with no
-      // way to make the change at all.
-      if (error instanceof ElicitationTimeout) {
-        const seconds = Math.max(1, Math.round(error.timeoutMs / 1000));
-        return {
-          stop: tokenAnswer(
-            `The host did not answer the confirmation prompt within ${seconds} seconds; it may not show prompts here. Ask the person in the conversation instead.`
-          ),
-          reason: 'elicitation_timeout',
-        };
-      }
       const reason =
         sanitizeUntrusted(
           error instanceof Error ? error.message : String(error),
           { maxChars: 200 }
         ) ?? 'no reason given';
-      return {
-        stop: tokenAnswer(
-          `The host could not show the confirmation prompt (${reason}). Ask the person in the conversation instead.`
-        ),
-        reason: 'elicitation_failed',
-      };
+      const timedOut = error instanceof ElicitationTimeout;
+      // A host error other than a failure to deliver: fail closed, since a
+      // host may report a person's rejection that way.
+      if (!timedOut && !(error instanceof ElicitationUndeliverable)) {
+        return {
+          stop: refusal(
+            `Nothing was changed: ${toolName} could not obtain confirmation from the host (${reason}). ${headline}`
+          ),
+          reason: 'elicitation_failed',
+        };
+      }
+      const seconds = timedOut
+        ? Math.max(1, Math.round(error.timeoutMs / 1000))
+        : 0;
+      // This host shows prompts, so nobody answering is not a yes.
+      if (runtime.hasAnswered()) {
+        return {
+          stop: refusal(
+            `Nothing was changed: the confirmation prompt for ${toolName} was not answered (${timedOut ? `no answer within ${seconds} seconds` : reason}). ${headline} Ask the user to confirm, then repeat the call.`
+          ),
+          reason: 'elicitation_unanswered',
+        };
+      }
+      // A host that never answered a prompt here declared elicitation and
+      // shows none: fall back to the token path a host without elicitation
+      // gets, which performs nothing and needs a second call after asking the
+      // person (see the module comment). Failing closed left those people
+      // with no way to make the change at all.
+      return timedOut
+        ? {
+            stop: tokenAnswer(
+              `The host did not answer the confirmation prompt within ${seconds} seconds; it may not show prompts here. Ask the person in the conversation instead.`
+            ),
+            reason: 'elicitation_timeout',
+          }
+        : {
+            stop: tokenAnswer(
+              `The host could not be sent the confirmation prompt (${reason}). Ask the person in the conversation instead.`
+            ),
+            reason: 'elicitation_undeliverable',
+          };
     }
 
     // Each accept is a new approval, so a new key: there is no token to

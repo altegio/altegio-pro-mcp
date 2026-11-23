@@ -69,6 +69,10 @@ async function connect(options: {
    * the request ends only when the server cancels it.
    */
   silent?: boolean;
+  /** Answer this many prompts as `answer` says, then fall silent. */
+  silentAfter?: number;
+  /** Declare elicitation without handling it, like a half-built host. */
+  noHandler?: boolean;
   elicitationTimeoutMs?: number;
 }): Promise<Harness> {
   const deleteStaff = jest.fn(async () => undefined);
@@ -101,7 +105,7 @@ async function connect(options: {
     }
   );
 
-  if (options.elicitation) {
+  if (options.elicitation && !options.noHandler) {
     client.setRequestHandler(ElicitRequestSchema, async (request, extra) => {
       const params = request.params;
       if (params.mode === 'url') throw new Error('Unexpected URL elicitation');
@@ -110,7 +114,11 @@ async function connect(options: {
         requestedSchema: params.requestedSchema,
       });
       if (options.broken) throw new Error('confirmation UI unavailable');
-      if (options.silent) {
+      if (
+        options.silent ||
+        (options.silentAfter !== undefined &&
+          elicitations.length > options.silentAfter)
+      ) {
         return new Promise<never>((_resolve, reject) => {
           extra.signal.addEventListener('abort', () =>
             reject(new Error('cancelled by the server'))
@@ -306,8 +314,31 @@ describe('destructive confirmation — host WITH elicitation', () => {
     }
   });
 
-  it('falls back to the token when the host fails to deliver the prompt', async () => {
+  it('does not delete, and issues no token, when the host answers with an error', async () => {
     const h = await connect({ elicitation: true, broken: true });
+    try {
+      let result: CallToolResult | undefined;
+      const lines = await toolCallLines(async () => {
+        result = await callDeleteStaff(h.client);
+      });
+      expect(h.deleteStaff).not.toHaveBeenCalled();
+      expect(result!.isError).toBe(true);
+      expect(firstText(result!)).toContain('could not obtain confirmation');
+      expect(firstText(result!)).not.toContain(CONFIRMATION_TOKEN_ARG);
+      expect(lines).toEqual([
+        expect.objectContaining({
+          outcome: 'error',
+          error_class: 'confirmation_failed',
+          confirmation: 'elicitation_failed',
+        }),
+      ]);
+    } finally {
+      await h.close();
+    }
+  });
+
+  it('falls back to the token when the host declares elicitation and has no handler', async () => {
+    const h = await connect({ elicitation: true, noHandler: true });
     try {
       let result: CallToolResult | undefined;
       const lines = await toolCallLines(async () => {
@@ -320,13 +351,13 @@ describe('destructive confirmation — host WITH elicitation', () => {
         changed: false,
       });
       expect(firstText(result!)).toContain(
-        'could not show the confirmation prompt'
+        'could not be sent the confirmation prompt'
       );
       expect(lines).toEqual([
         expect.objectContaining({
           outcome: 'error',
           error_class: 'confirmation_failed',
-          confirmation: 'elicitation_failed',
+          confirmation: 'elicitation_undeliverable',
         }),
       ]);
     } finally {
@@ -435,6 +466,40 @@ describe('destructive confirmation — host that declares elicitation and never 
           outcome: 'error',
           error_class: 'confirmation_failed',
           confirmation: 'invalid_token',
+        }),
+      ]);
+    } finally {
+      await h.close();
+    }
+  });
+
+  it('refuses, with no token, once the host has answered a prompt on this connection', async () => {
+    // It shows prompts: a person who leaves one unanswered is not a yes.
+    const h = await connect({
+      elicitation: true,
+      answer: 'decline',
+      silentAfter: 1,
+      elicitationTimeoutMs: 50,
+    });
+    try {
+      const declined = await callDeleteStaff(h.client);
+      expect(firstText(declined)).toContain('Confirmation declined');
+
+      let result: CallToolResult | undefined;
+      const lines = await toolCallLines(async () => {
+        result = await callDeleteStaff(h.client);
+      });
+      expect(h.elicitations).toHaveLength(2);
+      expect(h.deleteStaff).not.toHaveBeenCalled();
+      expect(result!.isError).toBe(true);
+      expect(firstText(result!)).toContain('was not answered');
+      expect(firstText(result!)).not.toContain(CONFIRMATION_TOKEN_ARG);
+      expect(result!.structuredContent).toBeUndefined();
+      expect(lines).toEqual([
+        expect.objectContaining({
+          outcome: 'error',
+          error_class: 'confirmation_failed',
+          confirmation: 'elicitation_unanswered',
         }),
       ]);
     } finally {

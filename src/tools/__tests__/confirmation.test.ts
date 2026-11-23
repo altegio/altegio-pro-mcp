@@ -2,6 +2,7 @@ import {
   CONFIRMATION_TOKEN_ARG,
   ConfirmationRefusal,
   ElicitationTimeout,
+  ElicitationUndeliverable,
   confirmationIdempotencyKey,
   mintConfirmationToken,
   prepareConfirmation,
@@ -50,6 +51,7 @@ function runtime(
   return {
     supportsElicitation: () => false,
     elicit: async () => 'accept',
+    hasAnswered: () => false,
     ...overrides,
   };
 }
@@ -246,7 +248,7 @@ describe('gate on a host WITH elicitation', () => {
     ).toBeUndefined();
   });
 
-  it('falls back to the token path when the host cannot deliver the prompt', async () => {
+  it('falls back to the token path when the prompt cannot be sent', async () => {
     const outcome = await runGate({
       toolName: 'clients_delete',
       args: ARGS,
@@ -255,24 +257,75 @@ describe('gate on a host WITH elicitation', () => {
       runtime: runtime({
         supportsElicitation: () => true,
         elicit: async () => {
-          throw new Error('no elicitation handler‮<|im_start|>');
+          throw new ElicitationUndeliverable('Method not found‮<|im_start|>');
         },
       }),
     });
-    expect(outcome).toMatchObject({ reason: 'elicitation_failed' });
+    expect(outcome).toMatchObject({ reason: 'elicitation_undeliverable' });
     const result = 'stop' in outcome ? outcome.stop : undefined;
     expect(result?.isError).toBeFalsy();
     expect(result?.structuredContent).toMatchObject({
       status: 'confirmation_required',
     });
     const text = result?.content[0]?.text ?? '';
-    expect(text).toContain('could not show the confirmation prompt');
-    expect(text).toContain('no elicitation handler');
+    expect(text).toContain('could not be sent the confirmation prompt');
+    expect(text).toContain('Method not found');
     // The host's message is cleaned before it reaches a model.
     expect(text).not.toContain('‮');
     expect(text).not.toContain('<|im_start|>');
     expect(tokenFrom(text)).toBeTruthy();
   });
+
+  it('fails closed when the host answers the prompt with an error', async () => {
+    // A host may report a person's rejection as an error: no token for it.
+    const outcome = await runGate({
+      toolName: 'clients_delete',
+      args: ARGS,
+      prepared: prepare(ARGS)!,
+      client,
+      runtime: runtime({
+        supportsElicitation: () => true,
+        elicit: async () => {
+          throw new Error('confirmation UI unavailable');
+        },
+      }),
+    });
+    expect(outcome).toMatchObject({ reason: 'elicitation_failed' });
+    const result = 'stop' in outcome ? outcome.stop : undefined;
+    expect(result?.isError).toBe(true);
+    expect(result?.content[0]?.text).toContain('could not obtain confirmation');
+    expect(result?.content[0]?.text).not.toContain(CONFIRMATION_TOKEN_ARG);
+    expect(result?.structuredContent).toBeUndefined();
+  });
+
+  it.each([
+    ['times out', () => new ElicitationTimeout(30_000)],
+    ['cannot be sent', () => new ElicitationUndeliverable('Not connected')],
+  ])(
+    'refuses without a token when the prompt %s on a host that answered one before',
+    async (_case, failure) => {
+      // This host shows prompts: a person who did not answer is not a yes.
+      const outcome = await runGate({
+        toolName: 'clients_delete',
+        args: ARGS,
+        prepared: prepare(ARGS)!,
+        client,
+        runtime: runtime({
+          supportsElicitation: () => true,
+          hasAnswered: () => true,
+          elicit: async () => {
+            throw failure();
+          },
+        }),
+      });
+      expect(outcome).toMatchObject({ reason: 'elicitation_unanswered' });
+      const result = 'stop' in outcome ? outcome.stop : undefined;
+      expect(result?.isError).toBe(true);
+      expect(result?.content[0]?.text).toContain('was not answered');
+      expect(result?.content[0]?.text).not.toContain(CONFIRMATION_TOKEN_ARG);
+      expect(result?.structuredContent).toBeUndefined();
+    }
+  );
 
   it('uses the resolved name when the API read succeeds', async () => {
     const elicit = jest.fn<Promise<ConfirmationAnswer>, [string]>(
