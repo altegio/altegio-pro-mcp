@@ -17,7 +17,9 @@
  *
  * - **Host supports elicitation** — the server sends the consequence text as an
  *   `elicitation/create` form and performs the operation only on an explicit
- *   accept. A decline, a cancel, or a broken elicitation stops the call.
+ *   accept. A decline or a cancel stops the call, and no token is issued: that
+ *   is the answer of the person (or of the host on their behalf), and a token
+ *   would let the caller route around it.
  * - **Host does not** — the first call performs nothing and returns the
  *   consequence text plus a `confirmation_token`; the caller must repeat the
  *   call with that token to proceed. Without this fallback the call would
@@ -25,6 +27,28 @@
  *   `structuredContent.status = "confirmation_required"`, not an error:
  *   nothing failed, the call is waiting for a person, and hosts that treat an
  *   error as "retry differently" looped on it.
+ *
+ * A host that declares elicitation and then never answers is the third case.
+ * On 2026-11-23, 30 days of logs showed 670 writes from 62 people stuck on it
+ * (Claude Code and Claude Desktop cloud sessions, Cursor, Codex, claude.ai
+ * connectors): the capability was declared, no prompt was shown, the request
+ * timed out after the SDK's 60 s, and the call failed closed with nothing to
+ * continue with. The gate now waits at most `ELICITATION_TIMEOUT_MS`, inside
+ * the time a host gives one tool call, and when the prompt times out or
+ * cannot be delivered it answers with the token path instead. That keeps the
+ * reason the prompt exists:
+ *
+ * - Only an explicit answer from the host decides. A decline or a cancel is
+ *   final. No answer at all proves only that nobody saw the prompt, so it
+ *   is neither an approval nor a refusal.
+ * - The fallback authorises nothing by itself. It performs nothing; the write
+ *   happens only on a second, explicit call that carries a token bound to these
+ *   exact arguments, after the caller asked the person. That is the guarantee
+ *   every host without elicitation already gets, and the host's own approval
+ *   of that second tool call still applies.
+ * - The SDK cancels the timed-out request (`notifications/cancelled`), so the
+ *   host can withdraw a prompt it did show, and a late answer is ignored: it
+ *   can no longer approve a call that has already answered.
  *
  * The token is an HMAC over the tool name and the parsed arguments, keyed by a
  * secret minted per process, so it cannot be guessed, cannot be replayed
@@ -71,6 +95,16 @@ export const CONFIRMATION_TOKEN_SCHEMA = {
 } as const;
 
 const TOKEN_TTL_MS = 10 * 60 * 1000;
+
+/**
+ * How long the gate waits for the host to answer a confirmation prompt before
+ * it falls back to the token path. Hosts give one tool call about 60 s, and
+ * the SDK's default request timeout is the same 60 s, so an unanswered prompt
+ * outlasted the call and its fallback reached nobody. Half of that leaves time
+ * for the target and detail reads before the prompt and the write after an
+ * accept.
+ */
+export const ELICITATION_TIMEOUT_MS = 30 * 1000;
 
 /** Per-process key. Restarting the server invalidates every outstanding token. */
 const TOKEN_SECRET = randomBytes(32);
@@ -142,9 +176,28 @@ export interface ConfirmedCall {
   readonly idempotency_key: string;
 }
 
+/**
+ * Why the gate stopped a call, for the `tool_call` log. The first three answer
+ * with a confirmation token; the rest are `isError` refusals.
+ */
+export type GateStop =
+  /** The host has no form elicitation: a token, as designed. */
+  | 'confirmation_required'
+  /** The host declared elicitation but did not answer the prompt in time. */
+  | 'elicitation_timeout'
+  /** The host declared elicitation but could not deliver the prompt. */
+  | 'elicitation_failed'
+  | 'declined'
+  | 'cancelled'
+  /** The supplied token does not verify for this call. */
+  | 'invalid_token'
+  /** The detail read said the call cannot succeed (`ConfirmationRefusal`). */
+  | 'refused';
+
 /** The gate's answer: run the handler with this confirmation, or stop here. */
 export type GateOutcome =
-  { readonly proceed: ConfirmedCall } | { readonly stop: ToolResult };
+  | { readonly proceed: ConfirmedCall }
+  | { readonly stop: ToolResult; readonly reason: GateStop };
 
 /**
  * Thrown by `ConfirmationSpec.detail` when the call cannot succeed (a
@@ -358,15 +411,32 @@ export type ConfirmationAnswer = 'accept' | 'decline' | 'cancel';
 export interface ConfirmationRuntime {
   /** Did the client declare form elicitation at `initialize`? */
   readonly supportsElicitation: () => boolean;
-  /** Ask the operator. Rejecting is treated as a failure to confirm. */
+  /**
+   * Ask the operator, waiting at most `ELICITATION_TIMEOUT_MS`. Rejects with
+   * `ElicitationTimeout` when the host did not answer in time; any other
+   * rejection means the host could not deliver the prompt. Either way nobody
+   * answered, and the gate falls back to the token path.
+   */
   readonly elicit: (message: string) => Promise<ConfirmationAnswer>;
 }
 
+/** What `ConfirmationRuntime.elicit` rejects with when the host never answered. */
+export class ElicitationTimeout extends Error {
+  readonly timeoutMs: number;
+
+  constructor(timeoutMs: number) {
+    super(`The host did not answer within ${timeoutMs} ms`);
+    this.name = 'ElicitationTimeout';
+    this.timeoutMs = timeoutMs;
+  }
+}
+
 /**
- * A refusal — declined, dismissed, undeliverable prompt, invalid token — is an
- * `isError` result: the tool did not do what it was asked to do and there is
- * no token to continue with, so a model has no room to read "cancelled" as
- * "deleted". A confirmation request is not a refusal (see `requireConfirmation`).
+ * A refusal — declined, dismissed, invalid token, a call that cannot succeed —
+ * is an `isError` result: the tool did not do what it was asked to do and
+ * there is no token to continue with, so a model has no room to read
+ * "cancelled" as "deleted". A confirmation request is not a refusal (see
+ * `requireConfirmation`).
  */
 function refusal(message: string): ToolResult {
   return {
@@ -440,6 +510,7 @@ export async function requireConfirmation(options: {
       stop: refusal(
         `Nothing was changed: the ${CONFIRMATION_TOKEN_ARG} for ${toolName} is not valid for these arguments. A token is bound to the call it was issued for (same target and options) and expires after 10 minutes. Repeat the call without a token to get a new one.`
       ),
+      reason: 'invalid_token',
     };
   }
 
@@ -450,26 +521,56 @@ export async function requireConfirmation(options: {
     detail = await resolveDetail(prepared, client);
   } catch (error) {
     if (!(error instanceof ConfirmationRefusal)) throw error;
-    return { stop: refusal(`Nothing was changed: ${error.message}`) };
+    return {
+      stop: refusal(`Nothing was changed: ${error.message}`),
+      reason: 'refused',
+    };
   }
   const consequence = detail
     ? `${prepared.consequence}\n\n${detail.text}`
     : prepared.consequence;
   const version = detail?.version;
+  const tokenAnswer = (note?: string): ToolResult =>
+    confirmationRequest({
+      toolName,
+      bound,
+      version,
+      headline,
+      consequence,
+      repeat,
+      note,
+    });
 
   if (runtime.supportsElicitation()) {
     let answer: ConfirmationAnswer;
     try {
       answer = await runtime.elicit(`${headline}\n\n${consequence}`);
     } catch (error) {
-      // The host advertised elicitation and then failed to deliver it. Fail
-      // closed: minting a token here would let the caller route around the
-      // one check that actually reaches a human.
-      const reason = error instanceof Error ? error.message : String(error);
+      // The host declared elicitation and gave no answer: the prompt timed
+      // out or never left. Nobody approved and nobody refused, so this falls
+      // back to the token path a host without elicitation gets, which
+      // performs nothing and needs a second call after asking the person (see
+      // the module comment). Failing closed here left those people with no
+      // way to make the change at all.
+      if (error instanceof ElicitationTimeout) {
+        const seconds = Math.max(1, Math.round(error.timeoutMs / 1000));
+        return {
+          stop: tokenAnswer(
+            `The host did not answer the confirmation prompt within ${seconds} seconds; it may not show prompts here. Ask the person in the conversation instead.`
+          ),
+          reason: 'elicitation_timeout',
+        };
+      }
+      const reason =
+        sanitizeUntrusted(
+          error instanceof Error ? error.message : String(error),
+          { maxChars: 200 }
+        ) ?? 'no reason given';
       return {
-        stop: refusal(
-          `Nothing was changed: ${toolName} could not obtain confirmation from the host (${reason}). ${headline}`
+        stop: tokenAnswer(
+          `The host could not show the confirmation prompt (${reason}). Ask the person in the conversation instead.`
         ),
+        reason: 'elicitation_failed',
       };
     }
 
@@ -483,27 +584,54 @@ export async function requireConfirmation(options: {
         },
       };
     }
-    return {
-      stop: refusal(
-        answer === 'decline'
-          ? `Confirmation declined — nothing was changed. ${headline}`
-          : `Confirmation dismissed by the host — nothing was changed. ${headline} Ask the user to confirm before retrying.`
-      ),
-    };
+    // An explicit answer is final: no token that could route around it.
+    return answer === 'decline'
+      ? {
+          stop: refusal(
+            `Confirmation declined — nothing was changed. ${headline}`
+          ),
+          reason: 'declined',
+        }
+      : {
+          stop: refusal(
+            `Confirmation dismissed by the host — nothing was changed. ${headline} Ask the user to confirm before retrying.`
+          ),
+          reason: 'cancelled',
+        };
   }
 
   // No elicitation on this host: hand back the consequences and a token, and
   // perform nothing until the caller repeats the call with it. This is a
   // successful answer, not a failure: the call is waiting for a person.
+  return { stop: tokenAnswer(), reason: 'confirmation_required' };
+}
+
+/**
+ * The token path's answer: the consequences and a token bound to this call,
+ * with nothing performed. `note` says why a host that declared elicitation
+ * gets it.
+ */
+function confirmationRequest(options: {
+  readonly toolName: string;
+  readonly bound: unknown;
+  readonly version: string | undefined;
+  readonly headline: string;
+  readonly consequence: string;
+  readonly repeat: string;
+  readonly note?: string;
+}): ToolResult {
+  const { toolName, bound, version, headline, consequence, repeat, note } =
+    options;
   const now = Date.now();
   const token = mintConfirmationToken(toolName, bound, now, version);
   const expiresAt = new Date(now + TOKEN_TTL_MS).toISOString();
-  const stop: ToolResult = {
+  return {
     content: [
       {
         type: 'text' as const,
         text: [
           `Confirmation required — nothing was changed.`,
+          ...(note ? [note] : []),
           ``,
           headline,
           consequence,
@@ -522,7 +650,6 @@ export async function requireConfirmation(options: {
       next_step: `Ask the user. Only if they agree, ${repeat}.`,
     },
   };
-  return { stop };
 }
 
 /** Lines of a detail block: cleaned one by one, capped in count and width. */

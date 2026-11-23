@@ -19,6 +19,7 @@ import {
 import { registerTools } from '../tools/registry.js';
 import { CONFIRMATION_TOKEN_ARG } from '../tools/confirmation.js';
 import type { AltegioClient } from '../providers/altegio-client.js';
+import { createLogger } from '../utils/logger.js';
 
 const LOCATION = 4564;
 const TEAM_MEMBER = 123;
@@ -63,6 +64,12 @@ async function connect(options: {
   content?: ElicitResult['content'];
   /** Reply with an error instead of an answer, like a host with a broken UI. */
   broken?: boolean;
+  /**
+   * Never answer, like a host that declares elicitation and shows no prompt;
+   * the request ends only when the server cancels it.
+   */
+  silent?: boolean;
+  elicitationTimeoutMs?: number;
 }): Promise<Harness> {
   const deleteStaff = jest.fn(async () => undefined);
   const removeServiceFromStaff = jest.fn(async () => undefined);
@@ -72,7 +79,11 @@ async function connect(options: {
     { name: 'test-server', version: '0.0.0' },
     { capabilities: { tools: {} } }
   );
-  registerTools(server, altegioStub(deleteStaff, removeServiceFromStaff));
+  registerTools(server, altegioStub(deleteStaff, removeServiceFromStaff), {
+    ...(options.elicitationTimeoutMs !== undefined
+      ? { elicitationTimeoutMs: options.elicitationTimeoutMs }
+      : {}),
+  });
 
   const client = new Client(
     { name: 'test-host', version: '0.0.0' },
@@ -91,7 +102,7 @@ async function connect(options: {
   );
 
   if (options.elicitation) {
-    client.setRequestHandler(ElicitRequestSchema, async (request) => {
+    client.setRequestHandler(ElicitRequestSchema, async (request, extra) => {
       const params = request.params;
       if (params.mode === 'url') throw new Error('Unexpected URL elicitation');
       elicitations.push({
@@ -99,6 +110,13 @@ async function connect(options: {
         requestedSchema: params.requestedSchema,
       });
       if (options.broken) throw new Error('confirmation UI unavailable');
+      if (options.silent) {
+        return new Promise<never>((_resolve, reject) => {
+          extra.signal.addEventListener('abort', () =>
+            reject(new Error('cancelled by the server'))
+          );
+        });
+      }
 
       const answer = options.answer ?? 'accept';
       return answer === 'accept'
@@ -134,6 +152,30 @@ async function connect(options: {
 function firstText(result: CallToolResult): string {
   const block = result.content[0];
   return block && block.type === 'text' ? block.text : '';
+}
+
+function tokenOf(result: CallToolResult): string {
+  return new RegExp(`${CONFIRMATION_TOKEN_ARG}="([^"]+)"`).exec(
+    firstText(result)
+  )![1]!;
+}
+
+/** The `tool_call` lines logged while `run` ran. */
+async function toolCallLines(
+  run: () => Promise<void>
+): Promise<Array<Record<string, unknown>>> {
+  const log = createLogger('tool-calls');
+  const info = jest.spyOn(log, 'info');
+  const error = jest.spyOn(log, 'error');
+  try {
+    await run();
+    return [...info.mock.calls, ...error.mock.calls]
+      .map(([fields]) => fields as unknown as Record<string, unknown>)
+      .filter((fields) => fields.event === 'tool_call');
+  } finally {
+    info.mockRestore();
+    error.mockRestore();
+  }
 }
 
 async function callDeleteStaff(
@@ -244,13 +286,49 @@ describe('destructive confirmation — host WITH elicitation', () => {
     }
   );
 
-  it('does not delete when the host fails to deliver the prompt', async () => {
+  it('logs a decline as a confirmation error, not as a confirmation request', async () => {
+    const h = await connect({ elicitation: true, answer: 'decline' });
+    try {
+      const lines = await toolCallLines(async () => {
+        await callDeleteStaff(h.client);
+      });
+      expect(lines).toEqual([
+        expect.objectContaining({
+          tool: 'team_members_delete',
+          outcome: 'error',
+          error_class: 'confirmation_declined',
+          error_type: 'confirmation',
+          confirmation: 'declined',
+        }),
+      ]);
+    } finally {
+      await h.close();
+    }
+  });
+
+  it('falls back to the token when the host fails to deliver the prompt', async () => {
     const h = await connect({ elicitation: true, broken: true });
     try {
-      const result = await callDeleteStaff(h.client);
+      let result: CallToolResult | undefined;
+      const lines = await toolCallLines(async () => {
+        result = await callDeleteStaff(h.client);
+      });
       expect(h.deleteStaff).not.toHaveBeenCalled();
-      expect(result.isError).toBe(true);
-      expect(firstText(result)).toContain('could not obtain confirmation');
+      expect(result!.isError).toBeFalsy();
+      expect(result!.structuredContent).toMatchObject({
+        status: 'confirmation_required',
+        changed: false,
+      });
+      expect(firstText(result!)).toContain(
+        'could not show the confirmation prompt'
+      );
+      expect(lines).toEqual([
+        expect.objectContaining({
+          outcome: 'error',
+          error_class: 'confirmation_failed',
+          confirmation: 'elicitation_failed',
+        }),
+      ]);
     } finally {
       await h.close();
     }
@@ -264,6 +342,101 @@ describe('destructive confirmation — host WITH elicitation', () => {
         arguments: { location_id: LOCATION },
       });
       expect(h.elicitations).toHaveLength(0);
+    } finally {
+      await h.close();
+    }
+  });
+});
+
+describe('destructive confirmation — host that declares elicitation and never answers', () => {
+  // 2026-11-23: Claude Code and Desktop cloud sessions, Cursor, Codex and
+  // claude.ai connectors declared elicitation and showed no prompt. Each write
+  // waited out the SDK's 60 s and failed with nothing to continue with, and
+  // the log called it `confirmation_required`, out of the error rate.
+  it('answers with a token before the host gives up, and logs an error', async () => {
+    const h = await connect({
+      elicitation: true,
+      silent: true,
+      elicitationTimeoutMs: 50,
+    });
+    try {
+      let result: CallToolResult | undefined;
+      const lines = await toolCallLines(async () => {
+        result = await callDeleteStaff(h.client);
+      });
+
+      expect(h.elicitations).toHaveLength(1);
+      expect(h.deleteStaff).not.toHaveBeenCalled();
+      expect(result!.isError).toBeFalsy();
+      expect(result!.structuredContent).toMatchObject({
+        status: 'confirmation_required',
+        changed: false,
+      });
+      const text = firstText(result!);
+      expect(text).toContain('did not answer the confirmation prompt');
+      expect(text).toContain('Ask the person in the conversation');
+      expect(text).toContain('Ivan Petrov');
+      expect(lines).toEqual([
+        expect.objectContaining({
+          tool: 'team_members_delete',
+          outcome: 'error',
+          error_class: 'confirmation_failed',
+          error_type: 'confirmation',
+          confirmation: 'elicitation_timeout',
+        }),
+      ]);
+    } finally {
+      await h.close();
+    }
+  });
+
+  it('performs the deletion only on the repeat that carries the token', async () => {
+    const h = await connect({
+      elicitation: true,
+      silent: true,
+      elicitationTimeoutMs: 50,
+    });
+    try {
+      const first = await callDeleteStaff(h.client);
+      expect(h.deleteStaff).not.toHaveBeenCalled();
+
+      const second = await callDeleteStaff(h.client, {
+        [CONFIRMATION_TOKEN_ARG]: tokenOf(first),
+      });
+      expect(second.isError).toBeFalsy();
+      expect(h.deleteStaff).toHaveBeenCalledTimes(1);
+      expect(h.deleteStaff).toHaveBeenCalledWith(LOCATION, TEAM_MEMBER);
+      // The repeat does not ask the silent host again.
+      expect(h.elicitations).toHaveLength(1);
+    } finally {
+      await h.close();
+    }
+  });
+
+  it('still refuses the token for another target', async () => {
+    const h = await connect({
+      elicitation: true,
+      silent: true,
+      elicitationTimeoutMs: 50,
+    });
+    try {
+      const first = await callDeleteStaff(h.client);
+      let result: CallToolResult | undefined;
+      const lines = await toolCallLines(async () => {
+        result = await callDeleteStaff(h.client, {
+          team_member_id: 999,
+          [CONFIRMATION_TOKEN_ARG]: tokenOf(first),
+        });
+      });
+      expect(h.deleteStaff).not.toHaveBeenCalled();
+      expect(result!.isError).toBe(true);
+      expect(lines).toEqual([
+        expect.objectContaining({
+          outcome: 'error',
+          error_class: 'confirmation_failed',
+          confirmation: 'invalid_token',
+        }),
+      ]);
     } finally {
       await h.close();
     }
