@@ -344,7 +344,7 @@ export const inventoryCreateOperationTool = defineTool({
   name: 'inventory_create_operation',
   category: 'Inventory',
   description:
-    'Record an inventory operation as one document with one line per product: kind sale (sold over the counter), receipt (products arriving, optionally from a supplier_id) or write_off (damaged, expired, lost). Consumption outside an appointment and transfers between inventories are not available. Each line takes product_id or product (name, article number, barcode), a quantity in the sale or consumable unit, and optionally unit_price and discount_percent; a line total is quantity × price minus the discount. team_member_id is required. No payment is recorded. For an appointment’s consumables use appointments_set_consumables. Undo with inventory_delete_document. Asks for confirmation first. Refused when an identical operation (same kind, inventory, lines, prices, date and comment) was just recorded; to record a genuine second one, give it a different comment.',
+    'Record an inventory operation as one document with one line per product: kind sale (sold over the counter), receipt (products arriving, optionally from a supplier_id) or write_off (damaged, expired, lost). Consumption outside an appointment and transfers between inventories are not available. Each line takes product_id or product (name, article number, barcode), a quantity in the sale or consumable unit, and optionally unit_price and discount_percent; a line total is quantity × price minus the discount. team_member_id is required for every kind, but Altegio stores it only on sale lines: receipt and write-off lines keep no team member, only the user who records them. No payment is recorded. For an appointment’s consumables use appointments_set_consumables. Undo with inventory_delete_document. Asks for confirmation first. Refused when an identical operation (same kind, inventory, lines, prices, date and comment) was just recorded; to record a genuine second one, give it a different comment.',
   annotations: {
     title: 'Inventory: record an inventory operation',
     destructiveHint: false,
@@ -361,7 +361,7 @@ export const inventoryCreateOperationTool = defineTool({
       .int()
       .positive()
       .describe(
-        'The team member who performs it (team_members_list); a dismissed one is refused.'
+        'The team member who performs it (team_members_list); a dismissed one is refused. Stored on sale lines only.'
       ),
     lines: z
       .array(operationLine)
@@ -404,7 +404,7 @@ export const inventoryCreateOperationTool = defineTool({
     target: (input) =>
       `${KIND_TEXT[input.kind] ?? 'inventory operation'} of ${input.lines?.length ?? 0} product line(s) at location ${input.location_id}`,
     consequence: (input) =>
-      `A ${KIND_TEXT[input.kind] ?? 'inventory operation'} document is created and its lines ${input.kind === 'receipt' ? 'add the products to' : 'take the products from'} the inventory at once, at the prices and totals below. No payment is recorded. It stays until someone deletes the document with inventory_delete_document, which reverses the stock.`,
+      `A ${KIND_TEXT[input.kind] ?? 'inventory operation'} document is created and its lines ${input.kind === 'receipt' ? 'add the products to' : 'take the products from'} the inventory at once, at the prices and totals below. No payment is recorded.${input.kind === 'sale' ? '' : ` Altegio does not store team member ${input.team_member_id} on ${KIND_TEXT[input.kind] ?? 'these'} lines; the document records the user who confirms it.`} It stays until someone deletes the document with inventory_delete_document, which reverses the stock.`,
     detail: (input, client) => inventory.describeOperation(client, input),
   },
   handler: async ({ input, client, confirmation }) =>

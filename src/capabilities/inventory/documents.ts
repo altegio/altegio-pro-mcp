@@ -263,7 +263,7 @@ interface UpdateDocumentPlan {
   version: string;
   document: InventoryDocument;
   currency: string | null;
-  header: { date_local: string; comment: string } | null;
+  header: { inventory_id: number; date_local: string; comment: string } | null;
   edits: LineEdit[];
   removals: DocumentLine[];
   additions: DocumentLineWrite[];
@@ -318,6 +318,14 @@ function lineWrite(
   };
 }
 
+/** The one inventory every line of a document moved stock in, if any. */
+function sharedLineInventory(lines: readonly DocumentLine[]): number | null {
+  const ids = new Set(
+    lines.map((l) => l.inventory_id).filter((id): id is number => id !== null)
+  );
+  return ids.size === 1 ? [...ids][0]! : null;
+}
+
 async function planDocumentUpdate(
   client: AltegioClient,
   input: UpdateDocumentInput
@@ -344,9 +352,23 @@ async function planDocumentUpdate(
       `Nothing was changed: document ${document.id} is a ${KIND_LABEL[document.kind]}; only product sale, product receipt and write-off documents are changed here.`
     );
   }
-  if (document.inventory_id === null || document.date_local === null) {
+  // A document created in the Altegio app can report no inventory or date in
+  // its header (storage 0) while every line has them. Only a header write and
+  // added lines need them; changing or removing lines does not.
+  const inventoryId = document.inventory_id ?? sharedLineInventory(lines);
+  const documentDate =
+    document.date_local ??
+    lines.find((l) => l.date_local !== null)?.date_local ??
+    null;
+  const headerChange = input.date !== undefined || input.comment !== undefined;
+  if (inventoryId === null && (headerChange || adds.length > 0)) {
     throw new InventoryInputError(
-      `Nothing was changed: document ${document.id} reports no inventory or date, so its header cannot be stored again.`
+      `Nothing was changed: document ${document.id} reports no inventory, in its header or one shared by its lines, so its ${headerChange ? 'date and comment' : 'new lines'} cannot be stored. Line quantities, prices and discounts can still be changed.`
+    );
+  }
+  if (headerChange && input.date === undefined && documentDate === null) {
+    throw new InventoryInputError(
+      `Nothing was changed: document ${document.id} reports no date, so its comment cannot be stored without one; pass date as well.`
     );
   }
   const byId = new Map(lines.map((l) => [l.id, l]));
@@ -408,7 +430,7 @@ async function planDocumentUpdate(
       location_id: input.location_id,
       kind,
       team_member_id: first?.team_member_id ?? 0,
-      inventory_id: document.inventory_id,
+      inventory_id: inventoryId!,
       lines: adds,
     });
     additions = planned.lines.map((l) => ({
@@ -427,12 +449,13 @@ async function planDocumentUpdate(
   }
 
   const header =
-    input.date !== undefined || input.comment !== undefined
+    headerChange && inventoryId !== null
       ? {
+          inventory_id: inventoryId,
           date_local:
             input.date !== undefined
               ? wireDate(input.date)
-              : document.date_local.replace('T', ' ').slice(0, 19),
+              : (documentDate ?? '').replace('T', ' ').slice(0, 19),
           comment: input.comment ?? document.comment ?? '',
         }
       : null;
@@ -565,7 +588,6 @@ export async function updateDocument(
         plan.document.id,
         {
           kind: plan.document.kind,
-          inventory_id: plan.document.inventory_id!,
           ...header,
         },
         options

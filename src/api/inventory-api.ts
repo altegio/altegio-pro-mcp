@@ -253,6 +253,13 @@ export interface DocumentLine {
   document_id: number | null;
   /** The location the line was recorded at. */
   location_id: number | null;
+  /**
+   * The inventory the line moved stock in. A document created in the Altegio
+   * app can report no inventory in its header while its lines do.
+   */
+  inventory_id: number | null;
+  /** Wall-clock time at the location, `YYYY-MM-DDTHH:MM:SS`. */
+  date_local: string | null;
   product_id: number | null;
   /** Absolute quantity in the unit below. */
   quantity: number | null;
