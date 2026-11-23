@@ -57,16 +57,16 @@ Served tools per category, in `tools/list` order:
 
 | View | Address | Lists (of 187 defined) | Reaches | `tools/list` bytes | Budget (used) | Reasons |
 | --- | --- | --- | --- | --- | --- | --- |
-| `all` | stdio (no HTTP route) | 177 | 177 | 233,786 | — | all ×177, -off ×6, -cmp ×4 |
+| `all` | stdio (no HTTP route) | 177 | 177 | 233,803 | — | all ×177, -off ×6, -cmp ×4 |
 | `default` | `/mcp` | 37 | 178 | 50,922 | 53,500 (95 %) | disp ×141, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
 | `full` | `/mcp/full` | 101 | 101 | 126,184 | 132,500 (95 %) | dflt ×97, -low ×44, -pack ×29, -off ×6, -cmp ×4, base ×3, -pwd ×2, -name ×1, xtra ×1 |
-| `readonly` | `/mcp/readonly` | 92 | 92 | 124,391 | 130,500 (95 %) | ro ×92, -write ×83, -off ×6, -cmp ×4, -pwd ×2 |
+| `readonly` | `/mcp/readonly` | 92 | 92 | 124,408 | 130,500 (95 %) | ro ×92, -write ×83, -off ×6, -cmp ×4, -pwd ×2 |
 | `compact` | `/mcp/compact` | 37 | 178 | 50,922 | 53,500 (95 %) | disp ×141, list ×34, -off ×6, base ×3, -pwd ×2, -name ×1 |
 | `ops` | `/mcp/ops` | 53 | 53 | 71,259 | 74,500 (96 %) | - ×122, pfx ×27, rule ×23, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
 | `catalog` | `/mcp/catalog` | 38 | 38 | 28,728 | 30,000 (96 %) | - ×137, rule ×35, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
-| `finance` | `/mcp/finance` | 70 | 70 | 117,962 | 118,000 (100 %) | - ×105, pfx ×63, -off ×6, -cmp ×4, rule ×4, base ×3, -pwd ×2 |
+| `finance` | `/mcp/finance` | 70 | 70 | 117,979 | 118,000 (100 %) | - ×105, pfx ×63, -off ×6, -cmp ×4, rule ×4, base ×3, -pwd ×2 |
 | `marketing` | `/mcp/marketing` | 24 | 24 | 32,918 | 34,500 (95 %) | - ×151, pfx ×20, -off ×6, -cmp ×4, base ×3, -pwd ×2, rule ×1 |
-| `analytics` | `/mcp/analytics` | 33 | 33 | 62,868 | 66,000 (95 %) | - ×142, pfx ×30, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
+| `analytics` | `/mcp/analytics` | 33 | 33 | 62,885 | 66,000 (95 %) | - ×142, pfx ×30, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
 | `onboarding` | `/mcp/onboarding` | 15 | 15 | 12,394 | 13,500 (92 %) | - ×160, pfx ×12, -off ×6, -cmp ×4, base ×3, -pwd ×2 |
 
 `tools/list` bytes is the serialized result the view sends in the default

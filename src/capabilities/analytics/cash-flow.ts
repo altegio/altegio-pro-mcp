@@ -26,11 +26,11 @@ import { AltegioApiError } from '../../utils/errors.js';
 export const MAX_CASH_FLOW_CELLS = 6000;
 
 /**
- * UTF-8 bytes the columns and rows of one cash-flow answer may take. The text
- * content lists the same rows for hosts that read text only, so the result as
- * a whole stays inside the 40 KB response budget.
+ * UTF-8 bytes the columns and rows of one cash-flow answer may take, inside
+ * the 24,000-character structured result bound with room for the filters
+ * and period; the text listing of the same rows has its own budget.
  */
-export const CASH_FLOW_JSON_BUDGET = 15_000;
+export const CASH_FLOW_JSON_BUDGET = 20_000;
 
 export interface CashFlowDayRow {
   payment_item_id: number | null;
@@ -305,7 +305,7 @@ export function isZeroMovement(row: CashFlowDayRow): boolean {
 /**
  * Build the answer at the finest grouping that fits: day, week, month, then
  * the period total alone, with per-account columns for every group before
- * per-account period totals only.
+ * per-account period totals only, before no account columns.
  */
 export function buildCashFlowReport(
   data: CashFlowDays,
@@ -328,7 +328,13 @@ export function buildCashFlowReport(
   ];
   for (const granularity of granularities) {
     const groups = buckets(data.days, granularity).length + 1;
-    for (const accountColumns of accountOptions) {
+    // Across all account types the account view is dropped last, at period
+    // totals: the account-type view still holds every amount.
+    const options: CashFlowAccountColumns[] =
+      granularity === 'period' && !accountOptions.includes('none')
+        ? [...accountOptions, 'none']
+        : accountOptions;
+    for (const accountColumns of options) {
       const accountGroups =
         accountColumns === 'per_period'
           ? groups

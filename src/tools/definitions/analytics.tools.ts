@@ -1318,7 +1318,7 @@ export const analyticsGetProfitAndLossStatementTool = defineTool({
       .boolean()
       .optional()
       .describe(
-        'Include a comparison. With no explicit comparison dates, uses the immediately preceding period of equal length.'
+        'Include a comparison. Without explicit dates: the preceding period of equal length, or of whole months for a whole-month period.'
       ),
     comparison_date_from: z
       .string()
@@ -1385,6 +1385,10 @@ export const analyticsGetProfitAndLossStatementTool = defineTool({
           complete: bool,
         }),
         source: {
+          type: 'string' as const,
+          enum: ['whole_month_finance_report', 'exact_day_cash_flow_report'],
+        },
+        comparison_source: {
           type: 'string' as const,
           enum: ['whole_month_finance_report', 'exact_day_cash_flow_report'],
         },

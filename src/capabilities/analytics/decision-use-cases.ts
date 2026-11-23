@@ -700,6 +700,32 @@ function compared(current: number | null, previous?: number | null) {
   };
 }
 
+/**
+ * The same number of whole calendar months right before a whole-month
+ * period: October compares with September, not with August 31 to September
+ * 30, which the P&L page cannot read as it is.
+ */
+function previousWholeMonths(period: { date_from: string; date_to: string }): {
+  date_from: string;
+  date_to: string;
+} {
+  const [fromYear, fromMonth] = period.date_from.split('-').map(Number);
+  const [toYear, toMonth] = period.date_to.split('-').map(Number);
+  const months = (toYear! - fromYear!) * 12 + (toMonth! - fromMonth!) + 1;
+  const start = new Date(Date.UTC(fromYear!, fromMonth! - 1 - months, 1));
+  const end = new Date(Date.UTC(fromYear!, fromMonth! - 1, 0));
+  return {
+    date_from: start.toISOString().slice(0, 10),
+    date_to: end.toISOString().slice(0, 10),
+  };
+}
+
+function ledgerSource(range: { date_from: string; date_to: string }) {
+  return isWholeMonths(range.date_from, range.date_to)
+    ? ('whole_month_finance_report' as const)
+    : ('exact_day_cash_flow_report' as const);
+}
+
 export interface ProfitAndLossInput extends PeriodInput {
   location_id: number;
   include_comparison?: boolean;
@@ -772,7 +798,9 @@ export async function getProfitAndLossStatement(
           },
           timezone
         )
-      : previousPeriod(period);
+      : isWholeMonths(period.date_from, period.date_to)
+        ? previousWholeMonths(period)
+        : previousPeriod(period);
     const [previousLedger, previousSales, previousContribution] =
       await Promise.all([
         readLedger(comparisonPeriod),
@@ -909,9 +937,10 @@ export async function getProfitAndLossStatement(
           limit: PROFIT_AND_LOSS_CATEGORY_LIMIT,
           complete: categories.length === categoryCount,
         },
-        source: isWholeMonths(period.date_from, period.date_to)
-          ? 'whole_month_finance_report'
-          : 'exact_day_cash_flow_report',
+        source: ledgerSource(period),
+        ...(comparison
+          ? { comparison_source: ledgerSource(comparison.period) }
+          : {}),
         formula:
           'Tracked operating result is the signed total of posted income and expense transactions in the location finance report. Whole calendar months read the profit and loss report; any other period sums the cash-flow report of the same transactions for its exact days, whose categories carry titles but no ids.',
       },

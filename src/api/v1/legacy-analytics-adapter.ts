@@ -222,21 +222,42 @@ async function readSearchEnvelope(
 const TABLE_OPEN = /<table\b[^>]*\btable-report\b[^>]*>/i;
 
 /**
- * Index just past the `</table>` closing the table that opens at `0`, or -1
- * while it is still open. Nested tables are balanced, not cut at the first
- * closing tag.
+ * Finds the `</table>` closing the table that opens at index 0 of a growing
+ * section, scanning each part once. Nested tables are balanced, not cut at
+ * the first closing tag; a tag split across parts is scanned again whole.
  */
-function tableEnd(section: string): number {
-  const tags = /<(\/?)table\b/gi;
-  let depth = 0;
-  for (let match = tags.exec(section); match; match = tags.exec(section)) {
-    depth += match[1] ? -1 : 1;
-    if (depth === 0) {
-      const close = section.indexOf('>', match.index);
-      return close === -1 ? -1 : close + 1;
+class TableEnd {
+  private readonly tags = /<(\/?)table\b/gi;
+  private depth = 0;
+  private from = 0;
+
+  /** Index just past the closing tag, or -1 while the table is still open. */
+  find(section: string): number {
+    this.tags.lastIndex = this.from;
+    let next = Math.max(this.from, section.length - '</table'.length);
+    for (
+      let match = this.tags.exec(section);
+      match;
+      match = this.tags.exec(section)
+    ) {
+      // A tag at the very end may continue in the next part.
+      if (match.index + match[0].length >= section.length) {
+        next = Math.min(next, match.index);
+        break;
+      }
+      if (match[1] && this.depth === 1) {
+        const close = section.indexOf('>', match.index);
+        if (close !== -1) return close + 1;
+        // Its `>` has not arrived yet: scan this tag again with the next part.
+        next = match.index;
+        break;
+      }
+      this.depth += match[1] ? -1 : 1;
+      next = Math.max(next, this.tags.lastIndex);
     }
+    this.from = next;
+    return -1;
   }
-  return -1;
 }
 
 /**
@@ -270,6 +291,8 @@ async function readReportTable(
   let head = '';
   let pending = '';
   let section: string | null = null;
+  let sectionBytes = 0;
+  const end = new TableEnd();
   let scanned = 0;
   try {
     while (true) {
@@ -285,6 +308,7 @@ async function readReportTable(
         const open = TABLE_OPEN.exec(pending);
         if (open) {
           section = pending.slice(open.index);
+          sectionBytes = Buffer.byteLength(section);
           pending = '';
         } else {
           // Keep enough of the tail for an opening tag split across chunks.
@@ -292,14 +316,15 @@ async function readReportTable(
         }
       } else {
         section += text;
+        sectionBytes += Buffer.byteLength(text);
       }
       if (section !== null) {
-        const end = tableEnd(section);
-        if (end !== -1) {
+        const close = end.find(section);
+        if (close !== -1) {
           await reader.cancel().catch(() => undefined);
-          return section.slice(0, end);
+          return section.slice(0, close);
         }
-        if (Buffer.byteLength(section) > MAX_HTML_BYTES) {
+        if (sectionBytes > MAX_HTML_BYTES) {
           await reader.cancel().catch(() => undefined);
           throw tooLarge();
         }
@@ -777,25 +802,38 @@ export class V1LegacyAnalyticsAdapter {
     });
   }
 
-  /** One cash-flow source page, as cents per day; halved while too large. */
+  /**
+   * Cash per day for `range`, from one source page, or from halves of it
+   * while the page is over the size bound.
+   *
+   * The source ends a period at 23:59:00 of its last day, so a payment in its
+   * last minute falls out of the page (prod, 2026-10: five weekly reports
+   * were 750 UAH short of the month's transactions). Every page therefore
+   * runs one day past its range and that day is dropped, so each day kept is
+   * complete wherever a page ends. `fitDays` is the longest page that fit.
+   */
   private async cashFlowPage(
     input: CashFlowBreakdownRequest,
     accountType: CashAccountType,
     range: { from: string; to: string },
     reads: { pages: number }
-  ): Promise<{ account_titles: string[]; rows: CashFlowDayRow[] }> {
+  ): Promise<{
+    days: { account_titles: string[]; rows: CashFlowDayRow[] };
+    fitDays: number;
+  }> {
     if (reads.pages >= MAX_CASH_FLOW_PAGES)
       throw new AltegioApiError(
         `The cash-flow breakdown for this period needs more than ${MAX_CASH_FLOW_PAGES} source pages. Narrow it: a shorter period, cash_account_type=cash or non_cash, cash_account_ids, or payment_item_id.`,
         413
       );
     reads.pages += 1;
+    const length = daysBetween(range.from, range.to);
     const response = await this.client.requestLegacyWebReport({
       locationId: input.location_id,
       path: `/finances_reports/account_period_search/${input.location_id}/`,
       query: {
         start_date: range.from,
-        end_date: range.to,
+        end_date: addDays(range.to, 1),
         'accounts_ids[]': input.cash_account_ids,
         master_id: input.team_member_id ?? 0,
         supplier_id: input.supplier_id ?? 0,
@@ -824,13 +862,10 @@ export class V1LegacyAnalyticsAdapter {
       if (
         !(error instanceof AltegioApiError) ||
         error.statusCode !== 413 ||
-        range.from >= range.to
+        length < 2
       )
         throw error;
-      const middle = addDays(
-        range.from,
-        Math.floor(daysBetween(range.from, range.to) / 2) - 1
-      );
+      const middle = addDays(range.from, Math.floor(length / 2) - 1);
       const first = await this.cashFlowPage(
         input,
         accountType,
@@ -843,12 +878,15 @@ export class V1LegacyAnalyticsAdapter {
         { from: addDays(middle, 1), to: range.to },
         reads
       );
-      if (!appendDays(first, second))
+      if (!appendDays(first.days, second.days))
         throw new LegacyAnalyticsParseError(
           'cash-flow breakdown',
           'rows differ between periods'
         );
-      return first;
+      return {
+        days: first.days,
+        fitDays: Math.min(first.fitDays, second.fitDays),
+      };
     }
     const days = chunkToDays(
       parseCashFlowBreakdownHtml({
@@ -860,50 +898,57 @@ export class V1LegacyAnalyticsAdapter {
           : {}),
       }),
       accountType,
-      daysBetween(range.from, range.to)
+      length + 1
     );
     if (!days)
       throw new LegacyAnalyticsParseError(
         'cash-flow breakdown',
         'day columns do not match the period'
       );
-    return days;
+    return {
+      days: {
+        account_titles: days.account_titles,
+        rows: days.rows.map((row) => ({
+          ...row,
+          types: row.types.slice(0, length),
+          accounts: row.accounts.slice(0, length),
+        })),
+      },
+      fitDays: length,
+    };
   }
 
   /**
-   * Cash movement per local day for the period, read in bounded pages.
-   *
-   * The source ends a period at 23:59:00 of its last day, so a payment in the
-   * last minute fell out of every window (prod, 2026-10: five weekly reports
-   * were 750 UAH short of the month's transactions). Each read runs one day
-   * past the period and that day is dropped, so the last day is complete and
-   * every total is summed from the days themselves.
+   * Cash movement per local day for the period, read in bounded pages: a
+   * month at a time across all account types, a quarter for one type, and
+   * no longer than the longest page that fit once a page had to be halved.
+   * Every total is summed from the days themselves.
    */
   async getCashFlowDays(
     input: CashFlowBreakdownRequest
   ): Promise<CashFlowDays> {
     const accountType = input.cash_account_type ?? 'all';
-    const requestedDays = daysBetween(input.date_from, input.date_to);
-    const readTo = addDays(input.date_to, 1);
-    const chunk = CASH_FLOW_CHUNK_DAYS[accountType];
-    const ranges: Array<{ from: string; to: string }> = [];
-    for (let from = input.date_from; from <= readTo;) {
-      const to = addDays(from, chunk - 1);
-      ranges.push({ from, to: to < readTo ? to : readTo });
-      from = addDays(to, 1);
-    }
+    let chunk = CASH_FLOW_CHUNK_DAYS[accountType];
     const reads = { pages: 0 };
     const pages: Array<{ account_titles: string[]; rows: CashFlowDayRow[] }> =
       [];
     const currency = this.currency(input.location_id);
-    for (let i = 0; i < ranges.length; i += CASH_FLOW_CONCURRENCY) {
-      pages.push(
-        ...(await Promise.all(
-          ranges
-            .slice(i, i + CASH_FLOW_CONCURRENCY)
-            .map((range) => this.cashFlowPage(input, accountType, range, reads))
-        ))
-      );
+    for (let from = input.date_from; from <= input.date_to;) {
+      const batch: Array<{ from: string; to: string }> = [];
+      while (batch.length < CASH_FLOW_CONCURRENCY && from <= input.date_to) {
+        const end = addDays(from, chunk - 1);
+        const to = end < input.date_to ? end : input.date_to;
+        batch.push({ from, to });
+        from = addDays(to, 1);
+      }
+      for (const page of await Promise.all(
+        batch.map((range) =>
+          this.cashFlowPage(input, accountType, range, reads)
+        )
+      )) {
+        pages.push(page.days);
+        chunk = Math.min(chunk, page.fitDays);
+      }
     }
     const merged = pages[0]!;
     for (const page of pages.slice(1))
@@ -915,15 +960,12 @@ export class V1LegacyAnalyticsAdapter {
     return {
       currency: await currency,
       account_type: accountType,
-      days: Array.from({ length: requestedDays }, (_, i) =>
-        addDays(input.date_from, i)
+      days: Array.from(
+        { length: daysBetween(input.date_from, input.date_to) },
+        (_, i) => addDays(input.date_from, i)
       ),
       account_titles: merged.account_titles,
-      rows: merged.rows.map((row) => ({
-        ...row,
-        types: row.types.slice(0, requestedDays),
-        accounts: row.accounts.slice(0, requestedDays),
-      })),
+      rows: merged.rows,
     };
   }
 

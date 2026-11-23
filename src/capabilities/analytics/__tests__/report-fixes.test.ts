@@ -370,6 +370,53 @@ describe('receptionist rebooking cohorts', () => {
   });
 });
 
+/** Day-end and service-contribution sources a P&L reads beside the ledger. */
+function stubSalesSources(): void {
+  jest
+    .spyOn(V1LegacyAnalyticsAdapter.prototype, 'getServiceProfitability')
+    .mockResolvedValue({
+      currency: 'UAH',
+      group_by: 'service',
+      rows: [],
+      totals: {
+        services_rendered_count: 0,
+        payments: {
+          discount: 0,
+          loyalty_points: 0,
+          memberships: 0,
+          gift_cards: 0,
+          client_accounts: 0,
+        },
+        cash_or_card_revenue: 0,
+        consumables_cost: 0,
+        team_member_compensation: 0,
+        contribution_result: 0,
+      },
+      page: {
+        page: 1,
+        page_size: 1,
+        total_count: 0,
+        returned: 0,
+        has_more: false,
+      },
+    });
+  jest
+    .spyOn(V1AnalyticsAdapter.prototype, 'getDayEndReport')
+    .mockResolvedValue({
+      period_status: 'unverified',
+      effective_period: null,
+      period_status_reason: 'test',
+      date_from: '2026-11-09',
+      date_to: '2026-11-15',
+      currency: 'UAH',
+      totals: {} as never,
+      takings_by_account: [],
+      write_offs: [],
+      takings_total: null,
+      write_offs_total: null,
+    } as never);
+}
+
 describe('profit and loss for a period shorter than a month', () => {
   it('reads the exact days instead of the month around them', async () => {
     const ledger = {
@@ -452,6 +499,46 @@ describe('profit and loss for a period shorter than a month', () => {
       },
     });
     expect(result.text).toContain('Service sales');
+  });
+});
+
+describe('profit and loss comparison of whole months', () => {
+  it('compares a month with the month before, on the P&L page', async () => {
+    const ledger = {
+      currency: 'UAH',
+      income_total: 1,
+      expense_total: 0,
+      tracked_operating_result: 1,
+      categories: [],
+    };
+    const month = jest
+      .spyOn(V1LegacyAnalyticsAdapter.prototype, 'getProfitAndLoss')
+      .mockResolvedValue(ledger);
+    const exact = jest
+      .spyOn(V1LegacyAnalyticsAdapter.prototype, 'getPeriodLedger')
+      .mockResolvedValue(ledger);
+    stubSalesSources();
+    const result = await getProfitAndLossStatement(
+      locationClient as unknown as AltegioClient,
+      {
+        location_id: 4564,
+        date_from: '2026-10-01',
+        date_to: '2026-10-31',
+        include_comparison: true,
+      }
+    );
+    expect(month.mock.calls.map(([range]) => range)).toEqual([
+      { location_id: 4564, date_from: '2026-10-01', date_to: '2026-10-31' },
+      { location_id: 4564, date_from: '2026-09-01', date_to: '2026-09-30' },
+    ]);
+    expect(exact).not.toHaveBeenCalled();
+    expect(result.structuredContent).toMatchObject({
+      comparison_period: { date_from: '2026-09-01', date_to: '2026-09-30' },
+      operating_ledger: {
+        source: 'whole_month_finance_report',
+        comparison_source: 'whole_month_finance_report',
+      },
+    });
   });
 });
 

@@ -126,6 +126,31 @@ describe('finance pages larger than the table bound', () => {
     expect(report.tracked_operating_result).toBe(4500);
   });
 
+  it('finds the closing tag split across chunks, past a nested table', async () => {
+    const table = fixture('profit-loss-en.html').replace(
+      '<td>Rent</td>',
+      '<td>Rent<table><tbody><tr><td>note</td></tr></tbody></table></td>'
+    );
+    // Put the final </table> across the 64 KiB chunk boundary.
+    const prefix = 'x'.repeat(65_536 - 4 - table.lastIndexOf('</table>'));
+    const html = `${prefix}${table}${LAYOUT}`;
+    const source = streamed(html);
+    const report = await new V1LegacyAnalyticsAdapter(
+      client([source.response]).client
+    ).getProfitAndLoss({
+      location_id: 4564,
+      date_from: '2026-08-01',
+      date_to: '2026-08-31',
+    });
+    expect(report.tracked_operating_result).toBe(4500);
+    expect(report.categories.map((c) => c.title)).toContain('Rentnote');
+    // Two chunks hold the table; the stream reads at most one ahead.
+    expect(source.pulled()).toBeLessThanOrEqual(3);
+    expect(source.pulled()).toBeLessThan(
+      Math.ceil(Buffer.byteLength(html) / 65_536)
+    );
+  });
+
   it('still refuses a report table over the bound', async () => {
     const rows = '<tr><td>Rent</td><td>-1.00</td></tr>'.repeat(80_000);
     await expect(

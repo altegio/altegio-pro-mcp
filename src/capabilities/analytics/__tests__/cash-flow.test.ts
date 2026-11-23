@@ -34,20 +34,28 @@ interface Day {
   accounts: [number, number];
 }
 
-/** A deterministic month of money: card service income, cash rent. */
-function ledger(day: string): Day {
+/** A cash payment of 750 at 23:59:30 on these days, as in the prod report. */
+const LATE = /-(07|31)$|^2026-10-01$/;
+
+/**
+ * A deterministic month of money: card service income, cash rent, and a
+ * last-minute cash payment the source drops when the day ends its page
+ * (`lastDayOfPage`), because the source ends a page at 23:59:00.
+ */
+function ledger(day: string, lastDayOfPage = false): Day {
   const n = Number(day.slice(8, 10));
+  const late = LATE.test(day) && !lastDayOfPage ? 75_000 : 0;
   return {
-    service: [n * 100, n * 1000],
+    service: [n * 100 + late, n * 1000],
     rent: [day.endsWith('-15') ? -50_000 : 0, 0],
-    accounts: [n * 100 + (day.endsWith('-15') ? -50_000 : 0), n * 1000],
+    accounts: [n * 100 + late + (day.endsWith('-15') ? -50_000 : 0), n * 1000],
   };
 }
 
 function page(from: string, to: string, type: number): string {
   const count = daysBetween(from, to);
   const days = Array.from({ length: count }, (_, i) =>
-    ledger(addDays(from, i))
+    ledger(addDays(from, i), i === count - 1)
   );
   const pick = (values: [number, number]): number[] =>
     type === 0
@@ -276,6 +284,60 @@ describe('cash-flow source reads', () => {
     );
   });
 
+  it('keeps last-minute payments where source pages meet', async () => {
+    // Pages of 31 days meet on Oct 1, which has a 23:59:30 payment.
+    const { client: fake, requests } = client();
+    const report = await new V1LegacyAnalyticsAdapter(
+      fake
+    ).getCashFlowBreakdown({
+      location_id: 4564,
+      date_from: '2026-09-01',
+      date_to: '2026-10-31',
+    });
+    expect(
+      requests.map((r) => {
+        const query = r.query as Record<string, unknown>;
+        return [query.start_date, query.end_date];
+      })
+    ).toEqual([
+      ['2026-09-01', '2026-10-02'],
+      ['2026-10-02', '2026-11-01'],
+    ]);
+    expect(Math.round(report.totals.inflow! * 100)).toBe(
+      expectedCents(
+        '2026-09-01',
+        '2026-10-31',
+        (d) => d.service[0] + d.service[1]
+      )
+    );
+  });
+
+  it('reads later pages at the size that fit', async () => {
+    const { client: fake, requests } = client({
+      tooLarge: (from, to) => daysBetween(from, to) > 9,
+    });
+    const report = await new V1LegacyAnalyticsAdapter(
+      fake
+    ).getCashFlowBreakdown({
+      location_id: 4564,
+      date_from: '2026-07-01',
+      date_to: '2026-10-31',
+    });
+    const oversized = requests.filter((r) => {
+      const query = r.query as Record<string, unknown>;
+      return daysBetween(String(query.start_date), String(query.end_date)) > 9;
+    });
+    // Only the first two month pages are tried at full size.
+    expect(oversized.length).toBeLessThanOrEqual(6);
+    expect(Math.round(report.totals.inflow! * 100)).toBe(
+      expectedCents(
+        '2026-07-01',
+        '2026-10-31',
+        (d) => d.service[0] + d.service[1]
+      )
+    );
+  });
+
   it('reads a page over the size bound again as two halves', async () => {
     const { client: fake, requests } = client({
       tooLarge: (from, to) => daysBetween(from, to) > 4,
@@ -298,7 +360,10 @@ describe('cash-flow source reads', () => {
   });
 
   it('refuses a period that needs too many source pages, with how to narrow it', async () => {
-    const { client: fake } = client({ tooLarge: (from, to) => from < to });
+    // Pages fit at two days, so a quarter needs more pages than allowed.
+    const { client: fake } = client({
+      tooLarge: (from, to) => daysBetween(from, to) > 3,
+    });
     await expect(
       new V1LegacyAnalyticsAdapter(fake).getCashFlowBreakdown({
         location_id: 4564,
