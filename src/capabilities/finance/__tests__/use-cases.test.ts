@@ -1020,6 +1020,113 @@ describe('financial_transactions_list', () => {
     expect(summaryOf(result.text)).not.toContain('ignore');
   });
 
+  // The listing ends a period at 23:59:00 of `date_to`; Prague is +02:00 and
+  // the wire carries the server's +04:00.
+  const scanOf = (call: Call) => call.query.get('end_date') === '2026-10-20';
+
+  it('puts the last minute of the period, which the listing drops, at the top of the first page', async () => {
+    const calls: Call[] = [];
+    const scan = ok([
+      transactionRow({ id: 30, date: '2026-10-20T11:00:00+0400' }), // next day
+      transactionRow({ id: 31, date: '2026-10-20T01:59:30+0400', amount: 70 }),
+      transactionRow({ id: 32, date: '2026-10-20T01:59:00+0400' }), // listed
+      transactionRow({ id: 33, date: '2026-10-19T12:00:00+0400' }),
+    ]);
+    const client = fakeClient(
+      [
+        [
+          'GET',
+          /^\/transactions\/4564$/,
+          200,
+          (call: Call) =>
+            scanOf(call)
+              ? scan
+              : ok([
+                  transactionRow({ id: 32, date: '2026-10-20T01:59:00+0400' }),
+                ]),
+        ],
+      ],
+      calls
+    );
+    const result = await listFinancialTransactions(client, {
+      location_id: LOCATION,
+      date_from: '2026-10-01',
+      date_to: '2026-10-19',
+      account_id: 1330531,
+      page: 1,
+      page_size: 25,
+    });
+    const scans = calls.filter(scanOf);
+    expect(scans).toHaveLength(1);
+    expect(Object.fromEntries(scans[0]!.query)).toEqual({
+      start_date: '2026-10-19',
+      end_date: '2026-10-20',
+      account_id: '1330531',
+      page: '1',
+      count: '200',
+    });
+    const content = result.structuredContent as { items: { id: number }[] };
+    expect(content.items.map((t) => t.id)).toEqual([31, 32]);
+    expect(content.items[0]).toMatchObject({
+      id: 31,
+      date: '2026-10-19T23:59:30+02:00',
+      amount: 70,
+    });
+    expect(result.structuredContent).toMatchObject({
+      pagination: { returned: 2, has_more: false },
+    });
+    expect(result.structuredContent).not.toHaveProperty('last_minute_complete');
+  });
+
+  it('reads the last minute for the first page only', async () => {
+    const calls: Call[] = [];
+    const client = fakeClient(
+      [['GET', /^\/transactions\/4564$/, 200, ok([transactionRow()])]],
+      calls
+    );
+    await listFinancialTransactions(client, {
+      location_id: LOCATION,
+      date_from: '2026-10-01',
+      date_to: '2026-10-19',
+      page: 2,
+      page_size: 25,
+    });
+    expect(calls.filter(scanOf)).toHaveLength(0);
+  });
+
+  it('says when the last minute could not all be read', async () => {
+    const calls: Call[] = [];
+    const busyNextDay = ok(
+      Array.from({ length: 200 }, (_, i) =>
+        transactionRow({ id: 1000 + i, date: '2026-10-20T11:00:00+0400' })
+      )
+    );
+    const client = fakeClient(
+      [
+        [
+          'GET',
+          /^\/transactions\/4564$/,
+          200,
+          (call: Call) => (scanOf(call) ? busyNextDay : ok([])),
+        ],
+      ],
+      calls
+    );
+    const result = await listFinancialTransactions(client, {
+      location_id: LOCATION,
+      date_from: '2026-10-01',
+      date_to: '2026-10-19',
+      page: 1,
+      page_size: 25,
+    });
+    expect(calls.filter(scanOf)).toHaveLength(5);
+    expect(result.structuredContent).toMatchObject({
+      items: [],
+      last_minute_complete: false,
+    });
+    expect(result.text).toContain('could not all be read');
+  });
+
   it('refuses a period over a year before reading', async () => {
     await expect(
       listFinancialTransactions(fakeClient([], []), {
@@ -1130,6 +1237,45 @@ describe('financial_transactions_create', () => {
           amount: 5,
         },
         NOW
+      )
+    ).rejects.toThrow(/financial transaction 7 with the same/);
+    expect(calls.some((c) => c.method === 'POST')).toBe(false);
+  });
+
+  it('finds a repeat in the last minute of the day, which the listing drops', async () => {
+    const calls: Call[] = [];
+    const client = fakeClient(
+      [
+        [
+          'GET',
+          /^\/transactions\/4564$/,
+          200,
+          (call: Call) =>
+            call.query.get('end_date') === '2026-10-20'
+              ? ok([
+                  // 23:59:30 in Prague, on the server's +04:00 clock.
+                  transactionRow({
+                    id: 7,
+                    date: '2026-10-20T01:59:30+0400',
+                    comment: '',
+                  }),
+                ])
+              : ok([]),
+        ],
+      ],
+      calls
+    );
+    await expect(
+      createFinancialTransaction(
+        client,
+        {
+          location_id: LOCATION,
+          payment_item_id: 9,
+          account_id: 1330531,
+          amount: 5,
+          date: '2026-10-19T23:59:30',
+        },
+        Date.parse('2026-10-20T08:00:00Z')
       )
     ).rejects.toThrow(/financial transaction 7 with the same/);
     expect(calls.some((c) => c.method === 'POST')).toBe(false);

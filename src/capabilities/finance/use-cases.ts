@@ -1163,23 +1163,30 @@ export async function listFinancialTransactions(
   input: TransactionListInput
 ): Promise<FinanceResult> {
   checkPeriod(input.date_from, input.date_to);
-  const [found, currency] = await Promise.all([
-    api(client).listFinancialTransactions(input.location_id, {
+  const filters = {
+    date_to: input.date_to,
+    ...(input.account_id !== undefined ? { account_id: input.account_id } : {}),
+    ...(input.client_id !== undefined ? { client_id: input.client_id } : {}),
+    ...(input.team_member_id !== undefined
+      ? { team_member_id: input.team_member_id }
+      : {}),
+    ...(input.supplier_id !== undefined
+      ? { supplier_id: input.supplier_id }
+      : {}),
+  };
+  const finance = api(client);
+  const [found, lastMinute, currency] = await Promise.all([
+    finance.listFinancialTransactions(input.location_id, {
+      ...filters,
       date_from: input.date_from,
-      date_to: input.date_to,
-      ...(input.account_id !== undefined
-        ? { account_id: input.account_id }
-        : {}),
-      ...(input.client_id !== undefined ? { client_id: input.client_id } : {}),
-      ...(input.team_member_id !== undefined
-        ? { team_member_id: input.team_member_id }
-        : {}),
-      ...(input.supplier_id !== undefined
-        ? { supplier_id: input.supplier_id }
-        : {}),
       page: input.page,
       page_size: input.page_size,
     }),
+    // The listing drops 23:59:01–23:59:59 of `date_to`; newest first, those
+    // belong at the top of the first page.
+    input.page === 1
+      ? finance.listLastMinuteTransactions(input.location_id, filters)
+      : Promise.resolve({ items: [], complete: true }),
     resolveLocationCurrency(client, input.location_id),
   ]);
   // The source has no total; a short page is the last one.
@@ -1187,7 +1194,9 @@ export async function listFinancialTransactions(
   return renderPage({
     input,
     items,
-    render: ({ items: page, pagination }) => {
+    render: ({ items: listed, pagination: listedPagination }) => {
+      const page = [...lastMinute.items, ...listed];
+      const pagination = { ...listedPagination, returned: page.length };
       const income = sumMajor(
         page.filter((t) => t.amount > 0).map((t) => t.amount)
       );
@@ -1202,6 +1211,8 @@ export async function listFinancialTransactions(
           : page.length > 0 && 'This is the last page.',
         page.some((t) => t.document_id !== null) &&
           'A transaction with an appointment or document was recorded by a visit payment, a product sale or a client account deposit; change it there (visits_cancel_payment), not with financial_transactions_update.',
+        !lastMinute.complete &&
+          `Transactions after 23:59:00 on ${input.date_to} could not all be read; the last minute of the period may be incomplete.`,
         ...currencyNote(currency)
       );
       return {
@@ -1215,6 +1226,7 @@ export async function listFinancialTransactions(
           currency,
           items: page,
           pagination,
+          ...(lastMinute.complete ? {} : { last_minute_complete: false }),
         },
       };
     },
@@ -1335,13 +1347,24 @@ export async function createFinancialTransaction(
   };
 
   // A repeated call with the same confirmation token must not record twice.
-  const sameDay = await finance.listFinancialTransactions(input.location_id, {
-    date_from: day,
-    date_to: day,
-    account_id: input.account_id,
-    page: 1,
-    page_size: 100,
-  });
+  const [listed, lastMinute] = await Promise.all([
+    finance.listFinancialTransactions(input.location_id, {
+      date_from: day,
+      date_to: day,
+      account_id: input.account_id,
+      page: 1,
+      page_size: 100,
+    }),
+    // The listing ends the day at 23:59:00; a repeat in the day's last
+    // minute is only found by the last-minute read.
+    local.slice(11, 16) === '23:59'
+      ? finance.listLastMinuteTransactions(input.location_id, {
+          date_to: day,
+          account_id: input.account_id,
+        })
+      : Promise.resolve({ items: [], complete: true }),
+  ]);
+  const sameDay = [...lastMinute.items, ...listed];
   const duplicate = sameDay.find((t) => {
     if (
       t.payment_item_id !== fields.payment_item_id ||
