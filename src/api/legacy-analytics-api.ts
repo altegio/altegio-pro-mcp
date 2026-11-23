@@ -249,9 +249,27 @@ export interface ProductSalesReport {
   pagination_source: 'upstream' | 'local';
 }
 export type CashAccountType = 'all' | 'cash' | 'non_cash';
-export interface CashFlowColumn {
+/** A column of one source page: a day of the requested chunk, or its total. */
+export interface CashFlowSourceColumn {
   period_label: string;
   period_kind: 'day' | 'period_total';
+  dimension: 'cash_account_type' | 'cash_account' | 'total';
+  cash_account_type: CashAccountType | null;
+  cash_account_id: null;
+  cash_account_title: string | null;
+}
+/** How the answer groups days into columns; `period` is the total alone. */
+export type CashFlowGranularity = 'day' | 'week' | 'month' | 'period';
+/** Which periods carry per-account columns in an all-account-types answer. */
+export type CashFlowAccountColumns =
+  'per_period' | 'period_total_only' | 'none';
+export interface CashFlowColumn {
+  /** `YYYY-MM-DD`, `YYYY-MM-DD..YYYY-MM-DD` for a week, `YYYY-MM`, or `total`. */
+  period_label: string;
+  period_kind: 'day' | 'week' | 'month' | 'period_total';
+  /** Inclusive local days the column covers, clipped to the period. */
+  date_from: string;
+  date_to: string;
   dimension: 'cash_account_type' | 'cash_account' | 'total';
   cash_account_type: CashAccountType | null;
   cash_account_id: null;
@@ -265,15 +283,25 @@ export interface CashFlowRow {
   amounts: Array<number | null>;
   total: number | null;
 }
+export interface CashFlowTotals {
+  inflow: number | null;
+  outflow: number | null;
+  net_movement: number | null;
+}
+/** One parsed source page, before its days are merged and regrouped. */
+export interface CashFlowSourceReport {
+  currency: string | null;
+  columns: CashFlowSourceColumn[];
+  rows: CashFlowRow[];
+  totals: CashFlowTotals;
+}
 export interface CashFlowBreakdownReport {
   currency: string | null;
+  granularity: CashFlowGranularity;
+  account_columns: CashFlowAccountColumns;
   columns: CashFlowColumn[];
   rows: CashFlowRow[];
-  totals: {
-    inflow: number | null;
-    outflow: number | null;
-    net_movement: number | null;
-  };
+  totals: CashFlowTotals;
 }
 
 export interface LegacyPeriodRequest {

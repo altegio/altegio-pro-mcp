@@ -16,8 +16,11 @@ import type {
 } from '../../api/legacy-analytics-api.js';
 import { CONTACTS_WITHHELD_NOTICE } from '../../tools/contacts.js';
 import { sanitizeUntrusted, UNTRUSTED_NOTE } from '../../tools/tool-result.js';
+import { AltegioApiError } from '../../utils/errors.js';
 import { resolveLocationTimezone } from './location-timezone.js';
 import { resolvePeriod, type Period, type PeriodInput } from './periods.js';
+import { rowsText, withRowsText } from './rows-text.js';
+import { scheduledCapacityByTeamMember } from './decision-use-cases.js';
 
 export interface LegacyAnalyticsResult {
   text: string;
@@ -132,7 +135,9 @@ export async function getClientSales(
   if (report.page.has_more) lines.push(`More rows: request page ${page + 1}.`);
   if (!includeContacts) lines.push(CONTACTS_WITHHELD_NOTICE);
   return {
-    text: lines.join('\n'),
+    text: withRowsText(lines.join('\n'), 'client sales', report.rows, {
+      pageSize,
+    }),
     structuredContent: {
       location_id: input.location_id,
       period,
@@ -162,10 +167,14 @@ export async function getClientRetention(
     })
   );
   return {
-    text: [
-      `Client retention for ${period.date_from}–${period.date_to}: ${report.rows.length} team member(s).`,
-      `Unique clients ${report.totals.clients_count}; returned ${report.totals.clients_returned_count} of ${report.totals.clients_eligible_for_return_count} eligible (${report.totals.retention_percent ?? 'n/a'}%).`,
-    ].join('\n'),
+    text: withRowsText(
+      [
+        `Client retention for ${period.date_from}–${period.date_to}: ${report.rows.length} team member(s).`,
+        `Unique clients ${report.totals.clients_count}; returned ${report.totals.clients_returned_count} of ${report.totals.clients_eligible_for_return_count} eligible (${report.totals.retention_percent ?? 'n/a'}%).`,
+      ].join('\n'),
+      'client retention',
+      report.rows
+    ),
     structuredContent: {
       location_id: input.location_id,
       period,
@@ -209,7 +218,9 @@ export async function getClientForecast(
   if (report.page.has_more) lines.push(`More rows: request page ${page + 1}.`);
   if (!includeContacts) lines.push(CONTACTS_WITHHELD_NOTICE);
   return {
-    text: lines.join('\n'),
+    text: withRowsText(lines.join('\n'), 'client forecast', report.rows, {
+      pageSize,
+    }),
     structuredContent: {
       location_id: input.location_id,
       ...report,
@@ -252,11 +263,18 @@ export async function getServiceProfitability(
     })
   );
   return {
-    text: [
-      `${report.page.total_count} ${groupBy === 'service' ? 'service' : 'service-category'} row(s) for ${period.date_from}–${period.date_to}; showing ${report.page.returned}.`,
-      `Total service contribution ${report.totals.contribution_result ?? 'n/a'} ${report.currency ?? '(currency unavailable)'} after consumables and team-member compensation.`,
-      ...(report.page.has_more ? [`More rows: request page ${page + 1}.`] : []),
-    ].join('\n'),
+    text: withRowsText(
+      [
+        `${report.page.total_count} ${groupBy === 'service' ? 'service' : 'service-category'} row(s) for ${period.date_from}–${period.date_to}; showing ${report.page.returned}.`,
+        `Total service contribution ${report.totals.contribution_result ?? 'n/a'} ${report.currency ?? '(currency unavailable)'} after consumables and team-member compensation.`,
+        ...(report.page.has_more
+          ? [`More rows: request page ${page + 1}.`]
+          : []),
+      ].join('\n'),
+      groupBy === 'service' ? 'services' : 'service categories',
+      report.rows,
+      { pageSize }
+    ),
     structuredContent: {
       location_id: input.location_id,
       period,
@@ -297,10 +315,14 @@ export async function getTeamMemberSales(
     })
   );
   return {
-    text: [
-      `Team-member sales for ${period.date_from}–${period.date_to}: ${report.rows.length} row(s).`,
-      `Total revenue ${report.totals.revenue ?? 'n/a'} ${report.currency ?? '(currency unavailable)'}; services ${report.totals.services_revenue ?? 'n/a'}, products ${report.totals.products_revenue ?? 'n/a'}.`,
-    ].join('\n'),
+    text: withRowsText(
+      [
+        `Team-member sales for ${period.date_from}–${period.date_to}: ${report.rows.length} row(s).`,
+        `Total revenue ${report.totals.revenue ?? 'n/a'} ${report.currency ?? '(currency unavailable)'}; services ${report.totals.services_revenue ?? 'n/a'}, products ${report.totals.products_revenue ?? 'n/a'}.`,
+      ].join('\n'),
+      'team-member sales',
+      report.rows
+    ),
     structuredContent: {
       location_id: input.location_id,
       period,
@@ -342,43 +364,115 @@ function sanitizeReport(value: unknown): unknown {
   return value;
 }
 
-function nextReportResult(
+function nextReportResult<R extends { rows: readonly object[] }>(
   locationId: number,
   period: Period,
-  report: object,
+  report: R,
   text: string,
-  extra: object = {}
+  options: {
+    label: string;
+    pageSize?: number;
+    extra?: object;
+    before?: string;
+  } = {
+    label: 'rows',
+  }
 ): LegacyAnalyticsResult {
+  const safeReport = sanitizeReport(report) as { rows: readonly object[] };
   const structuredContent = {
     location_id: locationId,
     period,
-    ...(sanitizeReport(report) as object),
-    ...extra,
+    ...safeReport,
+    ...(options.extra ?? {}),
     untrusted_data_note: UNTRUSTED_NOTE,
   };
   // Refuse an oversized answer rather than silently dropping rows or columns.
+  // A size bound the caller can act on, not a server failure.
   if (JSON.stringify(structuredContent).length > 24000)
-    throw new Error(
-      'This analytics result is too large. Narrow the period or filters, or reduce page_size.'
+    throw new AltegioApiError(
+      'This analytics result is too large. Narrow the period or filters, or reduce page_size.',
+      422
     );
-  return { text, structuredContent };
+  const summary = options.before ? `${text}\n\n${options.before}` : text;
+  return {
+    text: withRowsText(summary, options.label, safeReport.rows, {
+      ...(options.pageSize !== undefined ? { pageSize: options.pageSize } : {}),
+    }),
+    structuredContent,
+  };
 }
 
 export async function getTeamMemberCapacity(
   client: AltegioClient,
   input: TeamMemberCapacityInput
 ): Promise<LegacyAnalyticsResult> {
-  const period = await periodFor(client, input.location_id, input);
+  const timezone = await resolveLocationTimezone(client, input.location_id);
+  const period = resolvePeriod(input, timezone);
   const report = await adapter(client).getTeamMemberCapacity({
     ...input,
     date_from: period.date_from,
     date_to: period.date_to,
   });
+  // The source counts only time on arrived appointments as booked, so a
+  // period that is not over yet read zero booked hours whatever was booked
+  // (prod, 2026-11: 63 scheduled hours, 0 booked, while the appointment list
+  // had 8 hours of waiting appointments inside the schedule). Such a period
+  // is measured from schedules and non-cancelled appointments instead.
+  const today = resolvePeriod({ period: 'today' }, timezone).date_from;
+  if (period.date_to < today) {
+    return nextReportResult(
+      input.location_id,
+      period,
+      { ...report, booked_hours_basis: 'arrived_appointments' },
+      `Capacity for ${report.rows.length} team member(s): ${report.totals.booked_hours ?? 'n/a'} booked hours of ${report.totals.scheduled_hours ?? 'n/a'} scheduled hours; occupancy ${report.totals.occupancy_percent ?? 'n/a'}%. Booked hours are time on arrived appointments.`,
+      { label: 'team-member capacity' }
+    );
+  }
+  const scheduled = await scheduledCapacityByTeamMember(client, {
+    location_id: input.location_id,
+    date_from: period.date_from,
+    date_to: period.date_to,
+    team_member_ids: report.rows.map((row) => row.team_member_id),
+  });
+  const rows = report.rows.map((row) => {
+    const own = scheduled.by_team_member.get(row.team_member_id);
+    return {
+      ...row,
+      scheduled_hours: own?.scheduled_hours ?? null,
+      booked_hours: own?.booked_hours ?? null,
+      idle_hours: own?.idle_hours ?? null,
+      occupancy_percent: own?.occupancy_percent ?? null,
+      appointments_count: own?.appointments_count ?? null,
+    };
+  });
+  const sum = (
+    key: 'scheduled_hours' | 'booked_hours' | 'appointments_count'
+  ) => rows.reduce((total, row) => total + (row[key] ?? 0), 0);
+  const scheduledHours = Math.round(sum('scheduled_hours') * 100) / 100;
+  const bookedHours = Math.round(sum('booked_hours') * 100) / 100;
+  const totals = {
+    ...report.totals,
+    scheduled_hours: scheduledHours,
+    booked_hours: bookedHours,
+    idle_hours:
+      Math.round(Math.max(0, scheduledHours - bookedHours) * 100) / 100,
+    occupancy_percent:
+      scheduledHours > 0
+        ? Math.round((bookedHours / scheduledHours) * 1000) / 10
+        : null,
+    appointments_count: sum('appointments_count'),
+  };
   return nextReportResult(
     input.location_id,
     period,
-    report,
-    `Capacity for ${report.rows.length} team member(s): ${report.totals.booked_hours ?? 'n/a'} booked hours of ${report.totals.scheduled_hours ?? 'n/a'} scheduled hours; occupancy ${report.totals.occupancy_percent ?? 'n/a'}%.`
+    {
+      rows,
+      totals,
+      booked_hours_basis: 'scheduled_appointments',
+      coverage: { complete: scheduled.complete },
+    },
+    `Capacity for ${rows.length} team member(s): ${totals.booked_hours} booked hours of ${totals.scheduled_hours} scheduled hours; occupancy ${totals.occupancy_percent ?? 'n/a'}%; ${totals.appointments_count} non-cancelled appointment(s). The period is not over, so booked hours are the union of busy intervals and non-cancelled appointments inside scheduled time, pending and confirmed ones included.${scheduled.complete ? '' : ' The appointment list was cut at its page cap, so booked hours may be low; shorten the period.'}`,
+    { label: 'team-member capacity' }
   );
 }
 export async function getGroupEventPerformance(
@@ -397,7 +491,8 @@ export async function getGroupEventPerformance(
     input.location_id,
     period,
     report,
-    `${report.page.total_count} group event(s); showing ${report.page.returned}. Amounts are appointment value, not collected revenue. Dates retain the source display format; service ids are unavailable.${report.page.has_more ? ' Request the next page for more.' : ''}`
+    `${report.page.total_count} group event(s); showing ${report.page.returned}. Amounts are appointment value, not collected revenue. Dates retain the source display format; service ids are unavailable.${report.page.has_more ? ' Request the next page for more.' : ''}`,
+    { label: 'group events', pageSize: input.page_size ?? 25 }
   );
 }
 export async function getProductSales(
@@ -417,7 +512,14 @@ export async function getProductSales(
     input.location_id,
     period,
     report,
-    `${report.page.total_count} product sales row(s); showing ${report.page.returned}. Total revenue ${report.totals.revenue ?? 'n/a'} ${report.currency ?? ''} includes client-account payments. Cost is total cost of sold quantity. Category costs are withheld; hierarchical category rows must not be summed.${report.page.has_more ? ' Request the next page for more.' : ''}`
+    `${report.page.total_count} product sales row(s); showing ${report.page.returned}. Total revenue ${report.totals.revenue ?? 'n/a'} ${report.currency ?? ''} includes client-account payments. Cost is total cost of sold quantity. Category costs are withheld; hierarchical category rows must not be summed.${report.page.has_more ? ' Request the next page for more.' : ''}`,
+    {
+      label:
+        (input.group_by ?? 'product') === 'product'
+          ? 'product sales'
+          : 'product category sales',
+      pageSize: input.page_size ?? 25,
+    }
   );
 }
 export async function getCashFlowBreakdown(
@@ -430,23 +532,47 @@ export async function getCashFlowBreakdown(
     date_from: period.date_from,
     date_to: period.date_to,
   });
+  const grouping =
+    report.granularity === 'day'
+      ? 'Columns are days.'
+      : report.granularity === 'period'
+        ? 'Columns are period totals only: day, week and month columns do not fit one answer.'
+        : `Columns group days by ${report.granularity}, because day columns do not fit one answer; every group sums the same days.`;
+  const accounts =
+    report.account_columns === 'period_total_only'
+      ? ' Cash-account columns carry period totals only.'
+      : '';
+  const columns = rowsText(
+    'cash-flow columns',
+    report.columns.map((column) => ({
+      period: column.period_label,
+      dimension: column.dimension,
+      cash_account_type: column.cash_account_type,
+      cash_account_title: sanitizeReport(column.cash_account_title),
+    }))
+  ).block;
   return nextReportResult(
     input.location_id,
     period,
     report,
-    `Cash flow: inflow ${report.totals.inflow ?? 'n/a'}, signed outflow ${report.totals.outflow ?? 'n/a'}, net movement ${report.totals.net_movement ?? 'n/a'} ${report.currency ?? ''}. Net movement is not an opening or closing account balance. Amount arrays correspond to columns; account and account-type breakdowns overlap and must not be added together.`,
+    `Cash flow: inflow ${report.totals.inflow ?? 'n/a'}, signed outflow ${report.totals.outflow ?? 'n/a'}, net movement ${report.totals.net_movement ?? 'n/a'} ${report.currency ?? ''}. Net movement is not an opening or closing account balance. ${grouping}${accounts} Amount arrays correspond to columns, in the order listed; account and account-type breakdowns overlap and must not be added together.`,
     {
-      filters_applied: {
-        cash_account_ids: input.cash_account_ids ?? [],
-        team_member_id: input.team_member_id ?? null,
-        supplier_id: input.supplier_id ?? null,
-        payment_item_id: input.payment_item_id ?? null,
-        cash_account_type: input.cash_account_type ?? 'all',
-        service_ids: input.service_ids ?? [],
-        product_ids: input.product_ids ?? [],
-        service_category_ids: input.service_category_ids ?? [],
-        product_category_ids: input.product_category_ids ?? [],
-        include_zero_movement_rows: input.include_zero_movement_rows !== false,
+      label: 'cash-flow rows',
+      ...(columns ? { before: columns } : {}),
+      extra: {
+        filters_applied: {
+          cash_account_ids: input.cash_account_ids ?? [],
+          team_member_id: input.team_member_id ?? null,
+          supplier_id: input.supplier_id ?? null,
+          payment_item_id: input.payment_item_id ?? null,
+          cash_account_type: input.cash_account_type ?? 'all',
+          service_ids: input.service_ids ?? [],
+          product_ids: input.product_ids ?? [],
+          service_category_ids: input.service_category_ids ?? [],
+          product_category_ids: input.product_category_ids ?? [],
+          include_zero_movement_rows:
+            input.include_zero_movement_rows !== false,
+        },
       },
     }
   );

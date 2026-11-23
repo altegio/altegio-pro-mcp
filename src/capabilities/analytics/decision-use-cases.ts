@@ -5,7 +5,10 @@ import type {
   AltegioScheduleEntry,
   AltegioStaff,
 } from '../../types/altegio.types.js';
-import { V1LegacyAnalyticsAdapter } from '../../api/v1/legacy-analytics-adapter.js';
+import {
+  V1LegacyAnalyticsAdapter,
+  isWholeMonths,
+} from '../../api/v1/legacy-analytics-adapter.js';
 import { V1AnalyticsAdapter } from '../../api/v1/analytics-adapter.js';
 import { httpFromClient } from '../../api/altegio-http.js';
 import { AnalyticsInputError } from './errors.js';
@@ -14,6 +17,7 @@ import { resolveLocationTimezone } from './location-timezone.js';
 import { resolveLocationCurrency } from '../../api/v1/location-currency.js';
 import { sanitizeUntrusted, UNTRUSTED_NOTE } from '../../tools/tool-result.js';
 import { visitStatusOfAppointment, type VisitStatus } from './vocabulary.js';
+import { withRowsText } from './rows-text.js';
 
 export interface DecisionAnalyticsResult {
   text: string;
@@ -516,6 +520,76 @@ function calculateCapacity(args: {
   };
 }
 
+export interface ScheduledCapacity {
+  scheduled_hours: number;
+  booked_hours: number;
+  idle_hours: number;
+  occupancy_percent: number | null;
+  /** Non-cancelled appointments starting in scheduled time in the period. */
+  appointments_count: number;
+}
+
+/**
+ * Scheduled and booked hours per team member from work schedules and the
+ * appointment list: the same union of busy intervals and non-cancelled
+ * appointments inside scheduled time as the capacity heatmap, so pending and
+ * confirmed future appointments count as booked.
+ */
+export async function scheduledCapacityByTeamMember(
+  client: AltegioClient,
+  input: {
+    location_id: number;
+    date_from: string;
+    date_to: string;
+    team_member_ids: number[];
+  }
+): Promise<{
+  by_team_member: Map<number, ScheduledCapacity>;
+  complete: boolean;
+}> {
+  const ids = input.team_member_ids;
+  const [schedules, appointments] = await Promise.all([
+    ids.length === 0
+      ? Promise.resolve([])
+      : client.getTeamMemberSchedules(input.location_id, {
+          start_date: input.date_from,
+          end_date: input.date_to,
+          team_member_ids: ids,
+          include_busy_intervals: true,
+        }),
+    fetchAppointments(client, input),
+  ]);
+  const byTeamMember = new Map<number, ScheduledCapacity>();
+  for (const id of ids) {
+    const { buckets } = calculateCapacity({
+      schedules,
+      appointments: appointments.rows,
+      selectedIds: new Set([id]),
+      granularity: 'weekday',
+      date_from: input.date_from,
+      date_to: input.date_to,
+    });
+    const scheduled = buckets.reduce((sum, b) => sum + b.scheduled_hours, 0);
+    const booked = buckets.reduce((sum, b) => sum + b.booked_hours, 0);
+    byTeamMember.set(id, {
+      scheduled_hours: round(scheduled),
+      booked_hours: round(booked),
+      idle_hours: round(Math.max(0, scheduled - booked)),
+      occupancy_percent:
+        scheduled > 0 ? round((booked / scheduled) * 100, 1) : null,
+      appointments_count: buckets.reduce(
+        (sum, b) =>
+          sum +
+          b.completed_appointments_count +
+          b.no_show_appointments_count +
+          b.pending_appointments_count,
+        0
+      ),
+    });
+  }
+  return { by_team_member: byTeamMember, complete: !appointments.truncated };
+}
+
 export interface CapacityHeatmapInput extends PeriodInput {
   location_id: number;
   team_member_ids?: number[];
@@ -569,7 +643,11 @@ export async function getCapacityHeatmap(
     .sort((a, b) => a.occupancy_percent! - b.occupancy_percent!)
     .slice(0, 3);
   return {
-    text: `Capacity heatmap for ${period.date_from}–${period.date_to}: ${calculated.buckets.length} bucket(s), ${ids.length} team member(s). Peak occupancy ${peaks[0]?.occupancy_percent ?? 'n/a'}%.`,
+    text: withRowsText(
+      `Capacity heatmap for ${period.date_from}–${period.date_to}: ${calculated.buckets.length} bucket(s), ${ids.length} team member(s). Peak occupancy ${peaks[0]?.occupancy_percent ?? 'n/a'}%.`,
+      'capacity buckets',
+      calculated.buckets
+    ),
     structuredContent: {
       location_id: input.location_id,
       period: { ...period, timezone },
@@ -622,6 +700,32 @@ function compared(current: number | null, previous?: number | null) {
   };
 }
 
+/**
+ * The same number of whole calendar months right before a whole-month
+ * period: October compares with September, not with August 31 to September
+ * 30, which the P&L page cannot read as it is.
+ */
+function previousWholeMonths(period: { date_from: string; date_to: string }): {
+  date_from: string;
+  date_to: string;
+} {
+  const [fromYear, fromMonth] = period.date_from.split('-').map(Number);
+  const [toYear, toMonth] = period.date_to.split('-').map(Number);
+  const months = (toYear! - fromYear!) * 12 + (toMonth! - fromMonth!) + 1;
+  const start = new Date(Date.UTC(fromYear!, fromMonth! - 1 - months, 1));
+  const end = new Date(Date.UTC(fromYear!, fromMonth! - 1, 0));
+  return {
+    date_from: start.toISOString().slice(0, 10),
+    date_to: end.toISOString().slice(0, 10),
+  };
+}
+
+function ledgerSource(range: { date_from: string; date_to: string }) {
+  return isWholeMonths(range.date_from, range.date_to)
+    ? ('whole_month_finance_report' as const)
+    : ('exact_day_cash_flow_report' as const);
+}
+
 export interface ProfitAndLossInput extends PeriodInput {
   location_id: number;
   include_comparison?: boolean;
@@ -645,12 +749,20 @@ export async function getProfitAndLossStatement(
     page_size: 1,
     group_by: 'service' as const,
   };
-  const [ledger, sales, serviceContribution] = await Promise.all([
-    legacy.getProfitAndLoss({
+  // The P&L page reads whole calendar months only; a shorter period is
+  // summed from the same transactions for its exact days.
+  const readLedger = (range: { date_from: string; date_to: string }) => {
+    const request = {
       location_id: input.location_id,
-      date_from: period.date_from,
-      date_to: period.date_to,
-    }),
+      date_from: range.date_from,
+      date_to: range.date_to,
+    };
+    return isWholeMonths(range.date_from, range.date_to)
+      ? legacy.getProfitAndLoss(request)
+      : legacy.getPeriodLedger(request);
+  };
+  const [ledger, sales, serviceContribution] = await Promise.all([
+    readLedger(period),
     api.getDayEndReport({
       location_id: input.location_id,
       date_from: period.date_from,
@@ -686,14 +798,12 @@ export async function getProfitAndLossStatement(
           },
           timezone
         )
-      : previousPeriod(period);
+      : isWholeMonths(period.date_from, period.date_to)
+        ? previousWholeMonths(period)
+        : previousPeriod(period);
     const [previousLedger, previousSales, previousContribution] =
       await Promise.all([
-        legacy.getProfitAndLoss({
-          location_id: input.location_id,
-          date_from: comparisonPeriod.date_from,
-          date_to: comparisonPeriod.date_to,
-        }),
+        readLedger(comparisonPeriod),
         api.getDayEndReport({
           location_id: input.location_id,
           date_from: comparisonPeriod.date_from,
@@ -728,8 +838,13 @@ export async function getProfitAndLossStatement(
           : null
         : undefined
     );
+  // An exact-day ledger carries category titles, not ids: match by title
+  // whenever either side lacks ids, so a category is compared with itself.
+  const byId = [ledger, comparison?.ledger].every(
+    (side) => !side || side.categories.every((row) => row.category_id !== null)
+  );
   const categoryKey = (row: (typeof ledger.categories)[number]): string =>
-    `${row.direction}:${row.category_id ?? row.title ?? ''}`;
+    `${row.direction}:${(byId ? row.category_id : null) ?? row.title ?? ''}`;
   const currentCategories = new Map(
     ledger.categories.map((row) => [categoryKey(row), row])
   );
@@ -767,7 +882,11 @@ export async function getProfitAndLossStatement(
       : round((report.totals.contribution_result / revenue) * 100, 1);
   };
   return {
-    text: `Tracked operating result for ${period.date_from}–${period.date_to}: ${ledger.tracked_operating_result ?? 'unavailable'} ${ledger.currency ?? ''}. This is not labelled net profit because external cost coverage cannot be proven.${sales.period_status === 'verified' ? '' : ' The sales-stream memo is unavailable because its effective period could not be verified.'}`,
+    text: withRowsText(
+      `Tracked operating result for ${period.date_from}–${period.date_to}: ${ledger.tracked_operating_result ?? 'unavailable'} ${ledger.currency ?? ''}; posted income ${ledger.income_total ?? 'n/a'}, expenses ${ledger.expense_total ?? 'n/a'}. This is not labelled net profit because external cost coverage cannot be proven.${sales.period_status === 'verified' ? '' : ' The sales-stream memo is unavailable because its effective period could not be verified.'}`,
+      'ledger categories',
+      categories
+    ),
     structuredContent: {
       location_id: input.location_id,
       period: { ...period, timezone },
@@ -818,8 +937,12 @@ export async function getProfitAndLossStatement(
           limit: PROFIT_AND_LOSS_CATEGORY_LIMIT,
           complete: categories.length === categoryCount,
         },
+        source: ledgerSource(period),
+        ...(comparison
+          ? { comparison_source: ledgerSource(comparison.period) }
+          : {}),
         formula:
-          'Tracked operating result is the signed total of posted income and expense transactions in the location finance report.',
+          'Tracked operating result is the signed total of posted income and expense transactions in the location finance report. Whole calendar months read the profit and loss report; any other period sums the cash-flow report of the same transactions for its exact days, whose categories carry titles but no ids.',
       },
       service_contribution: {
         cash_or_card_revenue: compared(
@@ -1326,7 +1449,12 @@ export async function getTeamMemberServiceMatrix(
   const minimum = input.minimum_sample_size ?? 3;
   const rankable = withShares.filter((row) => row.sample_size >= minimum);
   return {
-    text: `Team-member × service matrix for ${period.date_from}–${period.date_to}: ${withShares.length} cell(s); showing page ${page}. Rankings exclude cells below ${minimum} delivered services.`,
+    text: withRowsText(
+      `Team-member × service matrix for ${period.date_from}–${period.date_to}: ${withShares.length} cell(s); showing page ${page}. Rankings exclude cells below ${minimum} delivered services.`,
+      'team-member × service cells',
+      withShares.slice(start, start + pageSize),
+      { pageSize }
+    ),
     structuredContent: {
       location_id: input.location_id,
       period: { ...period, timezone },
@@ -1486,9 +1614,8 @@ export async function getInventoryReorderRisks(
   const pageSize = input.page_size ?? 50;
   const lead = input.lead_time_days ?? 14;
   const safety = input.safety_stock_days ?? 7;
-  const report = await new V1LegacyAnalyticsAdapter(
-    client
-  ).getInventoryTurnover({
+  const legacy = new V1LegacyAnalyticsAdapter(client);
+  const report = await legacy.getInventoryTurnover({
     location_id: input.location_id,
     date_from: period.date_from,
     date_to: period.date_to,
@@ -1500,12 +1627,45 @@ export async function getInventoryReorderRisks(
       : {}),
     ...(input.supplier_id ? { supplier_id: input.supplier_id } : {}),
   });
+  // The turnover report divides consumable write-offs by the consumable
+  // units per sale unit although they are stored in sale units, so for a
+  // product written off in ml or g its sales, opening and closing stock are
+  // too low by that ratio (prod, 2026-11: a 60 ml product reported 0.97 sold
+  // and 61.03 in stock for 58 used and 4 in stock, and read as overstocked).
+  // The product card has the ratio and the true current stock; what the
+  // report got wrong is withheld rather than guessed, because its rounded
+  // figures cannot be converted back.
+  const cards = await mapWithConcurrency(report.rows, 4, (row) =>
+    legacy.getProductUnitStock(input.location_id, row.product_id)
+  );
   const riskFilter = new Set(input.risks ?? []);
+  let convertedProducts = 0;
+  let uncheckedProducts = 0;
   const rows = report.rows
-    .map((row) => {
+    .map((row, index) => {
+      const card = cards[index] ?? null;
+      const ratio = card?.consumable_units_per_sale_unit ?? null;
+      if (ratio === null) uncheckedProducts += 1;
+      const converted = ratio !== null && ratio !== 1;
+      if (converted) convertedProducts += 1;
+      const stock =
+        card?.stock_by_inventory?.filter(
+          (entry) =>
+            input.inventory_id === undefined ||
+            entry.inventory_id === input.inventory_id
+        ) ?? null;
+      const currentStock = converted
+        ? stock === null
+          ? null
+          : round(
+              stock.reduce((sum, entry) => sum + entry.amount, 0),
+              3
+            )
+        : row.current_stock;
+      const unitsSold = converted ? null : row.units_sold;
       const calculated = inventoryRisk({
-        current_stock: row.current_stock,
-        units_sold: row.units_sold,
+        current_stock: currentStock,
+        units_sold: unitsSold,
         period_days: period.days,
         lead_time_days: lead,
         safety_stock_days: safety,
@@ -1518,10 +1678,10 @@ export async function getInventoryReorderRisks(
         supplier_title: safe(row.supplier_title),
         inventory_id: input.inventory_id ?? null,
         product_category_id: input.product_category_id ?? null,
-        current_stock: row.current_stock,
+        current_stock: currentStock,
         reserved_stock: null,
         available_stock: null,
-        units_sold: row.units_sold,
+        units_sold: unitsSold,
         average_daily_sales: calculated.average_daily_sales,
         days_of_cover: calculated.days_of_cover,
         last_sale_date: null,
@@ -1529,20 +1689,29 @@ export async function getInventoryReorderRisks(
         cost_per_unit: null,
         risk: calculated.risk,
         recommended_reorder_quantity: calculated.recommended_reorder_quantity,
-        negative_stock: row.current_stock !== null && row.current_stock < 0,
+        negative_stock: currentStock !== null && currentStock < 0,
+        consumable_units_per_sale_unit: ratio,
+        withheld_reason: converted
+          ? 'The source report divides consumable write-offs by the consumable units per sale unit a second time, so its sales velocity and stock history for this product are wrong. Current stock is read from the product card; sales velocity and the risk class are withheld.'
+          : null,
         source_metrics: {
           units_received: row.units_received,
-          opening_stock: row.opening_stock,
-          average_stock: row.average_stock,
-          turnover_days: row.source_turnover_days,
-          turnover_count: row.source_turnover_count,
-          stock_level_days: row.source_stock_level_days,
+          opening_stock: converted ? null : row.opening_stock,
+          average_stock: converted ? null : row.average_stock,
+          turnover_days: converted ? null : row.source_turnover_days,
+          turnover_count: converted ? null : row.source_turnover_count,
+          stock_level_days: converted ? null : row.source_stock_level_days,
         },
       };
     })
     .filter((row) => riskFilter.size === 0 || riskFilter.has(row.risk));
   return {
-    text: `Inventory reorder risks for ${period.date_from}–${period.date_to}: ${rows.length} product(s) on page ${page}; ${rows.filter((row) => row.risk === 'stockout' || row.risk === 'reorder_soon').length} need attention.`,
+    text: withRowsText(
+      `Inventory reorder risks for ${period.date_from}–${period.date_to}: ${rows.length} product(s) on page ${page}; ${rows.filter((row) => row.risk === 'stockout' || row.risk === 'reorder_soon').length} need attention.`,
+      'products',
+      rows,
+      { pageSize }
+    ),
     structuredContent: {
       location_id: input.location_id,
       period: { ...period, timezone },
@@ -1562,6 +1731,8 @@ export async function getInventoryReorderRisks(
       },
       coverage: {
         complete: !report.page.has_more,
+        consumable_unit_products: convertedProducts,
+        unit_checks_unavailable: uncheckedProducts,
         filters_supported_by_source: [
           'inventory_id',
           'product_category_id',
@@ -1590,6 +1761,11 @@ export async function getInventoryReorderRisks(
           source_id: 'inventory_turnover_report',
           format: 'JSON envelope with HTML table',
           permission: 'inventory turnover report access',
+        },
+        {
+          source_id: 'product_card',
+          format: 'JSON',
+          permission: 'product read access',
         },
       ],
       untrusted_data_note: UNTRUSTED_NOTE,

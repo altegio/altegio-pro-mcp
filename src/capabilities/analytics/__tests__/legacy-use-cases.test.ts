@@ -291,11 +291,21 @@ describe('next analytics text boundary', () => {
       barcode: CANARY,
       unit: CANARY,
     });
-    const cash = parseCashFlowBreakdownHtml({
+    const source = parseCashFlowBreakdownHtml({
       html: nextFixture('cash-flow-en.html'),
       currency: 'EUR',
       accountType: 'all',
     });
+    const cash = {
+      ...source,
+      granularity: 'day' as const,
+      account_columns: 'per_period' as const,
+      columns: source.columns.map((column) => ({
+        ...column,
+        date_from: '2026-09-19',
+        date_to: '2026-09-19',
+      })),
+    };
     cash.rows[0]!.payment_item_title = CANARY;
     cash.columns[0]!.period_label = CANARY;
     cash.columns[4]!.cash_account_title = CANARY;
