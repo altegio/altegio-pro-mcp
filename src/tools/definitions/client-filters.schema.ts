@@ -72,9 +72,7 @@ export const clientFiltersSchema = z
       .describe('Client card labels, not service categories.'),
     birthday: dateRange
       .optional()
-      .describe(
-        'Birthday window under a year; MM-DD bounds for a yearly band, may cross New Year.'
-      ),
+      .describe('Birthday window under a year; MM-DD for a yearly band.'),
     age: numberRange.optional(),
     has_mobile_app: z
       .boolean()
@@ -85,20 +83,13 @@ export const clientFiltersSchema = z
       .describe('Client-account balance.'),
     membership_balance: numberRange
       .optional()
-      .describe(
-        'Visits left on a membership. Membership filters match clients with one membership sold here meeting all of them.'
-      ),
+      .describe('Visits left; membership filters match one membership.'),
     membership_type_ids: z.array(z.number().int().positive()).optional(),
     membership_is_frozen: z.boolean().optional(),
-    membership_is_used: z
-      .boolean()
-      .optional()
-      .describe('Membership used at least once (false = never used).'),
+    membership_is_used: z.boolean().optional().describe('Used at least once.'),
     gift_card_balance: moneyRange
       .optional()
-      .describe(
-        'Gift card balance left. Gift card filters match one gift card sold here meeting all of them.'
-      ),
+      .describe('Gift card balance left.'),
     gift_card_type_ids: z.array(z.number().int().positive()).optional(),
     gift_card_is_used: z.boolean().optional(),
     newsletter_allowed: z

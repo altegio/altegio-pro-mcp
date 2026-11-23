@@ -658,15 +658,20 @@ describe('api_call_operation', () => {
     });
 
     it('names the location-scoped route for client loyalty cards (regression: retried 1700 times)', async () => {
-      const refusal = await scoped(() =>
-        callOperation(client, 'get_loyalty_card_list_by_client_id', {
-          client_id: 186529560,
-        })
-      ).catch((e: unknown) => e as Error);
-      expect(refusal.message).toMatch(
+      let message = '';
+      try {
+        await scoped(() =>
+          callOperation(client, 'get_loyalty_card_list_by_client_id', {
+            client_id: 186529560,
+          })
+        );
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      expect(message).toMatch(
         /cannot be confined to the declared location scope/
       );
-      expect(refusal.message).toContain(
+      expect(message).toContain(
         'Call `get_client_loyalty_summary` with location_id and client_id instead'
       );
       expect(global.fetch).not.toHaveBeenCalled();
