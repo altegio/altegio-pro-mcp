@@ -138,7 +138,9 @@ describe('HTTP session budget at capacity', () => {
     expect(closes[1]).toHaveBeenCalledTimes(1);
     expect(closes[0]).not.toHaveBeenCalled();
     expect(budget.size).toBe(2);
-    expect(evictions).toEqual([{ used: false, idleSeconds: 4, sessions: 1 }]);
+    expect(evictions).toEqual([
+      { used: false, idleSeconds: 4, sessions: 1, principalSessions: 1 },
+    ]);
   });
 
   it('evicts a session that never did real work before one that did', () => {
@@ -174,7 +176,9 @@ describe('HTTP session budget at capacity', () => {
     expect(budget.acquire(closer())).toBeDefined();
     expect(freshClose).not.toHaveBeenCalled();
     expect(staleClose).toHaveBeenCalledTimes(1);
-    expect(evictions).toEqual([{ used: true, idleSeconds: 601, sessions: 1 }]);
+    expect(evictions).toEqual([
+      { used: true, idleSeconds: 601, sessions: 1, principalSessions: 1 },
+    ]);
   });
 
   it('takes the oldest idle session when every idle one is inside the grace', () => {
@@ -214,5 +218,150 @@ describe('HTTP session budget at capacity', () => {
       expect(budget.acquire(closer())).toBeDefined();
       expect(budget.size).toBeLessThanOrEqual(3);
     }
+  });
+});
+
+describe('HTTP session budget shared between callers', () => {
+  let clock = 0;
+  const now = () => clock;
+  const MINUTE = 60 * 1000;
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    clock = 0;
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  /** A session that initialized and made one tool call, now idle. */
+  const usedSession = (
+    budget: HttpSessionBudget,
+    principal: string | undefined,
+    close = closer()
+  ) => {
+    const lease = budget.acquire(close, { principal })!;
+    lease.beginPost()();
+    lease.markUsed();
+    return { lease, close };
+  };
+
+  it('takes the slot from the caller holding the most sessions, not the oldest one', () => {
+    const evictions: HttpSessionEviction[] = [];
+    const budget = new HttpSessionBudget(4, {
+      now,
+      onEvict: (eviction) => evictions.push(eviction),
+    });
+    // A conversation paused 12 minutes ago: the oldest session in the budget.
+    const person = usedSession(budget, 'altegio-user-1');
+    clock += 12 * MINUTE;
+    // A client that opens a session per call, each newer than the pause.
+    const churn = [1, 2, 3].map(() => {
+      clock += 2 * MINUTE;
+      return usedSession(budget, 'token-churn');
+    });
+    clock += 2 * MINUTE;
+
+    expect(
+      budget.acquire(closer(), { principal: 'token-churn' })
+    ).toBeDefined();
+    expect(person.close).not.toHaveBeenCalled();
+    expect(churn[0]!.close).toHaveBeenCalledTimes(1);
+    expect(churn[1]!.close).not.toHaveBeenCalled();
+    expect(evictions).toEqual([
+      { used: true, idleSeconds: 360, sessions: 3, principalSessions: 3 },
+    ]);
+  });
+
+  it('keeps every person’s session while a churning client fills the budget', () => {
+    // 2026-11-23: up to 6.5k evictions a day, 93% of used sessions idle a
+    // median 12.5 min, while Codex opened 2.7 sessions per tool call.
+    const capacity = 16;
+    const budget = new HttpSessionBudget(capacity, { now });
+    const people = Array.from({ length: 5 }, (_, i) =>
+      usedSession(budget, `altegio-user-${i}`)
+    );
+    for (let call = 0; call < 500; call++) {
+      clock += 20 * 1000;
+      // Initialize, then a tool call on a fresh session; the last ones stay
+      // inside the grace, the rest are abandoned.
+      expect(usedSession(budget, 'token-codex').lease).toBeDefined();
+      // A probe that never calls a tool, every third call.
+      if (call % 3 === 0) {
+        expect(
+          budget.acquire(closer(), { principal: 'token-codex' })
+        ).toBeDefined();
+      }
+      expect(budget.size).toBeLessThanOrEqual(capacity);
+    }
+    // 2.8 hours of churn later, nobody's paused conversation was taken.
+    for (const person of people) expect(person.close).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the least recently used between equal shares', () => {
+    const budget = new HttpSessionBudget(2, { now });
+    const first = usedSession(budget, 'altegio-user-1');
+    clock += MINUTE;
+    const second = usedSession(budget, 'altegio-user-2');
+    clock += 2 * MINUTE;
+
+    expect(
+      budget.acquire(closer(), { principal: 'altegio-user-3' })
+    ).toBeDefined();
+    expect(first.close).toHaveBeenCalledTimes(1);
+    expect(second.close).not.toHaveBeenCalled();
+  });
+
+  it('counts a caller of unknown identity as a caller of its own', () => {
+    const budget = new HttpSessionBudget(3, { now });
+    const unknown = [
+      usedSession(budget, undefined),
+      usedSession(budget, undefined),
+    ];
+    clock += MINUTE;
+    const known = [usedSession(budget, 'altegio-user-1')];
+    clock += 2 * MINUTE;
+
+    // Two unknown sessions are not one caller holding two: the oldest goes.
+    expect(budget.acquire(closer())).toBeDefined();
+    expect(unknown[0]!.close).toHaveBeenCalledTimes(1);
+    expect(unknown[1]!.close).not.toHaveBeenCalled();
+    expect(known[0]!.close).not.toHaveBeenCalled();
+  });
+
+  it('still takes a session that never made a tool call first', () => {
+    const budget = new HttpSessionBudget(3, { now });
+    const heavy = [
+      usedSession(budget, 'token-churn'),
+      usedSession(budget, 'token-churn'),
+    ];
+    clock += MINUTE;
+    const probe = closer();
+    budget.acquire(probe, { principal: 'altegio-user-1' });
+    clock += 2 * MINUTE;
+
+    expect(
+      budget.acquire(closer(), { principal: 'token-churn' })
+    ).toBeDefined();
+    expect(probe).toHaveBeenCalledTimes(1);
+    for (const session of heavy) expect(session.close).not.toHaveBeenCalled();
+  });
+
+  it('spares the heavy caller’s sessions inside the grace before a lighter caller’s older one', () => {
+    const budget = new HttpSessionBudget(3, { now });
+    const person = usedSession(budget, 'altegio-user-1');
+    clock += 10 * MINUTE;
+    // Initialized a moment ago, its tool call still to come.
+    const fresh = [
+      usedSession(budget, 'token-churn'),
+      usedSession(budget, 'token-churn'),
+    ];
+    clock += 1000;
+
+    expect(
+      budget.acquire(closer(), { principal: 'token-churn' })
+    ).toBeDefined();
+    expect(person.close).toHaveBeenCalledTimes(1);
+    for (const session of fresh) expect(session.close).not.toHaveBeenCalled();
   });
 });

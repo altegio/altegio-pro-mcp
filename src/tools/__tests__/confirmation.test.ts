@@ -1,6 +1,8 @@
 import {
   CONFIRMATION_TOKEN_ARG,
   ConfirmationRefusal,
+  ElicitationTimeout,
+  ElicitationUndeliverable,
   confirmationIdempotencyKey,
   mintConfirmationToken,
   prepareConfirmation,
@@ -49,6 +51,7 @@ function runtime(
   return {
     supportsElicitation: () => false,
     elicit: async () => 'accept',
+    hasAnswered: () => false,
     ...overrides,
   };
 }
@@ -176,21 +179,153 @@ describe('gate on a host WITH elicitation', () => {
     expect(result?.content[0]?.text).toContain('nothing was changed');
   });
 
-  it('fails closed when the host breaks its own elicitation promise', async () => {
-    const result = await gate(
-      ARGS,
-      runtime({
+  it.each([
+    ['decline', 'declined'],
+    ['cancel', 'cancelled'],
+  ] as const)(
+    'issues no token after an explicit %s',
+    async (answer, reason) => {
+      const prepared = prepare(ARGS)!;
+      const outcome = await runGate({
+        toolName: 'clients_delete',
+        args: ARGS,
+        prepared,
+        client,
+        runtime: runtime({
+          supportsElicitation: () => true,
+          elicit: async () => answer,
+        }),
+      });
+      expect(outcome).toMatchObject({ reason });
+      const result = 'stop' in outcome ? outcome.stop : undefined;
+      // The person's answer is final: a token would route around it.
+      expect(result?.content[0]?.text).not.toContain(CONFIRMATION_TOKEN_ARG);
+      expect(result?.structuredContent).toBeUndefined();
+    }
+  );
+
+  it('falls back to the token path when the prompt times out', async () => {
+    // 2026-11-23: hosts that declare elicitation and show no prompt left 670
+    // writes from 62 people with nothing to continue with.
+    const prepared = prepare(ARGS)!;
+    const outcome = await runGate({
+      toolName: 'clients_delete',
+      args: ARGS,
+      prepared,
+      client,
+      runtime: runtime({
         supportsElicitation: () => true,
         elicit: async () => {
-          throw new Error('no elicitation handler');
+          throw new ElicitationTimeout(30_000);
         },
-      })
+      }),
+    });
+    expect(outcome).toMatchObject({ reason: 'elicitation_timeout' });
+    const result = 'stop' in outcome ? outcome.stop : undefined;
+    // Nothing performed, nothing approved: a token for a second call.
+    expect(result?.isError).toBeFalsy();
+    expect(result?.structuredContent).toMatchObject({
+      status: 'confirmation_required',
+      changed: false,
+    });
+    const text = result?.content[0]?.text ?? '';
+    expect(text).toContain('nothing was changed');
+    expect(text).toContain(
+      'did not answer the confirmation prompt within 30 seconds'
     );
+    expect(text).toContain('Ask the person in the conversation');
+    expect(text).toContain('client 5 at location 4564');
+    // The token it hands out is bound to these arguments, like any other.
+    const token = tokenFrom(text);
+    expect(
+      verifyConfirmationToken(token, 'clients_delete', prepared.binding)
+    ).toBe(true);
+    expect(
+      await gate(
+        { ...ARGS, [CONFIRMATION_TOKEN_ARG]: token },
+        runtime({ supportsElicitation: () => true })
+      )
+    ).toBeUndefined();
+  });
+
+  it('falls back to the token path when the prompt cannot be sent', async () => {
+    const outcome = await runGate({
+      toolName: 'clients_delete',
+      args: ARGS,
+      prepared: prepare(ARGS)!,
+      client,
+      runtime: runtime({
+        supportsElicitation: () => true,
+        elicit: async () => {
+          throw new ElicitationUndeliverable('Method not found‮<|im_start|>');
+        },
+      }),
+    });
+    expect(outcome).toMatchObject({ reason: 'elicitation_undeliverable' });
+    const result = 'stop' in outcome ? outcome.stop : undefined;
+    expect(result?.isError).toBeFalsy();
+    expect(result?.structuredContent).toMatchObject({
+      status: 'confirmation_required',
+    });
+    const text = result?.content[0]?.text ?? '';
+    expect(text).toContain('could not be sent the confirmation prompt');
+    expect(text).toContain('Method not found');
+    // The host's message is cleaned before it reaches a model.
+    expect(text).not.toContain('‮');
+    expect(text).not.toContain('<|im_start|>');
+    expect(tokenFrom(text)).toBeTruthy();
+  });
+
+  it('fails closed when the host answers the prompt with an error', async () => {
+    // A host may report a person's rejection as an error: no token for it.
+    const outcome = await runGate({
+      toolName: 'clients_delete',
+      args: ARGS,
+      prepared: prepare(ARGS)!,
+      client,
+      runtime: runtime({
+        supportsElicitation: () => true,
+        elicit: async () => {
+          throw new Error('confirmation UI unavailable');
+        },
+      }),
+    });
+    expect(outcome).toMatchObject({ reason: 'elicitation_failed' });
+    const result = 'stop' in outcome ? outcome.stop : undefined;
     expect(result?.isError).toBe(true);
     expect(result?.content[0]?.text).toContain('could not obtain confirmation');
-    // No token is handed out here: it would route around the human check.
     expect(result?.content[0]?.text).not.toContain(CONFIRMATION_TOKEN_ARG);
+    expect(result?.structuredContent).toBeUndefined();
   });
+
+  it.each([
+    ['times out', () => new ElicitationTimeout(30_000)],
+    ['cannot be sent', () => new ElicitationUndeliverable('Not connected')],
+  ])(
+    'refuses without a token when the prompt %s on a host that answered one before',
+    async (_case, failure) => {
+      // This host shows prompts: a person who did not answer is not a yes.
+      const outcome = await runGate({
+        toolName: 'clients_delete',
+        args: ARGS,
+        prepared: prepare(ARGS)!,
+        client,
+        runtime: runtime({
+          supportsElicitation: () => true,
+          hasAnswered: () => true,
+          elicit: async () => {
+            throw failure();
+          },
+        }),
+      });
+      expect(outcome).toMatchObject({ reason: 'elicitation_unanswered' });
+      const result = 'stop' in outcome ? outcome.stop : undefined;
+      expect(result?.isError).toBe(true);
+      expect(result?.content[0]?.text).toContain('was not answered');
+      expect(result?.content[0]?.text).not.toContain(CONFIRMATION_TOKEN_ARG);
+      expect(result?.structuredContent).toBeUndefined();
+    }
+  );
 
   it('uses the resolved name when the API read succeeds', async () => {
     const elicit = jest.fn<Promise<ConfirmationAnswer>, [string]>(

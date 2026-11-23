@@ -5,6 +5,8 @@ import { Server, type ServerContext } from '@modelcontextprotocol/server';
 import {
   ProtocolError as McpError,
   ProtocolErrorCode as ErrorCode,
+  SdkError,
+  SdkErrorCode,
 } from '@modelcontextprotocol/server';
 import { AltegioClient } from '../providers/altegio-client.js';
 import { OnboardingHandlers } from './onboarding-handlers.js';
@@ -30,10 +32,14 @@ import {
 import { addressesServing, listView } from './listing.js';
 import type { ToolResult } from './tool-result.js';
 import {
+  ELICITATION_TIMEOUT_MS,
+  ElicitationTimeout,
+  ElicitationUndeliverable,
   requireConfirmation,
   type ConfirmationAnswer,
   type ConfirmationRuntime,
   type ConfirmedCall,
+  type GateStop,
   type PreparedConfirmation,
 } from './confirmation.js';
 import {
@@ -104,6 +110,12 @@ export interface RegisterToolsOptions {
    * endpoint (`MCP_PUBLIC_BASE_URL`).
    */
   readonly publicBaseUrl?: string;
+  /**
+   * How long a confirmation prompt may wait for the host's answer before the
+   * gate falls back to the token path. Defaults to `ELICITATION_TIMEOUT_MS`;
+   * tests shorten it.
+   */
+  readonly elicitationTimeoutMs?: number;
 }
 
 /**
@@ -142,16 +154,26 @@ function outOfFacetError(
 /**
  * Bind the confirmation gate to one MCP request.
  *
- * The SDK context binds legacy elicitation to the tool call that triggered
- * it. Modern calls use the same confirmation-token fallback as old hosts.
+ * The prompt is related to the tool call that triggered it
+ * (`relatedRequestId`), so Streamable HTTP sends it on that call's own
+ * response stream, which the host is reading. `context.mcpReq.elicitInput`
+ * does not relate it by itself: until 2026-11-23 the prompt went to the
+ * standalone GET stream, which many hosts behind the proxy never open, and
+ * the transport dropped it there silently. Modern calls use the same
+ * confirmation-token fallback as old hosts.
  *
  * The capability check is the point of this function: `elicitInput` throws
  * synchronously on a client that never declared elicitation, and a host that
  * silently ignores the request would otherwise leave the tool call hanging.
+ * The timeout bounds the host that declared it and still ignores it, before
+ * the host's own tool timeout ends the call. `prompts` is per connection:
+ * whether this host has answered a prompt (`ConfirmationRuntime.hasAnswered`).
  */
 function confirmationRuntime(
   server: Server,
-  context: ServerContext
+  context: ServerContext,
+  timeoutMs: number,
+  prompts: { answered: boolean }
 ): ConfirmationRuntime {
   return {
     supportsElicitation: () =>
@@ -160,19 +182,77 @@ function confirmationRuntime(
       !context.mcpReq.envelope &&
       Boolean(server.getClientCapabilities()?.elicitation?.form),
 
+    hasAnswered: () => prompts.answered,
+
     elicit: async (message): Promise<ConfirmationAnswer> => {
-      const result = await context.mcpReq.elicitInput({
-        mode: 'form',
-        message,
-        // This is a confirmation, with no data to collect. MCP's action
-        // already expresses consent; a second decision field makes hosts
-        // reject an otherwise explicit accept or display two choices.
-        requestedSchema: { type: 'object', properties: {} },
-      });
-      return result.action;
+      try {
+        const result = await context.mcpReq.elicitInput(
+          {
+            mode: 'form',
+            message,
+            // This is a confirmation, with no data to collect. MCP's action
+            // already expresses consent; a second decision field makes hosts
+            // reject an otherwise explicit accept or display two choices.
+            requestedSchema: { type: 'object', properties: {} },
+          },
+          {
+            timeout: timeoutMs,
+            relatedRequestId: context.mcpReq.id,
+            signal: context.mcpReq.signal,
+          }
+        );
+        prompts.answered = true;
+        return result.action;
+      } catch (error) {
+        // A cancelled tool call: the SDK reports the abort as a timeout.
+        if (context.mcpReq.signal.aborted) throw error;
+        if (error instanceof SdkError) {
+          if (error.code === SdkErrorCode.RequestTimeout) {
+            throw new ElicitationTimeout(timeoutMs);
+          }
+          if (UNDELIVERABLE.has(error.code)) {
+            throw new ElicitationUndeliverable(error.message);
+          }
+        }
+        // Declared the capability, has no handler for it.
+        if (
+          error instanceof McpError &&
+          error.code === ErrorCode.MethodNotFound
+        ) {
+          throw new ElicitationUndeliverable(error.message);
+        }
+        throw error;
+      }
     },
   };
 }
+
+/** SDK failures that mean the prompt never reached the host. */
+const UNDELIVERABLE: ReadonlySet<SdkErrorCode> = new Set([
+  SdkErrorCode.NotConnected,
+  SdkErrorCode.ConnectionClosed,
+  SdkErrorCode.SendFailed,
+  SdkErrorCode.CapabilityNotSupported,
+]);
+
+/**
+ * How a gate stop is classified in the `tool_call` log. A token issued to a
+ * host without elicitation is `confirmation_required`, the call waiting for a
+ * person; every other stop is an error, so a prompt that never reached anyone
+ * shows in the error rate instead of passing for a confirmation request.
+ */
+const GATE_STOP_ERROR_CLASS: Readonly<
+  Record<Exclude<GateStop, 'confirmation_required'>, ToolErrorClass>
+> = {
+  elicitation_timeout: 'confirmation_failed',
+  elicitation_undeliverable: 'confirmation_failed',
+  elicitation_unanswered: 'confirmation_failed',
+  elicitation_failed: 'confirmation_failed',
+  invalid_token: 'confirmation_failed',
+  declined: 'confirmation_declined',
+  cancelled: 'confirmation_declined',
+  refused: 'validation',
+};
 
 /** Why a tool call did not succeed, as the `tool_call` log reports it. */
 export type ToolErrorClass =
@@ -183,6 +263,10 @@ export type ToolErrorClass =
   | 'scope_denied'
   | 'out_of_view'
   | 'confirmation_required'
+  /** The prompt was not answered or not delivered, or the token is invalid. */
+  | 'confirmation_failed'
+  /** The host answered the prompt with a decline or a cancel. */
+  | 'confirmation_declined'
   | 'unknown_tool'
   | 'timeout'
   | 'cancelled'
@@ -533,6 +617,10 @@ export function registerTools(
 
   // call handler
   const activity = options.activity ?? new RequestActivity();
+  // Whether this connection's host has answered a confirmation prompt. One
+  // `Server` serves one HTTP session (or the stdio process), so this is per
+  // connection; the gate reads it before falling back to the token.
+  const prompts = { answered: false };
   server.setRequestHandler('tools/call', async (request, extra) => {
     const { name: requested, arguments: args } = request.params;
     // What the tool_call log reports about this call, filled in as it runs.
@@ -543,7 +631,8 @@ export function registerTools(
       via?: string;
       errorClass?: ToolErrorClass;
       validation?: ValidationIssue[];
-      confirmation?: boolean;
+      /** Why the confirmation gate stopped the call, if it did. */
+      confirmation?: GateStop;
       /** Named directly by a name this view does not list. */
       unlisted?: boolean;
     } = { tool: 'unknown' };
@@ -622,10 +711,10 @@ export function registerTools(
       }
 
       // Destructive operations stop here until a human says yes. `stop` is
-      // the result the caller gets instead of the operation being performed —
-      // logged as `confirmation_required` whatever shape that result takes;
-      // `proceed` carries the confirmation into the handler (the version the
-      // person was shown, the idempotency key).
+      // the result the caller gets instead of the operation being performed,
+      // logged by its reason (`GATE_STOP_ERROR_CLASS`); `proceed` carries the
+      // confirmation into the handler (the version the person was shown, the
+      // idempotency key).
       const prepared = confirmations.get(name)?.(callArgs);
       let confirmed: ConfirmedCall | undefined;
       if (prepared) {
@@ -634,11 +723,19 @@ export function registerTools(
           args: callArgs,
           prepared,
           client,
-          runtime: confirmationRuntime(server, extra),
+          runtime: confirmationRuntime(
+            server,
+            extra,
+            options.elicitationTimeoutMs ?? ELICITATION_TIMEOUT_MS,
+            prompts
+          ),
           ...(call.via ? { dispatcher: call.via } : {}),
         });
         if ('stop' in gate) {
-          call.confirmation = true;
+          call.confirmation = gate.reason;
+          if (gate.reason !== 'confirmation_required') {
+            call.errorClass = GATE_STOP_ERROR_CLASS[gate.reason];
+          }
           return gate.stop;
         }
         confirmed = gate.proceed;
@@ -759,18 +856,21 @@ export function registerTools(
         const completed = await runObservingToolCall(observation, () =>
           runOnView(servingView, execute)
         );
-        const outcome = call.confirmation
-          ? 'confirmation_required'
-          : completed.isError
-            ? 'error'
-            : 'success';
+        // A gate stop other than a plain token request is an error even when
+        // its result is a token: the prompt failed, and the call reports it.
+        const outcome =
+          call.confirmation === 'confirmation_required'
+            ? 'confirmation_required'
+            : call.confirmation !== undefined || completed.isError
+              ? 'error'
+              : 'success';
         const failed = outcome === 'error' ? failure() : undefined;
         const feedbackNudge =
           failed !== undefined &&
           invitesFeedback(call.tool, observation, failed);
         const staleListNudged =
           call.unlisted === true &&
-          outcome !== 'confirmation_required' &&
+          call.confirmation === undefined &&
           staleListQuota.admit(quotaCaller(observation.correlation.session));
         const result =
           feedbackNudge || staleListNudged
@@ -799,7 +899,18 @@ export function registerTools(
             ...(outcome === 'confirmation_required'
               ? { error_class: 'confirmation_required' }
               : {}),
-            ...(failed ? { error_type: 'tool_result', ...failed } : {}),
+            ...(failed
+              ? {
+                  error_type: call.confirmation
+                    ? 'confirmation'
+                    : 'tool_result',
+                  ...failed,
+                }
+              : {}),
+            ...(call.confirmation &&
+            call.confirmation !== 'confirmation_required'
+              ? { confirmation: call.confirmation }
+              : {}),
             ...(feedbackNudge ? { feedback_nudge: true } : {}),
             ...(staleListNudged ? { stale_list_nudge: true } : {}),
             response_bytes: resultBytes(result),
