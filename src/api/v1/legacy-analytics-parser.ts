@@ -1,12 +1,11 @@
 /** Structural parsers for the temporary ERP HTML/XLS analytics reports. */
 import { load, type CheerioAPI } from 'cheerio';
 import * as XLSX from '@e965/xlsx';
-import { AltegioApiError } from '../../utils/errors.js';
 import { noteCashFlowParseFailure } from '../../utils/tool-call-observation.js';
 import type {
   CashAccountType,
-  CashFlowBreakdownReport,
-  CashFlowColumn,
+  CashFlowSourceColumn,
+  CashFlowSourceReport,
   CashFlowRow,
   GroupEventPerformanceReport,
   ProductSalesGroup,
@@ -28,9 +27,6 @@ import type {
 } from '../legacy-analytics-api.js';
 
 const MISSING = /^(?:-|—|–|n\/a|null)?$/i;
-
-/** Most payment-item × column cells one cash-flow call returns. */
-export const MAX_CASH_FLOW_CELLS = 6000;
 
 export class LegacyAnalyticsParseError extends Error {
   constructor(report: string, detail: string) {
@@ -1138,7 +1134,7 @@ export function parseCashFlowBreakdownHtml(args: {
   currency: string | null;
   accountType: CashAccountType;
   paymentItemId?: number;
-}): CashFlowBreakdownReport {
+}): CashFlowSourceReport {
   const $ = load(args.html);
   const table = $('table.table-report');
   const headers = table.find('thead tr').first().children('th.by-type');
@@ -1151,7 +1147,7 @@ export function parseCashFlowBreakdownHtml(args: {
     .slice(1, -1)
     .toArray()
     .map((h) => cleanText($(h).text()));
-  const columns: CashFlowColumn[] = [];
+  const columns: CashFlowSourceColumn[] = [];
   const all = args.accountType === 'all';
   const accountHeaders = table.find('thead tr.by-account td');
   const accountCount = all ? accountHeaders.length / periods.length : 0;
@@ -1230,13 +1226,6 @@ export function parseCashFlowBreakdownHtml(args: {
   const sourceRows = table
     .find('tbody tr')
     .filter((_i, r) => $(r).children('.report-title-cell').length === 1);
-  if (sourceRows.length * columns.length > MAX_CASH_FLOW_CELLS)
-    // A size bound, not a changed markup: the same call keeps failing until
-    // the caller narrows it, so it must not read as "retry later".
-    throw new AltegioApiError(
-      `The cash-flow breakdown for this period has ${sourceRows.length} payment-item rows × ${columns.length} day and account columns, more than the ${MAX_CASH_FLOW_CELLS} cells one call returns. Narrow it: a shorter period (a few days), cash_account_type=cash or non_cash, or cash_account_ids.`,
-      422
-    );
   let aggregateIndex = 0;
   let direction: 'inflow' | 'outflow' | null = null;
   const rows: CashFlowRow[] = sourceRows.toArray().map((row) => {

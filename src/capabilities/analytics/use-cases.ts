@@ -292,6 +292,33 @@ export async function getReceptionistPerformance(
     ...(input.include_daily ? { include_daily: true } : {}),
   });
 
+  // The booked-client and rebooking figures come from the ERP analytics
+  // store, which answers 0 for all of them when its query fails. The visit
+  // cohort counts every client who arrived in the period, whoever booked
+  // them, so it cannot be 0 while appointments were closed in the period:
+  // that pair is a failed read, not a real zero (prod, 2026-10: 677
+  // appointments closed, 0 of 0 clients rebooked).
+  const cohortUnavailable =
+    (performance.appointments_closed.current ?? 0) > 0 &&
+    !performance.rebooked_after_visit.clients_count;
+  const unavailableRate = {
+    clients_count: null,
+    rebooked_count: null,
+    rate_percent: null,
+  };
+  if (cohortUnavailable) {
+    performance.rebooked_after_visit = { ...unavailableRate };
+    performance.rebooked_after_no_show = { ...unavailableRate };
+    if (
+      !performance.clients_booked.current &&
+      !performance.clients_booked.previous
+    )
+      performance.clients_booked = {
+        current: null,
+        previous: null,
+        change_percent: null,
+      };
+  }
   const scope = input.created_by_user_id
     ? `location user ${input.created_by_user_id}`
     : 'all receptionists';
@@ -302,6 +329,7 @@ export async function getReceptionistPerformance(
     `Revenue attributed: ${formatMoney(performance.revenue.current, performance.currency)} (previous period ${formatMoney(performance.revenue.previous, performance.currency)})`,
     `Rebooked after a visit: ${performance.rebooked_after_visit.rebooked_count ?? 'n/a'} of ${performance.rebooked_after_visit.clients_count ?? 'n/a'} clients (${performance.rebooked_after_visit.rate_percent ?? 'n/a'}%)`,
     `Rebooked after a no-show: ${performance.rebooked_after_no_show.rebooked_count ?? 'n/a'} of ${performance.rebooked_after_no_show.clients_count ?? 'n/a'} clients (${performance.rebooked_after_no_show.rate_percent ?? 'n/a'}%)`,
+    ...(cohortUnavailable ? [COHORT_UNAVAILABLE] : []),
   ].join('\n');
 
   return {
@@ -312,9 +340,16 @@ export async function getReceptionistPerformance(
         ? { created_by_user_id: input.created_by_user_id }
         : {}),
       ...performance,
+      cohort_status: cohortUnavailable ? 'unavailable' : 'reported',
+      ...(cohortUnavailable
+        ? { cohort_unavailable_reason: COHORT_UNAVAILABLE }
+        : {}),
     },
   };
 }
+
+const COHORT_UNAVAILABLE =
+  'Clients booked and the rebooking cohorts are unavailable, not zero: the source reported no arrived client in a period with closed appointments, which is how its analytics store answers a failed read. Retry later or with a shorter period; appointments_list with created_by_user_id lists the appointments a user created.';
 
 // ========== loyalty ==========
 

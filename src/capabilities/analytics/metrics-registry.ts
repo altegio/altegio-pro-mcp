@@ -113,20 +113,21 @@ export const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     key: 'revenue_total',
     name: 'Total revenue',
     definition:
-      'All money taken in the period: services, products, memberships, gift cards and client account top-ups.',
+      'Sales of the period by visit or sale date: the services of arrived appointments, products sold, and client account top-ups. It is not the finance ledger: posted income transactions count payments by payment date, so prepayments for later visits, debts paid later and income items other than visits and products make them differ. Reconcile money with analytics_get_cash_flow_breakdown or analytics_get_profit_and_loss_statement.',
     formula: 'services revenue + products revenue + client account top-ups',
     tool: 'analytics_get_overview',
   },
   {
     key: 'revenue_services',
     name: 'Services revenue',
-    definition: 'Money taken for services rendered in the period.',
+    definition:
+      'Service lines of the appointments that arrived in the period, by appointment date, whether or when they were paid.',
     tool: 'analytics_get_overview',
   },
   {
     key: 'revenue_products',
     name: 'Products revenue',
-    definition: 'Money taken for products sold in the period.',
+    definition: 'Products sold in the period, by sale date.',
     tool: 'analytics_get_overview',
   },
   {

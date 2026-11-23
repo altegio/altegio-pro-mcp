@@ -1,4 +1,3 @@
-import { AltegioApiError } from '../../../utils/errors.js';
 import {
   parseTeamMemberCapacityHtml,
   parseProductSalesHtml,
@@ -99,7 +98,7 @@ it('parses both dynamic account and account-type columns without double-counting
   });
 });
 
-it('refuses an over-wide cash-flow table as a narrowing request, not a markup change', () => {
+it('parses a wide cash-flow page; the answer bound applies after its days are grouped', () => {
   const headers =
     '<th class="by-type" rowspan="2">Item</th><th class="by-account" rowspan="2">Item</th>' +
     ['Sep 1', 'Total']
@@ -114,19 +113,15 @@ it('refuses an over-wide cash-flow table as a narrowing request, not a markup ch
   // 6 columns (2 periods × cash, non-cash + one account) × 1,001 rows > 6,000 cells.
   const items = Array.from({ length: 998 }, (_v, i) => row(`Item ${i}`, false));
   const html = `<table class="table-report"><thead><tr>${headers}</tr><tr class="by-type">${'<td>Cash</td><td>Card</td><td>Total</td>'.repeat(2)}</tr><tr class="by-account"><td>Front desk</td><td>Front desk</td></tr></thead><tbody>${row('Income', true)}${items.join('')}${row('Expenses', true)}${row('Balance', true)}</tbody></table>`;
-  let error: unknown;
-  try {
-    parseCashFlowBreakdownHtml({ html, currency: 'USD', accountType: 'all' });
-  } catch (caught) {
-    error = caught;
-  }
-  expect(error).toBeInstanceOf(AltegioApiError);
-  expect(error).toMatchObject({ statusCode: 422 });
-  expect((error as Error).message).toContain('1001 payment-item rows × 6');
-  expect((error as Error).message).toContain(
-    'cash_account_type=cash or non_cash'
-  );
-  expect((error as Error).message).not.toMatch(/unexpected structure|retry/i);
+  // The source page itself is bounded by bytes; the cells one answer
+  // returns are bounded in `capabilities/analytics/cash-flow.ts`, after the
+  // days are grouped into weeks or months.
+  const result = parseCashFlowBreakdownHtml({
+    html,
+    currency: 'USD',
+    accountType: 'all',
+  });
+  expect(result.rows).toHaveLength(1001);
 });
 
 import { readFileSync } from 'node:fs';

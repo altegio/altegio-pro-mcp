@@ -16,6 +16,8 @@ import {
   mapAnalyticsHttpError,
   type AnalyticsEndpointKind,
 } from '../../capabilities/analytics/errors.js';
+import { AltegioApiError } from '../../utils/errors.js';
+import { isTimeout } from '../../utils/tool-call-observation.js';
 
 /** Language the label-only series must come back in. */
 export const ANALYTICS_ACCEPT_LANGUAGE = 'en';
@@ -55,11 +57,26 @@ export async function callAnalytics(
     payload = JSON.stringify(options.body);
   }
 
-  const response = await http.request(path, {
-    method: options.method ?? 'GET',
-    headers,
-    ...(payload !== undefined ? { body: payload } : {}),
-  });
+  let response: Response;
+  try {
+    response = await http.request(path, {
+      method: options.method ?? 'GET',
+      headers,
+      ...(payload !== undefined ? { body: payload } : {}),
+    });
+  } catch (error) {
+    // The analytics service computes a period and the one before it per
+    // call; at a large location a long period runs past the request
+    // deadline (prod, 2026-11: 140 key-metric calls). Name the remedy
+    // instead of a bare deadline error. Timeouts are never retried here.
+    // A cancelled call (AbortError) is the caller's, not a slow service.
+    if (isTimeout(error) && (error as { name?: unknown }).name !== 'AbortError')
+      throw new AltegioApiError(
+        `The Altegio analytics service did not answer in time to ${options.context}. Long periods take longest at a large location: retry with a shorter period, such as one month or a week.`,
+        504
+      );
+    throw error;
+  }
 
   if (!response.ok) {
     throw mapAnalyticsHttpError(

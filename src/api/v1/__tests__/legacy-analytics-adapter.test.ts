@@ -7,6 +7,7 @@ import type {
 } from '../../../providers/altegio-client.js';
 import { AltegioApiError } from '../../../utils/errors.js';
 import { V1LegacyAnalyticsAdapter } from '../legacy-analytics-adapter.js';
+import { cashFlowPage, dayLabels } from './helpers/cash-flow-page.js';
 
 const FIXTURES = join(__dirname, 'fixtures/legacy-analytics');
 const fixture = (name: string): string =>
@@ -303,7 +304,27 @@ describe('next temporary report adapter contracts', () => {
       searchResponse(fixture('capacity-en.html')),
       searchResponse(fixture('products-en-cost.html'), 26),
       searchResponse(fixture('product-categories-en.html')),
-      searchResponse(fixture('cash-flow-en.html')),
+      // The period and the day that completes its last one.
+      searchResponse(
+        cashFlowPage({
+          labels: dayLabels('2026-09-01', 20),
+          accounts: ['Front desk'],
+          rows: [
+            { title: 'Income', aggregate: true, days: Array(20).fill([10, 0]) },
+            { title: 'Retail sales', days: Array(20).fill([10, 0]) },
+            {
+              title: 'Expenses',
+              aggregate: true,
+              days: Array(20).fill([0, 0]),
+            },
+            {
+              title: 'Balance',
+              aggregate: true,
+              days: Array(20).fill([10, 0]),
+            },
+          ],
+        })
+      ),
     ]);
     const adapter = new V1LegacyAnalyticsAdapter(client);
     await adapter.getTeamMemberCapacity(nextPeriod);
@@ -347,6 +368,8 @@ describe('next temporary report adapter contracts', () => {
       supplier_id: 0,
     });
     expect(requests[3]?.query).toMatchObject({
+      start_date: '2026-09-01',
+      end_date: '2026-09-20',
       'accounts_ids[]': [1, 2],
       master_id: 77,
       supplier_id: 9,
@@ -539,37 +562,83 @@ it('recognizes the cash-flow permission envelope without reflecting source diagn
     new V1LegacyAnalyticsAdapter(client).getCashFlowBreakdown(nextPeriod)
   ).rejects.toMatchObject({ statusCode: 403 });
 });
-it('points an oversized all-accounts cash flow at the account-type split', async () => {
+it('refuses a cash-flow day that alone exceeds the size bound', async () => {
   const oversized = () =>
     new Response('{}', {
       status: 200,
       headers: { 'content-length': String(3 * 1024 * 1024) },
     });
+  // One day and the day that completes it, then each half on its own.
   await expect(
     new V1LegacyAnalyticsAdapter(
-      fakeClient([oversized()]).client
-    ).getCashFlowBreakdown(nextPeriod)
-  ).rejects.toMatchObject({
-    statusCode: 413,
-    message: expect.stringMatching(/cash_account_type=cash and then non_cash/),
-  });
-  await expect(
-    new V1LegacyAnalyticsAdapter(
-      fakeClient([oversized()]).client
-    ).getCashFlowBreakdown({ ...nextPeriod, cash_account_type: 'cash' })
+      fakeClient([oversized(), oversized()]).client
+    ).getCashFlowBreakdown({
+      ...nextPeriod,
+      date_from: '2026-09-19',
+      date_to: '2026-09-19',
+      cash_account_type: 'cash',
+    })
   ).rejects.toThrow(/too large to process safely/);
 });
 it('keeps nonzero non-cash-only items when zero movement rows are excluded', async () => {
-  const html = fixture('cash-flow-en.html').replace(
-    /<td class="by-type report-amount-cell">1,234.56<\/td><td class="by-type report-amount-cell">0<\/td>/g,
-    '<td class="by-type report-amount-cell">0</td><td class="by-type report-amount-cell">1,234.56</td>'
-  );
+  const html = cashFlowPage({
+    labels: dayLabels('2026-09-19', 2),
+    accounts: ['Front desk'],
+    rows: [
+      {
+        title: 'Income',
+        aggregate: true,
+        days: [
+          [0, 1234.56],
+          [0, 0],
+        ],
+      },
+      {
+        title: 'Card sales',
+        days: [
+          [0, 1234.56],
+          [0, 0],
+        ],
+      },
+      {
+        title: 'Gift cards',
+        days: [
+          [0, 0],
+          [0, 0],
+        ],
+      },
+      {
+        title: 'Expenses',
+        aggregate: true,
+        days: [
+          [0, 0],
+          [0, 0],
+        ],
+      },
+      {
+        title: 'Balance',
+        aggregate: true,
+        days: [
+          [0, 1234.56],
+          [0, 0],
+        ],
+      },
+    ],
+  });
   const { client, requests } = fakeClient([searchResponse(html)]);
   const report = await new V1LegacyAnalyticsAdapter(
     client
-  ).getCashFlowBreakdown({ ...nextPeriod, include_zero_movement_rows: false });
-  expect(
-    report.rows.find((row) => row.kind === 'payment_item')?.amounts[1]
-  ).toBe(1234.56);
+  ).getCashFlowBreakdown({
+    ...nextPeriod,
+    date_from: '2026-09-19',
+    date_to: '2026-09-19',
+    include_zero_movement_rows: false,
+  });
+  const item = report.rows.find((row) => row.kind === 'payment_item');
+  expect(item?.payment_item_title).toBe('Card sales');
+  expect(item?.amounts[1]).toBe(1234.56);
+  expect(report.rows.map((row) => row.payment_item_title)).not.toContain(
+    'Gift cards'
+  );
   expect(requests[0]?.query?.movements_funds).toBe(1);
 });

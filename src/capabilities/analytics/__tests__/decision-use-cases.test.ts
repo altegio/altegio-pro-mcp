@@ -691,6 +691,13 @@ describe('decision-ready statements', () => {
 
   it('sanitizes inventory labels while preserving stable product ids', async () => {
     jest
+      .spyOn(V1LegacyAnalyticsAdapter.prototype, 'getProductUnitStock')
+      .mockResolvedValue({
+        product_id: 501,
+        consumable_units_per_sale_unit: 1,
+        stock_by_inventory: [{ inventory_id: 1, amount: 2 }],
+      });
+    jest
       .spyOn(V1LegacyAnalyticsAdapter.prototype, 'getInventoryTurnover')
       .mockResolvedValue({
         rows: [

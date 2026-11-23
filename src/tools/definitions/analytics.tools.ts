@@ -369,6 +369,11 @@ export const analyticsGetReceptionistPerformanceTool = defineTool({
       rebooked_count: int,
       rate_percent: num,
     }),
+    cohort_status: {
+      type: 'string' as const,
+      enum: ['reported', 'unavailable'],
+    },
+    cohort_unavailable_reason: { type: 'string' as const },
     daily: objectSchema({
       clients_booked: dailyPoints,
       appointments_closed: dailyPoints,
@@ -1210,6 +1215,8 @@ const inventoryRiskRowOutput = closedObjectSchema({
   risk: { type: 'string' as const, enum: decisionAnalytics.INVENTORY_RISKS },
   recommended_reorder_quantity: num,
   negative_stock: bool,
+  consumable_units_per_sale_unit: num,
+  withheld_reason: str,
   source_metrics: closedObjectSchema({
     units_received: num,
     opening_stock: num,
@@ -1377,6 +1384,10 @@ export const analyticsGetProfitAndLossStatementTool = defineTool({
           limit: requiredInteger,
           complete: bool,
         }),
+        source: {
+          type: 'string' as const,
+          enum: ['whole_month_finance_report', 'exact_day_cash_flow_report'],
+        },
         formula: requiredString,
       }),
       service_contribution: closedObjectSchema({
@@ -1845,6 +1856,8 @@ export const analyticsGetInventoryReorderRisksTool = defineTool({
     }),
     coverage: closedObjectSchema({
       complete: bool,
+      consumable_unit_products: requiredInteger,
+      unit_checks_unavailable: requiredInteger,
       filters_supported_by_source: {
         type: 'array' as const,
         items: {
@@ -1867,11 +1880,11 @@ export const analyticsGetInventoryReorderRisksTool = defineTool({
       items: closedObjectSchema({
         source_id: {
           type: 'string' as const,
-          const: 'inventory_turnover_report',
+          enum: ['inventory_turnover_report', 'product_card'],
         },
         format: {
           type: 'string' as const,
-          const: 'JSON envelope with HTML table',
+          enum: ['JSON envelope with HTML table', 'JSON'],
         },
         permission: requiredString,
       }),
@@ -2179,12 +2192,13 @@ const capacityMetricsOutput = {
   idle_hours: num,
   occupancy_percent: num,
   upcoming_appointments_count: int,
+  appointments_count: int,
 };
 export const analyticsGetTeamMemberCapacityTool = defineTool({
   name: 'analytics_get_team_member_capacity',
   category: 'Analytics',
   description:
-    'Working days and hours, booked hours, idle hours, occupancy percentage and upcoming appointments by team member, with source totals. Use for capacity planning; analytics_get_team_member_occupancy gives daily occupancy. Read from a temporary report source. Requires team occupancy report permission. Narrow the period if the result is too large.',
+    'Working days and hours, booked hours, idle hours, occupancy percentage and upcoming appointments by team member, with source totals. For a past period booked hours are time on arrived appointments; for a period reaching today or later they are non-cancelled appointments and busy intervals inside scheduled time (see booked_hours_basis). upcoming_appointments_count counts appointments after the period. Use for capacity planning; analytics_get_team_member_occupancy gives daily occupancy. Read from a temporary report source. Requires team occupancy report permission.',
   annotations: { title: 'Analytics: team-member capacity', ...READ_ONLY },
   input: z.object({ location_id: locationId, ...periodFields }),
   outputSchema: objectSchema({
@@ -2199,6 +2213,11 @@ export const analyticsGetTeamMemberCapacityTool = defineTool({
       }),
     },
     totals: objectSchema(capacityMetricsOutput),
+    booked_hours_basis: {
+      type: 'string' as const,
+      enum: ['arrived_appointments', 'scheduled_appointments'],
+    },
+    coverage: objectSchema({ complete: bool }),
   }),
   handler: async ({ input, client }) =>
     standardizeCollection(
@@ -2421,7 +2440,7 @@ export const analyticsGetCashFlowBreakdownTool = defineTool({
   name: 'analytics_get_cash_flow_breakdown',
   category: 'Analytics',
   description:
-    'Period cash movement by payment item, day, cash-account type and returned account columns, with signed inflow/outflow and net movement totals. Net movement is not an opening or closing account balance. Amount arrays align with columns; account and type views overlap and must not be summed. Source account ids are unavailable. Supports account, team-member, supplier, payment-item, service and product filters. Requires finance period-report access, not export access. Read from a temporary report source; narrow the period or filters for large tables.',
+    'Period cash movement by payment item, cash-account type and returned account columns, with signed inflow/outflow and net movement totals. Columns are days, or weeks or months when days do not fit (see granularity). Net movement is not an opening or closing account balance. Amount arrays align with columns; account and type views overlap and must not be summed. Source account ids are unavailable. Supports account, team-member, supplier, payment-item, service and product filters. Requires finance period-report access, not export access. Read from a temporary report source.',
   annotations: { title: 'Analytics: cash-flow breakdown', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
@@ -2482,14 +2501,24 @@ export const analyticsGetCashFlowBreakdownTool = defineTool({
       },
       include_zero_movement_rows: { type: 'boolean' as const },
     }),
+    granularity: {
+      type: 'string' as const,
+      enum: ['day', 'week', 'month', 'period'],
+    },
+    account_columns: {
+      type: 'string' as const,
+      enum: ['per_period', 'period_total_only', 'none'],
+    },
     columns: {
       type: 'array' as const,
       items: objectSchema({
         period_label: str,
         period_kind: {
           type: 'string' as const,
-          enum: ['day', 'period_total'],
+          enum: ['day', 'week', 'month', 'period_total'],
         },
+        date_from: date,
+        date_to: date,
         dimension: {
           type: 'string' as const,
           enum: ['cash_account_type', 'cash_account', 'total'],
