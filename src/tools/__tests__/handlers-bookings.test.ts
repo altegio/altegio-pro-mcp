@@ -298,6 +298,47 @@ describe('ToolHandlers - Appointments CRUD', () => {
       });
     });
 
+    it('changes only the status of an appointment with no services (regression)', async () => {
+      mockClient.getBooking.mockResolvedValue({
+        ...stored,
+        services: [],
+      } as unknown as Awaited<ReturnType<AltegioClient['getBooking']>>);
+
+      const result = await handlers.updateAppointment({
+        location_id: 456,
+        appointment_id: 999,
+        status: 'arrived',
+      });
+
+      expect(result.isError).toBeUndefined();
+      expect(mockClient.updateBooking.mock.calls[0]?.[2]).toMatchObject({
+        services: [],
+        staff_id: 123,
+        seance_length: 4800,
+        attendance: 1,
+        save_if_busy: true,
+      });
+    });
+
+    it('refuses when the read does not report the services at all', async () => {
+      const withoutServices: Record<string, unknown> = { ...stored };
+      delete withoutServices.services;
+      mockClient.getBooking.mockResolvedValue(
+        withoutServices as unknown as Awaited<
+          ReturnType<AltegioClient['getBooking']>
+        >
+      );
+
+      const result = await handlers.updateAppointment({
+        location_id: 456,
+        appointment_id: 999,
+        status: 'arrived',
+      });
+
+      expect(result.isError).toBe(true);
+      expect(mockClient.updateBooking).not.toHaveBeenCalled();
+    });
+
     it('keeps tags, color and the slot when only the comment changes', async () => {
       await handlers.updateAppointment({
         location_id: 456,

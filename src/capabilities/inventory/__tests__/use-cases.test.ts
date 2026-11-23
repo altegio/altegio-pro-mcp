@@ -799,6 +799,17 @@ describe('createOperation: money', () => {
     ],
   };
 
+  it('says a receipt keeps no team member, which Altegio stores on sales only (regression)', async () => {
+    const { client } = setup(operationRoutes([createdRoute()]));
+    const result = await createOperation(client, RECEIPT);
+    expect(summary(result.text)).toContain(
+      'Team member 7 is not stored on product receipt lines'
+    );
+    expect(result.structuredContent).toMatchObject({
+      team_member_stored: false,
+    });
+  });
+
   it('computes the line total in integers, not floats', async () => {
     const { client, calls } = setup(operationRoutes([createdRoute()]));
     await createOperation(client, RECEIPT);
@@ -927,6 +938,40 @@ describe('deleteDocument', () => {
     await expect(
       deleteDocument(client, { location_id: 1, document_id: 99 })
     ).rejects.toThrow(InventoryNotFoundError);
+  });
+
+  it('explains a document the read does not find while the listing still shows its lines (regression)', async () => {
+    const { client, calls } = setup([
+      [
+        'GET',
+        /^\/storage_operations\/documents\/1\/99$/,
+        404,
+        { success: false, meta: { message: 'Not found' } },
+      ],
+      [
+        'GET',
+        /^\/storages\/transactions\/1$/,
+        200,
+        ok([movementRow({ id: 651486614, document_id: 99, type_id: 3 })]),
+      ],
+      currencyRoute,
+    ]);
+    const refusal = await describeDocumentLines(client, {
+      location_id: 1,
+      document_id: 99,
+    }).catch((e) => e);
+    expect(refusal).toBeInstanceOf(ConfirmationRefusal);
+    expect(refusal.message).toContain(
+      'inventory_list_operations still lists 1 line(s) for it (651486614)'
+    );
+    expect(refusal.message).toContain('stocktaking');
+    const error = await deleteDocument(client, {
+      location_id: 1,
+      document_id: 99,
+    }).catch((e) => e);
+    expect(error).toBeInstanceOf(InventoryNotFoundError);
+    expect(error.message).toMatch(/^Nothing was deleted/);
+    expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
   });
 });
 

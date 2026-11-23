@@ -196,7 +196,8 @@ function flag(value: unknown): boolean {
 /** `2026-12-05 14:30:00` → `2026-12-05T14:30:00`. */
 function localDateTime(value: unknown): string | null {
   const raw = text(value);
-  if (!raw) return null;
+  // An unset date is printed as zeroes.
+  if (!raw || raw.startsWith('0000-00-00')) return null;
   return raw.replace(' ', 'T');
 }
 
@@ -328,6 +329,8 @@ function documentLineFromWire(row: Row): DocumentLine {
     id: id(row.id) ?? 0,
     document_id: id(row.document_id),
     location_id: id(row.company_id),
+    inventory_id: id(row.storage_id ?? asRow(row.storage).id),
+    date_local: localDateTime(row.create_date),
     product_id: id(row.good_id ?? asRow(row.good).id),
     quantity: amount === null ? null : Math.abs(amount),
     unit_id: id(row.unit_id),

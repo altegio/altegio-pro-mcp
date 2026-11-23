@@ -11,6 +11,7 @@ import type { AltegioService } from '../../types/altegio.types.js';
 import type { AltegioClient } from '../../providers/altegio-client.js';
 import { decimalsOf, moneyInput } from '../../api/money.js';
 import { resolveLocationCurrency } from '../../api/v1/location-currency.js';
+import { AltegioApiError } from '../../utils/errors.js';
 
 const seanceLengthSchema = z
   .number()
@@ -47,6 +48,106 @@ async function checkPrices(
   if (given.length === 0) return;
   const currency = await resolveLocationCurrency(client, locationId);
   for (const key of given) moneyInput(input[key]!, currency, key);
+}
+
+// ========== team member link details ==========
+
+/** What a team member ↔ service link stores. */
+interface LinkDetail {
+  seance_length: number | null;
+  technological_card_id: number | null;
+}
+
+function positiveInt(value: unknown): number | null {
+  const n = typeof value === 'string' ? Number(value) : value;
+  return typeof n === 'number' && Number.isInteger(n) && n > 0 ? n : null;
+}
+
+async function readServicesData(
+  client: AltegioClient,
+  path: string,
+  what: string
+): Promise<unknown[]> {
+  const response = await client.apiRequest(path);
+  const body: unknown = await response.json().catch(() => undefined);
+  if (!response.ok) {
+    throw new AltegioApiError(
+      `Could not read ${what} (HTTP ${response.status}).`,
+      response.status,
+      body
+    );
+  }
+  const data = (body as { data?: unknown } | undefined)?.data;
+  return Array.isArray(data) ? data : data ? [data] : [];
+}
+
+/** The links of each service: service id → team member id → link. */
+function linkDetails(
+  services: unknown[]
+): Map<number, Map<number, LinkDetail>> {
+  const result = new Map<number, Map<number, LinkDetail>>();
+  for (const raw of services) {
+    const service = (raw ?? {}) as { id?: unknown; staff?: unknown };
+    const serviceId = positiveInt(service.id);
+    if (serviceId === null || !Array.isArray(service.staff)) continue;
+    const links = new Map<number, LinkDetail>();
+    for (const rawLink of service.staff) {
+      const link = (rawLink ?? {}) as Record<string, unknown>;
+      const memberId = positiveInt(link.id);
+      if (memberId === null) continue;
+      links.set(memberId, {
+        seance_length: positiveInt(link.seance_length),
+        technological_card_id: positiveInt(link.technological_card_id),
+      });
+    }
+    result.set(serviceId, links);
+  }
+  return result;
+}
+
+/**
+ * The session length and Bill of Materials of every link at the location. The
+ * services list the other tools read reports a default 900 s for a link and
+ * no Bill of Materials; the location's services read has the stored values.
+ */
+async function readLinkDetails(
+  client: AltegioClient,
+  locationId: number,
+  serviceId?: number
+): Promise<Map<number, Map<number, LinkDetail>>> {
+  const path =
+    serviceId === undefined
+      ? `/locations/${locationId}/services`
+      : `/locations/${locationId}/services/${serviceId}`;
+  return linkDetails(
+    await readServicesData(
+      client,
+      path,
+      `the team member links of ${serviceId === undefined ? 'the services' : `service ${serviceId}`} at location ${locationId}`
+    )
+  );
+}
+
+/** The service with each link's stored length and Bill of Materials. */
+function withLinkDetails(
+  service: AltegioService,
+  details: Map<number, Map<number, LinkDetail>>
+): AltegioService {
+  const links = details.get(service.id);
+  if (!links || !service.staff) return service;
+  return {
+    ...service,
+    staff: service.staff.map((link) => {
+      const detail = links.get(link.id);
+      return detail
+        ? {
+            ...link,
+            seance_length: detail.seance_length ?? link.seance_length,
+            technological_card_id: detail.technological_card_id,
+          }
+        : link;
+    }),
+  };
 }
 
 /**
@@ -181,7 +282,13 @@ export const getServicesTool = defineTool({
   outputSchema: servicesOutput,
   handler: async ({ input, client }) => {
     const { location_id } = input;
-    const all = await client.getServices(location_id);
+    const [listed, details] = await Promise.all([
+      client.getServices(location_id),
+      readLinkDetails(client, location_id).catch(() => null),
+    ]);
+    const all = details
+      ? listed.map((service) => withLinkDetails(service, details))
+      : listed;
     const { items: page } = paginateCollection(all, input);
 
     return renderPage({
@@ -196,6 +303,11 @@ export const getServicesTool = defineTool({
               : `; next: page=${pagination.next_page}, page_size=${pagination.page_size}.`),
         ];
         lines.push(...services.map(serviceLine));
+        if (!details) {
+          lines.push(
+            'The stored session length and Bill of Materials of each team member link could not be read: session lengths may show the 900 s default and technological_card_id null.'
+          );
+        }
         // A service title and its comment are typed by the location's staff,
         // so they stay out of our rows and go in the untrusted block, by id.
         const untrusted: UntrustedField[] = services.flatMap((service) => [
@@ -310,6 +422,31 @@ export const updateServiceTool = defineTool({
       service_id,
       updateData
     );
+    // Altegio answers success but keeps the title and category of a service
+    // that belongs to the chain, or when the user may not edit them.
+    const kept = [
+      ...(rest.title !== undefined &&
+      typeof service.title === 'string' &&
+      service.title.trim() !== rest.title.trim()
+        ? ['title']
+        : []),
+      ...(rest.category_id !== undefined &&
+      service.category_id !== undefined &&
+      Number(service.category_id) !== rest.category_id
+        ? ['category']
+        : []),
+    ];
+    if (kept.length > 0) {
+      return {
+        text: withUntrustedBlock(
+          `Service ${service_id} was saved, but Altegio kept its ${kept.join(' and ')}: the service belongs to the chain, where ${kept.length === 1 ? 'it is' : 'they are'} changed (in the chain's service settings), or the user has no right to change ${kept.length === 1 ? 'it' : 'them'} at this location. Other changes in this call were applied.`,
+          [{ label: 'title as stored', value: service.title }],
+          { maxChars: 200 }
+        ),
+        structuredContent: { ...projectService(service), not_applied: kept },
+        isError: true,
+      };
+    }
     return {
       // A partial update reads back a title this call never sent.
       text: withUntrustedBlock(
@@ -429,24 +566,57 @@ export const updateServiceTeamMemberTool = defineTool({
       .positive()
       .nullable()
       .optional()
-      .describe('Bill-of-materials (tech card) ID, or null'),
+      .describe(
+        'Bill of Materials (tech card) id; null detaches it. Omitted: the current one stays.'
+      ),
   }),
   handler: async ({ input, client }) => {
-    await client.updateServiceStaffAssignment(
+    // Altegio replaces the Bill of Materials on every link update and detaches
+    // it when none is sent, so an omitted one is read and sent back.
+    let technologicalCardId = input.technological_card_id;
+    if (technologicalCardId === undefined) {
+      const details = await readLinkDetails(
+        client,
+        input.location_id,
+        input.service_id
+      ).catch((error: unknown) => {
+        throw new AltegioApiError(
+          `Nothing was changed: the current Bill of Materials of team member ${input.team_member_id} for service ${input.service_id} could not be read, and Altegio would detach it. Pass technological_card_id (null to detach). ${error instanceof Error ? error.message : ''}`.trim(),
+          error instanceof AltegioApiError ? error.statusCode : 502
+        );
+      });
+      const link = details.get(input.service_id)?.get(input.team_member_id);
+      if (!link) {
+        throw new AltegioApiError(
+          `Nothing was changed: team member ${input.team_member_id} is not linked to service ${input.service_id} at location ${input.location_id}; link them with services_link_team_member.`,
+          404
+        );
+      }
+      technologicalCardId = link.technological_card_id;
+    }
+    const saved = await client.updateServiceStaffAssignment(
       input.location_id,
       input.service_id,
       input.team_member_id,
       {
         seance_length: input.session_length,
-        technological_card_id: input.technological_card_id ?? null,
+        technological_card_id: technologicalCardId ?? null,
       }
     );
+    const storedLength = positiveInt(saved?.length ?? saved?.seance_length);
+    const storedCard =
+      saved && 'technological_card_id' in saved
+        ? positiveInt(saved.technological_card_id)
+        : (technologicalCardId ?? null);
     return {
-      text: `Updated link of team member ${input.team_member_id} to service ${input.service_id} (${input.session_length}s per session)`,
+      text:
+        `Updated link of team member ${input.team_member_id} to service ${input.service_id} (${storedLength ?? input.session_length}s per session` +
+        `, ${storedCard ? `Bill of Materials ${storedCard}` : 'no Bill of Materials'}).`,
       structuredContent: {
         service_id: input.service_id,
         team_member_id: input.team_member_id,
-        session_length: input.session_length,
+        session_length: storedLength ?? input.session_length,
+        technological_card_id: storedCard,
       },
     };
   },

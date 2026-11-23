@@ -284,6 +284,93 @@ describe('updateDocument', () => {
     expect(writes(calls)).toEqual([]);
   });
 
+  describe('a document created in the Altegio app (header storage 0)', () => {
+    const appHeader = documentRoute({
+      storage_id: 0,
+      storage: [],
+      create_date: '0000-00-00 00:00:00',
+    });
+    const appLine = (overrides: Record<string, unknown> = {}) =>
+      lineRow({
+        storage_id: 3,
+        create_date: '2026-10-19 14:05:00',
+        ...overrides,
+      });
+
+    it('changes a line price without touching the header (regression)', async () => {
+      const calls: Call[] = [];
+      const client = fakeClient(
+        [
+          appHeader,
+          [
+            'PUT',
+            /^\/storage_operations\/goods_transactions\/1\/31$/,
+            200,
+            ok(appLine({ cost_per_unit: 130, cost: 1300 })),
+          ],
+          ...readRoutes([appLine()]),
+        ],
+        calls
+      );
+      const result = await updateDocument(client, {
+        location_id: 1,
+        document_id: 21,
+        lines: [{ line_id: 31, unit_price: 130 }],
+      });
+      expect(result.isError).toBeUndefined();
+      expect(writes(calls).map((c) => `${c.method} ${c.path}`)).toEqual([
+        'PUT /storage_operations/goods_transactions/1/31',
+      ]);
+    });
+
+    it('stores a new comment with the inventory and date its lines share', async () => {
+      const calls: Call[] = [];
+      const client = fakeClient(
+        [
+          appHeader,
+          [
+            'PUT',
+            /^\/storage_operations\/documents\/1\/21$/,
+            200,
+            ok({ id: 21 }),
+          ],
+          ...readRoutes([appLine()]),
+        ],
+        calls
+      );
+      await updateDocument(client, {
+        location_id: 1,
+        document_id: 21,
+        comment: 'checked',
+      });
+      expect(writes(calls)[0]?.body).toEqual({
+        type_id: 3,
+        storage_id: 3,
+        create_date: '2026-10-19 14:05:00',
+        comment: 'checked',
+      });
+    });
+
+    it('refuses a header change when the lines span two inventories', async () => {
+      const calls: Call[] = [];
+      const client = fakeClient(
+        [
+          appHeader,
+          ...readRoutes([appLine(), appLine({ id: 32, storage_id: 4 })]),
+        ],
+        calls
+      );
+      await expect(
+        updateDocument(client, {
+          location_id: 1,
+          document_id: 21,
+          comment: 'checked',
+        })
+      ).rejects.toThrow(/reports no inventory, in its header or one shared/);
+      expect(writes(calls)).toEqual([]);
+    });
+  });
+
   it('reports a partial change as an error, naming what was done', async () => {
     const calls: Call[] = [];
     const client = fakeClient(

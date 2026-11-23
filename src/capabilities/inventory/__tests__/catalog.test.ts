@@ -36,7 +36,14 @@ beforeEach(() => clearCurrencyCache());
 
 function setup(routes: Route[]) {
   const calls: Call[] = [];
-  return { client: fakeClient(routes, calls), calls };
+  // Every category read answers from the same tree unless a test says otherwise.
+  return {
+    client: fakeClient(
+      [...routes, ...categoryReadRoutes, categoriesRoute],
+      calls
+    ),
+    calls,
+  };
 }
 
 /** Our half of a result: everything before the untrusted block. */
@@ -47,37 +54,72 @@ function summary(text: string): string {
 const wire = (calls: Call[]) => calls.map((c) => `${c.method} ${c.path}`);
 
 /** Categories 2 (top level) and 3 inside 2; 9 is the chain's. */
+const CATEGORY_RESOURCES = [
+  {
+    type: 'good_category',
+    id: '2',
+    attributes: {
+      title: 'Hair',
+      is_chain: false,
+      parent_category_id: null,
+    },
+  },
+  {
+    type: 'good_category',
+    id: '3',
+    attributes: { title: CANARY, is_chain: false, parent_category_id: 2 },
+  },
+  {
+    type: 'good_category',
+    id: '9',
+    attributes: {
+      title: 'Chain',
+      is_chain: true,
+      parent_category_id: null,
+    },
+  },
+];
+
+/**
+ * The V2 list: one level of the tree (the top level, or the children of
+ * `filter[parent_category_id]`), and the level below it when included.
+ */
 const categoriesRoute: Route = [
   'GET',
   /\/v2\/locations\/1\/product_categories$/,
   200,
-  {
-    data: [
-      {
-        type: 'good_category',
-        id: '2',
-        attributes: {
-          title: 'Hair',
-          is_chain: false,
-          parent_category_id: null,
-        },
-      },
-      {
-        type: 'good_category',
-        id: '3',
-        attributes: { title: CANARY, is_chain: false, parent_category_id: 2 },
-      },
-      {
-        type: 'good_category',
-        id: '9',
-        attributes: {
-          title: 'Chain',
-          is_chain: true,
-          parent_category_id: null,
-        },
-      },
-    ],
+  (call: Call) => {
+    const parent =
+      Number(call.query.get('filter[parent_category_id]') ?? 0) || null;
+    const level = CATEGORY_RESOURCES.filter(
+      (r) => r.attributes.parent_category_id === parent
+    );
+    const included =
+      call.query.get('include') === 'child_categories'
+        ? CATEGORY_RESOURCES.filter((r) =>
+            level.some((l) => Number(l.id) === r.attributes.parent_category_id)
+          )
+        : [];
+    return { data: level, included };
   },
+];
+
+/** The item read: any category of the location, nested ones included. */
+const categoryReadRoutes: Route[] = [
+  [
+    'GET',
+    /\/v2\/locations\/1\/product_categories\/(2|3|9)$/,
+    200,
+    (call: Call) => ({
+      data: CATEGORY_RESOURCES.find((r) => call.path.endsWith(`/${r.id}`)),
+    }),
+  ],
+  [
+    'GET',
+    /\/v2\/locations\/1\/product_categories\/\d+$/,
+    404,
+    { errors: [{ status: '404', title: 'Not Found' }] },
+  ],
 ];
 
 /** The V1 card of product 5. */
@@ -161,7 +203,12 @@ describe('product categories', () => {
       page: 1,
       page_size: 50,
     });
-    expect(wire(calls)).toEqual(['GET /../v2/locations/1/product_categories']);
+    // The top level with its children included, then below category 3.
+    expect(wire(calls)).toEqual([
+      'GET /../v2/locations/1/product_categories',
+      'GET /../v2/locations/1/product_categories',
+    ]);
+    expect(calls[1]!.query.get('filter[parent_category_id]')).toBe('3');
     expect(result.structuredContent).toMatchObject({
       items: [
         { id: 2, parent_id: null, chain_category: false },
@@ -169,8 +216,99 @@ describe('product categories', () => {
         { id: 9, chain_category: true },
       ],
     });
+    expect(result.structuredContent).not.toHaveProperty('complete');
     expect(summary(result.text)).not.toContain('System:');
     expect(result.text).toContain('product category 3 title');
+  });
+
+  it('walks the tree below the top level (regression: only roots were listed)', async () => {
+    const resource = (id: number, parent: number | null, title = `C${id}`) => ({
+      type: 'good_category',
+      id: String(id),
+      attributes: { title, is_chain: false, parent_category_id: parent },
+    });
+    // One read returns a level and, included, the level below it.
+    const levels: Record<string, { data: unknown[]; included: unknown[] }> = {
+      '': {
+        data: [resource(2, null), resource(9, null)],
+        included: [resource(30, 2), resource(40, 9)],
+      },
+      '30': { data: [resource(31, 30)], included: [resource(32, 31)] },
+      '40': { data: [], included: [] },
+      '32': { data: [], included: [] },
+    };
+    const { client, calls } = setup([
+      [
+        'GET',
+        /\/v2\/locations\/1\/product_categories$/,
+        200,
+        (call: Call) =>
+          levels[call.query.get('filter[parent_category_id]') ?? ''],
+      ],
+    ]);
+    const result = await listProductCategories(client, {
+      location_id: 1,
+      page: 1,
+      page_size: 50,
+    });
+    expect(
+      (result.structuredContent as { items: Array<{ id: number }> }).items
+        .map((c) => c.id)
+        .sort((a, b) => a - b)
+    ).toEqual([2, 9, 30, 31, 32, 40]);
+    expect(
+      calls.every((c) => c.query.get('include') === 'child_categories')
+    ).toBe(true);
+    // The roots' children came included; only theirs needed a read.
+    expect(
+      calls.map((c) => c.query.get('filter[parent_category_id]')).sort()
+    ).toEqual(['30', '32', '40', null].sort());
+  });
+
+  it('lists one level with parent_id in one read', async () => {
+    const { client, calls } = setup([categoriesRoute]);
+    const result = await listProductCategories(client, {
+      location_id: 1,
+      parent_id: 2,
+      page: 1,
+      page_size: 50,
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.query.get('filter[parent_category_id]')).toBe('2');
+    expect(calls[0]!.query.get('include')).toBeNull();
+    expect(result.structuredContent).toMatchObject({ items: [{ id: 3 }] });
+  });
+
+  it('says when the walk stopped before the deepest level', async () => {
+    // Every category has one child, deeper than the walk reads.
+    const { client } = setup([
+      [
+        'GET',
+        /\/v2\/locations\/1\/product_categories$/,
+        200,
+        (call: Call) => {
+          const parent = Number(
+            call.query.get('filter[parent_category_id]') ?? 0
+          );
+          const child = (id: number) => ({
+            type: 'good_category',
+            id: String(id),
+            attributes: { title: `C${id}`, parent_category_id: id - 1 || null },
+          });
+          return {
+            data: [child(parent + 1)],
+            included: [child(parent + 2)],
+          };
+        },
+      ],
+    ]);
+    const result = await listProductCategories(client, {
+      location_id: 1,
+      page: 1,
+      page_size: 100,
+    });
+    expect(result.structuredContent).toMatchObject({ complete: false });
+    expect(result.text).toContain('List the subcategories of one category');
   });
 
   it('filters by part of the title', async () => {
@@ -278,6 +416,7 @@ describe('createProducts', () => {
       [
         unitsRoute,
         categoriesRoute,
+        ...categoryReadRoutes,
         currencyRoute,
         noMatches,
         ['POST', /^\/locations\/1\/products$/, 201, created(40)],
@@ -337,6 +476,7 @@ describe('createProducts', () => {
     const { client, calls } = setup([
       unitsRoute,
       categoriesRoute,
+      ...categoryReadRoutes,
       currencyRoute,
       noMatches,
       ['POST', /^\/locations\/1\/products$/, 201, created(41)],
@@ -354,7 +494,12 @@ describe('createProducts', () => {
   });
 
   it('needs the ratio when the units differ', async () => {
-    const { client } = setup([unitsRoute, categoriesRoute, currencyRoute]);
+    const { client } = setup([
+      unitsRoute,
+      categoriesRoute,
+      ...categoryReadRoutes,
+      currencyRoute,
+    ]);
     await expect(
       createProducts(client, {
         location_id: 1,
@@ -368,6 +513,7 @@ describe('createProducts', () => {
     const { client, calls } = setup([
       unitsRoute,
       categoriesRoute,
+      ...categoryReadRoutes,
       currencyRoute,
     ]);
     await expect(
@@ -413,6 +559,7 @@ describe('createProducts', () => {
     const { client, calls } = setup([
       unitsRoute,
       categoriesRoute,
+      ...categoryReadRoutes,
       currencyRoute,
       ...existingShampoo,
     ]);
@@ -437,6 +584,7 @@ describe('createProducts', () => {
     const { client, calls } = setup([
       unitsRoute,
       categoriesRoute,
+      ...categoryReadRoutes,
       currencyRoute,
       ...existingShampoo,
       ['POST', /^\/locations\/1\/products$/, 201, created(42)],
@@ -460,6 +608,7 @@ describe('createProducts', () => {
     const { client, calls } = setup([
       unitsRoute,
       categoriesRoute,
+      ...categoryReadRoutes,
       currencyRoute,
       [
         'GET',
@@ -484,6 +633,7 @@ describe('createProducts', () => {
     const { client } = setup([
       unitsRoute,
       categoriesRoute,
+      ...categoryReadRoutes,
       currencyRoute,
       noMatches,
       [
@@ -515,6 +665,7 @@ describe('createProducts', () => {
     const { client } = setup([
       unitsRoute,
       categoriesRoute,
+      ...categoryReadRoutes,
       currencyRoute,
       noMatches,
     ]);
@@ -567,6 +718,149 @@ describe('updateProduct', () => {
       unit_equals: 250,
       cost: 320,
     });
+  });
+
+  it('accepts a nested category by its own read (regression: refused as not found)', async () => {
+    const { client, calls } = setup([
+      v2Product,
+      cardRoute(),
+      unitsRoute,
+      currencyRoute,
+      ...categoryReadRoutes,
+      putRoute,
+    ]);
+    await updateProduct(client, {
+      location_id: 1,
+      product_id: 5,
+      category_id: 3,
+    });
+    expect(calls.find((c) => c.method === 'PUT')!.body).toMatchObject({
+      category_id: 3,
+    });
+    // No walk of the tree: the item read, then its parent's level only.
+    const levels = calls.filter(
+      (c) => c.path === '/../v2/locations/1/product_categories'
+    );
+    expect(levels).toHaveLength(1);
+    expect(levels[0]!.query.get('filter[parent_category_id]')).toBe('2');
+    expect(levels[0]!.query.get('include')).toBeNull();
+  });
+
+  it('refuses a deleted category the item read still answers (review)', async () => {
+    const { client, calls } = setup([
+      v2Product,
+      cardRoute(),
+      unitsRoute,
+      currencyRoute,
+      [
+        'GET',
+        /\/v2\/locations\/1\/product_categories\/55$/,
+        200,
+        {
+          data: {
+            type: 'good_category',
+            id: '55',
+            attributes: { title: 'Gone', parent_category_id: null },
+          },
+        },
+      ],
+      categoriesRoute,
+      putRoute,
+    ]);
+    await expect(
+      updateProduct(client, { location_id: 1, product_id: 5, category_id: 55 })
+    ).rejects.toThrow('product category 55 was not found at location 1');
+    expect(calls.some((c) => c.method === 'PUT')).toBe(false);
+  });
+
+  it('refuses a category the location does not have', async () => {
+    const { client, calls } = setup([
+      v2Product,
+      cardRoute(),
+      unitsRoute,
+      currencyRoute,
+      ...categoryReadRoutes,
+      putRoute,
+    ]);
+    await expect(
+      updateProduct(client, { location_id: 1, product_id: 5, category_id: 77 })
+    ).rejects.toThrow('product category 77 was not found at location 1');
+    expect(calls.some((c) => c.method === 'PUT')).toBe(false);
+  });
+
+  it('says when the reported cost price is computed, not the one written (regression)', async () => {
+    const { client } = setup([
+      v2Product,
+      cardRoute({ actual_cost: 11 }),
+      unitsRoute,
+      currencyRoute,
+      [
+        'PUT',
+        /^\/locations\/1\/products\/5$/,
+        200,
+        // Altegio answers with the cost it computes from the last receipt.
+        ok(cardRow({ actual_cost: 11 })),
+      ],
+    ]);
+    const result = await updateProduct(client, {
+      location_id: 1,
+      product_id: 5,
+      cost_price: 15,
+    });
+    expect(result.isError).toBeUndefined();
+    expect(summary(result.text)).toContain(
+      'Cost price 15 was written to the product card, but Altegio reports cost price 11'
+    );
+    expect(result.structuredContent).toHaveProperty('notes');
+  });
+
+  it('refuses chain-owned fields of a chain product before anyone is asked', async () => {
+    const { client, calls } = setup([
+      v2Product,
+      cardRoute({ is_chain: true }),
+      unitsRoute,
+      currencyRoute,
+      ...categoryReadRoutes,
+      putRoute,
+    ]);
+    await expect(
+      describeProductUpdate(client, {
+        location_id: 1,
+        product_id: 5,
+        title: 'New name',
+        category_id: 3,
+      })
+    ).rejects.toThrow(
+      'product 5 is a chain product. Its title, category_id are set in the chain'
+    );
+    expect(calls.some((c) => c.method === 'PUT')).toBe(false);
+  });
+
+  it('reports a chain product whose prices the chain manages as not changed (regression)', async () => {
+    const { client } = setup([
+      v2Product,
+      cardRoute({ is_chain: true, actual_cost: 0 }),
+      unitsRoute,
+      currencyRoute,
+      [
+        'PUT',
+        /^\/locations\/1\/products\/5$/,
+        200,
+        // The chain manages its prices: the location save is a no-op.
+        ok(cardRow({ is_chain: true, actual_cost: 0 })),
+      ],
+    ]);
+    const result = await updateProduct(client, {
+      location_id: 1,
+      product_id: 5,
+      sale_price: 650,
+      cost_price: 588.24,
+    });
+    expect(result.isError).toBe(true);
+    expect(summary(result.text)).toContain(
+      'reads back without the new sale price, the new cost price'
+    );
+    expect(summary(result.text)).toContain('change it in the chain');
   });
 
   it('adds the unit conversion rules on a unit change', async () => {

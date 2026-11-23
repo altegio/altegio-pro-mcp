@@ -145,7 +145,7 @@ export const PAYMENT_STATUS_FROM_WIRE: Readonly<
 
 // ========== sort field ==========
 
-/** Canonical sort field → the wire `order_by` value. Only `total_spent` differs. */
+/** Canonical sort field → the wire `order_by` value. */
 export const SORT_FIELD_TO_WIRE: Readonly<Record<ClientSortField, string>> = {
   id: 'id',
   name: 'name',
@@ -155,5 +155,5 @@ export const SORT_FIELD_TO_WIRE: Readonly<Record<ClientSortField, string>> = {
   first_visit_date: 'first_visit_date',
   last_visit_date: 'last_visit_date',
   total_spent: 'sold_amount',
-  visit_count: 'visit_count',
+  visit_count: 'visits_count',
 };

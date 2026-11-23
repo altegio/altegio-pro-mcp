@@ -2,7 +2,7 @@ import { AltegioClient } from '../providers/altegio-client.js';
 import { OnboardingStateManager } from '../providers/onboarding-state-manager.js';
 import { z } from 'zod';
 import { randomInt } from 'node:crypto';
-import { AltegioApiError } from '../utils/errors.js';
+import { AltegioApiError, ExecutorRefusalError } from '../utils/errors.js';
 import { parseCSV, parseBooleanCell } from '../utils/csv-parser.js';
 import { logger } from '../utils/logger.js';
 import {
@@ -354,8 +354,8 @@ export class OnboardingHandlers {
       const state = await this.stateManager.load(location_id);
 
       if (!state) {
-        throw new Error(
-          `No onboarding session found for location ${location_id}`
+        throw new ExecutorRefusalError(
+          `No onboarding session found for location ${location_id}. Start one with onboarding_start.`
         );
       }
 
@@ -396,8 +396,8 @@ export class OnboardingHandlers {
       const state = await this.stateManager.load(location_id);
 
       if (!state) {
-        throw new Error(
-          `No onboarding session found for location ${location_id}`
+        throw new ExecutorRefusalError(
+          `No onboarding session found for location ${location_id}. Start one with onboarding_start.`
         );
       }
 

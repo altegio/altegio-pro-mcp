@@ -52,7 +52,7 @@ const productFields = {
     .min(0)
     .max(100_000_000)
     .optional()
-    .describe('What one sale unit costs the location, in its currency.'),
+    .describe('Cost of one sale unit; reads may show the receipt-based cost.'),
   sale_unit: unitRef
     .optional()
     .describe(
@@ -112,11 +112,17 @@ export const productCategoriesListTool = defineTool({
   name: 'product_categories_list',
   category: 'Inventory',
   description:
-    'The product categories of a location, the chain’s shared ones included, with the category each is nested in; optionally only those whose title contains query. Use the id as category_id of products_create and products_update. Paged: follow pagination.next_page.',
+    'The product categories of a location, the chain’s shared ones included, each with its parent; optionally only those whose title contains query. Use the id as category_id of products_create and products_update. Paged: follow pagination.next_page.',
   annotations: { title: 'Inventory: list product categories', ...READ_ONLY },
   input: z.object({
     location_id: locationId,
     query: z.string().max(100).optional().describe('Part of the title.'),
+    parent_id: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe('Only subcategories of this one; 0: top level.'),
     page: pageArg,
     page_size: pageSizeArg(100, 50),
   }),
@@ -264,7 +270,7 @@ export const productsUpdateTool = defineTool({
   name: 'products_update',
   category: 'Inventory',
   description:
-    'Change a product: name, product category, sale or cost price, units, article number, barcode, receipt name, comment, critical and desired stock. Fields left out stay. A unit change on a product whose stock has moved converts its past operations by Altegio’s rules. Membership and gift card products are refused. Asks for confirmation first, showing before → after; refused if the card changes after that.',
+    'Change a product: name, product category, sale or cost price, units, article number, barcode, receipt name, comment, critical and desired stock. Fields left out stay. A unit change on a product whose stock has moved converts its past operations by Altegio’s rules. Membership and gift card products are refused; a chain product takes only prices, stock levels and comment. Asks for confirmation first, showing before → after; refused if the card changes after that.',
   annotations: {
     title: 'Inventory: change a product',
     destructiveHint: false,

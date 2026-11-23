@@ -1318,7 +1318,7 @@ export const analyticsGetProfitAndLossStatementTool = defineTool({
       .boolean()
       .optional()
       .describe(
-        'Include a comparison. Without explicit dates: the preceding period of equal length, or of whole months for a whole-month period.'
+        'Include a comparison: by default the preceding equal period, or the preceding whole months.'
       ),
     comparison_date_from: z
       .string()
@@ -2202,7 +2202,7 @@ export const analyticsGetTeamMemberCapacityTool = defineTool({
   name: 'analytics_get_team_member_capacity',
   category: 'Analytics',
   description:
-    'Working days and hours, booked hours, idle hours, occupancy percentage and upcoming appointments by team member, with source totals. For a past period booked hours are time on arrived appointments; for a period reaching today or later they are non-cancelled appointments and busy intervals inside scheduled time (see booked_hours_basis). upcoming_appointments_count counts appointments after the period. Use for capacity planning; analytics_get_team_member_occupancy gives daily occupancy. Read from a temporary report source. Requires team occupancy report permission.',
+    'Working days and hours, booked hours, idle hours, occupancy percentage and upcoming appointments by team member, with source totals. Booked hours: arrived appointments in the past, all non-cancelled ones from today. Use for capacity planning; analytics_get_team_member_occupancy gives daily occupancy. Read from a temporary report source. Requires team occupancy report permission.',
   annotations: { title: 'Analytics: team-member capacity', ...READ_ONLY },
   input: z.object({ location_id: locationId, ...periodFields }),
   outputSchema: objectSchema({
@@ -2444,7 +2444,7 @@ export const analyticsGetCashFlowBreakdownTool = defineTool({
   name: 'analytics_get_cash_flow_breakdown',
   category: 'Analytics',
   description:
-    'Period cash movement by payment item, cash-account type and returned account columns, with signed inflow/outflow and net movement totals. Columns are days, or weeks or months when days do not fit (see granularity). Net movement is not an opening or closing account balance. Amount arrays align with columns; account and type views overlap and must not be summed. Source account ids are unavailable. Supports account, team-member, supplier, payment-item, service and product filters. Requires finance period-report access, not export access. Read from a temporary report source.',
+    'Period cash movement by payment item, cash-account type and returned account columns, with signed inflow/outflow and net movement totals. Columns are days, or weeks or months when days do not fit (see granularity). Net movement is not an opening or closing account balance. Amount arrays align with columns; account and type views overlap and must not be summed. Supports account, team-member, supplier, payment-item, service and product filters. Requires finance period-report access, not export access. Read from a temporary report source.',
   annotations: { title: 'Analytics: cash-flow breakdown', ...READ_ONLY },
   input: z.object({
     location_id: locationId,

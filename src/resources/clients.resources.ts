@@ -51,6 +51,10 @@ never minor units.
 
 Each filter is optional. Range filters (\`{from, to}\`) accept either bound alone.
 
+Membership filters are applied together: they match clients holding one
+membership sold at this location that meets all of them. Gift card filters work
+the same way.
+
 | Canonical filter | Shape | Meaning | Sends (v1) |
 |---|---|---|---|
 | \`query\` | string | Free text over name, phone, email | \`quick_search\` |
@@ -59,17 +63,17 @@ Each filter is optional. Range filters (\`{from, to}\`) accept either bound alon
 | \`importance\` | enum[] | Loyalty class: none, bronze, silver, gold | \`importance\` (0–3) |
 | \`gender\` | enum[] | unknown, male, female | \`gender\` (0–2) |
 | \`tag_ids\` | number[] | Client **tag/label** ids (not service categories) | \`category\` |
-| \`birthday\` | {from,to} | Birthday window; \`MM-DD\` for a day-of-year band | \`birthday\` |
+| \`birthday\` | {from,to} | Birthday window under a year; \`MM-DD\` for a yearly band (may cross New Year) | \`birthday\` |
 | \`age\` | {from,to} | Age in years | \`age\` |
 | \`has_mobile_app\` | boolean | Installed the location's mobile app | \`has_mobile_app\` |
 | \`client_account_balance\` | {from,to} | Prepaid client-account (deposit) balance | \`deposit_balance\` |
-| \`membership_balance\` | {from,to} | Remaining balance on memberships | \`abonement_balance\` |
-| \`membership_type_ids\` | number[] | Holds one of these membership types | \`abonement_types\` |
-| \`membership_is_frozen\` | boolean | Has a frozen membership | \`abonement_is_frozen\` |
-| \`membership_is_used\` | boolean | Has used a membership | \`abonement_is_used\` |
-| \`gift_card_balance\` | {from,to} | Remaining balance on gift cards | \`certificate_balance\` |
-| \`gift_card_type_ids\` | number[] | Holds one of these gift-card types | \`certificate_types\` |
-| \`gift_card_is_used\` | boolean | Has used a gift card | \`certificate_is_used\` |
+| \`membership_balance\` | {from,to} | Visits left on a membership | \`sale_abonement.abonement_balance\` |
+| \`membership_type_ids\` | number[] | Holds one of these membership types | \`sale_abonement.abonement_types\` |
+| \`membership_is_frozen\` | boolean | Has a frozen membership | \`sale_abonement.abonement_is_frozen\` |
+| \`membership_is_used\` | boolean | Membership used at least once | \`sale_abonement.abonement_is_used\` |
+| \`gift_card_balance\` | {from,to} | Remaining balance on a gift card | \`sale_certificate.certificate_balance\` |
+| \`gift_card_type_ids\` | number[] | Holds one of these gift-card types | \`sale_certificate.certificate_types\` |
+| \`gift_card_is_used\` | boolean | Has used a gift card | \`sale_certificate.certificate_is_used\` |
 | \`newsletter_allowed\` | boolean | Agreed to receive newsletters | \`is_newsletter_allowed\` |
 | \`mass_notification_allowed\` | boolean | Included in mass notifications | \`is_mass_notification_allowed\` |
 | \`push_enabled\` | boolean | Push notifications enabled | \`is_push_notification_enabled\` |
@@ -82,8 +86,8 @@ Filters clients by their past appointments. Sub-fields are ANDed together.
 
 - \`team_member_ids\`, \`service_ids\`, \`service_category_ids\`: number[]
 - \`outcome\`: enum[] — \`waiting\`, \`confirmed\`, \`arrived\`, \`no_show\`
-- \`created\`: {from,to} — when the appointment was created
-- \`count\`: {from,to} — how many matching appointments the client has
+- \`created\`: {from,to} — appointment date, \`YYYY-MM-DD\` or a relative offset such as \`-90 days\`
+- \`count\`: {from,to} — how many matching appointments the client has; \`{"to": 0}\` means none
 - \`amount\`: {from,to} — money sold across the matching appointments
 - \`exclude\`: boolean — **invert** the whole filter: clients who did NOT have a
   matching appointment. This is how a lapsed / win-back segment is built.
@@ -112,7 +116,7 @@ correctly.
 **Lapsed / win-back** — no arrived appointment in a chosen window:
 \`\`\`json
 { "location_id": 123, "filters": { "appointments": {
-    "outcome": ["arrived"], "created": { "from": "2026-06-01 00:00:00" },
+    "outcome": ["arrived"], "created": { "from": "2026-06-01" },
     "exclude": true } } }
 \`\`\`
 
