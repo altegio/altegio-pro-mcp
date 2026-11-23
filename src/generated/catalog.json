@@ -35,7 +35,7 @@
     "staff_id": "team_member_id"
   },
   "operationCount": 359,
-  "curatedCount": 134,
+  "curatedCount": 137,
   "domains": [
     {
       "domain": "altegio_plan",
@@ -21690,6 +21690,14 @@
           },
           "type": "object"
         }
+      },
+      "curation": {
+        "domain": "payroll",
+        "tier": "executor-only",
+        "failures": {
+          "403": "This is a team member's own payroll view: Altegio answers it only for the signed-in user's own team member and refuses everyone else with 403, owners and administrators included. For any team member, call search_team_member_calculation_salary with the same location_id, team_member_id, date_from and date_to, or use payroll_get_calculation."
+        },
+        "notes": "Self-view twin of search_team_member_calculation_salary."
       }
     },
     {
@@ -21838,6 +21846,14 @@
           ],
           "description": "Payroll for a period for a specific team member."
         }
+      },
+      "curation": {
+        "domain": "payroll",
+        "tier": "executor-only",
+        "failures": {
+          "403": "This is a team member's own payroll view: Altegio answers it only for the signed-in user's own team member and refuses everyone else with 403, owners and administrators included. For any team member, call search_team_member_period_salary with the same location_id, team_member_id, date_from and date_to, or use payroll_get_calculation."
+        },
+        "notes": "Self-view twin of search_team_member_period_salary."
       }
     },
     {
@@ -21922,6 +21938,14 @@
           },
           "type": "array"
         }
+      },
+      "curation": {
+        "domain": "payroll",
+        "tier": "executor-only",
+        "failures": {
+          "403": "This is a team member's own payroll view: Altegio answers it only for the signed-in user's own team member and refuses everyone else with 403, owners and administrators included, so no right granted to the caller changes it. For another team member, get_team_member_calculation_schemes_count says whether a payroll scheme applies and payroll_get_calculation computes their payroll; no documented operation lists another team member's schemes."
+        },
+        "notes": "Self-view only; 403 for anyone but the team member's own user."
       }
     },
     {

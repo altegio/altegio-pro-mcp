@@ -15,6 +15,7 @@ import {
   type ScheduleBatchItem,
 } from '../types/onboarding.types.js';
 import { requestPrincipalKey } from '../request-context.js';
+import { ExecutorRefusalError } from '../utils/errors.js';
 
 // Shared by every manager/handler instance in this Node process. A deployment
 // must give each process its own state directory; this is not a distributed lock.
@@ -309,9 +310,11 @@ export class OnboardingStateManager {
     const statePath = this.getStatePath(companyId);
     return this.exclusive(statePath, async () => {
       const state = await this.read(statePath, companyId);
+      // Checked before the action runs, so a missing session changes nothing
+      // at the location.
       if (!state)
-        throw new Error(
-          `No onboarding session found for location ${companyId}`
+        throw new ExecutorRefusalError(
+          `Nothing was changed: there is no onboarding session for location ${companyId}. Call onboarding_start with location_id ${companyId} first — it creates nothing at the location, only the record this step needs to roll back what it creates — then repeat this call.`
         );
       return action(
         new OnboardingSession(state, () => this.write(statePath, state))

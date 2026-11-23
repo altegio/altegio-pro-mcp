@@ -651,7 +651,24 @@ describe('api_call_operation', () => {
     it('refuses an entity-only operation before transport', async () => {
       await expect(
         scoped(() => callOperation(client, 'get_visit', { visit_id: 4564 }))
-      ).rejects.toThrow(/cannot be confined to the declared location scope/);
+      ).rejects.toThrow(
+        /cannot be confined to the declared location scope.*`visits_get` tool/
+      );
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('names the location-scoped route for client loyalty cards (regression: retried 1700 times)', async () => {
+      const refusal = await scoped(() =>
+        callOperation(client, 'get_loyalty_card_list_by_client_id', {
+          client_id: 186529560,
+        })
+      ).catch((e: unknown) => e as Error);
+      expect(refusal.message).toMatch(
+        /cannot be confined to the declared location scope/
+      );
+      expect(refusal.message).toContain(
+        'Call `get_client_loyalty_summary` with location_id and client_id instead'
+      );
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
@@ -796,6 +813,39 @@ describe('api_call_operation', () => {
         client: { phone: '+420000000000', email: 'client@example.test' },
       });
       expect(included.text).not.toContain('Contacts withheld');
+    });
+
+    it('withholds a reviewer’s phone and email on client comments (regression)', async () => {
+      const comment = {
+        id: 1,
+        rating: '5',
+        text: 'Great',
+        user_name: 'Anna',
+        user_phone: '+420700000001',
+        user_email: 'reviewer@example.test',
+      };
+      mockOk({ success: true, data: [comment] });
+      const withheld = await callOperation(client, 'get_comments', {
+        location_id: 4564,
+      });
+      expect(JSON.stringify(withheld.structuredContent)).not.toMatch(
+        /\+420700000001|reviewer@example\.test/
+      );
+      expect(withheld.text).not.toMatch(
+        /\+420700000001|reviewer@example\.test/
+      );
+      expect(withheld.text).toContain('Contacts withheld by default');
+
+      mockOk({ success: true, data: [comment] });
+      const included = await callOperation(
+        client,
+        'get_comments',
+        { location_id: 4564 },
+        { includeContacts: true }
+      );
+      expect(JSON.stringify(included.structuredContent)).toContain(
+        'reviewer@example.test'
+      );
     });
 
     it('keeps a location’s own phone on a location read', async () => {
@@ -1025,6 +1075,27 @@ describe('api_call_operation', () => {
         expect(message).toContain(
           'The curated tool `payroll_get_calculation` covers this operation, but this address does not serve it; it is served on /pro/finance.'
         );
+      });
+
+      it('explains a 403 from a team member’s own payroll view (regression)', async () => {
+        mockStatus(403, 'Access denied');
+        const message = await messageOf(
+          callOperation(client, 'get_team_member_salary_schemes', {
+            location_id: 4564,
+            team_member_id: 3100100,
+          })
+        );
+
+        expect(message).toContain('(HTTP 403).');
+        expect(message).toContain("This is a team member's own payroll view");
+        expect(message).toContain('owners and administrators included');
+        expect(message).toContain('get_team_member_calculation_schemes_count');
+
+        mockStatus(403, 'Access denied');
+        const period = await messageOf(
+          callOperation(client, 'get_team_member_salary_period', salary)
+        );
+        expect(period).toContain('call search_team_member_period_salary');
       });
 
       it('leaves a status it does not explain as the client words it', async () => {

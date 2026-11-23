@@ -105,17 +105,27 @@ const DROP_WHEN_EMPTY = new Set([
   'rating',
 ]);
 
-/** Personal contact fields, withheld unless the caller opted in. */
+/**
+ * Personal contact fields, withheld unless the caller opted in. `user_phone`
+ * and `user_email` are the reviewer's contacts on a client comment; the
+ * others are a client's second phone and the phones of callers and referrers.
+ */
 const CONTACT_KEYS = new Set([
   'phone',
   'phones',
   'email',
   'emails',
   'phone_country_id',
+  'phone_number',
+  'additional_phone',
   'client_phone',
   'client_email',
   'client_fictive_phone',
   'client_fictive_email',
+  'user_phone',
+  'user_email',
+  'caller_phone',
+  'referrer_phone',
 ]);
 
 /** The coded and flag fields an appointment's canonical `status` replaces. */
