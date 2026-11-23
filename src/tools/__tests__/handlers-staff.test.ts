@@ -12,6 +12,7 @@ describe('ToolHandlers - Staff CRUD', () => {
     mockClient = {
       createStaff: jest.fn(),
       updateStaff: jest.fn(),
+      getStaff: jest.fn(),
       deleteStaff: jest.fn(),
     } as unknown as jest.Mocked<AltegioClient>;
     handlers = new ToolHandlers(mockClient);
@@ -179,6 +180,98 @@ describe('ToolHandlers - Staff CRUD', () => {
       expect(mockClient.updateStaff).toHaveBeenCalledWith(456, 123, {
         name: 'John Smith',
       });
+      expect(mockClient.getStaff).not.toHaveBeenCalled();
+    });
+
+    it('sends the stored name on a partial update (regression: 422 without name)', async () => {
+      mockClient.getStaff.mockResolvedValue([
+        { id: 122, name: 'Other' },
+        { id: 123, name: 'John Smith', specialization: 'Stylist' },
+      ] as Awaited<ReturnType<AltegioClient['getStaff']>>);
+      mockClient.updateStaff.mockResolvedValue({
+        id: 123,
+        name: 'John Smith',
+      } as Awaited<ReturnType<AltegioClient['updateStaff']>>);
+
+      const result = await handlers.updateStaff({
+        location_id: 456,
+        team_member_id: 123,
+        external_id: 'ext-9',
+        hidden_from_online_booking: true,
+      });
+
+      expect(result.isError).toBeUndefined();
+      expect(mockClient.updateStaff).toHaveBeenCalledWith(456, 123, {
+        name: 'John Smith',
+        api_id: 'ext-9',
+        hidden: 1,
+      });
+    });
+
+    it('refuses a partial update of a team member that is not at the location', async () => {
+      mockClient.getStaff.mockResolvedValue([
+        { id: 122, name: 'Other' },
+      ] as Awaited<ReturnType<AltegioClient['getStaff']>>);
+
+      const result = await handlers.updateStaff({
+        location_id: 456,
+        team_member_id: 123,
+        dismissed: true,
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toContain('not found at location 456');
+      expect(mockClient.updateStaff).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createStaff read-back', () => {
+    it('reports a paid seat that Altegio did not apply (regression)', async () => {
+      mockClient.createStaff.mockResolvedValue({
+        id: 3124597,
+        name: 'Ann',
+        is_paid_staff: false,
+        has_access_timetable: true,
+      } as Awaited<ReturnType<AltegioClient['createStaff']>>);
+
+      const result = await handlers.createStaff({
+        location_id: 456,
+        name: 'Ann',
+        specialization: 'Stylist',
+        position_id: null,
+        has_paid_seat: true,
+        has_schedule_access: true,
+      });
+
+      expect(result.content[0]?.text).toContain(
+        'has_paid_seat was not applied'
+      );
+      expect(result.structuredContent).toMatchObject({
+        id: 3124597,
+        has_paid_seat: false,
+        has_schedule_access: true,
+      });
+    });
+
+    it('adds no note when the stored flags match the request', async () => {
+      mockClient.createStaff.mockResolvedValue({
+        id: 7,
+        name: 'Ann',
+        is_paid_staff: true,
+        has_access_timetable: true,
+      } as Awaited<ReturnType<AltegioClient['createStaff']>>);
+
+      const result = await handlers.createStaff({
+        location_id: 456,
+        name: 'Ann',
+        specialization: 'Stylist',
+        position_id: null,
+        has_paid_seat: true,
+        has_schedule_access: true,
+      });
+
+      expect(result.content[0]?.text).not.toContain('not applied');
+      expect(result.structuredContent).not.toHaveProperty('notes');
     });
   });
 

@@ -241,7 +241,14 @@ export const scheduleOutput = {
 // ========== Single entity (CREATE/UPDATE) ==========
 
 export const staffEntityOutput = entitySchema(
-  { id: idProp, name: strProp, specialization: strProp },
+  {
+    id: idProp,
+    name: strProp,
+    specialization: strProp,
+    has_paid_seat: nullableBoolProp,
+    has_schedule_access: nullableBoolProp,
+    notes: { type: 'array' as const, items: strProp },
+  },
   ['id', 'name']
 );
 
