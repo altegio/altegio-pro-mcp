@@ -176,6 +176,63 @@ describe('searchProducts', () => {
     });
   });
 
+  it('reads stock for at most 20 products a page (regression: 50 reads timed out)', async () => {
+    const { client, calls } = setup([
+      [
+        'GET',
+        /\/v2\/locations\/1\/products\/autocomplete$/,
+        200,
+        { data: [productResource()] },
+      ],
+      productRoute(),
+      unitsRoute,
+      inventoriesRoute,
+      currencyRoute,
+    ]);
+    const result = await searchProducts(client, {
+      location_id: 1,
+      query: 'sham',
+      include_stock: true,
+      page: 2,
+      page_size: 50,
+    });
+    // Page 2 of 50 starts at product 51: page 3 of 20 starts at 41, so
+    // nothing is skipped.
+    const search = calls.find((c) => c.path.endsWith('/autocomplete'))!;
+    expect(search.query.get('limit')).toBe('20');
+    expect(search.query.get('page')).toBe('3');
+    expect(result.structuredContent).toMatchObject({
+      pagination: { page: 3, page_size: 20 },
+    });
+    expect(result.text).toContain(
+      'this is page 3 of 20 (it holds where page 2 of 50 starts)'
+    );
+
+    // Without stock the requested size stands.
+    const plain = setup([
+      [
+        'GET',
+        /\/v2\/locations\/1\/products\/autocomplete$/,
+        200,
+        { data: [productResource()] },
+      ],
+      unitsRoute,
+      currencyRoute,
+    ]);
+    await searchProducts(plain.client, {
+      location_id: 1,
+      query: 'sham',
+      include_stock: false,
+      page: 1,
+      page_size: 50,
+    });
+    expect(
+      plain.calls
+        .find((c) => c.path.endsWith('/autocomplete'))!
+        .query.get('limit')
+    ).toBe('50');
+  });
+
   it('refuses a one-character query and a query combined with ids', async () => {
     const { client } = setup([]);
     await expect(

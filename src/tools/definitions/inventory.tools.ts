@@ -243,7 +243,7 @@ export const productsSearchTool = defineTool({
   name: 'products_search',
   category: 'Inventory',
   description:
-    'Find products of a location by name, article number or barcode (query), by product_ids, or page through all of them: sale price and cost price in the location currency, sale and consumable units, and stock per inventory (include_stock, default true; it reads each product, so keep pages small). Stock can be negative. Paged: follow pagination.next_page.',
+    'Find products of a location by name, article number or barcode (query), by product_ids, or page through all of them: sale price and cost price in the location currency, sale and consumable units, and stock per inventory (include_stock, default true; it reads each product, so a page holds at most 20). Stock can be negative. Paged: follow pagination.next_page.',
   annotations: { title: 'Inventory: search products and stock', ...READ_ONLY },
   input: z.object({
     location_id: locationId,

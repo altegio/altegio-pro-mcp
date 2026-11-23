@@ -236,6 +236,12 @@ function productUntrusted(rows: readonly ProductRow[]): UntrustedField[] {
 
 /** The stock reads of one page: one product read per product, eight at a time. */
 const PRODUCT_READ_CONCURRENCY = 8;
+/**
+ * Most products one page reads stock for. Stock costs one read per product,
+ * and a caller's upstream requests are rate limited, so a larger page waited
+ * in the queue until it timed out; the next page continues instead.
+ */
+export const STOCK_PAGE_MAX = 20;
 
 export async function searchProducts(
   client: AltegioClient,
@@ -258,7 +264,17 @@ export async function searchProducts(
       'query needs at least two characters of a product name, article number or barcode.'
     );
   }
-  const page = { page: input.page, page_size: input.page_size };
+  // With stock, a page is at most STOCK_PAGE_MAX products. The page number is
+  // moved to the smaller pages so the page starts where the one asked for
+  // would have (or just before it): nothing is skipped.
+  const pageSize = input.include_stock
+    ? Math.min(input.page_size, STOCK_PAGE_MAX)
+    : input.page_size;
+  const lowered = pageSize < input.page_size;
+  const pageNumber = lowered
+    ? Math.floor(((input.page - 1) * input.page_size) / pageSize) + 1
+    : input.page;
+  const page = { page: pageNumber, page_size: pageSize };
   const found = query
     ? await products.searchProducts(input.location_id, query, page)
     : await products.listProducts(input.location_id, {
@@ -289,7 +305,7 @@ export async function searchProducts(
   );
 
   return renderPage({
-    input,
+    input: { ...input, ...page },
     items: rows,
     render: ({ items, pagination }) => {
       const what = query
@@ -302,6 +318,10 @@ export async function searchProducts(
         ...items.map(productLine),
       ];
       if (items.length === 0) lines.push('No products match.');
+      if (lowered)
+        lines.push(
+          `With stock a page holds at most ${STOCK_PAGE_MAX} products, so this is page ${pageNumber} of ${STOCK_PAGE_MAX} (it holds where page ${input.page} of ${input.page_size} starts); continue with next_page and page_size ${STOCK_PAGE_MAX}. include_stock=false pages up to ${input.page_size}.`
+        );
       if (pagination.has_more)
         lines.push(
           `More may follow: request page ${pagination.next_page} with page_size ${pagination.page_size}.`

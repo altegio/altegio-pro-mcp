@@ -42,6 +42,7 @@ import { v2Path, type AltegioTransport } from '../api/altegio-http.js';
 import {
   UpstreamBudget,
   UpstreamRateGate,
+  UpstreamRateLimitedError,
   fetchWithDeadline,
 } from '../utils/upstream-budget.js';
 import { hexColor } from '../utils/color.js';
@@ -417,8 +418,9 @@ export class AltegioClient implements AltegioTransport {
     const budget = new UpstreamBudget(this.timeoutMs, options.signal);
     const recordFailure = upstreamFailureRecorder(endpoint, options.method);
     let phase: UpstreamPhase = 'admission';
+    let attempt = 0;
     try {
-      for (let attempt = 0; ; attempt++) {
+      for (; ; attempt++) {
         await this.rateGate.admit(budget);
         let response: Response;
         try {
@@ -469,7 +471,11 @@ export class AltegioClient implements AltegioTransport {
       }
     } catch (error) {
       budget.close();
-      recordFailure(error, phase, budget.cancelled);
+      // A first attempt refused at admission sent nothing and is logged as
+      // rate limited; a retry refused there follows a request that was sent.
+      if (!(error instanceof UpstreamRateLimitedError) || attempt > 0) {
+        recordFailure(error, phase, budget.cancelled);
+      }
       throw error;
     }
   }
