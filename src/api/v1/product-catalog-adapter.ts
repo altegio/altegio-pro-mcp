@@ -30,7 +30,9 @@
  *   `filter[parent_category_id]`, the chain's shared ones included.
  *   `include=child_categories` adds the next level, so the whole tree is read
  *   level by level (verified against the backend source, 2026-11-23). The
- *   item read answers any category of the location, nested ones included.
+ *   item read answers any category of the location, nested ones included —
+ *   and a deleted one too, so a category is live only while its parent's
+ *   level still lists it.
  * - V1 has no idempotency header, so the write methods ignore the
  *   `idempotency_key` of their `WriteOptions` (`../write-options.ts`).
  */
@@ -53,6 +55,7 @@ import type {
   ProductCardWrite,
   ProductCatalogApi,
   ProductCategory,
+  ProductCategoryTree,
   ProductCategoryWrite,
 } from '../inventory-api.js';
 
@@ -73,8 +76,12 @@ const PRODUCT_FLOAT_FIELDS = [
  */
 /** Category levels read at once while walking the tree. */
 const CATEGORY_READS_AT_ONCE = 5;
-/** Most level reads one category list makes; far above any real tree. */
-const CATEGORY_READS_MAX = 200;
+/**
+ * Most level reads one walk of the tree makes. Every category below the
+ * second level costs a read, and a caller's upstream requests are rate
+ * limited, so a larger tree is listed in part and says so.
+ */
+const CATEGORY_READS_MAX = 40;
 
 const CORRECTION_RULES = [
   { type: 1, base_unit: 'service' },
@@ -173,22 +180,24 @@ export class ProductCatalogAdapter implements ProductCatalogApi {
   }
 
   /**
-   * Every category of the location, nested ones included. One read returns
+   * The categories of the location, nested ones included. One read returns
    * the children of a parent and, through `include`, their children, so the
-   * walk reads again only below the categories that came in `included`.
+   * walk reads again only below the categories that came in `included`. The
+   * walk stops after `CATEGORY_READS_MAX` reads; `complete` is false then.
    */
-  async listCategories(locationId: number): Promise<ProductCategory[]> {
+  async listCategories(locationId: number): Promise<ProductCategoryTree> {
     const found = new Map<number, ProductCategory>();
     let parents: number[] = [0];
     let reads = 0;
     while (parents.length > 0 && reads < CATEGORY_READS_MAX) {
       const batch = parents.slice(0, CATEGORY_READS_MAX - reads);
-      parents = [];
+      const unread = parents.slice(batch.length);
+      parents = unread;
       for (let i = 0; i < batch.length; i += CATEGORY_READS_AT_ONCE) {
         const docs = await Promise.all(
           batch
             .slice(i, i + CATEGORY_READS_AT_ONCE)
-            .map((parent) => this.categoryLevel(locationId, parent))
+            .map((parent) => this.categoryLevel(locationId, parent, true))
         );
         reads += docs.length;
         for (const doc of docs) {
@@ -209,10 +218,24 @@ export class ProductCatalogAdapter implements ProductCatalogApi {
         }
       }
     }
-    return [...found.values()];
+    return { items: [...found.values()], complete: parents.length === 0 };
   }
 
-  private categoryLevel(locationId: number, parentId: number) {
+  /** The direct children of a category, or the top level for null. */
+  async listChildCategories(
+    locationId: number,
+    parentId: number | null
+  ): Promise<ProductCategory[]> {
+    return primaryList(
+      await this.categoryLevel(locationId, parentId ?? 0, false)
+    ).map(categoryFromV2);
+  }
+
+  private categoryLevel(
+    locationId: number,
+    parentId: number,
+    withChildren: boolean
+  ) {
     return callJsonApi(
       this.http,
       `/locations/${locationId}/product_categories`,
@@ -220,17 +243,23 @@ export class ProductCatalogAdapter implements ProductCatalogApi {
         context: `list the product categories of location ${locationId}`,
         query: {
           ...(parentId ? { 'filter[parent_category_id]': parentId } : {}),
-          include: 'child_categories',
+          ...(withChildren ? { include: 'child_categories' } : {}),
         },
         mapError: mapInventoryHttpError,
       }
     );
   }
 
+  /**
+   * A live category of the location, nested or not. The item read also
+   * answers a deleted category, so the category counts only while its
+   * parent's level lists it.
+   */
   async getCategory(
     locationId: number,
     categoryId: number
   ): Promise<ProductCategory | null> {
+    let category: ProductCategory;
     try {
       const doc = await callJsonApi(
         this.http,
@@ -241,11 +270,17 @@ export class ProductCatalogAdapter implements ProductCatalogApi {
         }
       );
       const resource = primaryOne(doc);
-      return resource ? categoryFromV2(resource) : null;
+      if (!resource) return null;
+      category = categoryFromV2(resource);
     } catch (error) {
       if (error instanceof InventoryNotFoundError) return null;
       throw error;
     }
+    const siblings = await this.listChildCategories(
+      locationId,
+      category.parent_id
+    );
+    return siblings.find((c) => c.id === categoryId) ?? null;
   }
 
   async createCategory(

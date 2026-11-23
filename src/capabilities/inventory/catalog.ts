@@ -81,25 +81,50 @@ function categoryUntrusted(
 
 export async function listProductCategories(
   client: AltegioClient,
-  input: { location_id: number; query?: string } & PageInput
+  input: { location_id: number; query?: string; parent_id?: number } & PageInput
 ): Promise<InventoryResult> {
-  const all = await productCatalogApi(client).listCategories(input.location_id);
+  const api = productCatalogApi(client);
+  // One level is one read; the whole tree is a bounded walk.
+  const level = input.parent_id !== undefined;
+  const { items: all, complete } = level
+    ? {
+        items: await api.listChildCategories(
+          input.location_id,
+          input.parent_id || null
+        ),
+        complete: true,
+      }
+    : await api.listCategories(input.location_id);
   const query = normalized(input.query);
   const matching = query
     ? all.filter((c) => normalized(c.title).includes(query))
     : all;
   const { items, pagination } = paginateCollection(matching, input);
+  const scope = level
+    ? input.parent_id
+      ? ` inside category ${input.parent_id}`
+      : ' at the top level'
+    : '';
   const lines = [
-    `${matching.length} product categor${matching.length === 1 ? 'y' : 'ies'}${query ? ' matching the query' : ''} at location ${input.location_id}; page ${pagination.page} shows ${items.length}:`,
+    `${matching.length} product categor${matching.length === 1 ? 'y' : 'ies'}${scope}${query ? ' matching the query' : ''} at location ${input.location_id}; page ${pagination.page} shows ${items.length}:`,
     ...items.map(categoryLine),
   ];
+  if (!complete)
+    lines.push(
+      'The category tree is deeper than one list reads, so categories below the listed ones may be missing. List the subcategories of one category with parent_id.'
+    );
   if (pagination.has_more)
     lines.push(
       `More follow: request page ${pagination.next_page} with page_size ${pagination.page_size}.`
     );
   return {
     text: fenced(lines, categoryUntrusted(items)),
-    structuredContent: { location_id: input.location_id, items, pagination },
+    structuredContent: {
+      location_id: input.location_id,
+      items,
+      pagination,
+      ...(complete ? {} : { complete: false }),
+    },
   };
 }
 
@@ -108,15 +133,14 @@ async function findCategory(
   locationId: number,
   categoryId: number,
   role = 'category'
-): Promise<{ category: ProductCategory; all: ProductCategory[] }> {
-  const all = await api.listCategories(locationId);
-  const category = all.find((c) => c.id === categoryId);
+): Promise<ProductCategory> {
+  const category = await api.getCategory(locationId, categoryId);
   if (!category) {
     throw new InventoryNotFoundError(
       `Product ${role} ${categoryId} was not found at location ${locationId}. Check the id with product_categories_list; a deleted category is gone.`
     );
   }
-  return { category, all };
+  return category;
 }
 
 export interface CreateCategoryInput {
@@ -131,19 +155,19 @@ async function planCategoryCreate(
   input: CreateCategoryInput
 ): Promise<{ parent: ProductCategory | null }> {
   const api = productCatalogApi(client);
-  const all = await api.listCategories(input.location_id);
   const parentId = input.parent_id ?? null;
   const parent =
-    parentId === null ? null : (all.find((c) => c.id === parentId) ?? null);
+    parentId === null
+      ? null
+      : await api.getCategory(input.location_id, parentId);
   if (parentId !== null && !parent) {
     throw new InventoryInputError(
       `Nothing was created: parent category ${parentId} was not found at location ${input.location_id}. Check it with product_categories_list.`
     );
   }
-  const twin = all.find(
-    (c) =>
-      c.parent_id === parentId &&
-      normalized(c.title) === normalized(input.title)
+  const siblings = await api.listChildCategories(input.location_id, parentId);
+  const twin = siblings.find(
+    (c) => normalized(c.title) === normalized(input.title)
   );
   if (twin) {
     throw new InventoryInputError(
@@ -212,8 +236,9 @@ async function planCategoryUpdate(
       'Nothing was changed: pass a new title, a new parent_id, or both.'
     );
   }
-  const { category, all } = await findCategory(
-    productCatalogApi(client),
+  const api = productCatalogApi(client);
+  const category = await findCategory(
+    api,
     input.location_id,
     input.category_id
   );
@@ -223,21 +248,25 @@ async function planCategoryUpdate(
       : input.parent_id === 0
         ? null
         : input.parent_id;
-  if (parentId !== null) {
-    if (!all.some((c) => c.id === parentId)) {
-      throw new InventoryInputError(
-        `Nothing was changed: parent category ${parentId} was not found at location ${input.location_id}. Check it with product_categories_list.`
-      );
-    }
-    // A category cannot move under itself or one of its own subcategories.
-    const byId = new Map(all.map((c) => [c.id, c]));
+  if (parentId !== null && parentId !== category.parent_id) {
+    // A category cannot move under itself or one of its own subcategories:
+    // walk up from the new parent to the top level.
+    const seen = new Set<number>();
     for (let at: number | null = parentId; at !== null;) {
       if (at === category.id) {
         throw new InventoryInputError(
           `Nothing was changed: category ${parentId} is category ${category.id} itself or one of its subcategories, so it cannot be its parent.`
         );
       }
-      at = byId.get(at)?.parent_id ?? null;
+      if (seen.has(at)) break;
+      seen.add(at);
+      const ancestor = await api.getCategory(input.location_id, at);
+      if (!ancestor) {
+        throw new InventoryInputError(
+          `Nothing was changed: parent category ${at} was not found at location ${input.location_id}. Check it with product_categories_list.`
+        );
+      }
+      at = ancestor.parent_id;
     }
   }
   const title = input.title?.trim() ?? category.title ?? '';
@@ -328,10 +357,12 @@ export async function describeCategory(
   client: AltegioClient,
   input: { location_id: number; category_id: number }
 ): Promise<string | undefined> {
-  const all = await productCatalogApi(client).listCategories(input.location_id);
-  const category = all.find((c) => c.id === input.category_id);
+  const api = productCatalogApi(client);
+  const category = await api.getCategory(input.location_id, input.category_id);
   if (!category) return undefined;
-  const children = all.filter((c) => c.parent_id === category.id).length;
+  const children = (
+    await api.listChildCategories(input.location_id, category.id)
+  ).length;
   return `product category "${category.title ?? ''}", id ${category.id}${children ? `, holding ${children} subcategor${children === 1 ? 'y' : 'ies'}` : ''}, at location ${input.location_id}`;
 }
 

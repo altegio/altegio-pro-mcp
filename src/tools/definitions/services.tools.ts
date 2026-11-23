@@ -425,7 +425,9 @@ export const updateServiceTool = defineTool({
     // Altegio answers success but keeps the title and category of a service
     // that belongs to the chain, or when the user may not edit them.
     const kept = [
-      ...(rest.title !== undefined && service.title !== rest.title
+      ...(rest.title !== undefined &&
+      typeof service.title === 'string' &&
+      service.title.trim() !== rest.title.trim()
         ? ['title']
         : []),
       ...(rest.category_id !== undefined &&

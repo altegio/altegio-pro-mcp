@@ -446,10 +446,22 @@ export interface ProductCardWrite {
   desired_quantity?: number;
 }
 
+/** The category tree as far as one bounded walk reads it. */
+export interface ProductCategoryTree {
+  items: ProductCategory[];
+  /** False when the walk stopped before the deepest level. */
+  complete: boolean;
+}
+
 export interface ProductCatalogApi {
-  /** Every category of the location, nested and chain ones included. */
-  listCategories(locationId: number): Promise<ProductCategory[]>;
-  /** One category of the location, nested or not; null when there is none. */
+  /** The categories of the location, nested and chain ones included. */
+  listCategories(locationId: number): Promise<ProductCategoryTree>;
+  /** The direct children of a category; the top level for null. */
+  listChildCategories(
+    locationId: number,
+    parentId: number | null
+  ): Promise<ProductCategory[]>;
+  /** One live category of the location, nested or not; null when none. */
   getCategory(
     locationId: number,
     categoryId: number
