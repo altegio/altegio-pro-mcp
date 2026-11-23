@@ -447,7 +447,13 @@ export interface ProductCardWrite {
 }
 
 export interface ProductCatalogApi {
+  /** Every category of the location, nested and chain ones included. */
   listCategories(locationId: number): Promise<ProductCategory[]>;
+  /** One category of the location, nested or not; null when there is none. */
+  getCategory(
+    locationId: number,
+    categoryId: number
+  ): Promise<ProductCategory | null>;
   createCategory(
     locationId: number,
     category: ProductCategoryWrite,

@@ -52,7 +52,9 @@ const productFields = {
     .min(0)
     .max(100_000_000)
     .optional()
-    .describe('What one sale unit costs the location, in its currency.'),
+    .describe(
+      'What one sale unit costs the location, in its currency. Stored on the card; a location that costs products by their receipts reports the computed cost instead.'
+    ),
   sale_unit: unitRef
     .optional()
     .describe(
@@ -264,7 +266,7 @@ export const productsUpdateTool = defineTool({
   name: 'products_update',
   category: 'Inventory',
   description:
-    'Change a product: name, product category, sale or cost price, units, article number, barcode, receipt name, comment, critical and desired stock. Fields left out stay. A unit change on a product whose stock has moved converts its past operations by Altegio’s rules. Membership and gift card products are refused. Asks for confirmation first, showing before → after; refused if the card changes after that.',
+    'Change a product: name, product category, sale or cost price, units, article number, barcode, receipt name, comment, critical and desired stock. Fields left out stay. A unit change on a product whose stock has moved converts its past operations by Altegio’s rules. Membership and gift card products are refused; on a chain product only prices, stock levels and the comment can change here. Asks for confirmation first, showing before → after; refused if the card changes after that. Says when Altegio does not apply a change.',
   annotations: {
     title: 'Inventory: change a product',
     destructiveHint: false,

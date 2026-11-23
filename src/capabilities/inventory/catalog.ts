@@ -555,12 +555,22 @@ async function planCreate(
       keys.set(key, index);
     }
   });
+  // A category is checked by its own read: the list walks the whole tree, and
+  // a nested or chain category is as valid as a top-level one.
+  const catalog = productCatalogApi(client);
+  const wantedCategories = [
+    ...new Set(input.products.map((p) => p.category_id)),
+  ];
   const [units, categories, currency] = await Promise.all([
     productsApi(client).listUnits(input.location_id),
-    productCatalogApi(client).listCategories(input.location_id),
+    Promise.all(
+      wantedCategories.map((id) => catalog.getCategory(input.location_id, id))
+    ),
     locationCurrency(client, input.location_id),
   ]);
-  const categoryIds = new Set(categories.map((c) => c.id));
+  const categoryIds = new Set(
+    categories.filter((c): c is ProductCategory => c !== null).map((c) => c.id)
+  );
   const planned: PlannedProduct[] = [];
   for (const [index, p] of input.products.entries()) {
     const where = `Line ${index + 1}`;
@@ -760,6 +770,22 @@ interface UpdatePlan {
   currency: string | null;
 }
 
+/**
+ * Fields of a chain product that only the chain sets: a location update
+ * stores just the prices, the stock levels and the comment, and silently
+ * keeps the rest.
+ */
+const CHAIN_OWNED: readonly (keyof ProductFieldsInput)[] = [
+  'title',
+  'category_id',
+  'sale_unit',
+  'consumable_unit',
+  'consumable_units_per_sale_unit',
+  'article',
+  'barcode',
+  'print_title',
+];
+
 const CHANGEABLE: readonly (keyof ProductFieldsInput)[] = [
   'title',
   'category_id',
@@ -790,23 +816,34 @@ async function planUpdate(
     stock: false,
   });
   const api = productCatalogApi(client);
-  const [before, units, currency, categories] = await Promise.all([
+  // undefined: no category change; null: the category is not at the location.
+  const [before, units, currency, category] = await Promise.all([
     api.getProductCard(input.location_id, input.product_id),
     productsApi(client).listUnits(input.location_id),
     locationCurrency(client, input.location_id),
     input.category_id === undefined
-      ? Promise.resolve(null)
-      : api.listCategories(input.location_id),
+      ? Promise.resolve(undefined)
+      : api.getCategory(input.location_id, input.category_id),
   ]);
   if (before.loyalty_kind) {
     throw new InventoryInputError(
       `Nothing was changed: product ${before.id} sells a ${before.loyalty_kind === 'membership' ? 'membership' : 'gift card'}; change it with its ${before.loyalty_kind === 'membership' ? 'membership type' : 'gift card type'}, not here.`
     );
   }
-  if (categories && !categories.some((c) => c.id === input.category_id)) {
+  if (category === null) {
     throw new InventoryInputError(
       `Nothing was changed: product category ${input.category_id} was not found at location ${input.location_id}. Check it with product_categories_list.`
     );
+  }
+  if (before.chain_product) {
+    const chainOwned = CHAIN_OWNED.filter(
+      (field) => input[field] !== undefined
+    );
+    if (chainOwned.length > 0) {
+      throw new InventoryInputError(
+        `Nothing was changed: product ${before.id} is a chain product. Its ${chainOwned.join(', ')} ${chainOwned.length === 1 ? 'is' : 'are'} set in the chain, and Altegio ignores ${chainOwned.length === 1 ? 'it' : 'them'} at a location. Here only the sale and cost price, the critical and desired stock and the comment can change, and only when the chain does not manage them too.`
+      );
+    }
   }
   const where = `Product ${before.id}`;
   const saleUnitId =
@@ -967,20 +1004,93 @@ export async function updateProduct(
     plan.write,
     { ...writeOptions(confirmation), unit_change: plan.unit_change }
   );
-  return {
-    text: fenced(
-      [
+  const check = checkSaved(plan, input, saved);
+  const applied = check.not_applied.length === 0;
+  const lines = applied
+    ? [
         `Changed product ${saved.id} at location ${input.location_id}: ${plan.changes.join('; ')}.`,
-      ],
-      [{ label: `product ${saved.id} title`, value: saved.title }]
-    ),
+      ]
+    : [
+        `Altegio answered success for product ${saved.id} at location ${input.location_id}, but it reads back without ${check.not_applied.join(', ')}.` +
+          (plan.before.chain_product
+            ? ' This is a chain product whose prices and stock levels the chain manages, so a location change is ignored; change it in the chain.'
+            : ' Read it again with products_search before trying again.'),
+      ];
+  lines.push(...check.notes);
+  return {
+    text: fenced(lines, [
+      { label: `product ${saved.id} title`, value: saved.title },
+    ]),
     structuredContent: {
       location_id: input.location_id,
       currency: plan.currency,
       before: plan.before,
       product: saved,
+      ...(applied ? {} : { not_applied: check.not_applied }),
+      ...(check.notes.length ? { notes: check.notes } : {}),
     },
+    ...(applied ? {} : { isError: true }),
   };
+}
+
+/**
+ * What the saved card shows of the change. A field that does not read back as
+ * written was not applied; the cost price is the exception, since Altegio
+ * reports the cost it computes from receipts, not the one on the card.
+ */
+function checkSaved(
+  plan: UpdatePlan,
+  input: UpdateProductInput,
+  saved: ProductCard
+): { not_applied: string[]; notes: string[] } {
+  const near = (a: number | null, b: number) =>
+    a !== null && Math.abs(a - b) < 0.005;
+  const notApplied: string[] = [];
+  const notes: string[] = [];
+  const expect = (field: string, ok: boolean) => {
+    if (!ok) notApplied.push(field);
+  };
+  if (input.title !== undefined) {
+    expect('the new title', (saved.title ?? '') === plan.write.title);
+  }
+  if (input.category_id !== undefined) {
+    expect('the new category', saved.category_id === input.category_id);
+  }
+  if (input.sale_price !== undefined) {
+    expect('the new sale price', near(saved.sale_price, input.sale_price));
+  }
+  if (input.critical_quantity !== undefined) {
+    expect(
+      'the new critical stock',
+      near(saved.critical_quantity ?? 0, input.critical_quantity)
+    );
+  }
+  if (input.desired_quantity !== undefined) {
+    expect(
+      'the new desired stock',
+      near(saved.desired_quantity ?? 0, input.desired_quantity)
+    );
+  }
+  if (
+    input.cost_price !== undefined &&
+    saved.cost_price !== null &&
+    !near(saved.cost_price, input.cost_price)
+  ) {
+    const unchanged =
+      plan.before.cost_price !== null &&
+      near(saved.cost_price, plan.before.cost_price);
+    if (plan.before.chain_product && unchanged && notApplied.length > 0) {
+      notApplied.push('the new cost price');
+    } else {
+      notes.push(
+        `Cost price ${input.cost_price} was written to the product card, but Altegio reports cost price ${saved.cost_price}: this location computes the cost price it uses from receipts (the last receipt price or the average), so products_search, documents and reports show the computed one. The card value counts only while the product has no receipt, or when the location takes the cost price from the card.` +
+          (plan.before.chain_product
+            ? ' On a chain product the chain may also manage the cost price; then change it in the chain.'
+            : '')
+      );
+    }
+  }
+  return { not_applied: notApplied, notes };
 }
 
 // ========== product cards: archive ==========
