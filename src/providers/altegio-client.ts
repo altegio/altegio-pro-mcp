@@ -42,6 +42,7 @@ import { v2Path, type AltegioTransport } from '../api/altegio-http.js';
 import {
   UpstreamBudget,
   UpstreamRateGate,
+  UpstreamRateLimitedError,
   fetchWithDeadline,
 } from '../utils/upstream-budget.js';
 import { hexColor } from '../utils/color.js';
@@ -469,7 +470,10 @@ export class AltegioClient implements AltegioTransport {
       }
     } catch (error) {
       budget.close();
-      recordFailure(error, phase, budget.cancelled);
+      // A refused admission sent nothing; it is logged as rate limited.
+      if (!(error instanceof UpstreamRateLimitedError)) {
+        recordFailure(error, phase, budget.cancelled);
+      }
       throw error;
     }
   }

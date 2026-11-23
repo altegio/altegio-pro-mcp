@@ -1,12 +1,16 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { currentRequestSignal } from './request-lifecycle.js';
+import { AltegioApiError } from './errors.js';
+import { noteRateLimited } from './tool-call-observation.js';
 
 /** One budget covers admission, every read attempt, headers and the final body. */
 export class UpstreamBudget {
   readonly signal: AbortSignal;
   private readonly cancellation: AbortSignal;
   private readonly timer: ReturnType<typeof setTimeout>;
+  private readonly deadlineAt: number;
   constructor(timeoutMs: number, signal?: AbortSignal | null) {
+    this.deadlineAt = performance.now() + timeoutMs;
     const deadline = new AbortController();
     this.timer = setTimeout(
       () =>
@@ -20,6 +24,10 @@ export class UpstreamBudget {
       [signal, currentRequestSignal()].filter((s): s is AbortSignal => !!s)
     );
     this.signal = AbortSignal.any([deadline.signal, this.cancellation]);
+  }
+  /** Milliseconds left before the deadline. */
+  remainingMs(): number {
+    return this.deadlineAt - performance.now();
   }
   get cancelled(): boolean {
     return (
@@ -106,27 +114,82 @@ export class UpstreamBudget {
   }
 }
 
-/** Sliding-window admission, bounded by each call's own request budget. */
+/**
+ * The caller's own request rate is at its limit, and no request slot opens
+ * before this call's deadline: refused at once, with nothing sent, instead of
+ * waiting out the deadline in the queue.
+ */
+export class UpstreamRateLimitedError extends AltegioApiError {
+  constructor(
+    readonly waitMs: number,
+    requests: number,
+    windowMs: number
+  ) {
+    const seconds = Math.max(1, Math.ceil(waitMs / 1000));
+    super(
+      `Nothing was sent to Altegio: this connection already made its ${requests} requests ` +
+        `for the last ${Math.round(windowMs / 1000)} seconds, and the next one fits in about ${seconds} seconds, ` +
+        'later than this call could wait. Wait that long before the next call, and send calls one at a ' +
+        'time rather than in parallel or in a tight loop.',
+      429
+    );
+    this.name = 'UpstreamRateLimitedError';
+    noteRateLimited();
+  }
+}
+
+/**
+ * Sliding-window admission, bounded by each call's own request budget. A
+ * call that would get its slot only after its deadline is refused at once:
+ * waiting would end in a timeout anyway, and it would hold up the calls
+ * queued behind it.
+ */
 export class UpstreamRateGate {
   private timestamps: number[] = [];
+  /** Calls queued for a slot, by arrival; the earlier ones get slots first. */
+  private readonly queue: number[] = [];
+  private nextTicket = 0;
   constructor(
     private readonly requests: number,
     private readonly windowMs: number
   ) {}
   async admit(budget: UpstreamBudget): Promise<void> {
-    for (;;) {
-      budget.signal.throwIfAborted();
-      const now = performance.now();
-      this.timestamps = this.timestamps.filter(
-        (at) => at > now - this.windowMs
-      );
-      if (this.timestamps.length < this.requests) {
-        this.timestamps.push(now);
-        return;
+    const ticket = this.nextTicket++;
+    this.queue.push(ticket);
+    try {
+      for (;;) {
+        budget.signal.throwIfAborted();
+        const now = performance.now();
+        this.timestamps = this.timestamps.filter(
+          (at) => at > now - this.windowMs
+        );
+        const ahead = this.queue.indexOf(ticket);
+        if (this.timestamps.length + ahead < this.requests) {
+          this.timestamps.push(now);
+          return;
+        }
+        // The slot this call can expect: the ones before it go to the calls
+        // queued ahead of it.
+        const opensAt =
+          ahead < this.timestamps.length
+            ? this.timestamps[ahead]! + this.windowMs
+            : now + this.windowMs;
+        if (opensAt - now > budget.remainingMs()) {
+          throw new UpstreamRateLimitedError(
+            opensAt - now,
+            this.requests,
+            this.windowMs
+          );
+        }
+        // Wake when the oldest slot frees, or soon when only the calls ahead
+        // still have to take the free ones.
+        const oldest = this.timestamps[0];
+        await budget.pause(
+          Math.max(1, oldest === undefined ? 1 : oldest + this.windowMs - now)
+        );
       }
-      await budget.pause(
-        Math.max(1, this.timestamps[0]! + this.windowMs - now)
-      );
+    } finally {
+      this.queue.splice(this.queue.indexOf(ticket), 1);
     }
   }
 }

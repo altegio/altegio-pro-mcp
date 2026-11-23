@@ -2,7 +2,10 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AltegioClient } from '../altegio-client.js';
-import { UpstreamRateGate } from '../../utils/upstream-budget.js';
+import {
+  UpstreamRateGate,
+  UpstreamRateLimitedError,
+} from '../../utils/upstream-budget.js';
 import {
   createToolCallObservation,
   runObservingToolCall,
@@ -36,7 +39,7 @@ afterEach(() => {
   rmSync(testDir, { recursive: true, force: true });
 });
 
-it('identifies admission exhaustion before any HTTP request is sent', async () => {
+it('refuses at once, sending nothing, when no slot opens before the deadline', async () => {
   client = new AltegioClient(
     { partnerToken: 'synthetic', timeout: 50 },
     testDir,
@@ -46,24 +49,58 @@ it('identifies admission exhaustion before any HTTP request is sent', async () =
   await (await client.apiRequest(endpoint)).text();
   fetchMock.mockClear();
   const observation = createToolCallObservation();
-  const rejected = expect(
-    runObservingToolCall(observation, () =>
-      client.apiRequest(endpoint, { method: 'PUT' })
-    )
-  ).rejects.toThrow('deadline');
-  await jest.advanceTimersByTimeAsync(50);
-  await rejected;
+  const started = Date.now();
+  const error = await runObservingToolCall(observation, () =>
+    client.apiRequest(endpoint, { method: 'PUT' })
+  ).catch((e: unknown) => e);
+  // No time passed in the queue: the refusal does not wait for the deadline.
+  expect(Date.now() - started).toBe(0);
+  expect(error).toBeInstanceOf(UpstreamRateLimitedError);
+  expect((error as UpstreamRateLimitedError).statusCode).toBe(429);
+  expect((error as Error).message).toContain(
+    'the next one fits in about 1 seconds'
+  );
   expect(fetchMock).not.toHaveBeenCalled();
-  expect(observation).toMatchObject({
-    upstreamResponses: 0,
-    upstreamFailure: 'timeout',
-    upstreamFailureDetail: {
-      phase: 'admission',
-      method: 'PUT',
-      route: template,
-    },
-  });
+  expect(observation.rateLimited).toBe(true);
+  expect(observation.upstreamFailure).toBeUndefined();
   expect(observation.upstreamRequests ?? 0).toBe(0);
+});
+
+it('waits for a slot that opens before the deadline', async () => {
+  client = new AltegioClient(
+    { partnerToken: 'synthetic', timeout: 500 },
+    testDir,
+    { rateGate: new UpstreamRateGate(1, 100) }
+  );
+  fetchMock.mockImplementation(async () => new Response('ok'));
+  await (await client.apiRequest(endpoint)).text();
+  const second = client.apiRequest(endpoint);
+  await jest.advanceTimersByTimeAsync(100);
+  await expect((await second).text()).resolves.toBe('ok');
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+
+it('counts the calls queued ahead when it decides', async () => {
+  // Two slots a second; one used, so one call fits now and the next only
+  // after a second — past a 300 ms deadline.
+  const gate = new UpstreamRateGate(2, 1000);
+  client = new AltegioClient(
+    { partnerToken: 'synthetic', timeout: 300 },
+    testDir,
+    {
+      rateGate: gate,
+    }
+  );
+  fetchMock.mockImplementation(async () => new Response('ok'));
+  await (await client.apiRequest(endpoint)).text();
+  const results = await Promise.allSettled([
+    client.apiRequest(endpoint),
+    client.apiRequest(endpoint),
+  ]);
+  expect(results.map((r) => r.status)).toEqual(['fulfilled', 'rejected']);
+  expect((results[1] as PromiseRejectedResult).reason).toBeInstanceOf(
+    UpstreamRateLimitedError
+  );
 });
 
 it.each(['GET', 'PUT'])(
