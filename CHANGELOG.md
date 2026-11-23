@@ -148,6 +148,16 @@ is declared stable.
   defined, so the first-page size cap now reads the ceiling through
   `maxValue`, and serves it only when the schema accepts it.
 
+### Fixed — the container image owns its onboarding state directory
+
+- **The image creates `~/.altegio-mcp/onboarding`, owned by `nodejs`**, so a
+  hosted deployment can keep onboarding sessions on a volume across
+  redeploys. Until now each redeploy deleted the sessions in progress, and the
+  next step answered that there was no onboarding session. Docker gives a new
+  volume the owner of the directory it is mounted on, and without that
+  directory in the image both the volume and `~/.altegio-mcp` came up owned by
+  root, refusing every write.
+
 ### Fixed — a service category change reads the category as it is now
 
 - **`service_categories_update` reads the category from the location's

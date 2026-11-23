@@ -27,6 +27,17 @@ RUN apk add --no-cache dumb-init
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
+# Onboarding sessions live under the default state path, and a hosted
+# deployment mounts a volume there so a redeploy keeps them. Docker gives an
+# empty named volume the owner of the image directory it is mounted on, so
+# that directory must exist here, owned by nodejs. A volume on a path the
+# image lacks comes up root-owned, along with ~/.altegio-mcp itself, and every
+# onboarding and credential write fails. Credentials stay in ~/.altegio-mcp,
+# outside that volume.
+RUN mkdir -p /home/nodejs/.altegio-mcp/onboarding && \
+    chown -R nodejs /home/nodejs/.altegio-mcp && \
+    chmod -R 700 /home/nodejs/.altegio-mcp
+
 # Set working directory
 WORKDIR /app
 
