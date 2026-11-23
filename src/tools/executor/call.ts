@@ -582,7 +582,7 @@ const SCOPED_ALTERNATIVES: Readonly<Record<string, string>> = {
   get_document_product_transactions:
     'Use the `inventory_list_operations` tool with location_id and document_id instead.',
   get_document_financial_transactions:
-    'Call `get_transactions` with location_id and document_id instead.',
+    'Use the `financial_transactions_list` tool with location_id and the document’s dates instead; each transaction names its document_id.',
   get_location_list: 'Use the `locations_list` tool instead.',
 };
 
