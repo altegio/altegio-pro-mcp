@@ -19,6 +19,27 @@ const docker = (args, options = {}) =>
 const version = JSON.parse(
   await readFile(new URL('../../package.json', import.meta.url), 'utf8')
 ).version;
+// Hosted deployments keep onboarding sessions on a named volume at the
+// default state path. A new volume takes its owner from the image directory,
+// so the service user must be able to write both it and ~/.altegio-mcp.
+const stateVolume = `altegio-pro-smoke-onboarding-${process.pid}`;
+try {
+  docker([
+    'run',
+    '--rm',
+    '--network',
+    'none',
+    '--volume',
+    `${stateVolume}:/home/nodejs/.altegio-mcp/onboarding`,
+    '--entrypoint',
+    'sh',
+    image,
+    '-c',
+    'test -w "$HOME/.altegio-mcp/onboarding" && test -w "$HOME/.altegio-mcp"',
+  ]);
+} finally {
+  docker(['volume', 'rm', '--force', stateVolume]);
+}
 for (const protocolMode of ['legacy', 'dual']) {
   const cid = docker([
     'run',
