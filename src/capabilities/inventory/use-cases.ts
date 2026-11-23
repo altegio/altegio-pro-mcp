@@ -911,6 +911,11 @@ export async function createOperation(
   const text = [
     `Recorded ${documentLine(created.document)} with ${lines.length} line(s), total ${money(sum, plan.currency)}:`,
     ...lines.map(movementLine),
+    ...(input.kind === 'sale'
+      ? []
+      : [
+          `Team member ${input.team_member_id} is not stored on ${KIND_LABEL[input.kind]} lines: Altegio keeps a team member on sale lines only, and records the user who created the document.`,
+        ]),
     input.kind === 'sale' || input.kind === 'receipt'
       ? 'No payment was recorded with it. To undo the operation, delete the document with inventory_delete_document.'
       : 'To undo the operation, delete the document with inventory_delete_document.',
@@ -937,6 +942,7 @@ export async function createOperation(
       document: created.document,
       lines,
       total: sum,
+      team_member_stored: input.kind === 'sale',
     },
   };
 }
@@ -948,15 +954,46 @@ export async function describeDocument(
   client: AltegioClient,
   input: { location_id: number; document_id: number }
 ): Promise<string> {
-  const d = await inventoryApi(client).getDocument(
-    input.location_id,
-    input.document_id
-  );
+  const d = await deletableDocument(client, input);
   return `${documentLine(d)} at location ${input.location_id}`;
 }
 
 /** Most lines one document read lists; a document holds far fewer. */
 const DOCUMENT_LINES_MAX = 100;
+
+/**
+ * The document to delete. Altegio finds only live inventory operation
+ * documents here, while the line listing also shows lines of other documents
+ * (a stocktaking, a visit's product sale, an appointment's consumables) and
+ * lines it kept from a deleted document. When the listing still shows lines
+ * for an id the document read does not find, say so rather than answer a bare
+ * "not found" for an id the listing itself gave.
+ */
+async function deletableDocument(
+  client: AltegioClient,
+  input: { location_id: number; document_id: number }
+): Promise<InventoryDocument> {
+  try {
+    return await inventoryApi(client).getDocument(
+      input.location_id,
+      input.document_id
+    );
+  } catch (error) {
+    if (!(error instanceof InventoryNotFoundError)) throw error;
+    const listed = await documentLines(
+      client,
+      input.location_id,
+      input.document_id
+    ).catch(() => [] as InventoryMovement[]);
+    if (listed.length === 0) throw error;
+    const ids = listed.map((m) => m.id).join(', ');
+    throw new InventoryNotFoundError(
+      `Nothing was deleted: Altegio finds no inventory operation document ${input.document_id} at location ${input.location_id}, although inventory_list_operations still lists ${listed.length} line(s) for it (${ids}). ` +
+        'Such lines belong to a document this tool cannot delete — a stocktaking (inventory count), a product sale on a visit or an appointment’s consumables — or were kept by Altegio from a document already deleted. ' +
+        'Check the document in the Altegio app; inventory_delete_document deletes only documents recorded as a product sale, receipt or write-off.'
+    );
+  }
+}
 
 async function documentLines(
   client: AltegioClient,
@@ -977,10 +1014,7 @@ export async function describeDocumentLines(
   input: { location_id: number; document_id: number }
 ): Promise<string> {
   try {
-    await inventoryApi(client).getDocument(
-      input.location_id,
-      input.document_id
-    );
+    await deletableDocument(client, input);
   } catch (error) {
     if (error instanceof InventoryNotFoundError)
       throw new ConfirmationRefusal(error.message);
@@ -1006,7 +1040,7 @@ export async function deleteDocument(
   confirmation?: ConfirmedCall
 ): Promise<InventoryResult> {
   const api = inventoryApi(client);
-  const document = await api.getDocument(input.location_id, input.document_id);
+  const document = await deletableDocument(client, input);
   const [lines, currency] = await Promise.all([
     documentLines(client, input.location_id, input.document_id),
     locationCurrency(client, input.location_id),

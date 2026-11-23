@@ -9,6 +9,14 @@ import {
 import { staffListOutput, staffEntityOutput } from '../output-schemas.js';
 import { paidSeatChoice, scheduleAccessChoice } from '../staff-seat-choice.js';
 
+/** A stored 0/1 or boolean flag; null when the response omits it. */
+function readFlag(value: unknown): boolean | null {
+  if (typeof value === 'boolean') return value;
+  if (value === 0 || value === 1) return value === 1;
+  if (value === '0' || value === '1') return value === '1';
+  return null;
+}
+
 export const getStaffTool = defineTool({
   name: 'team_members_list',
   category: 'Team members',
@@ -139,15 +147,39 @@ export const createStaffTool = defineTool({
       has_timetable_access: has_schedule_access,
       is_paid_staff: has_paid_seat,
     });
+    // Altegio applies the paid-seat flag only on per-seat licensing and
+    // ignores it elsewhere, so report what was stored instead of echoing the
+    // request.
+    const paidSeat = readFlag(staff.is_paid_staff);
+    const scheduleAccess = readFlag(staff.has_access_timetable);
+    const notes: string[] = [];
+    if (paidSeat !== null && paidSeat !== has_paid_seat) {
+      notes.push(
+        has_paid_seat
+          ? 'has_paid_seat was not applied: the location is not on per-seat licensing, where Altegio ignores the paid-seat flag and stores false.'
+          : 'Altegio stored a paid seat although has_paid_seat was false.'
+      );
+    }
+    if (scheduleAccess !== null && scheduleAccess !== has_schedule_access) {
+      notes.push(
+        `has_schedule_access is stored as ${scheduleAccess}, not ${has_schedule_access} as requested.`
+      );
+    }
     return {
-      text: withUntrustedBlock(`Created team member ${staff.id}.`, [
-        { label: 'name', value: staff.name },
-        { label: 'specialization', value: staff.specialization },
-      ]),
+      text: withUntrustedBlock(
+        [`Created team member ${staff.id}.`, ...notes].join(' '),
+        [
+          { label: 'name', value: staff.name },
+          { label: 'specialization', value: staff.specialization },
+        ]
+      ),
       structuredContent: {
         id: staff.id,
         name: sanitizeUntrusted(staff.name) ?? undefined,
         specialization: sanitizeUntrusted(staff.specialization) ?? undefined,
+        has_paid_seat: paidSeat,
+        has_schedule_access: scheduleAccess,
+        ...(notes.length > 0 ? { notes } : {}),
       },
     };
   },
@@ -200,6 +232,20 @@ export const updateStaffTool = defineTool({
       dismissed,
       ...updateData
     } = input;
+    // The v1 endpoint refuses any update without `name` (422), although it
+    // keeps every other omitted field. Send the stored name so a partial update
+    // stays partial.
+    if (updateData.name === undefined) {
+      const current = (await client.getStaff(location_id)).find(
+        (member) => member.id === team_member_id
+      );
+      if (!current?.name) {
+        throw new Error(
+          `Team member ${team_member_id} was not found at location ${location_id}; check the id with team_members_list, or pass name.`
+        );
+      }
+      updateData.name = current.name;
+    }
     // Canonical names at the boundary; V1 field names and 0/1 flags on the wire.
     const staff = await client.updateStaff(location_id, team_member_id, {
       ...updateData,

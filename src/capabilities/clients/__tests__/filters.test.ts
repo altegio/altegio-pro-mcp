@@ -10,6 +10,7 @@ import { buildFilterPayload } from '../filters.js';
 import {
   OUTCOME_TO_ATTENDANCE_CODE,
   OUTCOME_TO_RECORD_CODE,
+  SORT_FIELD_TO_WIRE,
 } from '../vocabulary.js';
 import type { ClientSearchFilters } from '../../../api/clients-api.js';
 
@@ -62,13 +63,76 @@ describe('buildFilterPayload', () => {
     });
   });
 
-  it('maps membership and gift-card filters to abonement/certificate', () => {
+  it('nests membership filters in one sale_abonement group (regression: top-level types were ignored)', () => {
+    const payload = build({
+      membership_balance: { to: 0 },
+      membership_is_used: true,
+      membership_type_ids: [4],
+      membership_is_frozen: false,
+    });
+    expect(payload.filters).toEqual([
+      {
+        type: 'sale_abonement',
+        state: {
+          abonement_balance: { to: 0 },
+          abonement_types: { value: [4] },
+          abonement_is_frozen: { value: false },
+          abonement_is_used: { value: true },
+        },
+      },
+    ]);
+    expect(byType(payload, 'abonement_balance')).toBeUndefined();
+  });
+
+  it('nests gift card filters in one sale_certificate group', () => {
     expect(
-      byType(build({ membership_balance: { from: 1 } }), 'abonement_balance')
-    ).toEqual({ type: 'abonement_balance', state: { from: 1 } });
+      build({ gift_card_type_ids: [9], gift_card_balance: { from: 10.5 } })
+        .filters
+    ).toEqual([
+      {
+        type: 'sale_certificate',
+        state: {
+          certificate_balance: { from: 10.5 },
+          certificate_types: { value: [9] },
+        },
+      },
+    ]);
+  });
+
+  it('refuses a fractional membership visit balance and reversed ranges', () => {
+    expect(() => build({ membership_balance: { from: 1.5 } })).toThrow(
+      /whole number/
+    );
+    expect(() => build({ total_spent: { from: 500, to: 100 } })).toThrow(
+      /swap the bounds/
+    );
+    expect(() => build({ age: { from: -1 } })).toThrow(/cannot be negative/);
+  });
+
+  it('gives MM-DD birthday bounds a year the backend accepts', () => {
     expect(
-      byType(build({ gift_card_type_ids: [9] }), 'certificate_types')
-    ).toEqual({ type: 'certificate_types', state: { value: [9] } });
+      byType(build({ birthday: { from: '12-20', to: '01-10' } }), 'birthday')
+    ).toEqual({
+      type: 'birthday',
+      state: { from: '2000-12-20', to: '2000-01-10' },
+    });
+    expect(
+      byType(build({ birthday: { from: '02-29' } }), 'birthday')?.state
+    ).toEqual({ from: '2000-02-29' });
+    expect(
+      byType(build({ birthday: { from: '0 days', to: '+7 days' } }), 'birthday')
+        ?.state
+    ).toEqual({ from: '0 days', to: '+7 days' });
+  });
+
+  it('refuses birthday bounds the backend would reject with a bare 400', () => {
+    expect(() => build({ birthday: { from: '13-01' } })).toThrow(/MM-DD/);
+    expect(() =>
+      build({ birthday: { from: '1990-01-01', to: '2000-01-01' } })
+    ).toThrow(/less than a year/);
+    expect(() => build({ birthday: { from: '09-01', to: '+7 days' } })).toThrow(
+      /relative offset/
+    );
   });
 
   it('maps consent flags to their is_* filters as booleans', () => {
@@ -90,7 +154,7 @@ describe('buildFilterPayload', () => {
         appointments: {
           team_member_ids: [1, 2],
           outcome: ['arrived', 'no_show'],
-          created: { from: '2026-06-01 00:00:00' },
+          created: { from: '2026-06-01' },
           count: { from: 1 },
           amount: { to: 500 },
         },
@@ -103,11 +167,66 @@ describe('buildFilterPayload', () => {
         staff: { value: [1, 2] },
         // arrived → 3, no_show → 1 in the *record* numbering
         status: { value: [3, 1] },
-        created: { from: '2026-06-01 00:00:00' },
+        created: { from: '2026-06-01' },
         records_count: { from: 1 },
         sold_amount: { to: 500 },
       },
     });
+  });
+
+  it('sends the date part of a date-time and refuses other date shapes', () => {
+    expect(
+      byType(
+        build({
+          appointments: {
+            created: { from: '2026-06-01 00:00:00', to: '2026-06-30T23:59Z' },
+          },
+        }),
+        'record'
+      )?.state.created
+    ).toEqual({ from: '2026-06-01', to: '2026-06-30' });
+    expect(
+      byType(
+        build({ appointments: { created: { from: '-90 days' } } }),
+        'record'
+      )?.state.created
+    ).toEqual({ from: '-90 days' });
+    expect(() =>
+      build({ appointments: { created: { from: '06/01/2026' } } })
+    ).toThrow(/YYYY-MM-DD/);
+  });
+
+  it('avoids the zero bounds the backend rejects in the record filter', () => {
+    // from 0 is no lower bound at all.
+    expect(
+      byType(
+        build({
+          appointments: { service_ids: [5], count: { from: 0, to: 3 } },
+        }),
+        'record'
+      )?.state
+    ).toEqual({ service: { value: [5] }, records_count: { to: 3 } });
+    // "at most 0" is "not at least 1".
+    expect(
+      byType(build({ appointments: { count: { to: 0 } } }), 'record')?.state
+    ).toEqual({ records_count: { from: 1 }, invert: true });
+    expect(
+      byType(
+        build({
+          appointments: { service_ids: [5], count: { to: 0 }, exclude: true },
+        }),
+        'record'
+      )?.state
+    ).toEqual({ service: { value: [5] }, records_count: { from: 1 } });
+    expect(
+      byType(
+        build({ appointments: { service_ids: [5], amount: { from: 0 } } }),
+        'record'
+      )?.state
+    ).toEqual({ service: { value: [5] } });
+    expect(() =>
+      build({ appointments: { service_ids: [5], amount: { to: 0 } } })
+    ).toThrow(/above 0/);
   });
 
   it('sets invert for a win-back segment, but only alongside a real constraint', () => {
@@ -115,7 +234,7 @@ describe('buildFilterPayload', () => {
       build({
         appointments: {
           outcome: ['arrived'],
-          created: { from: '2026-06-01 00:00:00' },
+          created: { from: '2026-06-01' },
           exclude: true,
         },
       }),
@@ -128,6 +247,13 @@ describe('buildFilterPayload', () => {
     expect(
       byType(build({ appointments: { exclude: true } }), 'record')
     ).toBeUndefined();
+  });
+});
+
+describe('sort field', () => {
+  it('sends visits_count for visit_count (regression: API rejected visit_count)', () => {
+    expect(SORT_FIELD_TO_WIRE.visit_count).toBe('visits_count');
+    expect(SORT_FIELD_TO_WIRE.total_spent).toBe('sold_amount');
   });
 });
 

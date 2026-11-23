@@ -570,6 +570,23 @@ function usedChainId(
 }
 
 /**
+ * Where the data of an operation that names no location can be read inside a
+ * location scope. The refusal names the route, so a caller does not retry the
+ * same unscoped operation or guess at a tool.
+ */
+const SCOPED_ALTERNATIVES: Readonly<Record<string, string>> = {
+  get_loyalty_card_list_by_client_id:
+    'Call `get_client_loyalty_summary` with location_id and client_id instead: it lists the loyalty cards valid at the location, with the client’s memberships and gift cards. `get_loyalty_card_list_by_phone` with the phone, chain_id and location_id lists the cards too.',
+  get_visit:
+    'Use the `visits_get` tool with location_id and visit_id (or appointment_id) instead.',
+  get_document_product_transactions:
+    'Use the `inventory_list_operations` tool with location_id and document_id instead.',
+  get_document_financial_transactions:
+    'Use the `financial_transactions_list` tool with location_id and the document’s dates instead; each transaction names its document_id.',
+  get_location_list: 'Use the `locations_list` tool instead.',
+};
+
+/**
  * Resolve and enforce the location dimension from catalog metadata.
  *
  * A URL-number heuristic cannot distinguish a location id from a visit,
@@ -614,8 +631,9 @@ function enforceCatalogCompanyScope(
   if (declaredScope !== undefined) {
     throw new ExecutorRefusalError(
       `\`${op.operationId}\` cannot be confined to the declared location scope of ` +
-        'this connection: the operation names neither a location nor a chain. ' +
-        'Use a curated tool that takes a location_id or chain_id for this data.',
+        'this connection: the operation names neither a location nor a chain, so it is refused every time. ' +
+        (SCOPED_ALTERNATIVES[op.operationId] ??
+          'Use a curated tool that takes a location_id or chain_id for this data.'),
       { operationId: op.operationId, reason: 'unscoped_catalog_operation' }
     );
   }

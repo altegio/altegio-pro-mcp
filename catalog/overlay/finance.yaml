@@ -177,3 +177,41 @@ operations:
     facets: [finance]
     tool_name: payroll_get_calculation
     notes: Saved payroll calculations for the same period.
+  # A team member's own payroll view (Altegio's /salary/staff/{id}/… routes):
+  # Altegio serves it only to the user linked to that team member and answers
+  # 403 to anyone else, owners included — not a right the caller lacks.
+  get_team_member_salary_schemes:
+    domain: payroll
+    tier: executor-only
+    failures:
+      '403': >-
+        This is a team member's own payroll view: Altegio answers it only for
+        the signed-in user's own team member and refuses everyone else with
+        403, owners and administrators included, so no right granted to the
+        caller changes it. For another team member,
+        get_team_member_calculation_schemes_count says whether a payroll
+        scheme applies and payroll_get_calculation computes their payroll; no
+        documented operation lists another team member's schemes.
+    notes: Self-view only; 403 for anyone but the team member's own user.
+  get_team_member_salary_period:
+    domain: payroll
+    tier: executor-only
+    failures:
+      '403': >-
+        This is a team member's own payroll view: Altegio answers it only for
+        the signed-in user's own team member and refuses everyone else with
+        403, owners and administrators included. For any team member, call
+        search_team_member_period_salary with the same location_id,
+        team_member_id, date_from and date_to, or use payroll_get_calculation.
+    notes: Self-view twin of search_team_member_period_salary.
+  get_team_member_salary_calculation:
+    domain: payroll
+    tier: executor-only
+    failures:
+      '403': >-
+        This is a team member's own payroll view: Altegio answers it only for
+        the signed-in user's own team member and refuses everyone else with
+        403, owners and administrators included. For any team member, call
+        search_team_member_calculation_salary with the same location_id,
+        team_member_id, date_from and date_to, or use payroll_get_calculation.
+    notes: Self-view twin of search_team_member_calculation_salary.

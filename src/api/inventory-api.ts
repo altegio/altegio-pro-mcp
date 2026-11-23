@@ -253,6 +253,13 @@ export interface DocumentLine {
   document_id: number | null;
   /** The location the line was recorded at. */
   location_id: number | null;
+  /**
+   * The inventory the line moved stock in. A document created in the Altegio
+   * app can report no inventory in its header while its lines do.
+   */
+  inventory_id: number | null;
+  /** Wall-clock time at the location, `YYYY-MM-DDTHH:MM:SS`. */
+  date_local: string | null;
   product_id: number | null;
   /** Absolute quantity in the unit below. */
   quantity: number | null;
@@ -439,8 +446,26 @@ export interface ProductCardWrite {
   desired_quantity?: number;
 }
 
+/** The category tree as far as one bounded walk reads it. */
+export interface ProductCategoryTree {
+  items: ProductCategory[];
+  /** False when the walk stopped before the deepest level. */
+  complete: boolean;
+}
+
 export interface ProductCatalogApi {
-  listCategories(locationId: number): Promise<ProductCategory[]>;
+  /** The categories of the location, nested and chain ones included. */
+  listCategories(locationId: number): Promise<ProductCategoryTree>;
+  /** The direct children of a category; the top level for null. */
+  listChildCategories(
+    locationId: number,
+    parentId: number | null
+  ): Promise<ProductCategory[]>;
+  /** One live category of the location, nested or not; null when none. */
+  getCategory(
+    locationId: number,
+    categoryId: number
+  ): Promise<ProductCategory | null>;
   createCategory(
     locationId: number,
     category: ProductCategoryWrite,

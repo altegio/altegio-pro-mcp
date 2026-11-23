@@ -550,8 +550,13 @@ export const updateAppointmentTool = defineTool({
     const datetime = input.datetime ?? current.datetime ?? current.date;
     const sessionLength =
       input.session_length ?? current.seance_length ?? current.length;
-    const services = input.services ?? currentServices(current);
-    if (!staffId || !datetime || !sessionLength || services.length === 0) {
+    // An appointment can hold no services (a block of time, a consultation);
+    // its empty list is kept as it is, which the API accepts. Only a read that
+    // does not report the services at all leaves nothing to keep.
+    const services =
+      input.services ??
+      (Array.isArray(current.services) ? currentServices(current) : undefined);
+    if (!staffId || !datetime || !sessionLength || services === undefined) {
       throw new ExecutorRefusalError(
         `Appointment ${appointment_id} did not report its team member, start, length or services. Pass team_member_id, datetime, session_length and services explicitly.`
       );

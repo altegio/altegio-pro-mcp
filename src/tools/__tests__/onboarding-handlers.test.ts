@@ -427,6 +427,79 @@ describe('Onboarding Handlers', () => {
     });
   });
 
+  describe('without an onboarding session (regression: clients were created first)', () => {
+    it('refuses every batch before anything is written and names the next step', async () => {
+      mockClient.createStaff = jest.fn();
+      mockClient.createService = jest.fn();
+      mockClient.setSchedule = jest.fn();
+      const calls: Array<[string, Promise<ToolResult>]> = [
+        [
+          'import clients',
+          handlers.importClients({
+            location_id: 1400991,
+            clients_csv: 'name,phone\nJohn,+10000000001',
+          }),
+        ],
+        [
+          'add team members',
+          handlers.addStaffBatch({
+            location_id: 1400991,
+            team_members: [
+              {
+                name: 'Ann',
+                specialization: 'Barber',
+                has_paid_seat: true,
+                has_schedule_access: true,
+              },
+            ],
+          }),
+        ],
+        [
+          'add services',
+          handlers.addServicesBatch({
+            location_id: 1400991,
+            services: [
+              {
+                title: 'Cut',
+                price_min: 10,
+                duration_seconds: 1800,
+                category_id: 10,
+              },
+            ],
+          }),
+        ],
+        [
+          'set schedules',
+          handlers.setSchedules({
+            location_id: 1400991,
+            schedules: [
+              {
+                team_member_id: 1,
+                dates: ['2026-12-01'],
+                slots: [{ from: '10:00', to: '18:00' }],
+              },
+            ],
+          }),
+        ],
+      ];
+      for (const [what, call] of calls) {
+        const result = await call;
+        expect({ what, isError: result.isError }).toEqual({
+          what,
+          isError: true,
+        });
+        expect(result.content[0]?.text).toContain(
+          'Nothing was changed: there is no onboarding session for location 1400991. Call onboarding_start'
+        );
+      }
+      expect(mockClient.createClient).not.toHaveBeenCalled();
+      expect(mockClient.createStaff).not.toHaveBeenCalled();
+      expect(mockClient.createService).not.toHaveBeenCalled();
+      expect(mockClient.setSchedule).not.toHaveBeenCalled();
+      expect(await stateManager.load(1400991)).toBeNull();
+    });
+  });
+
   describe('createTestBookings', () => {
     it('should generate test bookings', async () => {
       await handlers.start({ location_id: 123 });

@@ -74,7 +74,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_add_positions',
     description:
-      'Bulk create positions (for example Manager, Stylist, Receptionist) from a JSON array or CSV string. Create positions before team members so each team member can reference position_id. Created IDs are checkpointed, so onboarding_rollback_phase can delete them again.',
+      'Bulk create positions (for example Manager, Stylist, Receptionist) from a JSON array or CSV string. Create positions before team members so each team member can reference position_id. Created IDs are checkpointed, so onboarding_rollback_phase can delete them again. Needs onboarding_start first; without it nothing is created.',
     annotations: {
       title: 'Batch Add Positions',
       destructiveHint: false,
@@ -110,7 +110,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_add_team_members_batch',
     description:
-      'Bulk add team members from a JSON array or CSV string. Reads name, specialization, position_id, has_paid_seat and has_schedule_access. Every team member needs an explicit has_paid_seat (takes a paid seat — billed on per-seat licensing) and has_schedule_access (in the work schedule, able to have working hours and take appointments; per-seat licensing allows it only for a paid seat). Ask the location owner for both and never choose them yourself; give them per row, or once for the whole list with the batch-level fields when the owner gave one answer for everybody. A row without an answer refuses the whole batch before anything is created. Team members are created without user accounts; phone, email and external_id columns are ignored, because the create operation stores none of them (use team_members_create with user_phone or user_email to link a user). Creates checkpoint for rollback.',
+      'Bulk add team members from a JSON array or CSV string. Reads name, specialization, position_id, has_paid_seat and has_schedule_access. Every team member needs an explicit has_paid_seat (takes a paid seat — billed on per-seat licensing) and has_schedule_access (in the work schedule, able to have working hours and take appointments; per-seat licensing allows it only for a paid seat). Ask the location owner for both and never choose them yourself; give them per row, or once for the whole list with the batch-level fields when the owner gave one answer for everybody. A row without an answer refuses the whole batch before anything is created. Team members are created without user accounts; phone, email and external_id columns are ignored, because the create operation stores none of them (use team_members_create with user_phone or user_email to link a user). Needs onboarding_start first; without it nothing is created. Creates checkpoint for rollback.',
     annotations: {
       title: 'Batch Add Team Members',
       destructiveHint: false,
@@ -168,7 +168,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_add_services_batch',
     description:
-      'Bulk add services from a JSON array or CSV string. Accepts title, price_min, price_max, duration_seconds, category_id, external_id. Creates checkpoint for rollback.',
+      'Bulk add services from a JSON array or CSV string. Accepts title, price_min, price_max, duration_seconds, category_id, external_id. Needs onboarding_start first; without it nothing is created. Creates checkpoint for rollback.',
     annotations: {
       title: 'Batch Add Services',
       destructiveHint: false,
@@ -209,7 +209,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_set_schedules',
     description:
-      'Set work schedules (working hours) for team members. Accepts an array of { team_member_id, dates[], slots[{from,to}] }. Use the team member IDs returned by onboarding_add_team_members_batch. Without schedules the appointment grid stays empty. Creates checkpoint for rollback.',
+      'Set work schedules (working hours) for team members. Accepts an array of { team_member_id, dates[], slots[{from,to}] }. Use the team member IDs returned by onboarding_add_team_members_batch. Without schedules the appointment grid stays empty. Needs onboarding_start first; without it nothing is created. Creates checkpoint for rollback.',
     annotations: {
       title: 'Set Work Schedules',
       destructiveHint: false,
@@ -262,7 +262,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_add_categories',
     description:
-      'Create service categories from a JSON array of objects with title, external_id and sort_weight. Creates checkpoint for rollback.',
+      'Create service categories from a JSON array of objects with title, external_id and sort_weight. Needs onboarding_start first; without it nothing is created. Creates checkpoint for rollback.',
     annotations: {
       title: 'Add Categories',
       destructiveHint: false,
@@ -300,7 +300,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_import_clients',
     description:
-      'Import client database from CSV string. CSV must have headers: name,phone,email,surname,comment. Either phone or email is required. Creates checkpoint for rollback.',
+      'Import client database from CSV string. CSV must have headers: name,phone,email,surname,comment. Either phone or email is required. Needs onboarding_start first; without it nothing is created. Creates checkpoint for rollback.',
     annotations: {
       title: 'Import Clients',
       destructiveHint: false,
@@ -324,7 +324,7 @@ export const onboardingTools: McpToolSpec[] = [
   {
     name: 'onboarding_create_test_appointments',
     description:
-      'Generate test appointments using previously created team members and services. Distributes appointments across next 1-7 days. Marks onboarding as complete.',
+      'Generate test appointments using previously created team members and services. Distributes appointments across next 1-7 days. Marks onboarding as complete. Needs onboarding_start first; without it nothing is created.',
     annotations: {
       title: 'Create Test Appointments',
       destructiveHint: false,
