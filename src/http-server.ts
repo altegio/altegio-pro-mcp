@@ -83,6 +83,13 @@ const WORK_METHODS: ReadonlySet<string> = new Set([
 /** A JSON-RPC method name as the request log may record it. */
 const LOGGABLE_METHOD = /^[A-Za-z0-9_/.-]{1,64}$/;
 
+/**
+ * How long a POST waits for an earlier request of its session that uses the
+ * same JSON-RPC id. Longer than a confirmation prompt plus a tool's upstream
+ * work; past it the POST is refused rather than crossing response streams.
+ */
+const DUPLICATE_ID_WAIT_MS = 120 * 1000;
+
 /** The JSON-RPC messages of a POST body, single or batched. */
 function rpcMessages(body: unknown): Array<Record<string, unknown>> {
   const messages = Array.isArray(body) ? body : [body];
@@ -169,6 +176,22 @@ function refuseAtCapacity(
   });
 }
 
+/** The 409 for a POST whose JSON-RPC id an earlier request still holds. */
+function refuseDuplicateRequestId(
+  res: express.Response,
+  requestId: string | number | null
+): void {
+  res.status(409).json({
+    jsonrpc: '2.0',
+    error: {
+      code: -32600,
+      message:
+        'Invalid Request: this request id is still in use by an earlier request on this session; use a new id for each request',
+    },
+    id: requestId,
+  });
+}
+
 /**
  * Refuse a request this view has no session for, as the Streamable HTTP
  * transport specifies. A session ID the view does not hold — lost when the
@@ -218,6 +241,7 @@ export function createApp(
     maxSessions?: number;
     idleTimeoutMs?: number;
     unusedIdleTimeoutMs?: number;
+    evictionGraceMs?: number;
   } = {}
 ): {
   app: express.Express;
@@ -248,7 +272,10 @@ export function createApp(
       unusedIdleTimeoutMs:
         options.unusedIdleTimeoutMs ??
         env.MCP_HTTP_UNUSED_SESSION_IDLE_SECONDS * 1000,
-      onEvict: ({ used, idleSeconds, sessions }) => {
+      ...(options.evictionGraceMs !== undefined
+        ? { evictionGraceMs: options.evictionGraceMs }
+        : {}),
+      onEvict: ({ used, idleSeconds, sessions, principalSessions }) => {
         logger.info(
           {
             event: 'session_evicted',
@@ -256,6 +283,7 @@ export function createApp(
             session_used: used,
             idle_s: idleSeconds,
             sessions,
+            principal_sessions: principalSessions,
           },
           'Evicted an idle MCP session to admit a new one'
         );
@@ -263,6 +291,72 @@ export function createApp(
     }
   );
   const leases = new WeakMap<StreamableHTTPServerTransport, HttpSessionLease>();
+  // Whose session a lease is, so a full budget takes a slot back from the
+  // caller holding the most (`./utils/http-sessions.ts`). Pseudonymous. An
+  // unidentified caller is nobody in particular, not one caller holding all
+  // such sessions.
+  const leaseOptions = (requestContext: RequestContext) => {
+    const principal = runWithContext(requestContext, requestPrincipalKey);
+    return { principal: principal === 'anonymous' ? undefined : principal };
+  };
+  // JSON-RPC ids in flight per session, each mapped to when it is free again.
+  // The SDK transport routes a response to its stream by request id alone, so
+  // two concurrent POSTs reusing one id crossed: one stream got the other's
+  // result and the other never closed. On 2026-11-16 Cursor sent every
+  // tools/call with id 0, and its parallel calls held proxy connections open
+  // until the 3600 s ceiling. A reused id now waits for the earlier request.
+  const inFlightIds = new WeakMap<
+    StreamableHTTPServerTransport,
+    Map<string | number, Promise<void>>
+  >();
+  /** False when an earlier request with one of these ids did not end in time. */
+  const awaitFreeRequestIds = async (
+    transport: StreamableHTTPServerTransport,
+    body: unknown,
+    res: express.Response
+  ): Promise<boolean> => {
+    const ids = [
+      ...new Set(
+        rpcMessages(body).flatMap((message) =>
+          typeof message.method === 'string' &&
+          (typeof message.id === 'string' || typeof message.id === 'number')
+            ? [message.id]
+            : []
+        )
+      ),
+    ];
+    if (ids.length === 0) return true;
+    const pending =
+      inFlightIds.get(transport) ?? new Map<string | number, Promise<void>>();
+    inFlightIds.set(transport, pending);
+    const earlier = ids.flatMap((id) => {
+      const previous = pending.get(id);
+      return previous ? [previous] : [];
+    });
+    const ended = new Promise<void>((resolve) => {
+      res.once('finish', resolve);
+      res.once('close', resolve);
+    });
+    // Free once this response and every earlier one with its ids ended, so a
+    // request that gave up waiting cannot let a third overlap the first.
+    const free = Promise.all([ended, ...earlier]).then(() => undefined);
+    for (const id of ids) pending.set(id, free);
+    void free.then(() => {
+      for (const id of ids) if (pending.get(id) === free) pending.delete(id);
+    });
+    if (earlier.length === 0) return true;
+    res.locals.duplicateRequestId = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const waited = await Promise.race([
+      Promise.all(earlier).then(() => true),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), DUPLICATE_ID_WAIT_MS);
+        timer.unref();
+      }),
+    ]);
+    clearTimeout(timer);
+    return waited;
+  };
   const dualHandlers: Array<ReturnType<typeof createMcpHandler>> = [];
   // A fresh SDK instance must not reset a caller's upstream rate window.
   // Shared across views, bounded like the existing per-caller quotas.
@@ -310,7 +404,10 @@ export function createApp(
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
     });
-    const lease = budget.acquire(() => transport.close());
+    const lease = budget.acquire(
+      () => transport.close(),
+      leaseOptions(requestContext)
+    );
     if (!lease) {
       refuseAtCapacity(res, req.body?.id ?? null);
       return;
@@ -459,6 +556,9 @@ export function createApp(
             ? { session: sessionLogId(session) }
             : {}),
           ...(res.locals.stateless ? { transport: 'stateless' } : {}),
+          ...(res.locals.duplicateRequestId
+            ? { duplicate_request_id: true }
+            : {}),
           // Who opens sessions: the product token a client names itself by.
           ...(method === 'initialize' &&
           clientInfo &&
@@ -590,6 +690,12 @@ export function createApp(
             lease.markUsed();
           }
           trackPost(transport, res);
+          if (!(await awaitFreeRequestIds(transport, req.body, res))) {
+            refuseDuplicateRequestId(res, requestId);
+            return;
+          }
+          // The client left while it waited: nothing to answer, nothing run.
+          if (res.writableEnded || res.destroyed) return;
         } else if (!sessionId && isInitializeRequest(req.body)) {
           // New initialization request — create transport + server
           transport = new StreamableHTTPServerTransport({
@@ -610,8 +716,12 @@ export function createApp(
 
           // Reserve before the first await: concurrent initializes and views
           // share one process-wide capacity rather than each growing forever.
-          // A full budget evicts its least recently used idle session first.
-          const lease = budget.acquire(() => transport.close());
+          // A full budget evicts an idle session, from the caller holding the
+          // most of them first.
+          const lease = budget.acquire(
+            () => transport.close(),
+            leaseOptions(requestContext)
+          );
           if (!lease) {
             refuseAtCapacity(res, requestId);
             return;

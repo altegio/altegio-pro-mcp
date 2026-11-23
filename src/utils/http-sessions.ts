@@ -23,6 +23,20 @@ export interface HttpSessionEviction {
   readonly idleSeconds: number;
   /** Sessions held after the eviction, before the new one is added. */
   readonly sessions: number;
+  /**
+   * Sessions its caller held before the eviction, the evicted one included;
+   * 1 when the caller is unknown.
+   */
+  readonly principalSessions: number;
+}
+
+/** What a lease is acquired for. */
+export interface HttpSessionLeaseOptions {
+  /**
+   * The pseudonymous caller the session belongs to (`requestPrincipalKey()`),
+   * for fair-share eviction. Undefined counts as a caller of its own.
+   */
+  readonly principal?: string;
 }
 
 export interface HttpSessionBudgetOptions {
@@ -41,11 +55,12 @@ export interface HttpSessionBudgetOptions {
  * Bound retained HTTP servers across all views, including abandoned sessions.
  *
  * Memory stays bounded by `maxSessions` leases. When the budget is full, a new
- * session takes the slot of the least recently used idle one — among those
- * idle past the eviction grace, a session that never made a tool call before
- * one that did — and only a budget whose every lease is serving a request
- * refuses. A per-request (sessionless) server holds a
- * lease too, for exactly as long as its request runs.
+ * session takes the slot of an idle one — among those idle past the eviction
+ * grace, a session that never made a tool call first, then a session of the
+ * caller holding the most sessions, least recently used first — and only a
+ * budget whose every lease is serving a request refuses. A per-request
+ * (sessionless) server holds a lease too, for exactly as long as its request
+ * runs.
  */
 export class HttpSessionBudget {
   /** Insertion order is recency order: the first entry is least recently used. */
@@ -78,7 +93,10 @@ export class HttpSessionBudget {
     return this.leases.size;
   }
 
-  acquire(close: () => Promise<void>): HttpSessionLease | undefined {
+  acquire(
+    close: () => Promise<void>,
+    options: HttpSessionLeaseOptions = {}
+  ): HttpSessionLease | undefined {
     if (this.leases.size >= this.maxSessions && !this.evictIdle()) {
       return undefined;
     }
@@ -94,7 +112,8 @@ export class HttpSessionBudget {
           if (this.leases.delete(lease)) this.leases.add(lease);
         },
         now: this.now,
-      }
+      },
+      options.principal
     );
     this.leases.add(lease);
     lease.touch();
@@ -105,17 +124,40 @@ export class HttpSessionBudget {
    * Close one idle session to make room; false when every lease is busy.
    *
    * Among sessions idle past the grace, one that never made a tool call goes
-   * before one that did, least recently used first. A session inside the
-   * grace goes only when no older one is idle, and then the oldest. Until
-   * 2026-10-24 the first unused session went whatever its age: on 2026-10-23
-   * ChatGPT (a session per call) kept the customer budget full, 613 sessions
-   * were evicted in three hours, most of them idle 0 s, and its tool calls
-   * came back 404 a second or two after their initialize.
+   * first. Then a used one goes from the caller that holds the most sessions,
+   * its least recently used first; between callers holding as many, the least
+   * recently used. A session inside the grace goes only when no older one is
+   * idle, and then the oldest.
+   *
+   * Until 2026-10-24 the first unused session went whatever its age: on
+   * 2026-10-23 ChatGPT (a session per call) kept the customer budget full, 613
+   * sessions were evicted in three hours, most of them idle 0 s, and its tool
+   * calls came back 404 a second or two after their initialize.
+   *
+   * Until 2026-11-23 a used session went least recently used first, whoever
+   * held it. A client that opens a session for nearly every call (Codex: 309k
+   * initializes for 115k tool calls) keeps its abandoned sessions fresher than
+   * a person's conversation that paused for ten minutes. Up to 6.5k sessions a
+   * day were evicted, 93% of them used, median idle 12.5 min, and 232 of 307
+   * claude.ai connector users got 404 on a tool call after a pause. Counting
+   * shares makes the caller that holds the most slots give one back first, so
+   * a churning client recycles its own abandoned sessions.
    */
   private evictIdle(): boolean {
     const now = this.now();
+    // Each caller's share of the budget, busy sessions included.
+    const held = new Map<string, number>();
+    for (const lease of this.leases) {
+      if (lease.principal !== undefined) {
+        held.set(lease.principal, (held.get(lease.principal) ?? 0) + 1);
+      }
+    }
+    const shareOf = (lease: HttpSessionLease) =>
+      lease.principal === undefined ? 1 : (held.get(lease.principal) ?? 1);
+
     let oldestIdle: HttpSessionLease | undefined;
     let usedPastGrace: HttpSessionLease | undefined;
+    let usedShare = 0;
     let unusedPastGrace: HttpSessionLease | undefined;
     // Recency order: once one lease is inside the grace, so is every later one.
     for (const lease of this.leases) {
@@ -126,7 +168,12 @@ export class HttpSessionBudget {
         unusedPastGrace = lease;
         break;
       }
-      usedPastGrace ??= lease;
+      // Strictly larger: the first (least recently used) of an equal share wins.
+      const share = shareOf(lease);
+      if (share > usedShare) {
+        usedPastGrace = lease;
+        usedShare = share;
+      }
     }
     const candidate = unusedPastGrace ?? usedPastGrace ?? oldestIdle;
     if (!candidate) return false;
@@ -134,11 +181,13 @@ export class HttpSessionBudget {
       0,
       Math.round((now - candidate.lastActive) / 1000)
     );
+    const principalSessions = shareOf(candidate);
     candidate.evict();
     this.onEvict?.({
       used: candidate.used,
       idleSeconds,
       sessions: this.leases.size,
+      principalSessions,
     });
     return true;
   }
@@ -160,7 +209,9 @@ export class HttpSessionLease {
   constructor(
     private readonly idleTimeoutFor: (used: boolean) => number,
     private readonly close: () => Promise<void>,
-    private readonly hooks: LeaseHooks
+    private readonly hooks: LeaseHooks,
+    /** The pseudonymous caller it belongs to (`HttpSessionLeaseOptions`). */
+    readonly principal?: string
   ) {
     this.lastActiveAt = hooks.now();
   }
