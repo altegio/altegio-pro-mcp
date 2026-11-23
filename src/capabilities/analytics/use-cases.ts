@@ -109,6 +109,14 @@ function periodBlock(ctx: Context) {
 
 // ========== key metrics ==========
 
+/**
+ * The period of explicit `date_from`/`date_to` input, validated without the
+ * location timezone it does not depend on; `null` for a preset.
+ */
+function resolveExplicitPeriod(input: PeriodInput): Period | null {
+  return input.period ? null : resolvePeriod(input);
+}
+
 export interface OverviewInput extends PeriodInput {
   location_id: number;
   team_member_id?: number;
@@ -120,17 +128,33 @@ export async function getOverview(
   client: AltegioClient,
   input: OverviewInput
 ): Promise<AnalyticsResult> {
-  const ctx = await context(client, input.location_id, input);
-  const overview = await ctx.api.getOverview({
+  // The key-metrics call is the slowest analytics read (prod, 2026-11: p95
+  // above 12 s on the read-only route). Explicit dates do not depend on the
+  // location timezone, so that call starts beside the timezone lookup rather
+  // than after it; a preset needs the timezone to resolve its days first.
+  const explicit = resolveExplicitPeriod(input);
+  const timezoneRead = resolveLocationTimezone(client, input.location_id);
+  const period = explicit ?? resolvePeriod(input, await timezoneRead);
+  const overviewRead = new V1AnalyticsAdapter(httpFromClient(client), {
+    timezone: period.timezone,
+  }).getOverview({
     location_id: input.location_id,
-    date_from: ctx.period.date_from,
-    date_to: ctx.period.date_to,
+    date_from: period.date_from,
+    date_to: period.date_to,
     ...(input.team_member_id ? { team_member_id: input.team_member_id } : {}),
     ...(input.position_id ? { position_id: input.position_id } : {}),
     ...(input.created_by_user_id
       ? { created_by_user_id: input.created_by_user_id }
       : {}),
   });
+  const [timezone, overview] = await Promise.all([timezoneRead, overviewRead]);
+  const resolved = { ...period, timezone };
+  const ctx: Context = {
+    api: plainApi(client, timezone),
+    timezone,
+    period: resolved,
+    previous: previousPeriod(resolved),
+  };
 
   return {
     text: overviewSummary(overview, ctx.period, ctx.previous),

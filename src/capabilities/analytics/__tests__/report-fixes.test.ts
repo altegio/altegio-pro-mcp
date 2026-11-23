@@ -489,6 +489,61 @@ describe('key metrics', () => {
     ).rejects.toMatchObject({ name: 'AbortError' });
   });
 
+  it('starts the key-metrics call beside the timezone lookup for explicit dates', async () => {
+    const events: string[] = [];
+    let releaseLookup: () => void = () => undefined;
+    const client = {
+      isAuthenticated: () => true,
+      getCompanies: async () => {
+        events.push('timezone lookup started');
+        await new Promise<void>((resolve) => {
+          releaseLookup = resolve;
+        });
+        events.push('timezone lookup done');
+        return [{ id: 4564, title: 'Demo', timezone_name: TIMEZONE }];
+      },
+      getLocation: locationClient.getLocation,
+      apiRequest: async () => {
+        events.push('key metrics requested');
+        releaseLookup();
+        return new Response(
+          JSON.stringify({ success: true, data: { record_stats: {} } }),
+          { status: 200 }
+        );
+      },
+    } as unknown as AltegioClient;
+    const result = await getOverview(client, {
+      location_id: 4564,
+      date_from: '2026-10-01',
+      date_to: '2026-10-31',
+    });
+    expect(events.indexOf('key metrics requested')).toBeLessThan(
+      events.indexOf('timezone lookup done')
+    );
+    expect(result.structuredContent).toMatchObject({
+      period: {
+        date_from: '2026-10-01',
+        date_to: '2026-10-31',
+        timezone: TIMEZONE,
+      },
+      previous_period: { date_from: '2026-08-31', date_to: '2026-09-30' },
+    });
+
+    clearTimezoneCache();
+    events.length = 0;
+    const preset = getOverview(client, {
+      location_id: 4564,
+      period: 'last_month',
+    });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(events).toEqual(['timezone lookup started']);
+    releaseLookup();
+    await preset;
+    expect(events.indexOf('timezone lookup done')).toBeLessThan(
+      events.indexOf('key metrics requested')
+    );
+  });
+
   it('answers parallel calls per position with their own position', async () => {
     const positions = [36217, 244437, 124522, 1, 2, 3, 4, 5];
     const client = {
