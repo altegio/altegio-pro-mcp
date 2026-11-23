@@ -218,6 +218,7 @@ export function createApp(
     maxSessions?: number;
     idleTimeoutMs?: number;
     unusedIdleTimeoutMs?: number;
+    evictionGraceMs?: number;
   } = {}
 ): {
   app: express.Express;
@@ -248,7 +249,10 @@ export function createApp(
       unusedIdleTimeoutMs:
         options.unusedIdleTimeoutMs ??
         env.MCP_HTTP_UNUSED_SESSION_IDLE_SECONDS * 1000,
-      onEvict: ({ used, idleSeconds, sessions }) => {
+      ...(options.evictionGraceMs !== undefined
+        ? { evictionGraceMs: options.evictionGraceMs }
+        : {}),
+      onEvict: ({ used, idleSeconds, sessions, principalSessions }) => {
         logger.info(
           {
             event: 'session_evicted',
@@ -256,6 +260,7 @@ export function createApp(
             session_used: used,
             idle_s: idleSeconds,
             sessions,
+            principal_sessions: principalSessions,
           },
           'Evicted an idle MCP session to admit a new one'
         );
@@ -263,6 +268,11 @@ export function createApp(
     }
   );
   const leases = new WeakMap<StreamableHTTPServerTransport, HttpSessionLease>();
+  // Whose session a lease is, so a full budget takes a slot back from the
+  // caller holding the most (`./utils/http-sessions.ts`). Pseudonymous.
+  const leaseOptions = (requestContext: RequestContext) => ({
+    principal: runWithContext(requestContext, requestPrincipalKey),
+  });
   const dualHandlers: Array<ReturnType<typeof createMcpHandler>> = [];
   // A fresh SDK instance must not reset a caller's upstream rate window.
   // Shared across views, bounded like the existing per-caller quotas.
@@ -310,7 +320,10 @@ export function createApp(
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
     });
-    const lease = budget.acquire(() => transport.close());
+    const lease = budget.acquire(
+      () => transport.close(),
+      leaseOptions(requestContext)
+    );
     if (!lease) {
       refuseAtCapacity(res, req.body?.id ?? null);
       return;
@@ -610,8 +623,12 @@ export function createApp(
 
           // Reserve before the first await: concurrent initializes and views
           // share one process-wide capacity rather than each growing forever.
-          // A full budget evicts its least recently used idle session first.
-          const lease = budget.acquire(() => transport.close());
+          // A full budget evicts an idle session, from the caller holding the
+          // most of them first.
+          const lease = budget.acquire(
+            () => transport.close(),
+            leaseOptions(requestContext)
+          );
           if (!lease) {
             refuseAtCapacity(res, requestId);
             return;

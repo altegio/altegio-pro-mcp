@@ -1,8 +1,9 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect, jest } from '@jest/globals';
 import type { AddressInfo } from 'net';
 import type { NodeStreamableHTTPServerTransport as StreamableHTTPServerTransport } from '@modelcontextprotocol/node';
 import { createApp, FACET_ROUTES } from '../http-server.js';
 import { loadConfig } from '../config/schema.js';
+import { createLogger } from '../utils/logger.js';
 import {
   ALL_TOOLS_FACET,
   DEFAULT_FACET,
@@ -821,6 +822,100 @@ describe('HTTP session capacity across views', () => {
         for (const transport of Object.values(transports))
           await transport.close();
       }
+      server.close();
+    }
+  });
+
+  it('takes the slot back from the caller holding the most sessions', async () => {
+    // 2026-11-23: a client opening a session per call evicted people's paused
+    // conversations, and their next tool call came back 404.
+    const info = jest.spyOn(createLogger('http-server'), 'info');
+    const { app, transports } = createApp({
+      maxSessions: 3,
+      evictionGraceMs: 0,
+    });
+    const server = app.listen(0);
+    const { port } = server.address() as AddressInfo;
+    const as = (email: string) => ({
+      'x-mcp-auth-kind': 'user',
+      'x-mcp-auth-email': email,
+    });
+    const rpc = (
+      headers: Record<string, string>,
+      body: unknown,
+      sessionId?: string
+    ) =>
+      fetch(`http://127.0.0.1:${port}/mcp`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
+          'mcp-protocol-version': '2025-11-25',
+          ...headers,
+          ...(sessionId ? { 'mcp-session-id': sessionId } : {}),
+        },
+        body: JSON.stringify(body),
+      });
+    /** Initialize and make one tool call, as a working session does. */
+    const open = async (email: string) => {
+      const init = await rpc(as(email), {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-11-25',
+          capabilities: {},
+          clientInfo: { name: 'fair-share-test', version: '1' },
+        },
+      });
+      await init.text();
+      const sessionId = init.headers.get('mcp-session-id')!;
+      const call = await rpc(
+        as(email),
+        {
+          jsonrpc: '2.0',
+          id: 2,
+          method: 'tools/call',
+          params: { name: 'no_such_tool', arguments: {} },
+        },
+        sessionId
+      );
+      await call.text();
+      return sessionId;
+    };
+    try {
+      const person = await open('person@example.test');
+      const churned = await open('churn@example.test');
+      const second = await open('churn@example.test');
+      // Full: the person's session is the oldest, the churning caller's
+      // first one goes instead.
+      const third = await open('churn@example.test');
+
+      expect(Object.keys(transports).sort()).toEqual(
+        [person, second, third].sort()
+      );
+      expect(Object.keys(transports)).not.toContain(churned);
+      const evictions = info.mock.calls
+        .map(([fields]) => fields as unknown as Record<string, unknown>)
+        .filter((fields) => fields.event === 'session_evicted');
+      expect(evictions).toEqual([
+        expect.objectContaining({
+          session_used: true,
+          principal_sessions: 2,
+        }),
+      ]);
+
+      const ping = await rpc(
+        as('person@example.test'),
+        { jsonrpc: '2.0', id: 3, method: 'ping' },
+        person
+      );
+      await ping.text();
+      expect(ping.status).toBe(200);
+    } finally {
+      info.mockRestore();
+      for (const transport of Object.values(transports))
+        await transport.close();
       server.close();
     }
   });
