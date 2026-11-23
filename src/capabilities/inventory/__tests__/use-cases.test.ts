@@ -196,13 +196,17 @@ describe('searchProducts', () => {
       page: 2,
       page_size: 50,
     });
+    // Page 2 of 50 starts at product 51: page 3 of 20 starts at 41, so
+    // nothing is skipped.
     const search = calls.find((c) => c.path.endsWith('/autocomplete'))!;
     expect(search.query.get('limit')).toBe('20');
-    expect(search.query.get('page')).toBe('2');
+    expect(search.query.get('page')).toBe('3');
     expect(result.structuredContent).toMatchObject({
-      pagination: { page: 2, page_size: 20 },
+      pagination: { page: 3, page_size: 20 },
     });
-    expect(result.text).toContain('page_size is 20');
+    expect(result.text).toContain(
+      'this is page 3 of 20 (it holds where page 2 of 50 starts)'
+    );
 
     // Without stock the requested size stands.
     const plain = setup([

@@ -81,26 +81,69 @@ it('waits for a slot that opens before the deadline', async () => {
 });
 
 it('counts the calls queued ahead when it decides', async () => {
-  // Two slots a second; one used, so one call fits now and the next only
-  // after a second — past a 300 ms deadline.
-  const gate = new UpstreamRateGate(2, 1000);
+  // Two slots per 100 ms, used at 0 and 60 ms. At 60 ms the next slot opens
+  // at 100 ms and the one after at 160 ms. With a 100 ms budget (80 ms after
+  // the request allowance), the first queued call waits 40 ms; the second,
+  // whose slot is 100 ms away, is refused at once.
   client = new AltegioClient(
-    { partnerToken: 'synthetic', timeout: 300 },
+    { partnerToken: 'synthetic', timeout: 100 },
     testDir,
-    {
-      rateGate: gate,
-    }
+    { rateGate: new UpstreamRateGate(2, 100) }
   );
   fetchMock.mockImplementation(async () => new Response('ok'));
   await (await client.apiRequest(endpoint)).text();
-  const results = await Promise.allSettled([
-    client.apiRequest(endpoint),
-    client.apiRequest(endpoint),
-  ]);
-  expect(results.map((r) => r.status)).toEqual(['fulfilled', 'rejected']);
-  expect((results[1] as PromiseRejectedResult).reason).toBeInstanceOf(
-    UpstreamRateLimitedError
+  await jest.advanceTimersByTimeAsync(60);
+  await (await client.apiRequest(endpoint)).text();
+
+  const settled: string[] = [];
+  const first = client.apiRequest(endpoint).then(
+    () => settled.push('first admitted'),
+    () => settled.push('first refused')
   );
+  const second = client.apiRequest(endpoint).then(
+    () => settled.push('second admitted'),
+    (error: unknown) =>
+      settled.push(
+        error instanceof UpstreamRateLimitedError
+          ? 'second refused'
+          : 'second failed'
+      )
+  );
+  await jest.advanceTimersByTimeAsync(0);
+  // Refused before any time passed, while the first is still queued.
+  expect(settled).toEqual(['second refused']);
+  await jest.advanceTimersByTimeAsync(40);
+  await Promise.all([first, second]);
+  expect(settled).toEqual(['second refused', 'first admitted']);
+});
+
+it('records a retry refused at admission as a failure of the request it follows', async () => {
+  client = new AltegioClient(
+    { partnerToken: 'synthetic', timeout: 500 },
+    testDir,
+    { rateGate: new UpstreamRateGate(1, 1000) }
+  );
+  // Altegio answers 429 with a short Retry-After; the retry needs a slot the
+  // gate cannot give before the deadline.
+  fetchMock.mockImplementation(
+    async () =>
+      new Response('{}', { status: 429, headers: { 'Retry-After': '0' } })
+  );
+  const observation = createToolCallObservation();
+  const pending = runObservingToolCall(observation, () =>
+    client.apiRequest(endpoint)
+  ).catch((e: unknown) => e);
+  // The client waits at least 100 ms before a retry.
+  await jest.advanceTimersByTimeAsync(150);
+  const error = await pending;
+  expect(error).toBeInstanceOf(UpstreamRateLimitedError);
+  expect((error as Error).message).toContain(
+    'The next request to Altegio was not sent'
+  );
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(observation.upstreamFailureDetail).toMatchObject({
+    phase: 'admission',
+  });
 });
 
 it.each(['GET', 'PUT'])(

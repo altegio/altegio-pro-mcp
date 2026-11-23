@@ -9,8 +9,14 @@ export class UpstreamBudget {
   private readonly cancellation: AbortSignal;
   private readonly timer: ReturnType<typeof setTimeout>;
   private readonly deadlineAt: number;
+  /**
+   * Time a request needs once admitted: a slot that opens later than this
+   * before the deadline would still end in a timeout.
+   */
+  readonly requestAllowanceMs: number;
   constructor(timeoutMs: number, signal?: AbortSignal | null) {
     this.deadlineAt = performance.now() + timeoutMs;
+    this.requestAllowanceMs = Math.min(1000, timeoutMs / 5);
     const deadline = new AbortController();
     this.timer = setTimeout(
       () =>
@@ -127,7 +133,7 @@ export class UpstreamRateLimitedError extends AltegioApiError {
   ) {
     const seconds = Math.max(1, Math.ceil(waitMs / 1000));
     super(
-      `Nothing was sent to Altegio: this connection already made its ${requests} requests ` +
+      `The next request to Altegio was not sent: this connection already made its ${requests} requests ` +
         `for the last ${Math.round(windowMs / 1000)} seconds, and the next one fits in about ${seconds} seconds, ` +
         'later than this call could wait. Wait that long before the next call, and send calls one at a ' +
         'time rather than in parallel or in a tight loop.',
@@ -168,13 +174,15 @@ export class UpstreamRateGate {
           this.timestamps.push(now);
           return;
         }
-        // The slot this call can expect: the ones before it go to the calls
-        // queued ahead of it.
+        // The slot this call can expect: free room and the slots that open
+        // first go to the calls queued ahead of it. A slot that only a request
+        // not made yet would free opens a window after it at the earliest.
+        const index = this.timestamps.length + ahead - this.requests;
         const opensAt =
-          ahead < this.timestamps.length
-            ? this.timestamps[ahead]! + this.windowMs
+          index < this.timestamps.length
+            ? this.timestamps[index]! + this.windowMs
             : now + this.windowMs;
-        if (opensAt - now > budget.remainingMs()) {
+        if (opensAt - now > budget.remainingMs() - budget.requestAllowanceMs) {
           throw new UpstreamRateLimitedError(
             opensAt - now,
             this.requests,

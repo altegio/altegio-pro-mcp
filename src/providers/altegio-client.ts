@@ -418,8 +418,9 @@ export class AltegioClient implements AltegioTransport {
     const budget = new UpstreamBudget(this.timeoutMs, options.signal);
     const recordFailure = upstreamFailureRecorder(endpoint, options.method);
     let phase: UpstreamPhase = 'admission';
+    let attempt = 0;
     try {
-      for (let attempt = 0; ; attempt++) {
+      for (; ; attempt++) {
         await this.rateGate.admit(budget);
         let response: Response;
         try {
@@ -470,8 +471,9 @@ export class AltegioClient implements AltegioTransport {
       }
     } catch (error) {
       budget.close();
-      // A refused admission sent nothing; it is logged as rate limited.
-      if (!(error instanceof UpstreamRateLimitedError)) {
+      // A first attempt refused at admission sent nothing and is logged as
+      // rate limited; a retry refused there follows a request that was sent.
+      if (!(error instanceof UpstreamRateLimitedError) || attempt > 0) {
         recordFailure(error, phase, budget.cancelled);
       }
       throw error;
