@@ -53,7 +53,16 @@ dispatchers, not the tools dispatched through them: approve or block a
 dispatcher to approve or block its tier. A tool `/pro` lists runs only when
 called directly — its dispatcher refuses it — so a toggle for that tool holds.
 To keep an agent from changing data
-at all, connect it to `/pro/readonly` or grant it a read-only token.
+at all, connect it to `/pro/readonly` or give the sign-in read-only permissions.
+
+The hosted endpoints take nothing but the Altegio sign-in. A static Altegio user
+token — `POST /auth`, a Marketplace application's system-user token, sent as
+`X-Altegio-User-Token` or `Authorization: Bearer` — is answered `401`, so do not
+create an application or a system user to connect an agent or a script. An
+unattended agent signs in once, keeps the refresh token it receives and stores
+the new one after every refresh (1-hour access tokens, 30-day refresh tokens,
+a 90-day sign-in). Addresses under `https://mcp.alteg.io/public/` were retired
+and answer `410`.
 
 Named views are available at `https://mcp.alteg.io/pro/<facet>`:
 `ops`, `catalog`, `finance`, `marketing`, `analytics`, and `onboarding`.
@@ -117,6 +126,8 @@ an unknown JSON-RPC method gets error -32601.
 
 Local HTTP binds to loopback by default and cannot borrow the stdio user's
 stored credentials. Pass a per-request `x-altegio-user-token` for business calls.
+This applies only to a server you run yourself; the hosted
+`https://mcp.alteg.io/pro` refuses a user token (see [Connect](#connect)).
 `MCP_HTTP_ALLOW_SHARED_CREDENTIALS=true` is an explicit local-only legacy opt-in.
 
 Hosted mode (`MCP_HTTP_MODE=hosted`, also inferred from a proxy signing key or
